@@ -51,10 +51,7 @@
 #include <ff/farm.hpp>
 #include <mammut/module.hpp>
 #include <mammut/utils.hpp>
-#include <mammut/cpufreq/cpufreq.hpp>
-#include <mammut/energy/energy.hpp>
-#include <mammut/task/task.hpp>
-#include <mammut/topology/topology.hpp>
+#include <mammut/mammut.hpp>
 
 #include <cmath>
 #include <iostream>
@@ -107,24 +104,32 @@ public:
 template<typename lb_t=ff_loadbalancer, typename gt_t=ff_gatherer>
 class adp_ff_farm: public ff_farm<lb_t, gt_t>{
     friend class AdaptivityManagerFarm<lb_t, gt_t>;
+public:
+    void setAdaptivityParameters(AdaptivityParameters adaptivityParameters){
+		_adaptivityParameters = adaptivityParameters;
+		uint validationRes = _adaptivityParameters.validate();
+		if(validationRes != VALIDATION_OK){
+			throw std::runtime_error("AdaptiveFarm: invalid AdaptivityParameters: " + utils::intToString(validationRes));
+		}
+	}
 private:
     std::vector<adp_ff_node*> _adaptiveWorkers;
     adp_ff_node* _adaptiveEmitter;
     adp_ff_node* _adaptiveCollector;
     bool _firstRun;
-    AdaptivityParameters* _adaptivityParameters;
+    AdaptivityParameters _adaptivityParameters;
     AdaptivityManagerFarm<lb_t, gt_t>* _adaptivityManager;
 
-    void construct(AdaptivityParameters* adaptivityParameters){
+    void construct(){
         _adaptiveEmitter = NULL;
         _adaptiveCollector = NULL;
         _firstRun = true;
-        _adaptivityParameters = adaptivityParameters;
         _adaptivityManager = NULL;
-        uint validationRes = _adaptivityParameters->validate();
-        if(validationRes != VALIDATION_OK){
-            throw std::runtime_error("AdaptiveFarm: invalid AdaptivityParameters: " + utils::intToString(validationRes));
-        }
+    }
+
+    void construct(AdaptivityParameters adaptivityParameters){
+    	construct();
+        setAdaptivityParameters(adaptivityParameters);
     }
 
     std::vector<adp_ff_node*> getAdaptiveWorkers() const{
@@ -139,12 +144,37 @@ private:
         return _adaptiveCollector;
     }
 public:
+
+    /**
+     * Builds the adaptive farm.
+     * For parameters documentation, see fastflow's farm documentation.
+     */
+    adp_ff_farm(std::vector<ff_node*>& w, ff_node* const emitter = NULL,
+    		    ff_node* const collector = NULL, bool inputCh = false):
+		ff_farm<lb_t, gt_t>::ff_farm(w, emitter, collector, inputCh){
+		construct();
+	}
+
+    /**
+     * Builds the adaptive farm.
+     * For parameters documentation, see fastflow's farm documentation.
+     */
+    explicit adp_ff_farm(bool inputCh = false,
+                          int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
+                          int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
+                          bool workerCleanup = false,
+                          int maxNumWorkers = ff_farm<lb_t, gt_t>::DEF_MAX_NUM_WORKERS,
+                          bool fixedSize = false):
+		ff_farm<lb_t, gt_t>::ff_farm(inputCh, inBufferEntries, outBufferEntries, workerCleanup, maxNumWorkers, fixedSize){
+		construct();
+	}
+
     /**
      * Builds the adaptive farm.
      * For parameters documentation, see fastflow's farm documentation.
      * @param adaptivityParameters Parameters that will be used by the farm to take reconfiguration decisions.
      */
-    adp_ff_farm(AdaptivityParameters* adaptivityParameters, std::vector<ff_node*>& w,
+    adp_ff_farm(AdaptivityParameters adaptivityParameters, std::vector<ff_node*>& w,
                  ff_node* const emitter = NULL, ff_node* const collector = NULL, bool inputCh = false):
 		ff_farm<lb_t, gt_t>::ff_farm(w, emitter, collector, inputCh){
 		construct(adaptivityParameters);
@@ -155,7 +185,7 @@ public:
      * For parameters documentation, see fastflow's farm documentation.
      * @param adaptivityParameters Parameters that will be used by the farm to take reconfiguration decisions.
      */
-    explicit adp_ff_farm(AdaptivityParameters* adaptivityParameters = NULL, bool inputCh = false,
+    explicit adp_ff_farm(AdaptivityParameters adaptivityParameters = NULL, bool inputCh = false,
                           int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
                           int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
                           bool workerCleanup = false,
@@ -172,38 +202,45 @@ public:
         ;
     }
 
-    /**
-     * Runs this farm.
-     */
-    int run(bool skip_init=false){
+    void firstRunBefore(){
         if(_firstRun){
             svector<ff_node*> workers = ff_farm<lb_t, gt_t>::getWorkers();
             for(size_t i = 0; i < workers.size(); i++){
                 _adaptiveWorkers.push_back(static_cast<adp_ff_node*>(workers[i]));
-                _adaptiveWorkers.at(i)->initMammutModules(_adaptivityParameters->communicator);
+                _adaptiveWorkers.at(i)->initMammutModules(_adaptivityParameters.mammut);
             }
 
             _adaptiveEmitter = static_cast<adp_ff_node*>(ff_farm<lb_t, gt_t>::getEmitter());
             if(_adaptiveEmitter){
-                _adaptiveEmitter->initMammutModules(_adaptivityParameters->communicator);
+                _adaptiveEmitter->initMammutModules(_adaptivityParameters.mammut);
             }
 
             _adaptiveCollector = static_cast<adp_ff_node*>(ff_farm<lb_t, gt_t>::getCollector());
             if(_adaptiveCollector){
-                _adaptiveCollector->initMammutModules(_adaptivityParameters->communicator);
+                _adaptiveCollector->initMammutModules(_adaptivityParameters.mammut);
             }
         }
+    }
 
-        int r = ff_farm<lb_t, gt_t>::run(skip_init);
-        if(r){
-            return r;
-        }
 
+    void firstRunAfter(){
         if(_firstRun){
             _firstRun = false;
             _adaptivityManager = new AdaptivityManagerFarm<lb_t, gt_t>(this, _adaptivityParameters);
             _adaptivityManager->start();
         }
+    }
+
+    /**
+     * Runs this farm.
+     */
+    int run(bool skip_init=false){
+    	firstRunBefore();
+        int r = ff_farm<lb_t, gt_t>::run(skip_init);
+        if(r){
+            return r;
+        }
+        firstRunAfter();
         return r;
     }
 
@@ -246,7 +283,11 @@ private:
     bool _stop; ///< When true, the manager is stopped.
     utils::LockPthreadMutex _lock; ///< Used to let the manager stop safe.
     adp_ff_farm<lb_t, gt_t>* _farm; ///< The managed farm.
-    AdaptivityParameters* _p; ///< The parameters used to take management decisions.
+    AdaptivityParameters _p; ///< The parameters used to take management decisions.
+    cpufreq::CpuFreq* _cpufreq; ///< The cpufreq module.
+    energy::Energy* _energy; ///< The energy module.
+    task::TasksManager* _task; ///< The task module.
+    topology::Topology* _topology; ///< The topology module.
     adp_ff_node* _emitter; ///< The emitter (if present).
     adp_ff_node* _collector; ///< The collector (if present).
     std::vector<adp_ff_node*> _activeWorkers; ///< The currently running workers.
@@ -290,14 +331,14 @@ private:
      * @return A set of physical cores that can always run at the highest frequency.
      */
     std::vector<topology::PhysicalCore*> getSeparatedDomainPhysicalCores(const std::vector<topology::VirtualCore*>& virtualCores) const{
-        std::vector<cpufreq::Domain*> allDomains = _p->cpufreq->getDomains();
-        std::vector<cpufreq::Domain*> hypotheticWorkersDomains = _p->cpufreq->getDomains(virtualCores);
+        std::vector<cpufreq::Domain*> allDomains = _cpufreq->getDomains();
+        std::vector<cpufreq::Domain*> hypotheticWorkersDomains = _cpufreq->getDomains(virtualCores);
         std::vector<topology::PhysicalCore*> physicalCoresInUnusedDomains;
         if(allDomains.size() > hypotheticWorkersDomains.size()){
            for(size_t i = 0; i < allDomains.size(); i++){
                cpufreq::Domain* currentDomain = allDomains.at(i);
                if(!utils::contains(hypotheticWorkersDomains, currentDomain)){
-                   utils::insertToEnd(_p->topology->virtualToPhysical(currentDomain->getVirtualCores()),
+                   utils::insertToEnd(_topology->virtualToPhysical(currentDomain->getVirtualCores()),
                                       physicalCoresInUnusedDomains);
                }
            }
@@ -327,11 +368,11 @@ private:
      */
     std::vector<topology::VirtualCore*> getAvailableVirtualCores(){
         std::vector<topology::VirtualCore*> r;
-        if(_p->strategyMapping == STRATEGY_MAPPING_AUTO){
-            _p->strategyMapping = STRATEGY_MAPPING_LINEAR;
+        if(_p.strategyMapping == STRATEGY_MAPPING_AUTO){
+            _p.strategyMapping = STRATEGY_MAPPING_LINEAR;
         }
 
-        switch(_p->strategyMapping){
+        switch(_p.strategyMapping){
             case STRATEGY_MAPPING_LINEAR:{
                /*
                 * Generates a vector of virtual cores to be used for linear mapping.node
@@ -339,11 +380,11 @@ private:
                 * on the same CPU are consecutive).
                 * Then, the other groups of virtual cores follow.
                 */
-                std::vector<topology::Cpu*> cpus = _p->topology->getCpus();
+                std::vector<topology::Cpu*> cpus = _topology->getCpus();
 
                 size_t virtualUsed = 0;
-                size_t virtualPerPhysical = _p->topology->getVirtualCores().size() /
-                                            _p->topology->getPhysicalCores().size();
+                size_t virtualPerPhysical = _topology->getVirtualCores().size() /
+                                            _topology->getPhysicalCores().size();
                 while(virtualUsed < virtualPerPhysical){
                     for(size_t i = 0; i < cpus.size(); i++){
                         std::vector<topology::PhysicalCore*> physicalCores = cpus.at(i)->getPhysicalCores();
@@ -368,20 +409,20 @@ private:
      * emitter or collector (or both) can be run at the highest frequency.
      */
     void manageSensitiveNodes(){
-        if(_p->sensitiveEmitter && !_emitter){
-            _p->sensitiveEmitter = false;
+        if(_p.sensitiveEmitter && !_emitter){
+            _p.sensitiveEmitter = false;
         }
 
-        if(_p->sensitiveCollector && !_collector){
-            _p->sensitiveCollector = false;
+        if(_p.sensitiveCollector && !_collector){
+            _p.sensitiveCollector = false;
         }
 
-        if(_p->strategyFrequencies != STRATEGY_FREQUENCY_NO &&
-          ((_p->sensitiveEmitter && !_emitterSensitivitySatisfied) ||
-           (_p->sensitiveCollector && !_collectorSensitivitySatisfied))){
+        if(_p.strategyFrequencies != STRATEGY_FREQUENCY_NO &&
+          ((_p.sensitiveEmitter && !_emitterSensitivitySatisfied) ||
+           (_p.sensitiveCollector && !_collectorSensitivitySatisfied))){
             size_t scalableVirtualCoresNum = _activeWorkers.size() +
-                                             (_emitter && !_p->sensitiveEmitter) +
-                                             (_collector && !_p->sensitiveCollector);
+                                             (_emitter && !_p.sensitiveEmitter) +
+                                             (_collector && !_p.sensitiveCollector);
             /** When sensitive is specified, we always choose the WEC mapping. **/
             std::vector<topology::VirtualCore*> scalableVirtualCores(_availableVirtualCores.begin(), (scalableVirtualCoresNum < _availableVirtualCores.size())?
                                                                                                    _availableVirtualCores.begin() + scalableVirtualCoresNum:
@@ -391,17 +432,17 @@ private:
             if(performancePhysicalCores.size()){
                 size_t index = 0;
 
-                if(_p->sensitiveEmitter){
+                if(_p.sensitiveEmitter){
                     topology::VirtualCore* vc = performancePhysicalCores.at(index)->getVirtualCore();
-                    setDomainToHighestFrequency(_p->cpufreq->getDomain(vc));
+                    setDomainToHighestFrequency(_cpufreq->getDomain(vc));
                     _emitterVirtualCore = vc;
                     _emitterSensitivitySatisfied = true;
                     index = (index + 1) % performancePhysicalCores.size();
                 }
 
-                if(_p->sensitiveCollector){
+                if(_p.sensitiveCollector){
                     topology::VirtualCore* vc = performancePhysicalCores.at(index)->getVirtualCore();
-                    setDomainToHighestFrequency(_p->cpufreq->getDomain(vc));
+                    setDomainToHighestFrequency(_cpufreq->getDomain(vc));
                     _collectorVirtualCore = vc;
                     _collectorSensitivitySatisfied = true;
                     index = (index + 1) % performancePhysicalCores.size();
@@ -489,7 +530,7 @@ private:
                 }
             }break;
             case STRATEGY_UNUSED_VC_LOWEST_FREQUENCY:{
-                std::vector<cpufreq::Domain*> unusedDomains = _p->cpufreq->getDomainsComplete(unusedVirtualCores);
+                std::vector<cpufreq::Domain*> unusedDomains = _cpufreq->getDomainsComplete(unusedVirtualCores);
                 for(size_t i = 0; i < unusedDomains.size(); i++){
                     cpufreq::Domain* domain = unusedDomains.at(i);
                     if(!domain->setGovernor(cpufreq::GOVERNOR_POWERSAVE)){
@@ -517,22 +558,22 @@ private:
          * TODO: Explain better
          */
         std::vector<topology::VirtualCore*> virtualCores;
-        if(_p->strategyInactiveVirtualCores != STRATEGY_UNUSED_VC_NONE){
+        if(_p.strategyInactiveVirtualCores != STRATEGY_UNUSED_VC_NONE){
             utils::insertToEnd(_inactiveWorkersVirtualCores, virtualCores);
         }
-        if(_p->strategyUnusedVirtualCores != STRATEGY_UNUSED_VC_NONE){
+        if(_p.strategyUnusedVirtualCores != STRATEGY_UNUSED_VC_NONE){
             utils::insertToEnd(_unusedVirtualCores, virtualCores);
         }
         applyUnusedVirtualCoresStrategy(STRATEGY_UNUSED_VC_LOWEST_FREQUENCY, virtualCores);
 
 
         virtualCores.clear();
-        if(_p->strategyInactiveVirtualCores == STRATEGY_UNUSED_VC_OFF ||
-           _p->strategyInactiveVirtualCores == STRATEGY_UNUSED_VC_AUTO){
+        if(_p.strategyInactiveVirtualCores == STRATEGY_UNUSED_VC_OFF ||
+           _p.strategyInactiveVirtualCores == STRATEGY_UNUSED_VC_AUTO){
             utils::insertToEnd(_inactiveWorkersVirtualCores, virtualCores);
         }
-        if(_p->strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_OFF ||
-           _p->strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_AUTO){
+        if(_p.strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_OFF ||
+           _p.strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_AUTO){
             utils::insertToEnd(_unusedVirtualCores, virtualCores);
         }
         applyUnusedVirtualCoresStrategy(STRATEGY_UNUSED_VC_AUTO, virtualCores);
@@ -555,7 +596,7 @@ private:
             frequencyScalableVirtualCores.push_back(_collectorVirtualCore);
         }
 
-        _scalableDomains = _p->cpufreq->getDomains(frequencyScalableVirtualCores);
+        _scalableDomains = _cpufreq->getDomains(frequencyScalableVirtualCores);
     }
 
     /**
@@ -567,15 +608,15 @@ private:
     void updatePstate(cpufreq::Frequency frequency){
         updateScalableDomains();
         for(size_t i = 0; i < _scalableDomains.size(); i++){
-            if(!_scalableDomains.at(i)->setGovernor(_p->frequencyGovernor)){
+            if(!_scalableDomains.at(i)->setGovernor(_p.frequencyGovernor)){
                 throw std::runtime_error("AdaptivityManagerFarm: Impossible to set the specified governor.");
             }
-            if(_p->frequencyGovernor != cpufreq::GOVERNOR_USERSPACE){
-                if(!_scalableDomains.at(i)->setGovernorBounds(_p->frequencyLowerBound,
-                                                              _p->frequencyUpperBound)){
+            if(_p.frequencyGovernor != cpufreq::GOVERNOR_USERSPACE){
+                if(!_scalableDomains.at(i)->setGovernorBounds(_p.frequencyLowerBound,
+                                                              _p.frequencyUpperBound)){
                     throw std::runtime_error("AdaptivityManagerFarm: Impossible to set the specified governor's bounds.");
                 }
-            }else if(_p->strategyFrequencies != STRATEGY_FREQUENCY_OS){
+            }else if(_p.strategyFrequencies != STRATEGY_FREQUENCY_OS){
                 if(!_scalableDomains.at(i)->setFrequencyUserspace(frequency)){
                     throw std::runtime_error("AdaptivityManagerFarm: Impossible to set the specified frequency.");
                 }
@@ -588,7 +629,7 @@ private:
      * prepares frequencies and governors for running.
      */
     void mapAndSetFrequencies(){
-        if(_p->strategyMapping == STRATEGY_MAPPING_NO){
+        if(_p.strategyMapping == STRATEGY_MAPPING_NO){
             return;
         }
 
@@ -605,10 +646,10 @@ private:
         updateUsedCpus();
         applyUnusedVirtualCoresStrategy();
 
-        if(_p->strategyFrequencies != STRATEGY_FREQUENCY_NO){
-            if(_p->strategyFrequencies != STRATEGY_FREQUENCY_OS){
+        if(_p.strategyFrequencies != STRATEGY_FREQUENCY_NO){
+            if(_p.strategyFrequencies != STRATEGY_FREQUENCY_OS){
                 /** We suppose that all the domains have the same available frequencies. **/
-                _availableFrequencies = _p->cpufreq->getDomains().at(0)->getAvailableFrequencies();
+                _availableFrequencies = _cpufreq->getDomains().at(0)->getAvailableFrequencies();
                 /** Sets the current frequency to the highest possible. **/
                 _currentConfiguration.frequency = _availableFrequencies.back();
             }
@@ -630,7 +671,7 @@ private:
         _usedJoules.zero();
         _unusedJoules.zero();
 
-        uint numStoredSamples = (_elapsedSamples < _p->numSamples)?_elapsedSamples:_p->numSamples;
+        uint numStoredSamples = (_elapsedSamples < _p.numSamples)?_elapsedSamples:_p.numSamples;
         /****************** Bandwidth and utilization ******************/
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             workerAverageBandwidth = 0;
@@ -640,7 +681,7 @@ private:
                 workerAverageBandwidth += sample.tasksCount;
                 workerAverageUtilization += sample.loadPercentage;
             }
-            _averageBandwidth += (workerAverageBandwidth / ((double) numStoredSamples * (double) _p->samplingInterval));
+            _averageBandwidth += (workerAverageBandwidth / ((double) numStoredSamples * (double) _p.samplingInterval));
             _averageUtilization += (workerAverageUtilization / numStoredSamples);
         }
         _averageUtilization /= _currentConfiguration.numWorkers;
@@ -659,7 +700,7 @@ private:
      * @return true if the contract has been violated, false otherwise.
      */
     bool isContractViolated() const{
-        switch(_p->contractType){
+        switch(_p.contractType){
             case CONTRACT_UTILIZATION:{
                 return isContractViolated(_averageUtilization);
             }break;
@@ -678,18 +719,18 @@ private:
      * @return true if the contract has been violated, false otherwise.
      */
     bool isContractViolated(double monitoredValue) const{
-        switch(_p->contractType){
+        switch(_p.contractType){
             case CONTRACT_UTILIZATION:{
-                return monitoredValue < _p->underloadThresholdFarm ||
-                       monitoredValue > _p->overloadThresholdFarm;
+                return monitoredValue < _p.underloadThresholdFarm ||
+                       monitoredValue > _p.overloadThresholdFarm;
             }break;
             case CONTRACT_BANDWIDTH:{
-                double offset = (_p->requiredBandwidth * _p->maxBandwidthVariation) / 100.0;
-                return monitoredValue < _p->requiredBandwidth ||
-                       monitoredValue > _p->requiredBandwidth + offset;
+                double offset = (_p.requiredBandwidth * _p.maxBandwidthVariation) / 100.0;
+                return monitoredValue < _p.requiredBandwidth ||
+                       monitoredValue > _p.requiredBandwidth + offset;
             }break;
             case CONTRACT_COMPLETION_TIME:{
-                return monitoredValue < _p->requiredBandwidth;
+                return monitoredValue < _p.requiredBandwidth;
             }break;
         }
         return false;
@@ -702,7 +743,7 @@ private:
      */
     double getEstimatedMonitoredValue(const FarmConfiguration& configuration) const{
         double scalingFactor = 0;
-        switch(_p->strategyFrequencies){
+        switch(_p.strategyFrequencies){
             case STRATEGY_FREQUENCY_NO:
             case STRATEGY_FREQUENCY_OS:{
                 scalingFactor = (double) configuration.numWorkers /
@@ -715,7 +756,7 @@ private:
             }break;
         }
 
-        switch(_p->contractType){
+        switch(_p.contractType){
             case CONTRACT_UTILIZATION:{
                 return _averageUtilization * (1.0 / scalingFactor);
             }break;
@@ -740,7 +781,7 @@ private:
         if(it != _voltageTable.end()){
             cpufreq::Voltage v = it->second;
             double watts = configuration.numWorkers*configuration.frequency*v*v;
-            if(_p->contractType == CONTRACT_COMPLETION_TIME){
+            if(_p.contractType == CONTRACT_COMPLETION_TIME){
                 time_t now = time(NULL);
                 if(_deadline > now){
                     return watts * (_deadline - now);
@@ -763,17 +804,17 @@ private:
      */
     bool isBestSuboptimalValue(double x, double y) const{
         double distanceX, distanceY;
-        switch(_p->contractType){
+        switch(_p.contractType){
             case CONTRACT_UTILIZATION:{
                 // Concerning utilization factors, if both are suboptimal, we prefer the closest to the lower bound.
-                distanceX = _p->underloadThresholdFarm - x;
-                distanceY = _p->underloadThresholdFarm - y;
+                distanceX = _p.underloadThresholdFarm - x;
+                distanceY = _p.underloadThresholdFarm - y;
             }break;
             case CONTRACT_BANDWIDTH:
             case CONTRACT_COMPLETION_TIME:{
                 // Concerning bandwidths, if both are suboptimal, we prefer the higher one.
-                distanceX = x - _p->requiredBandwidth;
-                distanceY = y - _p->requiredBandwidth;
+                distanceX = x - _p.requiredBandwidth;
+                distanceY = y - _p.requiredBandwidth;
             }break;
         }
 
@@ -794,7 +835,7 @@ private:
         FarmConfiguration r;
         double estimatedMonitoredValue = 0;
         double bestSuboptimalValue;
-        switch(_p->contractType){
+        switch(_p.contractType){
             case CONTRACT_UTILIZATION:{
                 bestSuboptimalValue = _averageUtilization;
             }break;
@@ -807,7 +848,7 @@ private:
         FarmConfiguration bestSuboptimalConfiguration = _currentConfiguration;
         bool feasibleSolutionFound = false;
 
-        switch(_p->strategyFrequencies){
+        switch(_p.strategyFrequencies){
             case STRATEGY_FREQUENCY_NO:
             case STRATEGY_FREQUENCY_OS:{
                 for(size_t i = 1; i <= _maxNumWorkers; i++){
@@ -892,7 +933,7 @@ private:
             }
         }
 
-        std::vector<topology::Cpu*> cpus = _p->topology->getCpus();
+        std::vector<topology::Cpu*> cpus = _topology->getCpus();
         for(size_t i = 0; i < cpus.size(); i++){
             if(!utils::contains(_usedCpus, cpus.at(i)->getCpuId())){
                 _unusedCpus.push_back(cpus.at(i)->getCpuId());
@@ -915,7 +956,7 @@ private:
         /****************** Workers change started ******************/
         if(_currentConfiguration.numWorkers != configuration.numWorkers){
             std::vector<cpufreq::RollbackPoint> rollbackPoints;
-            if(_p->fastReconfiguration){
+            if(_p.fastReconfiguration){
                 for(size_t i = 0; i < _scalableDomains.size(); i++){
                     rollbackPoints.push_back(_scalableDomains.at(i)->getRollbackPoint());
                     setDomainToHighestFrequency(_scalableDomains.at(i));
@@ -964,15 +1005,15 @@ private:
             /** Start the farm again. **/
             _farm->run_then_freeze(configuration.numWorkers);
             //TODO: Se la farm non è stata avviata con la run_then_freeze questo potrebbe essere un problema.
-            if(_p->fastReconfiguration){
-                _p->cpufreq->rollback(rollbackPoints);
+            if(_p.fastReconfiguration){
+                _cpufreq->rollback(rollbackPoints);
             }
         }
         /****************** Workers change terminated ******************/
         applyUnusedVirtualCoresStrategy();
         /****************** P-state change started ******************/
         //TODO: Maybe sensitivity could not be satisfied with the maximum number of workers but could be satisfied now.
-        if(_p->strategyFrequencies != STRATEGY_FREQUENCY_NO){
+        if(_p.strategyFrequencies != STRATEGY_FREQUENCY_NO){
             updatePstate(configuration.frequency);
         }
         /****************** P-state change terminated ******************/
@@ -985,10 +1026,14 @@ public:
      * @param farm The farm to be managed.
      * @param adaptivityParameters The parameters to be used for adaptivity decisions.
      */
-    AdaptivityManagerFarm(adp_ff_farm<lb_t, gt_t>* farm, AdaptivityParameters* adaptivityParameters):
+    AdaptivityManagerFarm(adp_ff_farm<lb_t, gt_t>* farm, AdaptivityParameters adaptivityParameters):
         _stop(false),
         _farm(farm),
         _p(adaptivityParameters),
+        _cpufreq(_p.mammut.getInstanceCpuFreq()),
+        _energy(_p.mammut.getInstanceEnergy()),
+        _task(_p.mammut.getInstanceTask()),
+        _topology(_p.mammut.getInstanceTopology()),
         _emitter(_farm->getAdaptiveEmitter()),
         _collector(_farm->getAdaptiveCollector()),
         _activeWorkers(_farm->getAdaptiveWorkers()),
@@ -1001,8 +1046,8 @@ public:
         _collectorVirtualCore(NULL),
         _elapsedSamples(0){
         /** If voltage table file is specified, then load the table. **/
-        if(_p->voltageTableFile.compare("")){
-            cpufreq::loadVoltageTable(_voltageTable, _p->voltageTableFile);
+        if(_p.voltageTableFile.compare("")){
+            cpufreq::loadVoltageTable(_voltageTable, _p.voltageTableFile);
         }
     }
 
@@ -1030,36 +1075,36 @@ public:
             _collector->waitThreadCreation();
         }
 
-        if(_p->cpufreq->isBoostingSupported()){
-            if(_p->turboBoost){
-                _p->cpufreq->enableBoosting();
+        if(_cpufreq->isBoostingSupported()){
+            if(_p.turboBoost){
+                _cpufreq->enableBoosting();
             }else{
-                _p->cpufreq->disableBoosting();
+                _cpufreq->disableBoosting();
             }
         }
 
         mapAndSetFrequencies();
 
         _nodeSamples.resize(_activeWorkers.size());
-        _usedCpusEnergySamples.resize(_p->numSamples);
-        _unusedCpusEnergySamples.resize(_p->numSamples);
+        _usedCpusEnergySamples.resize(_p.numSamples);
+        _unusedCpusEnergySamples.resize(_p.numSamples);
         for(size_t i = 0; i < _activeWorkers.size(); i++){
-            _nodeSamples.at(i).resize(_p->numSamples);
+            _nodeSamples.at(i).resize(_p.numSamples);
         }
 
-        _p->energy->resetCountersCpu();
+        _energy->resetCountersCpu();
 
         size_t nextSampleIndex = 0;
-        uint64_t samplesToDiscard = _p->samplesToDiscard;
+        uint64_t samplesToDiscard = _p.samplesToDiscard;
         double lastOverheadMs = 0;
         double startOverheadMs = 0;
         double microsecsSleep = 0;
-        if(_p->contractType == CONTRACT_COMPLETION_TIME){
-            _remainingTasks = _p->expectedTasksNumber;
-            _deadline = time(NULL) + _p->requiredCompletionTime;
+        if(_p.contractType == CONTRACT_COMPLETION_TIME){
+            _remainingTasks = _p.expectedTasksNumber;
+            _deadline = time(NULL) + _p.requiredCompletionTime;
         }
         while(!mustStop()){
-            microsecsSleep = (double)_p->samplingInterval*(double)MAMMUT_MICROSECS_IN_SEC -
+            microsecsSleep = (double)_p.samplingInterval*(double)MAMMUT_MICROSECS_IN_SEC -
                              lastOverheadMs*(double)MAMMUT_MICROSECS_IN_MILLISEC;
             if(microsecsSleep < 0){
                 microsecsSleep = 0;
@@ -1077,7 +1122,7 @@ public:
                 if(!workerRunning){
                     goto controlLoopEnd;
                 }
-                if(_p->contractType == CONTRACT_COMPLETION_TIME){
+                if(_p.contractType == CONTRACT_COMPLETION_TIME){
                     if(_remainingTasks > ns.tasksCount){
                         _remainingTasks -= ns.tasksCount;
                     }else{
@@ -1088,53 +1133,53 @@ public:
                 _nodeSamples.at(i).at(nextSampleIndex) = ns;
             }
 
-            if(_p->contractType == CONTRACT_COMPLETION_TIME){
+            if(_p.contractType == CONTRACT_COMPLETION_TIME){
                 time_t now = time(NULL);
                 if(now >= _deadline){
-                    _p->requiredBandwidth = std::numeric_limits<double>::max();
+                    _p.requiredBandwidth = std::numeric_limits<double>::max();
                 }else{
-                    _p->requiredBandwidth = _remainingTasks / (_deadline - now);
+                    _p.requiredBandwidth = _remainingTasks / (_deadline - now);
                 }
             }
 
             _usedCpusEnergySamples.at(nextSampleIndex).zero();
             for(size_t i = 0; i < _usedCpus.size(); i++){
-                energy::CounterCpu* currentCounter = _p->energy->getCounterCpu(_usedCpus.at(i));
+                energy::CounterCpu* currentCounter = _energy->getCounterCpu(_usedCpus.at(i));
                 _usedCpusEnergySamples.at(nextSampleIndex) += currentCounter->getJoules();
             }
             _unusedCpusEnergySamples.at(nextSampleIndex).zero();
             for(size_t i = 0; i < _unusedCpus.size(); i++){
-                energy::CounterCpu* currentCounter = _p->energy->getCounterCpu(_unusedCpus.at(i));
+                energy::CounterCpu* currentCounter = _energy->getCounterCpu(_unusedCpus.at(i));
                 _unusedCpusEnergySamples.at(nextSampleIndex) += currentCounter->getJoules();
             }
-            _p->energy->resetCountersCpu();
+            _energy->resetCountersCpu();
 
             if(!samplesToDiscard){
                 ++_elapsedSamples;
-                nextSampleIndex = (nextSampleIndex + 1) % _p->numSamples;
+                nextSampleIndex = (nextSampleIndex + 1) % _p.numSamples;
                 updateMonitoredValues();
             }else{
                 --samplesToDiscard;
             }
 
-            if(_p->observer){
-                _p->observer->_numberOfWorkers = _currentConfiguration.numWorkers;
-                _p->observer->_currentFrequency = _currentConfiguration.frequency;
-                _p->observer->_emitterVirtualCore = _emitterVirtualCore;
-                _p->observer->_workersVirtualCore = _activeWorkersVirtualCores;
-                _p->observer->_collectorVirtualCore = _collectorVirtualCore;
-                _p->observer->_currentBandwidth = _averageBandwidth;
-                _p->observer->_currentUtilization = _averageUtilization;
-                _p->observer->_usedJoules = _usedJoules;
-                _p->observer->_unusedJoules = _unusedJoules;
-                _p->observer->observe();
+            if(_p.observer){
+                _p.observer->_numberOfWorkers = _currentConfiguration.numWorkers;
+                _p.observer->_currentFrequency = _currentConfiguration.frequency;
+                _p.observer->_emitterVirtualCore = _emitterVirtualCore;
+                _p.observer->_workersVirtualCore = _activeWorkersVirtualCores;
+                _p.observer->_collectorVirtualCore = _collectorVirtualCore;
+                _p.observer->_currentBandwidth = _averageBandwidth;
+                _p.observer->_currentUtilization = _averageUtilization;
+                _p.observer->_usedJoules = _usedJoules;
+                _p.observer->_unusedJoules = _unusedJoules;
+                _p.observer->observe();
             }
 
-            if((_elapsedSamples > _p->numSamples) && isContractViolated()){
+            if((_elapsedSamples > _p.numSamples) && isContractViolated()){
                 changeConfiguration(getNewConfiguration());
                 _elapsedSamples = 0;
                 nextSampleIndex = 0;
-                samplesToDiscard = _p->samplesToDiscard;
+                samplesToDiscard = _p.samplesToDiscard;
             }
 
             lastOverheadMs = utils::getMillisecondsTime() - startOverheadMs;

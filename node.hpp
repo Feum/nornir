@@ -29,12 +29,8 @@
 #define ADAPTIVE_FASTFLOW_NODE_HPP_
 
 #include <ff/node.hpp>
+#include <mammut/mammut.hpp>
 #include <mammut/module.hpp>
-#include <mammut/utils.hpp>
-#include <mammut/cpufreq/cpufreq.hpp>
-#include <mammut/energy/energy.hpp>
-#include <mammut/task/task.hpp>
-#include <mammut/topology/topology.hpp>
 #include <mammut/utils.hpp>
 
 #include <fstream>
@@ -85,7 +81,7 @@ private:
 
     task::TasksManager* _tasksManager;
     task::ThreadHandler* _thread;
-    bool _threadFirstCreation;
+    bool _threadCreationPerformed;
     utils::Monitor _threadCreated;
     bool _threadRunning;
     utils::LockPthreadMutex _threadRunningLock;
@@ -127,12 +123,8 @@ private:
      * @param communicator A communicator. If NULL, the modules
      *        will be initialized locally.
      */
-    void initMammutModules(Communicator* const communicator){
-        if(communicator){
-            _tasksManager = task::TasksManager::remote(communicator);
-        }else{
-            _tasksManager = task::TasksManager::local();
-        }
+    void initMammutModules(Mammut& mammut){
+        _tasksManager = mammut.getInstanceTask();
     }
 
     /**
@@ -180,7 +172,7 @@ public:
     adp_ff_node():
     	  _tasksManager(NULL),
     	  _thread(NULL),
-    	  _threadFirstCreation(false),
+    	  _threadCreationPerformed(false),
     	  _threadRunning(false),
     	  _tasksCount(0),
     	  _workTicks(0),
@@ -235,15 +227,15 @@ public:
         _threadRunningLock.lock();
         _threadRunning = true;
         _threadRunningLock.unlock();
-        if(!_threadFirstCreation){
+        if(!_threadCreationPerformed){
             /** Operations performed only the first time the thread is running. **/
             if(_tasksManager){
                 _thread = _tasksManager->getThreadHandler();
             }else{
-                throw std::runtime_error("AdaptiveWorker: Tasks manager not initialized.");
+                throw std::runtime_error("AdaptiveNode: Tasks manager not initialized.");
             }
             _threadCreated.notifyAll();
-            _threadFirstCreation = true;
+            _threadCreationPerformed = true;
         }
         return adp_svc_init();
     }

@@ -31,12 +31,8 @@
 
 #include "external/rapidXml/rapidxml.hpp"
 
-#include <mammut/module.hpp>
 #include <mammut/utils.hpp>
-#include <mammut/cpufreq/cpufreq.hpp>
-#include <mammut/energy/energy.hpp>
-#include <mammut/task/task.hpp>
-#include <mammut/topology/topology.hpp>
+#include <mammut/mammut.hpp>
 
 namespace adpff{
 
@@ -122,11 +118,6 @@ private:
     template<typename lb_t, typename gt_t>
     friend class AdaptivityManagerFarm;
 
-    Communicator* const communicator;
-    cpufreq::CpuFreq* cpufreq;
-    energy::Energy* energy;
-    topology::Topology* topology;
-
     /**
      * Sets default parameters
      */
@@ -157,17 +148,9 @@ private:
         expectedTasksNumber = 0;
         voltageTableFile = "";
         observer = NULL;
-        if(communicator){
-            cpufreq = cpufreq::CpuFreq::remote(this->communicator);
-            energy = energy::Energy::remote(this->communicator);
-            topology = topology::Topology::remote(this->communicator);
-        }else{
-            cpufreq = cpufreq::CpuFreq::local();
-            energy = energy::Energy::local();
-            topology = topology::Topology::local();
-        }
     }
 public:
+    mammut::Mammut mammut; ///< The mammut modules handler.
     ContractType contractType; ///< The contract type that must be respected by the application
                                ///< [default = CONTRACT_UTILIZATION].
     StrategyMapping strategyMapping; ///< The mapping strategy [default = STRATEGY_MAPPING_LINEAR].
@@ -222,7 +205,7 @@ public:
     std::string voltageTableFile; ///< The file containing the voltage table. It is mandatory when
                                   ///< strategyFrequencies is STRATEGY_FREQUENCY_POWER_CONSERVATIVE [default = unused].
     adp_ff_farm_observer* observer; ///< The observer object. It will be called every samplingInterval seconds
-                                  ///< to monitor the adaptivity behaviour [default = NULL].
+                                   ///< to monitor the adaptivity behaviour [default = NULL].
 
     /**
      * Creates the adaptivity parameters.
@@ -230,7 +213,7 @@ public:
      *        If NULL, the modules will be created as local modules.
      */
     AdaptivityParameters(Communicator* const communicator = NULL):
-      communicator(communicator){
+      mammut(communicator){
     	setDefault();
     }
 
@@ -241,7 +224,7 @@ public:
      *        If NULL, the modules will be created as local modules.
      */
     AdaptivityParameters(const std::string& xmlFileName, Communicator* const communicator = NULL):
-      communicator(communicator){
+      mammut(communicator){
 		setDefault();
 		rapidxml::xml_document<> xmlContent;
 		std::ifstream file(xmlFileName.c_str());
@@ -395,9 +378,7 @@ public:
      * Destroyes these parameters.
      */
     ~AdaptivityParameters(){
-        cpufreq::CpuFreq::release(cpufreq);
-        energy::Energy::release(energy);
-        topology::Topology::release(topology);
+    	;
     }
 
     /**
@@ -405,8 +386,8 @@ public:
      * @return The validation result.
      */
     AdaptivityParametersValidation validate(){
-        std::vector<cpufreq::Domain*> frequencyDomains = cpufreq->getDomains();
-        std::vector<topology::VirtualCore*> virtualCores = topology->getVirtualCores();
+        std::vector<cpufreq::Domain*> frequencyDomains = mammut.getInstanceCpuFreq()->getDomains();
+        std::vector<topology::VirtualCore*> virtualCores = mammut.getInstanceTopology()->getVirtualCores();
         std::vector<cpufreq::Frequency> availableFrequencies;
         if(frequencyDomains.size()){
             availableFrequencies = frequencyDomains.at(0)->getAvailableFrequencies();
@@ -424,13 +405,13 @@ public:
 
             if(strategyFrequencies != STRATEGY_FREQUENCY_OS){
                 frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
-                if(!cpufreq->isGovernorAvailable(frequencyGovernor)){
+                if(!mammut.getInstanceCpuFreq()->isGovernorAvailable(frequencyGovernor)){
                     return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
                 }
             }
             if((sensitiveEmitter || sensitiveCollector) &&
-               !cpufreq->isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
-               !cpufreq->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
+               !mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
+               !mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
                 return VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS;
             }
 
@@ -441,7 +422,7 @@ public:
         }
 
         /** Validate governor availability. **/
-        if(!cpufreq->isGovernorAvailable(frequencyGovernor)){
+        if(!mammut.getInstanceCpuFreq()->isGovernorAvailable(frequencyGovernor)){
             return VALIDATION_GOVERNOR_UNSUPPORTED;
         }
 
@@ -491,8 +472,8 @@ public:
                 }
             }break;
             case STRATEGY_UNUSED_VC_LOWEST_FREQUENCY:{
-                if(!cpufreq->isGovernorAvailable(cpufreq::GOVERNOR_POWERSAVE) &&
-                   !cpufreq->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
+                if(!mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_POWERSAVE) &&
+                   !mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
                     return VALIDATION_UNUSED_VC_NO_FREQUENCIES;
                 }
             }break;
@@ -531,8 +512,8 @@ public:
 
         /** Validate fast reconfiguration. **/
         if(fastReconfiguration){
-            if(!cpufreq->isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
-               (!cpufreq->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE) ||
+            if(!mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
+               (!mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE) ||
                 !availableFrequencies.size())){
                 return VALIDATION_NO_FAST_RECONF;
             }

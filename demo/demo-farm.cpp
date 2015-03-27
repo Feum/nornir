@@ -34,6 +34,7 @@
 #include <iostream>
 #include <fstream>
 #include "../farm.hpp"
+#include "../parallel_for.hpp"
 
 using namespace ff;
 
@@ -161,9 +162,9 @@ int main(int argc, char * argv[]) {
     }
     
     Obs obs;
-    adpff::AdaptivityParameters ap("demo-fastflow.xml");
+    adpff::AdaptivityParameters ap("demo-farm.xml");
     ap.observer = &obs;
-    adpff::adp_ff_farm<> farm(&ap); // farm object
+    adpff::adp_ff_farm<> farm(ap); // farm object
     
     Emitter E(streamlen);
     farm.add_emitter(&E);
