@@ -120,10 +120,11 @@ using namespace ff;
      *  step : for step
      *  chunk: chunk size
      *  nw   : n. of worker threads
+     *  ct   : completion time (milliseconds)
      */
-#define FF_PARFOR_BEGIN(name, idx, begin, end, step, chunk, nw)                   \
+#define ADP_FF_PARFOR_BEGIN(name, idx, begin, end, step, chunk, nw, ct)           \
     ::adpff::ff_forall_farm<::adpff::forallreduce_W<int> > name(nw,false,true);   \
-    name.setloop(begin,end,step,chunk,nw);                                        \
+    name.setloop(begin,end,step,chunk,nw,ct/1000.0);                              \
     auto F_##name = [&] (const long ff_start_##idx, const long ff_stop_##idx,     \
                          const int _ff_thread_id, const int) {                    \
         PRAGMA_IVDEP;                                                             \
@@ -142,13 +143,13 @@ using namespace ff;
     /* here you have to define the for loop using ff_start/stop_idx  */
 
 
-#define FF_PARFOR_END(name)                                                       \
+#define ADP_FF_PARFOR_END(name)                                                       \
     };                                                                            \
     {                                                                             \
       if (name.getnw()>1) {                                                       \
         name.setF(F_##name);                                                      \
         if (name.run_and_wait_end()<0) {                                          \
-			error("running parallel for\n");                                      \
+			::ff::error("running parallel for\n");                                      \
         }                                                                         \
       } else F_##name(name.startIdx(),name.stopIdx(),0,0);                        \
     }
@@ -183,7 +184,7 @@ using namespace ff;
           auto ovar_##name = var;                                                 \
           name.setF(F_##name,idtt_##name);                                        \
           if (name.run_and_wait_end()<0) {                                        \
-			error("running forall_##name\n");                                     \
+			::ff::error("running forall_##name\n");                                     \
           }                                                                       \
           var = ovar_##name;                                                      \
           for(size_t i=0;i<name.getnw();++i)  {                                   \
@@ -201,7 +202,7 @@ using namespace ff;
           auto ovar_##name = var;                                                 \
           name.setF(F_##name,idtt_##name);                                        \
           if (name.run_and_wait_end()<0)                                          \
-            error("running ff_forall_farm (reduce F end)\n");	                  \
+            ::ff::error("running ff_forall_farm (reduce F end)\n");	                  \
           var = ovar_##name;                                                      \
           for(size_t i=0;i<name.getnw();++i)  {                                   \
              F(var,name.getres(i));                                               \
@@ -291,7 +292,7 @@ using namespace ff;
     if (name->getnw()>1) {                                                               \
       name->setF(F_##name);                                                              \
       if (name->run_then_freeze(name->getnw())<0)                                        \
-		 error("running ff_forall_farm (name)\n");                                       \
+		::ff::error("running ff_forall_farm (name)\n");                                       \
       name->wait_freezing();                                                             \
     } else F_##name(name->startIdx(),name->stopIdx(),0,0);
 
@@ -300,7 +301,7 @@ using namespace ff;
     if (name->getnw()>1) {                                                               \
         name->setF(F_##name, type());                                                    \
         if (name->run_then_freeze(name->getnw())<0)                                      \
-		  error("running ff_forall_farm (name)\n");                                      \
+		  ::ff::error("running ff_forall_farm (name)\n");                                      \
         name->wait_freezing();                                                           \
     } else {                                                                             \
         F_##name(name->startIdx(),name->stopIdx(),0,type());                             \
@@ -334,7 +335,7 @@ using namespace ff;
           auto ovar_##name = var;                                                        \
           name->setF(F_##name,idtt_##name);                                              \
           if (name->run_then_freeze(name->getnw())<0)                                    \
-			error("running ff_forall_farm (name)\n");                                    \
+			::ff::error("running ff_forall_farm (name)\n");                                    \
           name->wait_freezing();                                                         \
           var = ovar_##name;                                                             \
           for(size_t i=0;i<name->getnw();++i)  {                                         \
@@ -351,7 +352,7 @@ using namespace ff;
           auto ovar_##name = var;                                                        \
           name->setF(F_##name,idtt_##name);                                              \
           if (name->run_then_freeze(name->getnw())<0)                                    \
-			 error("running ff_forall_farm (name)\n");                                   \
+			 ::ff::error("running ff_forall_farm (name)\n");                                   \
           name->wait_freezing();                                                         \
           var = ovar_##name;                                                             \
           for(size_t i=0;i<name->getnw();++i)  {                                         \
@@ -907,7 +908,7 @@ public:
 
         // needed to avoid the initial barrier (see (**) below)
         if (ff_farm<foralllb_t>::prepare() < 0)
-            error("running base forall farm(2)\n");
+            ::ff::error("running base forall farm(2)\n");
 
         // NOTE: the warmup phase has to be done, if not now latern on.
         // The run_then_freeze method will fail if skipwarmup is true.
@@ -916,7 +917,7 @@ public:
             getlb()->freeze();
             if (getlb()->run() != -1)
                 r = getlb()->wait_freezing();
-            if (r<0) error("running base forall farm(1)\n");
+            if (r<0) ::ff::error("running base forall farm(1)\n");
         }
 
         if (spinwait) {
@@ -1099,7 +1100,8 @@ public:
     inline void setloop(long begin,long end,long step,long chunk,long nw,long completionTime = 0) {
     	if(completionTime){
 			AdaptivityParameters ap;
-			ap.strategyFrequencies = STRATEGY_FREQUENCY_POWER_CONSERVATIVE;
+			ap.strategyFrequencies = STRATEGY_FREQUENCY_CORES_CONSERVATIVE;
+			//ap.strategyFrequencies = STRATEGY_FREQUENCY_POWER_CONSERVATIVE; //TODO
 			ap.contractType = CONTRACT_COMPLETION_TIME;
 			ap.expectedTasksNumber = end - begin + 1;
 			ap.requiredCompletionTime = completionTime;

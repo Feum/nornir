@@ -79,6 +79,7 @@ private:
     template<typename lb_t, typename gt_t>
     friend class AdaptivityManagerFarm;
 
+    Mammut _mammut;
     task::TasksManager* _tasksManager;
     task::ThreadHandler* _thread;
     bool _threadCreationPerformed;
@@ -124,7 +125,8 @@ private:
      *        will be initialized locally.
      */
     void initMammutModules(Mammut& mammut){
-        _tasksManager = mammut.getInstanceTask();
+        _mammut = mammut;
+        _tasksManager = _mammut.getInstanceTask();
     }
 
     /**
@@ -190,10 +192,6 @@ public:
     ~adp_ff_node(){
         if(_thread){
             _tasksManager->releaseThreadHandler(_thread);
-        }
-
-        if(_tasksManager){
-            task::TasksManager::release(_tasksManager);
         }
     }
 

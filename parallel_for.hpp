@@ -782,26 +782,26 @@ public:
 //! Parallel loop over a range of indexes (step=1)
 template <typename Function>
 static void parallel_for(long first, long last, const Function& body,
-                         const long nw=FF_AUTO) {
-    FF_PARFOR_BEGIN(pfor, parforidx,first,last,1,PARFOR_STATIC(0),nw) {
+                         const long nw=FF_AUTO, const long ct=0) {
+    ADP_FF_PARFOR_BEGIN(pfor, parforidx,first,last,1,PARFOR_STATIC(0),nw,ct) {
         body(parforidx);
-    } FF_PARFOR_END(pfor);
+    } ADP_FF_PARFOR_END(pfor);
 }
 //! Parallel loop over a range of indexes using a given step
 template <typename Function>
 static void parallel_for(long first, long last, long step, const Function& body,
-                         const long nw=FF_AUTO) {
-    FF_PARFOR_BEGIN(pfor, parforidx,first,last,step,PARFOR_STATIC(0),nw) {
+                         const long nw=FF_AUTO, const long ct=0) {
+    ADP_FF_PARFOR_BEGIN(pfor, parforidx,first,last,step,PARFOR_STATIC(0),nw,ct) {
         body(parforidx);
-    } FF_PARFOR_END(pfor);
+    } ADP_FF_PARFOR_END(pfor);
 }
 //! Parallel loop over a range of indexes using a given step and granularity
 template <typename Function>
 static void parallel_for(long first, long last, long step, long grain,
-                         const Function& body, const long nw=FF_AUTO) {
-    FF_PARFOR_BEGIN(pfor, parforidx,first,last,step,grain,nw) {
+                         const Function& body, const long nw=FF_AUTO, const long ct=0) {
+    ADP_FF_PARFOR_BEGIN(pfor, parforidx,first,last,step,grain,nw,ct) {
         body(parforidx);
-    } FF_PARFOR_END(pfor);
+    } ADP_FF_PARFOR_END(pfor);
 }
 
 template <typename Function, typename Value_t, typename FReduction>

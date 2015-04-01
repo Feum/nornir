@@ -1,4 +1,8 @@
-LDFLAGS              = -L/home/daniele/Mammut/mammut
+CXX                  = g++
+CXXFLAGS             = -Wall -g -pedantic -fpermissive
+OPTIMIZE_FLAGS       = -O3 -finline-functions 
+INCS                 = -I../../Mammut
+LDFLAGS              = -L../../Mammut/mammut
 LDLIBS               = -lm -pthread -lrt -lmammut -lprotobuf-lite
 TARGET               = demo-farm demo-parfor
 

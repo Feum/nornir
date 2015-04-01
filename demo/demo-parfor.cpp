@@ -95,10 +95,10 @@ int main(int argc, char* argv[]) {
                      usleep(V[i]); 
                  }, nw);
 #else
-    FF_PARFOR_BEGIN(test1, i,0,size,1, chunk,nw) {
+    ADP_FF_PARFOR_BEGIN(test1, i, 0, size, 1, chunk, nw, 10) {
         //printf("I'm thread %d\n", _ff_thread_id);
         usleep(V[i]);
-    } FF_PARFOR_END(test1);    
+    } ADP_FF_PARFOR_END(test1);    
 #endif
     ffTime(STOP_TIME);
     printf("Time =%g\n", ffTime(GET_TIME));
@@ -118,5 +118,6 @@ int main(int argc, char* argv[]) {
     printf("wTime=%g\n", farm.ffwTime());
 #endif
     printf("done\n");
+    delete[] V;
     return 0;
 }
