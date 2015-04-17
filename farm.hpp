@@ -159,7 +159,7 @@ public:
      * Builds the adaptive farm.
      * For parameters documentation, see fastflow's farm documentation.
      */
-    explicit adp_ff_farm(bool inputCh = false,
+    adp_ff_farm(bool inputCh = false,
                           int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
                           int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
                           bool workerCleanup = false,
@@ -185,7 +185,7 @@ public:
      * For parameters documentation, see fastflow's farm documentation.
      * @param adaptivityParameters Parameters that will be used by the farm to take reconfiguration decisions.
      */
-    explicit adp_ff_farm(AdaptivityParameters adaptivityParameters = NULL, bool inputCh = false,
+    explicit adp_ff_farm(AdaptivityParameters adaptivityParameters, bool inputCh = false,
                           int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
                           int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
                           bool workerCleanup = false,
