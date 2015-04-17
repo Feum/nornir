@@ -86,11 +86,13 @@ protected:
     topology::VirtualCore* _collectorVirtualCore;
     double _currentBandwidth;
     double _currentUtilization;
+    double _currentCoresUtilization;
     energy::JoulesCpu _usedJoules;
     energy::JoulesCpu _unusedJoules;
 public:
     adp_ff_farm_observer():_numberOfWorkers(0), _currentFrequency(0), _emitterVirtualCore(NULL),
-                         _collectorVirtualCore(NULL), _currentBandwidth(0), _currentUtilization(0){;}
+                         _collectorVirtualCore(NULL), _currentBandwidth(0), _currentUtilization(0),
+                         _currentCoresUtilization(0){;}
     virtual ~adp_ff_farm_observer(){;}
     virtual void observe(){;}
 };
@@ -318,6 +320,7 @@ private:
     size_t _elapsedSamples; ///< The number of registered samples up to now.
     double _averageBandwidth; ///< The last value registered for average bandwidth.
     double _averageUtilization; ///< The last value registered for average utilization.
+    double _averageCoresUtilization; ///< The last value registered for average cores utilization (percentage of the average utilization).
     energy::JoulesCpu _usedJoules; ///< Joules consumed by the used virtual cores.
     energy::JoulesCpu _unusedJoules; ///< Joules consumed by the unused virtual cores.
     uint64_t _remainingTasks; ///< When contract is CONTRACT_COMPLETION_TIME, represent the number of tasks that
@@ -665,9 +668,11 @@ private:
 
         double workerAverageBandwidth;
         double workerAverageUtilization;
+        double workerAverageCoreUtilization;
 
         _averageBandwidth = 0;
         _averageUtilization = 0;
+        _averageCoresUtilization = 0;
         _usedJoules.zero();
         _unusedJoules.zero();
 
@@ -676,15 +681,19 @@ private:
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             workerAverageBandwidth = 0;
             workerAverageUtilization = 0;
+            workerAverageCoreUtilization = 0;
             for(size_t j = 0; j < numStoredSamples; j++){
                 sample = _nodeSamples.at(i).at(j);
                 workerAverageBandwidth += sample.tasksCount;
                 workerAverageUtilization += sample.loadPercentage;
+                workerAverageCoreUtilization += sample.corePercentage;
             }
             _averageBandwidth += (workerAverageBandwidth / ((double) numStoredSamples * (double) _p.samplingInterval));
             _averageUtilization += (workerAverageUtilization / numStoredSamples);
+            _averageCoresUtilization += (workerAverageCoreUtilization / numStoredSamples);
         }
         _averageUtilization /= _currentConfiguration.numWorkers;
+        _averageCoresUtilization /= _currentConfiguration.numWorkers;
 
         /****************** Energy ******************/
         for(size_t i = 0; i < numStoredSamples; i++){
@@ -1170,6 +1179,7 @@ public:
                 _p.observer->_collectorVirtualCore = _collectorVirtualCore;
                 _p.observer->_currentBandwidth = _averageBandwidth;
                 _p.observer->_currentUtilization = _averageUtilization;
+                _p.observer->_currentCoresUtilization = _averageCoresUtilization;
                 _p.observer->_usedJoules = _usedJoules;
                 _p.observer->_unusedJoules = _unusedJoules;
                 _p.observer->observe();

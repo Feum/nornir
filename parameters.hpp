@@ -31,6 +31,7 @@
 
 #include "external/rapidXml/rapidxml.hpp"
 
+#include <fstream>
 #include <mammut/utils.hpp>
 #include <mammut/mammut.hpp>
 
