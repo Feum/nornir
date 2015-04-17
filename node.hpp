@@ -52,7 +52,8 @@ using namespace mammut;
 typedef struct NodeSample{
     double loadPercentage; ///< The percentage of time that the node spent on svc().
     uint64_t tasksCount; ///< The number of computed tasks.
-    NodeSample():loadPercentage(0), tasksCount(0){;}
+    double corePercentage; ///< The percentage of time that the node spent on the core while it was in svc().
+    NodeSample():loadPercentage(0), tasksCount(0), corePercentage(0){;}
 }NodeSample;
 
 /*!
@@ -251,11 +252,16 @@ public:
             switch(_managementRequest){
                 case MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE:{
                     ticks now = getticks();
+                    double totalCorePercentage = 0;
                     _sampleResponse.loadPercentage = ((double) _workTicks / (double)(now - _startTicks)) * 100.0;
                     _sampleResponse.tasksCount = _tasksCount;
+                    _thread->getCoreUsage(totalCorePercentage);
+                    _sampleResponse.corePercentage = ((totalCorePercentage - (100.0 - _sampleResponse.loadPercentage)) / _sampleResponse.loadPercentage) * 100.0;
+
                     _workTicks = 0;
                     _startTicks = now;
                     _tasksCount = 0;
+                    _thread->resetCoreUsage();
                     _responseQ.push(dummyPtr);
                 }break;
                 case MANAGEMENT_REQUEST_PRODUCE_NULL:{
