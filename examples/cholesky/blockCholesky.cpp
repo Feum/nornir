@@ -38,7 +38,7 @@
 #include <cmath>
 #include <fcntl.h>
 //#include <sys/mman.h>
-#include <ff/farm.hpp>
+#include <farm.hpp>
 #include <cholconst.h>
 #include <complex.h>
 #include <common.h>
@@ -261,9 +261,9 @@ void matrixSub(const comp_t *a, unsigned bia, unsigned bja,
 
 
 // generic worker
-class Worker: public ff_node {
+class Worker: public adpff::adp_ff_node {
 public:
-	void *svc(void *task) {
+	void *adp_svc(void *task) {
         comp_t *l = ((ff_task_t *) task)->l;
 		int i, k, j, cpi, cpj;		// indexes used in loops
 		
@@ -345,7 +345,7 @@ public:
 
 
 // the load-balancer filter
-class Emitter: public ff_node
+class Emitter: public adpff::adp_ff_node
 {
 private:
     int ntask;
@@ -354,7 +354,7 @@ private:
 public:
     Emitter(ff_task_t *taskList, int max_task) : ntask(max_task) { tasks = taskList; }
 	
-    void *svc(void *) {
+    void *adp_svc(void *) {
         if (--ntask < 0) return NULL;
         
 		return tasks + ntask;
@@ -441,7 +441,8 @@ int main(int argc,
 	}
 	
 	// Farm declaration
-    ff_farm<> farm;
+	adpff::AdaptivityParameters ap;
+    adpff::adp_ff_farm<> farm(ap);
     
 	// Emitter declaration
     Emitter E(tasks, streamlen);
