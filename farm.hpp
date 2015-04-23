@@ -408,24 +408,23 @@ private:
     }
 
     /**
-     * If requested, and if there are available domains, arrange nodes such that
-     * emitter or collector (or both) can be run at the highest frequency.
+     * Manages mapping of emitter and collector.
      */
-    void manageSensitiveNodes(){
-        if(_p.sensitiveEmitter && !_emitter){
-            _p.sensitiveEmitter = false;
+    void manageServiceNodesPerformance(){
+        if((_p.mappingEmitter != SERVICE_NODE_MAPPING_ALONE) && !_emitter){
+            _p.mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
         }
 
-        if(_p.sensitiveCollector && !_collector){
-            _p.sensitiveCollector = false;
+        if((_p.mappingCollector != SERVICE_NODE_MAPPING_ALONE) && !_collector){
+            _p.mappingCollector = SERVICE_NODE_MAPPING_ALONE;
         }
 
         if(_p.strategyFrequencies != STRATEGY_FREQUENCY_NO &&
-          ((_p.sensitiveEmitter && !_emitterSensitivitySatisfied) ||
-           (_p.sensitiveCollector && !_collectorSensitivitySatisfied))){
+          ((_p.mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE && !_emitterSensitivitySatisfied) ||
+           (_p.mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE && !_collectorSensitivitySatisfied))){
             size_t scalableVirtualCoresNum = _activeWorkers.size() +
-                                             (_emitter && !_p.sensitiveEmitter) +
-                                             (_collector && !_p.sensitiveCollector);
+                                             (_emitter && _p.mappingEmitter != SERVICE_NODE_MAPPING_PERFORMANCE) +
+                                             (_collector && _p.mappingEmitter != SERVICE_NODE_MAPPING_PERFORMANCE);
             /** When sensitive is specified, we always choose the WEC mapping. **/
             std::vector<topology::VirtualCore*> scalableVirtualCores(_availableVirtualCores.begin(), (scalableVirtualCoresNum < _availableVirtualCores.size())?
                                                                                                    _availableVirtualCores.begin() + scalableVirtualCoresNum:
@@ -435,7 +434,7 @@ private:
             if(performancePhysicalCores.size()){
                 size_t index = 0;
 
-                if(_p.sensitiveEmitter){
+                if(_p.mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE){
                     topology::VirtualCore* vc = performancePhysicalCores.at(index)->getVirtualCore();
                     setDomainToHighestFrequency(_cpufreq->getDomain(vc));
                     _emitterVirtualCore = vc;
@@ -443,7 +442,7 @@ private:
                     index = (index + 1) % performancePhysicalCores.size();
                 }
 
-                if(_p.sensitiveCollector){
+                if(_p.mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE){
                     topology::VirtualCore* vc = performancePhysicalCores.at(index)->getVirtualCore();
                     setDomainToHighestFrequency(_cpufreq->getDomain(vc));
                     _collectorVirtualCore = vc;
@@ -465,13 +464,18 @@ private:
         size_t nextIndex = 0;
         if(_emitter && !_emitterVirtualCore){
             emitterIndex = nextIndex;
-            nextIndex = (nextIndex + 1) % _availableVirtualCores.size();
+            if(_p.mappingEmitter != SERVICE_NODE_MAPPING_COLLAPSED){
+                nextIndex = (nextIndex + 1) % _availableVirtualCores.size();
+            }
         }
 
         firstWorkerIndex = nextIndex;
         nextIndex = (nextIndex + _activeWorkers.size()) % _availableVirtualCores.size();
 
         if(_collector && !_collectorVirtualCore){
+            if(_p.mappingCollector == SERVICE_NODE_MAPPING_COLLAPSED){
+                nextIndex = (nextIndex - 1) % _availableVirtualCores.size();
+            }
             collectorIndex = nextIndex;
         }
     }
@@ -636,7 +640,7 @@ private:
             return;
         }
 
-        manageSensitiveNodes();
+        manageServiceNodesPerformance();
         mapNodesToVirtualCores();
         for(size_t i = 0; i < _availableVirtualCores.size(); i++){
             topology::VirtualCore* vc = _availableVirtualCores.at(i);
