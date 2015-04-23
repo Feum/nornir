@@ -80,6 +80,15 @@ typedef enum{
                            ///< operating system and it will not schedule anything on them.
 }StrategyUnusedVirtualCores;
 
+/// Possible mappings for a service node (emitter or collector).
+typedef enum{
+    SERVICE_NODE_MAPPING_ALONE = 0, ///< The service node is mapped on a physical core where no workers are mapped.
+    SERVICE_NODE_MAPPING_COLLAPSED, ///< The service node is mapped on a physical core together with a worker.
+    SERVICE_NODE_MAPPING_PERFORMANCE ///< The service node is mapped on an independent voltage domain and is kept
+                                     ///< running at maximum performances (only available when
+                                     ///< strategyFrequencies != STRATEGY_FREQUENCY_NO).
+}ServiceNodeMapping;
+
 /// Possible parameters validation results.
 typedef enum{
     VALIDATION_OK = 0, ///< Parameters are ok.
@@ -133,8 +142,8 @@ private:
         fastReconfiguration = false;
         strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
-        sensitiveEmitter = false;
-        sensitiveCollector = false;
+        mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
+        mappingCollector = SERVICE_NODE_MAPPING_ALONE;
         migrateCollector = false;
         numSamples = 10;
         samplesToDiscard = 1;
@@ -173,12 +182,8 @@ public:
     StrategyUnusedVirtualCores strategyInactiveVirtualCores; ///< Strategy for virtual cores that become inactive
                                                              ///< after a workers reconfiguration
                                                              ///< [default = STRATEGY_UNUSED_VC_NONE].
-    bool sensitiveEmitter; ///< If true, we will try to run the emitter at the highest possible
-                           ///< frequency (only available when strategyFrequencies != STRATEGY_FREQUENCY_NO.
-                           ///< In some cases it may still not be possible) [default = false].
-    bool sensitiveCollector; ///< If true, we will try to run the collector at the highest possible frequency
-                             ///< (only available when strategyFrequencies != STRATEGY_FREQUENCY_NO.
-                             ///< In some cases it may still not be possible) [default = false].
+    ServiceNodeMapping mappingEmitter; ///< Emitter mapping [default = SERVICE_NODE_MAPPING_ALONE].
+    ServiceNodeMapping mappingCollector; ///< Collector mapping [default = SERVICE_NODE_MAPPING_ALONE].
     bool migrateCollector; ///< If true, when a reconfiguration occur, the collector is migrated to a
                            ///< different virtual core (if needed) [default = false].
     uint32_t numSamples; ///< The number of samples used to take reconfiguration decisions [default = 10].
@@ -296,14 +301,14 @@ public:
 			strategyInactiveVirtualCores = (StrategyUnusedVirtualCores) utils::stringToInt(node->value());
 		}
 
-		node = root->first_node("sensitiveEmitter");
+		node = root->first_node("mappingEmitter");
 		if(node){
-			sensitiveEmitter = utils::stringToInt(node->value());
+			mappingEmitter = (ServiceNodeMapping) utils::stringToInt(node->value());
 		}
 
-		node = root->first_node("sensitiveCollector");
+		node = root->first_node("mappingCollector");
 		if(node){
-			sensitiveCollector = utils::stringToInt(node->value());
+			mappingCollector = (ServiceNodeMapping) utils::stringToInt(node->value());
 		}
 
 		node = root->first_node("numSamples");
@@ -410,14 +415,14 @@ public:
                     return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
                 }
             }
-            if((sensitiveEmitter || sensitiveCollector) &&
+            if(((mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE) || (mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE)) &&
                !mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
                !mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
                 return VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS;
             }
 
         }else{
-            if(sensitiveEmitter || sensitiveCollector){
+            if((mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE) || (mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE)){
                 return VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY;
             }
         }
