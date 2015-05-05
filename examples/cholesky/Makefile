@@ -1,15 +1,7 @@
-FF_ROOT              = ../..
 CC                   = gcc 
 CXX                  = g++ 
-LINK_OPT             = 
-VERSION              = 
 OPTIMIZE_FLAGS       = -O3 -finline-functions
 CXXFLAGS             = -DNO_CMAKE_CONFIG -Wall
-CFLAGS               =
-LDFLAGS              = 
-INCS                 = -I../../ -I../../../Mammut
-LIBS                 = -lpthread -L../../../Mammut/mammut -lmammut -lprotobuf-lite
-
 INCLUDES             = -I. -I./include $(INCS)
 TARGET               = cholesky blockCholesky
 

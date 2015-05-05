@@ -42,9 +42,6 @@
 #include <complex.h>
 #include <common.h>
 
-
-using namespace ff;
-
 // generic worker
 class Worker: public adpff::adp_ff_node {
 public:
@@ -203,8 +200,8 @@ int main(int argc,
 			   (size_t) MATSIZE * MATSIZE * sizeof(comp_t));
 	}
 	
-	// Farm declaration
-	adpff::AdaptivityParameters ap;
+    // Farm declaration
+    adpff::AdaptivityParameters ap;
     adpff::adp_ff_farm<> farm(ap);
 	
 	// Emitter declaration
@@ -212,7 +209,7 @@ int main(int argc,
     farm.add_emitter(&e);
 	
 	// Workers declaration
-    std::vector<ff_node *> w;
+    std::vector<ff::ff_node *> w;
     for(int i = 0; i < nworkers; i++)
 	w.push_back(new Worker);
     
@@ -220,7 +217,7 @@ int main(int argc,
     
     // Starts computation
     if (farm.run_and_wait_end() < 0) {
-        error("running farm\n");
+        ff::error("running farm\n");
         return -1;
     }
     

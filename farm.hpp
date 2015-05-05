@@ -1171,22 +1171,21 @@ public:
                 ++_elapsedSamples;
                 nextSampleIndex = (nextSampleIndex + 1) % _p.numSamples;
                 updateMonitoredValues();
+                if(_p.observer){
+                    _p.observer->_numberOfWorkers = _currentConfiguration.numWorkers;
+                    _p.observer->_currentFrequency = _currentConfiguration.frequency;
+                    _p.observer->_emitterVirtualCore = _emitterVirtualCore;
+                    _p.observer->_workersVirtualCore = _activeWorkersVirtualCores;
+                    _p.observer->_collectorVirtualCore = _collectorVirtualCore;
+                    _p.observer->_currentBandwidth = _averageBandwidth;
+                    _p.observer->_currentUtilization = _averageUtilization;
+                    _p.observer->_currentCoresUtilization = _averageCoresUtilization;
+                    _p.observer->_usedJoules = _usedJoules;
+                    _p.observer->_unusedJoules = _unusedJoules;
+                    _p.observer->observe();
+                }
             }else{
                 --samplesToDiscard;
-            }
-
-            if(_p.observer){
-                _p.observer->_numberOfWorkers = _currentConfiguration.numWorkers;
-                _p.observer->_currentFrequency = _currentConfiguration.frequency;
-                _p.observer->_emitterVirtualCore = _emitterVirtualCore;
-                _p.observer->_workersVirtualCore = _activeWorkersVirtualCores;
-                _p.observer->_collectorVirtualCore = _collectorVirtualCore;
-                _p.observer->_currentBandwidth = _averageBandwidth;
-                _p.observer->_currentUtilization = _averageUtilization;
-                _p.observer->_currentCoresUtilization = _averageCoresUtilization;
-                _p.observer->_usedJoules = _usedJoules;
-                _p.observer->_unusedJoules = _unusedJoules;
-                _p.observer->observe();
             }
 
             if((_elapsedSamples > _p.numSamples) && isContractViolated()){
