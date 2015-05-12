@@ -89,6 +89,7 @@ protected:
     double _currentCoresUtilization;
     energy::JoulesCpu _usedJoules;
     energy::JoulesCpu _unusedJoules;
+    unsigned int _startMonitoringMs;
 public:
     adp_ff_farm_observer():_numberOfWorkers(0), _currentFrequency(0), _emitterVirtualCore(NULL),
                          _collectorVirtualCore(NULL), _currentTasks(0), _currentUtilization(0),
@@ -1181,6 +1182,7 @@ public:
         }
 
         _energy->resetCountersCpu();
+        _p.observer->_startMonitoringMs = utils::getMillisecondsTime();
 
         size_t nextSampleIndex = 0;
         uint64_t samplesToDiscard = _p.samplesToDiscard;

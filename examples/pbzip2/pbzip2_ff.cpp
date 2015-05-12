@@ -153,6 +153,7 @@
 /* ------------------- Mammut specific ----------------- */
 #include <mammut/energy/energy.hpp>
 #include <mammut/cpufreq/cpufreq.hpp>
+#include <mammut/utils.hpp>
 
 /* ------------------ FastFlow specific ---------------- */
 
@@ -298,10 +299,8 @@ private:
     std::ofstream _statsFile;
     std::ofstream _energyFile;
     mammut::energy::JoulesCpu _totalUsedJoules, _totalUnusedJoules;
-    time_t _startTime;
-    unsigned long _duration;
 public:
-    Obs():_startTime(time(NULL)), _duration(0){
+    Obs():{
         _statsFile.open("stats.txt");
         if(!_statsFile.is_open()){
             throw std::runtime_error("Obs: Impossible to open stats file.");
@@ -316,8 +315,8 @@ public:
   }
 
     ~Obs(){
-        _duration = time(NULL) - _startTime;
-        _energyFile << _totalUsedJoules.cpu/(double)_duration << " " << _totalUsedJoules.cores/(double)_duration << " " << _totalUsedJoules.graphic/(double)_duration << " " << _totalUsedJoules.dram/(double)_duration << std::endl;
+        double durationSec = (mammut::utils::getMillisecondsTime() - _startMonitoringMs) / 1000.0;
+        _energyFile << _totalUsedJoules.cpu/_duration << " " << _totalUsedJoules.cores/_duration << " " << _totalUsedJoules.graphic/_duration << " " << _totalUsedJoules.dram/_duration << std::endl;
         _statsFile.close();
         _energyFile.close();
     }
