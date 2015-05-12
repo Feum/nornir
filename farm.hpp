@@ -201,10 +201,7 @@ public:
      * Destroyes this adaptive farm.
      */
     ~adp_ff_farm(){
-        if(_adaptivityManager){
-            _adaptivityManager->join();
-            delete _adaptivityManager;
-        }
+        ;
     }
 
     void firstRunBefore(){
@@ -253,7 +250,13 @@ public:
      * Waits this farm for completion.
      */
     int wait(){
-        return ff_farm<lb_t, gt_t>::wait();
+        int r = ff_farm<lb_t, gt_t>::wait();
+        if(_adaptivityManager){
+            _adaptivityManager->stop();
+            _adaptivityManager->join();
+            delete _adaptivityManager;
+        }
+        return r;
     }
 };
 
@@ -1187,8 +1190,7 @@ public:
         }
 
         if(_p.contractType == CONTRACT_NONE){
-            //_monitor.wait();
-            _farm->wait();
+            _monitor.wait();
             storeNewSamples(0);
             updateMonitoredValues();
             observe();
