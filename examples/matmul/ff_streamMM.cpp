@@ -162,6 +162,7 @@ int main(int argc, char* argv[]) {
     adpff::adp_ff_farm<> farm(ap);
     Emitter E(N);
     farm.add_emitter(&E);
+    farm.set_scheduling_ondemand();
     std::vector<ff_node *> w;
     for(int i=0;i<nworkers;++i) w.push_back(new Worker(size));
     farm.add_workers(w);    
