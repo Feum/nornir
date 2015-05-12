@@ -43,7 +43,8 @@ using namespace mammut;
 
 /// Possible contracts requested by the user.
 typedef enum{
-    CONTRACT_UTILIZATION = 0, ///< A specific utilization (expressed by two bounds [X, Y]) is requested.
+    CONTRACT_NONE = 0, ///< No contract required.
+    CONTRACT_UTILIZATION, ///< A specific utilization (expressed by two bounds [X, Y]) is requested.
     CONTRACT_BANDWIDTH, ///< A specific minimum bandwidth is requested.
     CONTRACT_COMPLETION_TIME ///< A specific maximum completion time is requested.
 }ContractType;
@@ -506,6 +507,9 @@ public:
                 if(!expectedTasksNumber || !requiredCompletionTime){
                     return VALIDATION_WRONG_CONTRACT_PARAMETERS;
                 }
+            }break;
+            default:{
+                ;
             }break;
         }
 

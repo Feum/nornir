@@ -9,65 +9,65 @@ using namespace ff;
 
 class Obs: public adpff::adp_ff_farm_observer{
 private:
-  std::ofstream _statsFile;
-  std::ofstream _energyFile;
-  mammut::energy::JoulesCpu _totalUsedJoules, _totalUnusedJoules;
-  unsigned long samples;
+    std::ofstream _statsFile;
+    std::ofstream _energyFile;
+    mammut::energy::JoulesCpu _totalUsedJoules, _totalUnusedJoules;
+    time_t _startTime;
+    unsigned long _duration;
 public:
-  Obs():samples(0){
-    _statsFile.open("stats.txt");
-    if(!_statsFile.is_open()){
-      throw std::runtime_error("Obs: Impossible to open stats file.");
-    }
-    _statsFile << "# [[EmitterVc][WorkersVc][CollectorVc]] NumWorkers,Frequency CurrentBandwidth CurrentUtilization" << std::endl;
+    Obs():_startTime(time(NULL)), _duration(0){
+        _statsFile.open("stats.txt");
+        if(!_statsFile.is_open()){
+            throw std::runtime_error("Obs: Impossible to open stats file.");
+        }
+        _statsFile << "# [[EmitterVc][WorkersVc][CollectorVc]] NumWorkers,Frequency CurrentBandwidth CurrentUtilization" << std::endl;
 
-    _energyFile.open("energy.txt");
-    if(!_energyFile.is_open()){
-      throw std::runtime_error("Obs: Impossible to open energy file.");
-    }
-    _energyFile << "# UsedVCCpuEnergy UsedVCCoresEnergy UsedVCGraphicEnergy UsedVCDRAMEnergy NotusedVCCpuEnergy NotusedVCCoresEnergy NotusedVCGraphicEnergy NotusedVCDRAMEnergy " << std::endl;
+        _energyFile.open("energy.txt");
+        if(!_energyFile.is_open()){
+            throw std::runtime_error("Obs: Impossible to open energy file.");
+        }
+        _energyFile << "# UsedVCCpuWattsy UsedVCCoresWatts UsedVCGraphicWatts UsedVCDRAMWatts NotusedVCCpuWatts NotusedVCCoresWatts NotusedVCGraphicWatts NotusedVCDRAMWatts " << std::endl;
   }
 
-  ~Obs(){
-    _energyFile << _totalUsedJoules.cpu/(double)samples << " " << _totalUsedJoules.cores/(double)samples << " " << _totalUsedJoules.graphic/(double)samples << " " << _totalUsedJoules.dram/(double)samples << std::endl;
-    _statsFile.close();
-    _energyFile.close();
-  }
-
-  void observe(){
-    /****************** Stats ******************/
-    _statsFile << time(NULL);
-    _statsFile << " [";
-    if(_emitterVirtualCore){
-      _statsFile << "[" << _emitterVirtualCore->getVirtualCoreId() << "]";
+    ~Obs(){
+        _duration = time(NULL) - _startTime;
+        _energyFile << _totalUsedJoules.cpu/(double)_duration << " " << _totalUsedJoules.cores/(double)_duration << " " << _totalUsedJoules.graphic/(double)_duration << " " << _totalUsedJoules.dram/(double)_duration << std::endl;
+        _statsFile.close();
+        _energyFile.close();
     }
 
-    _statsFile << "[";
-    for(size_t i = 0; i < _workersVirtualCore.size(); i++){
-      _statsFile << _workersVirtualCore.at(i)->getVirtualCoreId() << ",";
+    void observe(){
+        /****************** Stats ******************/
+        _statsFile << time(NULL);
+        _statsFile << " [";
+        if(_emitterVirtualCore){
+            _statsFile << "[" << _emitterVirtualCore->getVirtualCoreId() << "]";
+        }
+
+        _statsFile << "[";
+        for(size_t i = 0; i < _workersVirtualCore.size(); i++){
+            _statsFile << _workersVirtualCore.at(i)->getVirtualCoreId() << ",";
+        }
+        _statsFile << "]";
+
+        if(_collectorVirtualCore){
+            _statsFile << "[" << _collectorVirtualCore->getVirtualCoreId() << "]";
+        }
+        _statsFile << "] ";
+
+        _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
+        _statsFile << _currentTasks << " ";
+        _statsFile << _currentUtilization << " ";
+        _statsFile << _currentCoresUtilization << " ";
+        _statsFile << std::endl;
+        /****************** Energy ******************/
+
+        _energyFile << _usedJoules.cpu << " " << _usedJoules.cores << " " << _usedJoules.graphic << " " << _usedJoules.dram << " ";
+        _energyFile << _unusedJoules.cpu << " " << _unusedJoules.cores << " " << _unusedJoules.graphic << " " << _unusedJoules.dram << " ";
+        _energyFile << std::endl;
+        _totalUsedJoules += _usedJoules;
+        _totalUnusedJoules += _unusedJoules;
     }
-    _statsFile << "]";
-
-    if(_collectorVirtualCore){
-      _statsFile << "[" << _collectorVirtualCore->getVirtualCoreId() << "]";
-    }
-    _statsFile << "] ";
-
-    _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
-    _statsFile << _currentBandwidth << " ";
-    _statsFile << _currentUtilization << " ";
-    _statsFile << _currentCoresUtilization << " ";
-
-    _statsFile << std::endl;
-    /****************** Energy ******************/
-
-    _energyFile << _usedJoules.cpu << " " << _usedJoules.cores << " " << _usedJoules.graphic << " " << _usedJoules.dram << " ";
-    _energyFile << _unusedJoules.cpu << " " << _unusedJoules.cores << " " << _unusedJoules.graphic << " " << _unusedJoules.dram << " ";
-    _energyFile << std::endl;
-    _totalUsedJoules += _usedJoules;
-    _totalUnusedJoules += _unusedJoules;
-    ++samples;
-  }
 };
 
 

@@ -84,14 +84,14 @@ protected:
     topology::VirtualCore* _emitterVirtualCore;
     std::vector<topology::VirtualCore*> _workersVirtualCore;
     topology::VirtualCore* _collectorVirtualCore;
-    double _currentBandwidth;
+    double _currentTasks;
     double _currentUtilization;
     double _currentCoresUtilization;
     energy::JoulesCpu _usedJoules;
     energy::JoulesCpu _unusedJoules;
 public:
     adp_ff_farm_observer():_numberOfWorkers(0), _currentFrequency(0), _emitterVirtualCore(NULL),
-                         _collectorVirtualCore(NULL), _currentBandwidth(0), _currentUtilization(0),
+                         _collectorVirtualCore(NULL), _currentTasks(0), _currentUtilization(0),
                          _currentCoresUtilization(0){;}
     virtual ~adp_ff_farm_observer(){;}
     virtual void observe(){;}
@@ -282,8 +282,7 @@ typedef struct FarmConfiguration{
 template<typename lb_t=ff_loadbalancer, typename gt_t=ff_gatherer>
 class AdaptivityManagerFarm: public utils::Thread{
 private:
-    bool _stop; ///< When true, the manager is stopped.
-    utils::LockPthreadMutex _lock; ///< Used to let the manager stop safe.
+    utils::Monitor _monitor; ///< Used to let the manager stop safe.
     adp_ff_farm<lb_t, gt_t>* _farm; ///< The managed farm.
     AdaptivityParameters _p; ///< The parameters used to take management decisions.
     cpufreq::CpuFreq* _cpufreq; ///< The cpufreq module.
@@ -318,7 +317,7 @@ private:
     std::vector<energy::JoulesCpu> _usedCpusEnergySamples; ///< The energy samples taken from the used CPUs.
     std::vector<energy::JoulesCpu> _unusedCpusEnergySamples; ///< The energy samples taken from the unused CPUs.
     size_t _elapsedSamples; ///< The number of registered samples up to now.
-    double _averageBandwidth; ///< The last value registered for average bandwidth.
+    double _averageTasks; ///< The last value registered for average tasks processed.
     double _averageUtilization; ///< The last value registered for average utilization.
     double _averageCoresUtilization; ///< The last value registered for average cores utilization (percentage of the average utilization).
     energy::JoulesCpu _usedJoules; ///< Joules consumed by the used virtual cores.
@@ -670,11 +669,11 @@ private:
     void updateMonitoredValues(){
         NodeSample sample;
 
-        double workerAverageBandwidth;
+        double workerAverageTasks;
         double workerAverageUtilization;
         double workerAverageCoreUtilization;
 
-        _averageBandwidth = 0;
+        _averageTasks = 0;
         _averageUtilization = 0;
         _averageCoresUtilization = 0;
         _usedJoules.zero();
@@ -683,16 +682,16 @@ private:
         uint numStoredSamples = (_elapsedSamples < _p.numSamples)?_elapsedSamples:_p.numSamples;
         /****************** Bandwidth and utilization ******************/
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
-            workerAverageBandwidth = 0;
+            workerAverageTasks = 0;
             workerAverageUtilization = 0;
             workerAverageCoreUtilization = 0;
             for(size_t j = 0; j < numStoredSamples; j++){
                 sample = _nodeSamples.at(i).at(j);
-                workerAverageBandwidth += sample.tasksCount;
+                workerAverageTasks += sample.tasksCount;
                 workerAverageUtilization += sample.loadPercentage;
                 workerAverageCoreUtilization += sample.corePercentage;
             }
-            _averageBandwidth += (workerAverageBandwidth / ((double) numStoredSamples * (double) _p.samplingInterval));
+            _averageTasks += (workerAverageTasks / (double) numStoredSamples);
             _averageUtilization += (workerAverageUtilization / numStoredSamples);
             _averageCoresUtilization += (workerAverageCoreUtilization / numStoredSamples);
         }
@@ -719,7 +718,10 @@ private:
             }break;
             case CONTRACT_BANDWIDTH:
             case CONTRACT_COMPLETION_TIME:{
-                return isContractViolated(_averageBandwidth);
+                return isContractViolated(_averageTasks / (double) _p.samplingInterval);
+            }break;
+            default:{
+                return false;
             }break;
         }
         return false;
@@ -744,6 +746,9 @@ private:
             }break;
             case CONTRACT_COMPLETION_TIME:{
                 return monitoredValue < _p.requiredBandwidth;
+            }break;
+            default:{
+                return false;
             }break;
         }
         return false;
@@ -775,7 +780,10 @@ private:
             }break;
             case CONTRACT_BANDWIDTH:
             case CONTRACT_COMPLETION_TIME:{
-                return _averageBandwidth * scalingFactor;
+                return (_averageTasks / (double) _p.samplingInterval) * scalingFactor;
+            }break;
+            default:{
+                ;
             }break;
         }
         return 0;
@@ -829,6 +837,9 @@ private:
                 distanceX = x - _p.requiredBandwidth;
                 distanceY = y - _p.requiredBandwidth;
             }break;
+            default:{
+                ;
+            }break;
         }
 
         if(distanceX > 0 && distanceY < 0){
@@ -854,7 +865,10 @@ private:
             }break;
             case CONTRACT_BANDWIDTH:
             case CONTRACT_COMPLETION_TIME:{
-                bestSuboptimalValue = _averageBandwidth;
+                bestSuboptimalValue = _averageTasks / (double) _p.samplingInterval;
+            }break;
+            default:{
+                ;
             }break;
         }
 
@@ -1032,6 +1046,63 @@ private:
         /****************** P-state change terminated ******************/
         _currentConfiguration = configuration;
     }
+
+    /** Send data to observer. **/
+    void observe(){
+        if(_p.observer){
+            _p.observer->_numberOfWorkers = _currentConfiguration.numWorkers;
+            _p.observer->_currentFrequency = _currentConfiguration.frequency;
+            _p.observer->_emitterVirtualCore = _emitterVirtualCore;
+            _p.observer->_workersVirtualCore = _activeWorkersVirtualCores;
+            _p.observer->_collectorVirtualCore = _collectorVirtualCore;
+            _p.observer->_currentTasks = _averageTasks;
+            _p.observer->_currentUtilization = _averageUtilization;
+            _p.observer->_currentCoresUtilization = _averageCoresUtilization;
+            _p.observer->_usedJoules = _usedJoules;
+            _p.observer->_unusedJoules = _unusedJoules;
+            _p.observer->observe();
+        }
+    }
+
+    /** Asks the workers for samples. **/
+    bool storeNewSamples(size_t nextSampleIndex){
+        for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
+            _activeWorkers.at(i)->askForSample();
+        }
+
+        for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
+            NodeSample ns;
+            bool workerRunning = _activeWorkers.at(i)->getSampleResponse(ns);
+            if(!workerRunning){
+                return false;
+            }
+
+            if(_p.contractType == CONTRACT_COMPLETION_TIME){
+                if(_remainingTasks > ns.tasksCount){
+                    _remainingTasks -= ns.tasksCount;
+                }else{
+                    _remainingTasks = 0;
+                }
+            }
+
+            _nodeSamples.at(i).at(nextSampleIndex) = ns;
+        }
+
+        _usedCpusEnergySamples.at(nextSampleIndex).zero();
+        for(size_t i = 0; i < _usedCpus.size(); i++){
+            energy::CounterCpu* currentCounter = _energy->getCounterCpu(_usedCpus.at(i));
+            _usedCpusEnergySamples.at(nextSampleIndex) += currentCounter->getJoules();
+        }
+        _unusedCpusEnergySamples.at(nextSampleIndex).zero();
+        for(size_t i = 0; i < _unusedCpus.size(); i++){
+            energy::CounterCpu* currentCounter = _energy->getCounterCpu(_unusedCpus.at(i));
+            _unusedCpusEnergySamples.at(nextSampleIndex) += currentCounter->getJoules();
+        }
+        _energy->resetCountersCpu();
+
+        return true;
+    }
+
 public:
     /**
      * Creates a farm adaptivity manager.
@@ -1040,7 +1111,6 @@ public:
      * @param adaptivityParameters The parameters to be used for adaptivity decisions.
      */
     AdaptivityManagerFarm(adp_ff_farm<lb_t, gt_t>* farm, AdaptivityParameters adaptivityParameters):
-        _stop(false),
         _farm(farm),
         _p(adaptivityParameters),
         _cpufreq(_p.mammut.getInstanceCpuFreq()),
@@ -1116,86 +1186,54 @@ public:
             _remainingTasks = _p.expectedTasksNumber;
             _deadline = time(NULL) + _p.requiredCompletionTime;
         }
-        while(!mustStop()){
-            microsecsSleep = (double)_p.samplingInterval*(double)MAMMUT_MICROSECS_IN_SEC -
-                             lastOverheadMs*(double)MAMMUT_MICROSECS_IN_MILLISEC;
-            if(microsecsSleep < 0){
-                microsecsSleep = 0;
-            }
-            usleep(microsecsSleep);
 
-            startOverheadMs = utils::getMillisecondsTime();
+        if(_p.contractType == CONTRACT_NONE){
+            _monitor.wait();
+            storeNewSamples(0);
+            updateMonitoredValues();
+            observe();
+        }else{
+            while(!mustStop()){
+                microsecsSleep = (double)_p.samplingInterval*(double)MAMMUT_MICROSECS_IN_SEC -
+                                 lastOverheadMs*(double)MAMMUT_MICROSECS_IN_MILLISEC;
+                if(microsecsSleep < 0){
+                    microsecsSleep = 0;
+                }
+                usleep(microsecsSleep);
 
-            for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
-                _activeWorkers.at(i)->askForSample();
-            }
-            for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
-                NodeSample ns;
-                bool workerRunning = _activeWorkers.at(i)->getSampleResponse(ns);
-                if(!workerRunning){
+                startOverheadMs = utils::getMillisecondsTime();
+
+                if(!storeNewSamples(nextSampleIndex)){
                     goto controlLoopEnd;
                 }
+
                 if(_p.contractType == CONTRACT_COMPLETION_TIME){
-                    if(_remainingTasks > ns.tasksCount){
-                        _remainingTasks -= ns.tasksCount;
+                    time_t now = time(NULL);
+                    if(now >= _deadline){
+                        _p.requiredBandwidth = std::numeric_limits<double>::max();
                     }else{
-                        _remainingTasks = 0;
+                        _p.requiredBandwidth = _remainingTasks / (_deadline - now);
                     }
                 }
 
-                _nodeSamples.at(i).at(nextSampleIndex) = ns;
-            }
-
-            if(_p.contractType == CONTRACT_COMPLETION_TIME){
-                time_t now = time(NULL);
-                if(now >= _deadline){
-                    _p.requiredBandwidth = std::numeric_limits<double>::max();
+                if(!samplesToDiscard){
+                    ++_elapsedSamples;
+                    nextSampleIndex = (nextSampleIndex + 1) % _p.numSamples;
+                    updateMonitoredValues();
+                    observe();
                 }else{
-                    _p.requiredBandwidth = _remainingTasks / (_deadline - now);
+                    --samplesToDiscard;
                 }
-            }
 
-            _usedCpusEnergySamples.at(nextSampleIndex).zero();
-            for(size_t i = 0; i < _usedCpus.size(); i++){
-                energy::CounterCpu* currentCounter = _energy->getCounterCpu(_usedCpus.at(i));
-                _usedCpusEnergySamples.at(nextSampleIndex) += currentCounter->getJoules();
-            }
-            _unusedCpusEnergySamples.at(nextSampleIndex).zero();
-            for(size_t i = 0; i < _unusedCpus.size(); i++){
-                energy::CounterCpu* currentCounter = _energy->getCounterCpu(_unusedCpus.at(i));
-                _unusedCpusEnergySamples.at(nextSampleIndex) += currentCounter->getJoules();
-            }
-            _energy->resetCountersCpu();
-
-            if(!samplesToDiscard){
-                ++_elapsedSamples;
-                nextSampleIndex = (nextSampleIndex + 1) % _p.numSamples;
-                updateMonitoredValues();
-                if(_p.observer){
-                    _p.observer->_numberOfWorkers = _currentConfiguration.numWorkers;
-                    _p.observer->_currentFrequency = _currentConfiguration.frequency;
-                    _p.observer->_emitterVirtualCore = _emitterVirtualCore;
-                    _p.observer->_workersVirtualCore = _activeWorkersVirtualCores;
-                    _p.observer->_collectorVirtualCore = _collectorVirtualCore;
-                    _p.observer->_currentBandwidth = _averageBandwidth;
-                    _p.observer->_currentUtilization = _averageUtilization;
-                    _p.observer->_currentCoresUtilization = _averageCoresUtilization;
-                    _p.observer->_usedJoules = _usedJoules;
-                    _p.observer->_unusedJoules = _unusedJoules;
-                    _p.observer->observe();
+                if((_elapsedSamples > _p.numSamples) && isContractViolated()){
+                    changeConfiguration(getNewConfiguration());
+                    _elapsedSamples = 0;
+                    nextSampleIndex = 0;
+                    samplesToDiscard = _p.samplesToDiscard;
                 }
-            }else{
-                --samplesToDiscard;
-            }
 
-            if((_elapsedSamples > _p.numSamples) && isContractViolated()){
-                changeConfiguration(getNewConfiguration());
-                _elapsedSamples = 0;
-                nextSampleIndex = 0;
-                samplesToDiscard = _p.samplesToDiscard;
+                lastOverheadMs = utils::getMillisecondsTime() - startOverheadMs;
             }
-
-            lastOverheadMs = utils::getMillisecondsTime() - startOverheadMs;
         }
     controlLoopEnd:
         ;
@@ -1205,9 +1243,7 @@ public:
      * Stops this manager.
      */
     void stop(){
-        _lock.lock();
-        _stop = true;
-        _lock.unlock();
+        _monitor.notifyOne();
     }
 
     /**
@@ -1215,11 +1251,7 @@ public:
      * @retur true if the manager must stop, false otherwise.
      */
     bool mustStop(){
-        bool r;
-        _lock.lock();
-        r = _stop;
-        _lock.unlock();
-        return r;
+        return _monitor.predicate();
     }
 };
 

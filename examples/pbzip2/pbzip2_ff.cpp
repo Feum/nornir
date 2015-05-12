@@ -43,7 +43,7 @@
  *  Chris Dearman <chris@mips.com> - fixed pthreads race condition
  *  Richard Russon <ntfs@flatcap.org> - help fix decompression bug
  *  Paul Pluzhnikov <paul@parasoft.com> - fixed minor memory leak
- *  Aníbal Monsalve Salazar <anibal@debian.org> - creates and maintains Debian packages
+ *  Anï¿½ï¿½bal Monsalve Salazar <anibal@debian.org> - creates and maintains Debian packages
  *  Steve Christensen - creates and maintains Solaris packages (sunfreeware.com)
  *  Alessio Cervellin - creates and maintains Solaris packages (blastwave.org)
  *  Ying-Chieh Liao - created the FreeBSD port
@@ -51,13 +51,13 @@
  *          resolve any FreeBSD-related problems
  *  Roland Illig <rillig@NetBSD.org> - creates and maintains NetBSD packages
  *  Matt Turner <mattst88@gmail.com> - code cleanup
- *  Álvaro Reguly <alvaro@reguly.com> - RPM spec update to support SUSE Linux
+ *  ï¿½ï¿½lvaro Reguly <alvaro@reguly.com> - RPM spec update to support SUSE Linux
  *  Ivan Voras <ivoras@freebsd.org> - support for stdin and pipes during compression and
  *          CPU detect changes
  *  John Dalton <john@johndalton.info> - code cleanup and bug fixes for stdin support
  *  Rene Georgi <rene.georgi@online.de> - code and Makefile cleanup, support for direct
  *          decompress and bzcat
- *  René Rhéaume & Jeroen Roovers <jer@xs4all.nl> - patch to support uclibc's lack of
+ *  Renï¿½ï¿½ Rhï¿½ï¿½aume & Jeroen Roovers <jer@xs4all.nl> - patch to support uclibc's lack of
  *          a getloadavg function
  *  Reinhard Schiedermeier <rs@cs.hm.edu> - support for tar --use-compress-prog=pbzip2
  *
@@ -65,10 +65,10 @@
  *  James Terhune, Dru Lemley, Bryan Stillwell, George Chalissery,
  *  Kir Kolyshkin, Madhu Kangara, Mike Furr, Joergen Ramskov, Kurt Fitzner,
  *  Peter Cordes, Oliver Falk, Jindrich Novy, Benjamin Reed, Chris Dearman,
- *  Richard Russon, Aníbal Monsalve Salazar, Jim Leonard, Paul Pluzhnikov,
+ *  Richard Russon, Anï¿½ï¿½bal Monsalve Salazar, Jim Leonard, Paul Pluzhnikov,
  *  Coran Fisher, Ken Takusagawa, David Pyke, Matt Turner, Damien Ancelin,
- *  Álvaro Reguly, Ivan Voras, John Dalton, Sami Liedes, Rene Georgi, 
- *  René Rhéaume, Jeroen Roovers, Reinhard Schiedermeier, Kari Pahula,
+ *  ï¿½ï¿½lvaro Reguly, Ivan Voras, John Dalton, Sami Liedes, Rene Georgi, 
+ *  Renï¿½ï¿½ Rhï¿½ï¿½aume, Jeroen Roovers, Reinhard Schiedermeier, Kari Pahula,
  *  Elbert Pol.
  *
  *
@@ -290,70 +290,72 @@ int testCompressedData(char *);
 ssize_t bufread(int hf, char *buf, size_t bsize);
 int detectCPUs(void);
 
-#include "/home/desensi/adaptivefastflow/farm.hpp"
+#include "../../farm.hpp"
 #include <fstream>
 
 class Obs: public adpff::adp_ff_farm_observer{
 private:
-  std::ofstream _statsFile;
-  std::ofstream _energyFile;
-  mammut::energy::JoulesCpu _totalUsedJoules, _totalUnusedJoules;
-  unsigned long _numSamples;
+    std::ofstream _statsFile;
+    std::ofstream _energyFile;
+    mammut::energy::JoulesCpu _totalUsedJoules, _totalUnusedJoules;
+    time_t _startTime;
+    unsigned long _duration;
 public:
-  Obs():_numSamples(0){
-    _statsFile.open("stats.txt");
-    if(!_statsFile.is_open()){
-      throw std::runtime_error("Obs: Impossible to open stats file.");
-    }
-    _statsFile << "# [[EmitterVc][WorkersVc][CollectorVc]] NumWorkers,Frequency CurrentBandwidth CurrentUtilization" << std::endl;
+    Obs():_startTime(time(NULL)), _duration(0){
+        _statsFile.open("stats.txt");
+        if(!_statsFile.is_open()){
+            throw std::runtime_error("Obs: Impossible to open stats file.");
+        }
+        _statsFile << "# [[EmitterVc][WorkersVc][CollectorVc]] NumWorkers,Frequency CurrentBandwidth CurrentUtilization" << std::endl;
 
-    _energyFile.open("energy.txt");
-    if(!_energyFile.is_open()){
-      throw std::runtime_error("Obs: Impossible to open energy file.");
-    }
-    _energyFile << "# UsedVCCpuEnergy UsedVCCoresEnergy UsedVCGraphicEnergy UsedVCDRAMEnergy NotusedVCCpuEnergy NotusedVCCoresEnergy NotusedVCGraphicEnergy NotusedVCDRAMEnergy " << std::endl;
+        _energyFile.open("energy.txt");
+        if(!_energyFile.is_open()){
+            throw std::runtime_error("Obs: Impossible to open energy file.");
+        }
+        _energyFile << "# UsedVCCpuWattsy UsedVCCoresWatts UsedVCGraphicWatts UsedVCDRAMWatts NotusedVCCpuWatts NotusedVCCoresWatts NotusedVCGraphicWatts NotusedVCDRAMWatts " << std::endl;
   }
 
-  ~Obs(){
-    _energyFile << _totalUsedJoules.cpu/(double)_numSamples << " " << _totalUsedJoules.cores/(double)_numSamples << " " << _totalUsedJoules.graphic/(double)_numSamples << " " << _totalUsedJoules.dram/(double)_numSamples << std::endl;
-    _statsFile.close();
-    _energyFile.close();
-  }
-
-  void observe(){
-    _numSamples++;
-    /****************** Stats ******************/
-    _statsFile << time(NULL);
-    _statsFile << " [";
-    if(_emitterVirtualCore){
-      _statsFile << "[" << _emitterVirtualCore->getVirtualCoreId() << "]";
+    ~Obs(){
+        _duration = time(NULL) - _startTime;
+        _energyFile << _totalUsedJoules.cpu/(double)_duration << " " << _totalUsedJoules.cores/(double)_duration << " " << _totalUsedJoules.graphic/(double)_duration << " " << _totalUsedJoules.dram/(double)_duration << std::endl;
+        _statsFile.close();
+        _energyFile.close();
     }
 
-    _statsFile << "[";
-    for(size_t i = 0; i < _workersVirtualCore.size(); i++){
-      _statsFile << _workersVirtualCore.at(i)->getVirtualCoreId() << ",";
+    void observe(){
+        /****************** Stats ******************/
+        _statsFile << time(NULL);
+        _statsFile << " [";
+        if(_emitterVirtualCore){
+            _statsFile << "[" << _emitterVirtualCore->getVirtualCoreId() << "]";
+        }
+
+        _statsFile << "[";
+        for(size_t i = 0; i < _workersVirtualCore.size(); i++){
+            _statsFile << _workersVirtualCore.at(i)->getVirtualCoreId() << ",";
+        }
+        _statsFile << "]";
+
+        if(_collectorVirtualCore){
+            _statsFile << "[" << _collectorVirtualCore->getVirtualCoreId() << "]";
+        }
+        _statsFile << "] ";
+
+        _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
+        _statsFile << _currentTasks << " ";
+        _statsFile << _currentUtilization << " ";
+        _statsFile << _currentCoresUtilization << " ";
+        _statsFile << std::endl;
+        /****************** Energy ******************/
+
+        _energyFile << _usedJoules.cpu << " " << _usedJoules.cores << " " << _usedJoules.graphic << " " << _usedJoules.dram << " ";
+        _energyFile << _unusedJoules.cpu << " " << _unusedJoules.cores << " " << _unusedJoules.graphic << " " << _unusedJoules.dram << " ";
+        _energyFile << std::endl;
+        _totalUsedJoules += _usedJoules;
+        _totalUnusedJoules += _unusedJoules;
     }
-    _statsFile << "]";
-
-    if(_collectorVirtualCore){
-      _statsFile << "[" << _collectorVirtualCore->getVirtualCoreId() << "]";
-    }
-    _statsFile << "] ";
-
-    _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
-    _statsFile << _currentBandwidth << " ";
-    _statsFile << _currentUtilization << " ";
-
-    _statsFile << std::endl;
-
-    /****************** Energy ******************/
-    _energyFile << _usedJoules.cpu << " " << _usedJoules.cores << " " << _usedJoules.graphic << " " << _usedJoules.dram << " ";
-    _energyFile << _unusedJoules.cpu << " " << _unusedJoules.cores << " " << _unusedJoules.graphic << " " << _unusedJoules.dram << " ";
-    _energyFile << std::endl;
-    _totalUsedJoules += _usedJoules;
-    _totalUnusedJoules += _unusedJoules;
-  }
 };
+
 
 /*
  *********************************************************

@@ -81,7 +81,7 @@ public:
         _statsFile << "] ";
 
         _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
-        _statsFile << _currentBandwidth << " ";
+        _statsFile << _currentTasks << " ";
         _statsFile << _currentUtilization << " ";
 
         _statsFile << std::endl;
