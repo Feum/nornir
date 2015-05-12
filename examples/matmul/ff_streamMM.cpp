@@ -14,7 +14,7 @@ private:
     std::ofstream _energyFile;
     mammut::energy::JoulesCpu _totalUsedJoules, _totalUnusedJoules;
 public:
-    Obs():{
+    Obs(){
         _statsFile.open("stats.txt");
         if(!_statsFile.is_open()){
             throw std::runtime_error("Obs: Impossible to open stats file.");
@@ -29,8 +29,8 @@ public:
   }
 
     ~Obs(){
-        double durationSec = (mammut::utils::getMillisecondsTime() - _startMonitoringMs) / 1000.0;
-        _energyFile << _totalUsedJoules.cpu/_duration << " " << _totalUsedJoules.cores/_duration << " " << _totalUsedJoules.graphic/_duration << " " << _totalUsedJoules.dram/_duration << std::endl;
+        double duration = (mammut::utils::getMillisecondsTime() - _startMonitoringMs) / 1000.0;
+        _energyFile << _totalUsedJoules.cpu/duration << " " << _totalUsedJoules.cores/duration << " " << _totalUsedJoules.graphic/duration << " " << _totalUsedJoules.dram/duration << std::endl;
         _statsFile.close();
         _energyFile.close();
     }

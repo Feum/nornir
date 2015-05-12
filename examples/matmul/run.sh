@@ -1,5 +1,5 @@
 #!/bin/bash
-NUMCORES=22
+NUMCORES=24
 FREQUENCIES=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies | tr ' ' '\n' | sort | tr '\n' ' ')
 
 for (( i=0; i<=47; i++ ))
@@ -10,7 +10,7 @@ done
 rm -rf results.txt
 echo "Workers Frequency WattsCpu WattsCores WattsOffCores CompletionTime" | tee results.txt
 
-for (( i=2; i<=$NUMCORES; i++ ))
+for (( i=1; i<=$NUMCORES; i++ ))
 do
 for j in $FREQUENCIES
 do
