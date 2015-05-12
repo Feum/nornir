@@ -132,8 +132,8 @@ public:
 int main(int argc, char* argv[]) {
 
     if (argc<4) {
-	printf("use: %s matrix-size streamlen nworkers\n", argv[0]);
-	return -1;
+        printf("use: %s matrix-size streamlen nworkers\n", argv[0]);
+        return -1;
     }
 
     int size      = atoi(argv[1]);
@@ -147,12 +147,14 @@ int main(int argc, char* argv[]) {
     B = (double*)calloc(N, tsize*sizeof(double));
     C = (double*)calloc(N, tsize*sizeof(double));
 
-    for(int i=0;i<N;++i)
-	for(int j=0;j<size;++j)
-	    for(int k=0;k<size;++k) {
-		A[i*tsize + j*size + k] = (i+j+k)/3.14;
-		B[i*tsize + j*size + k] = (i+j*k) + 3.14;
-	    }
+    for(int i=0;i<N;++i){
+        for(int j=0;j<size;++j){
+            for(int k=0;k<size;++k) {
+                A[i*tsize + j*size + k] = (i+j+k)/3.14;
+                B[i*tsize + j*size + k] = (i+j*k) + 3.14;
+            }
+        }
+    }
 
     Obs obs;
     adpff::AdaptivityParameters ap("demo-fastflow.xml");

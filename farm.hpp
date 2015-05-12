@@ -800,7 +800,6 @@ private:
     double getEstimatedConsumption(const FarmConfiguration& configuration) const{
         cpufreq::VoltageTableKey key(configuration.numWorkers, configuration.frequency);
         cpufreq::VoltageTableIterator it = _voltageTable.find(key);
-        //TODO: Nettare rispetto al consumo quando l'applicazioine non gira
         if(it != _voltageTable.end()){
             cpufreq::Voltage v = it->second;
             double watts = configuration.numWorkers*configuration.frequency*v*v;
@@ -1066,7 +1065,11 @@ private:
         }
     }
 
-    /** Asks the workers for samples. **/
+    /**
+     * Asks the workers for samples.
+     * @param nextSampleIndex The index where to store the new sample.
+     * @return false if the farm is not running anymore, true otherwise.
+     **/
     bool storeNewSamples(size_t nextSampleIndex){
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             _activeWorkers.at(i)->askForSample();
@@ -1192,6 +1195,7 @@ public:
         if(_p.contractType == CONTRACT_NONE){
             _monitor.wait();
             storeNewSamples(0);
+            _elapsedSamples = 1;
             updateMonitoredValues();
             observe();
         }else{
