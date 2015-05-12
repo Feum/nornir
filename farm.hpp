@@ -1188,7 +1188,8 @@ public:
         }
 
         if(_p.contractType == CONTRACT_NONE){
-            _monitor.wait();
+            //_monitor.wait();
+            _farm->wait();
             storeNewSamples(0);
             updateMonitoredValues();
             observe();

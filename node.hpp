@@ -168,6 +168,26 @@ private:
         _managementRequest = MANAGEMENT_REQUEST_PRODUCE_NULL;
         _managementQ.push(&_managementRequest); // The value pushed in the queue will not be read, it could be anything.
     }
+
+    void storeSample(){
+        int dummy;
+        int* dummyPtr = &dummy;
+        ticks now = getticks();
+        double totalCorePercentage = 0;
+        _sampleResponse.loadPercentage = ((double) (_workTicks)
+                / (double) ((now - _startTicks))) * 100.0;
+        _sampleResponse.tasksCount = _tasksCount;
+        _thread->getCoreUsage(totalCorePercentage);
+        _sampleResponse.corePercentage = ((totalCorePercentage
+                - (100.0 - _sampleResponse.loadPercentage))
+                / _sampleResponse.loadPercentage) * 100.0;
+        _workTicks = 0;
+        _startTicks = now;
+        _tasksCount = 0;
+        _thread->resetCoreUsage();
+        _responseQ.push(dummyPtr);
+    }
+
 public:
     /**
      * Builds an adaptive node.
@@ -251,18 +271,7 @@ public:
         if(_managementQ.pop((void**)&dummyPtr)){
             switch(_managementRequest){
                 case MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE:{
-                    ticks now = getticks();
-                    double totalCorePercentage = 0;
-                    _sampleResponse.loadPercentage = ((double) _workTicks / (double)(now - _startTicks)) * 100.0;
-                    _sampleResponse.tasksCount = _tasksCount;
-                    _thread->getCoreUsage(totalCorePercentage);
-                    _sampleResponse.corePercentage = ((totalCorePercentage - (100.0 - _sampleResponse.loadPercentage)) / _sampleResponse.loadPercentage) * 100.0;
-
-                    _workTicks = 0;
-                    _startTicks = now;
-                    _tasksCount = 0;
-                    _thread->resetCoreUsage();
-                    _responseQ.push(dummyPtr);
+                    storeSample();
                 }break;
                 case MANAGEMENT_REQUEST_PRODUCE_NULL:{
                     return NULL;
@@ -281,10 +290,11 @@ public:
      * Wraps the user svc_end with adaptivity logics.
      */
     void svc_end() CX11_KEYWORD(final){
+        storeSample();
+        adp_svc_end();
         _threadRunningLock.lock();
         _threadRunning = false;
         _threadRunningLock.unlock();
-        adp_svc_end();
     }
 
     /**

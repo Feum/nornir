@@ -164,7 +164,8 @@ int main(int argc, char* argv[]) {
     for(int i=0;i<nworkers;++i) w.push_back(new Worker(size));
     farm.add_workers(w);    
 
-    farm.run_and_wait_end();
+    farm.run();
+    farm.wait();
     printf("Total time %0.2f (ms)\n", farm.ffTime());
     for(int i=0;i<nworkers;++i)
 	printf("Worker %d mean task time %.2f\n", i,

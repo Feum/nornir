@@ -27,6 +27,7 @@
     <contractType>2</contractType>
     <strategyFrequencies>3</strategyFrequencies>
     <voltageTableFile>voltage.txt</voltageTableFile> -->
+    <contractType>0</contractType>
     <samplesToDiscard>2</samplesToDiscard>
     <numSamples>4</numSamples>
     <requiredCompletionTime>0</requiredCompletionTime>
