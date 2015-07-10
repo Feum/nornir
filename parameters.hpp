@@ -44,20 +44,26 @@ using namespace mammut;
 /// Possible contracts requested by the user.
 typedef enum{
     CONTRACT_NONE = 0, ///< No contract required.
-    CONTRACT_UTILIZATION, ///< A specific utilization (expressed by two bounds [X, Y]) is requested.
-    CONTRACT_BANDWIDTH, ///< A specific minimum bandwidth is requested.
-    CONTRACT_COMPLETION_TIME ///< A specific maximum completion time is requested.
+    CONTRACT_PERF_UTILIZATION, ///< A specific utilization (expressed by two bounds [X, Y]) is requested.
+    CONTRACT_PERF_BANDWIDTH, ///< A specific minimum bandwidth is requested.
+    CONTRACT_PERF_COMPLETION_TIME, ///< A specific maximum completion time is requested.
+    CONTRACT_POWER_BUDGET ///< A specific maximum cores power is requested. Under this constraint, the configuration
+                          ///< with best performance is chosen.
 }ContractType;
 
 /// Possible reconfiguration strategies.
 typedef enum{
-    STRATEGY_FREQUENCY_NO = 0, ///< Does not reconfigure frequencies.
+    STRATEGY_FREQUENCY_YES = 0, ///< Reconfigures frequencies and number of workers. If contractType is
+                                ///< of type CONTRACT_PERF_*, it tries to minimize the consumed power.
+                                ///< If contractType is of type CONTRACT_POWER_*, it tries to maximize
+                                ///< the performances.
+    STRATEGY_FREQUENCY_NO, ///< Does not reconfigure frequencies.
     STRATEGY_FREQUENCY_OS, ///< Reconfigures the number of workers. The frequencies are managed by OS governor.
                            ///< The governor must be specified with 'setFrequengyGovernor' call.
-    STRATEGY_FREQUENCY_CORES_CONSERVATIVE, ///< Reconfigures frequencies and number of workers. Tries always to
-                                           ///< minimize the number of virtual cores used.
-    STRATEGY_FREQUENCY_POWER_CONSERVATIVE ///< Reconfigures frequencies and number of workers. Tries to minimize
-                                          ///< the consumed power.
+    STRATEGY_FREQUENCY_MIN_CORES, ///< Reconfigures frequencies and number of workers. Tries always to
+                                  ///< minimize the number of virtual cores used. Only valid if contract
+                                  ///< type is CONTRACT_PERF_*.
+
 }StrategyFrequencies;
 
 /// Possible mapping strategies.
@@ -80,6 +86,12 @@ typedef enum{
     STRATEGY_UNUSED_VC_OFF ///< Turn off the virtual cores. They will not be anymore seen by the
                            ///< operating system and it will not schedule anything on them.
 }StrategyUnusedVirtualCores;
+
+/// Possible strategies to use to predict power and performance values.
+typedef enum{
+    STRATEGY_PREDICTION_SIMPLE = 0,       ///< Applies a simple analytical model.
+    STRATEGY_PREDICTION_REGRESSION_LINEAR ///< Applies multivariate linear regression.
+}StrategyPrediction;
 
 /// Possible mappings for a service node (emitter or collector).
 typedef enum{
@@ -111,7 +123,9 @@ typedef enum{
     VALIDATION_WRONG_CONTRACT_PARAMETERS, ///< Specified parameters are not valid for the specified contract.
     VALIDATION_VOLTAGE_FILE_NEEDED, ///< strategyFrequencies is STRATEGY_FREQUENCY_POWER_CONSERVATIVE but the voltage file
                                     ///< has not been specified or it does not exist.
-    VALIDATION_NO_FAST_RECONF ///< Fast reconfiguration not available.
+    VALIDATION_NO_FAST_RECONF, ///< Fast reconfiguration not available.
+    VALIDATION_WRONG_REGRESSION_PARAMETERS ///< If strategyPrediction is STRATEGY_PREDICTION_REGRESSION_LINEAR but the
+                                           ///< parameters are wrong.
 }AdaptivityParametersValidation;
 
 /*!
@@ -133,18 +147,19 @@ private:
      * Sets default parameters
      */
     void setDefault(){
-        contractType = CONTRACT_UTILIZATION;
+        contractType = CONTRACT_PERF_UTILIZATION;
         strategyMapping = STRATEGY_MAPPING_LINEAR;
         strategyFrequencies = STRATEGY_FREQUENCY_NO;
+        strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
+        strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
+        strategyPrediction = STRATEGY_PREDICTION_SIMPLE;
+        mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
+        mappingCollector = SERVICE_NODE_MAPPING_ALONE;
         frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
         turboBoost = false;
         frequencyLowerBound = 0;
         frequencyUpperBound = 0;
         fastReconfiguration = false;
-        strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
-        strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
-        mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
-        mappingCollector = SERVICE_NODE_MAPPING_ALONE;
         migrateCollector = false;
         numSamples = 10;
         samplesToDiscard = 1;
@@ -157,6 +172,8 @@ private:
         maxBandwidthVariation = 5.0;
         requiredCompletionTime = 0;
         expectedTasksNumber = 0;
+        powerBudget = 0;
+        numRegressionPoints = 0;
         voltageTableFile = "";
         observer = NULL;
     }
@@ -183,6 +200,8 @@ public:
     StrategyUnusedVirtualCores strategyInactiveVirtualCores; ///< Strategy for virtual cores that become inactive
                                                              ///< after a workers reconfiguration
                                                              ///< [default = STRATEGY_UNUSED_VC_NONE].
+    StrategyPrediction strategyPrediction; ///< Strategy to be used to predict power and performance values
+                                           ///< [default = STRATEGY_PREDICTION_SIMPLE].
     ServiceNodeMapping mappingEmitter; ///< Emitter mapping [default = SERVICE_NODE_MAPPING_ALONE].
     ServiceNodeMapping mappingCollector; ///< Collector mapping [default = SERVICE_NODE_MAPPING_ALONE].
     bool migrateCollector; ///< If true, when a reconfiguration occur, the collector is migrated to a
@@ -209,8 +228,12 @@ public:
                                  ///< valid only if contractType is CONTRACT_COMPLETION_TIME [default = unused].
     uint64_t expectedTasksNumber; ///< The number of task expected for this computation. It is
                                   ///< valid only if contractType is CONTRACT_COMPLETION_TIME [default = unused].
+    double powerBudget;           ///< The maximum cores power to be used. It is
+                                  ///< valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
     std::string voltageTableFile; ///< The file containing the voltage table. It is mandatory when
                                   ///< strategyFrequencies is STRATEGY_FREQUENCY_POWER_CONSERVATIVE [default = unused].
+    unsigned int numRegressionPoints; ///< Points to be used for regression when strategyPrediction is
+                                      ///< STRATEGY_PREDICTION_REGRESSION_LINEAR [default = unused].
     adp_ff_farm_observer* observer; ///< The observer object. It will be called every samplingInterval seconds
                                    ///< to monitor the adaptivity behaviour [default = NULL].
 
@@ -267,6 +290,31 @@ public:
 			strategyFrequencies = (StrategyFrequencies) utils::stringToInt(node->value());
 		}
 
+        node = root->first_node("strategyUnusedVirtualCores");
+        if(node){
+            strategyUnusedVirtualCores = (StrategyUnusedVirtualCores) utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("strategyInactiveVirtualCores");
+        if(node){
+            strategyInactiveVirtualCores = (StrategyUnusedVirtualCores) utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("strategyPrediction");
+        if(node){
+            strategyPrediction = (StrategyPrediction) utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("mappingEmitter");
+        if(node){
+            mappingEmitter = (ServiceNodeMapping) utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("mappingCollector");
+        if(node){
+            mappingCollector = (ServiceNodeMapping) utils::stringToInt(node->value());
+        }
+
 		node = root->first_node("frequencyGovernor");
 		if(node){
 			frequencyGovernor = (cpufreq::Governor) utils::stringToInt(node->value());
@@ -290,26 +338,6 @@ public:
 		node = root->first_node("fastReconfiguration");
 		if(node){
 			fastReconfiguration = utils::stringToInt(node->value());
-		}
-
-		node = root->first_node("strategyUnusedVirtualCores");
-		if(node){
-			strategyUnusedVirtualCores = (StrategyUnusedVirtualCores) utils::stringToInt(node->value());
-		}
-
-		node = root->first_node("strategyInactiveVirtualCores");
-		if(node){
-			strategyInactiveVirtualCores = (StrategyUnusedVirtualCores) utils::stringToInt(node->value());
-		}
-
-		node = root->first_node("mappingEmitter");
-		if(node){
-			mappingEmitter = (ServiceNodeMapping) utils::stringToInt(node->value());
-		}
-
-		node = root->first_node("mappingCollector");
-		if(node){
-			mappingCollector = (ServiceNodeMapping) utils::stringToInt(node->value());
 		}
 
 		node = root->first_node("numSamples");
@@ -362,19 +390,29 @@ public:
 			maxBandwidthVariation = utils::stringToDouble(node->value());
 		}
 
+		node = root->first_node("requiredCompletionTime");
+        if(node){
+            requiredCompletionTime = utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("expectedTasksNumber");
+        if(node){
+            expectedTasksNumber = utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("powerBudget");
+        if(node){
+            powerBudget = utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("numRegressionPoints");
+        if(node){
+            numRegressionPoints = utils::stringToInt(node->value());
+        }
+
 		node = root->first_node("voltageTableFile");
 		if(node){
 			voltageTableFile = node->value();
-		}
-
-		node = root->first_node("requiredCompletionTime");
-		if(node){
-			requiredCompletionTime = utils::stringToInt(node->value());
-		}
-
-		node = root->first_node("expectedTasksNumber");
-		if(node){
-			expectedTasksNumber = utils::stringToInt(node->value());
 		}
 
 		delete[] fileContentChars;
@@ -490,7 +528,7 @@ public:
 
         /** Validate contract parameters. **/
         switch(contractType){
-            case CONTRACT_UTILIZATION:{
+            case CONTRACT_PERF_UTILIZATION:{
                 if((underloadThresholdFarm > overloadThresholdFarm) ||
                    (underloadThresholdWorker > overloadThresholdWorker) ||
                    underloadThresholdFarm < 0 || overloadThresholdFarm > 100 ||
@@ -498,13 +536,19 @@ public:
                     return VALIDATION_WRONG_CONTRACT_PARAMETERS;
                 }
             }break;
-            case CONTRACT_BANDWIDTH:{
+            case CONTRACT_PERF_BANDWIDTH:{
                 if(requiredBandwidth < 0 || maxBandwidthVariation < 0 || maxBandwidthVariation > 100.0){
                     return VALIDATION_WRONG_CONTRACT_PARAMETERS;
                 }
             }break;
-            case CONTRACT_COMPLETION_TIME:{
+            case CONTRACT_PERF_COMPLETION_TIME:{
                 if(!expectedTasksNumber || !requiredCompletionTime){
+                    return VALIDATION_WRONG_CONTRACT_PARAMETERS;
+                }
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                if(!powerBudget || (strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES) ||
+                   strategyPrediction == STRATEGY_PREDICTION_SIMPLE){
                     return VALIDATION_WRONG_CONTRACT_PARAMETERS;
                 }
             }break;
@@ -514,7 +558,7 @@ public:
         }
 
         /** Validate voltage table. **/
-        if(strategyFrequencies == STRATEGY_FREQUENCY_POWER_CONSERVATIVE){
+        if(strategyFrequencies == STRATEGY_FREQUENCY_YES){
             if(voltageTableFile.empty() || !utils::existsFile(voltageTableFile)){
                 return VALIDATION_VOLTAGE_FILE_NEEDED;
             }
@@ -527,6 +571,11 @@ public:
                 !availableFrequencies.size())){
                 return VALIDATION_NO_FAST_RECONF;
             }
+        }
+
+        /** Validate linear regression. **/
+        if(strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR && numRegressionPoints == 0){
+            return VALIDATION_WRONG_REGRESSION_PARAMETERS;
         }
 
         return VALIDATION_OK;

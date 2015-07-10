@@ -54,7 +54,31 @@ typedef struct NodeSample{
     uint64_t tasksCount; ///< The number of computed tasks.
     double corePercentage; ///< The percentage of time that the node spent on the core while it was in svc().
     NodeSample():loadPercentage(0), tasksCount(0), corePercentage(0){;}
+
+    NodeSample& operator+=(const NodeSample& rhs){
+        loadPercentage += rhs.loadPercentage;
+        tasksCount += rhs.tasksCount;
+        corePercentage += rhs.corePercentage;
+        return *this;
+    }
+
+    NodeSample& operator/=(double c){
+        loadPercentage /= c;
+        tasksCount /= c;
+        corePercentage /= c;
+        return *this;
+    }
 }NodeSample;
+
+inline NodeSample operator+(NodeSample lhs, const NodeSample& rhs){
+    lhs += rhs;
+    return lhs;
+}
+
+inline NodeSample operator/(NodeSample lhs, double c){
+    lhs /= c;
+    return lhs;
+}
 
 /*!
  * \internal

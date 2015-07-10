@@ -47,6 +47,7 @@
 
 #include "parameters.hpp"
 #include "node.hpp"
+#include "utils.hpp"
 
 #include <ff/farm.hpp>
 #include <mammut/module.hpp>
@@ -58,7 +59,6 @@
 #include <limits>
 
 namespace adpff{
-
 
 class AdaptivityParameters;
 class adp_ff_node;
@@ -275,6 +275,86 @@ typedef struct FarmConfiguration{
     FarmConfiguration(uint numWorkers, cpufreq::Frequency frequency = 0):numWorkers(numWorkers), frequency(frequency){;}
 }FarmConfiguration;
 
+/**
+ * Type of predictor.
+ */
+typedef enum PredictorType{
+    PREDICTION_BANDWIDTH = 0,
+    PREDICTION_POWER
+}PredictorType;
+
+/*!
+ * Represents a generic predictor.
+ */
+class Predictor{
+public:
+    virtual ~Predictor(){;}
+
+    /**
+     * If possible, refines the model with the information obtained on the current
+     * configuration.
+     */
+    virtual void refine(){;}
+
+    /**
+     * Prepare the predictor to accept a set of prediction requests.
+     */
+    virtual void prepareForPredictions() = 0;
+
+    /**
+     * Predicts the value at a specific configuration.
+     * @param configuration The configuration.
+     * @return The predicted value at a specific configuration.
+     */
+    virtual double predict(const FarmConfiguration& configuration) = 0;
+};
+
+typedef struct MonitoredSample{
+    std::vector<NodeSample> nodes; ///< The samples taken from the active workers (one per worker).
+    energy::JoulesCpu usedCpusEnergy; ///< Energy consumed by active CPUs.
+    energy::JoulesCpu unusedCpusEnergy; ///< Energy consumed by inactive CPUs.
+
+
+    NodeSample getAverageNodesSamples() const{
+        NodeSample ns;
+        for(size_t i = 0; i < nodes.size(); i++){
+            ns += nodes.at(i);
+        }
+        ns /= nodes.size();
+        return ns;
+    }
+
+    MonitoredSample& operator+=(const MonitoredSample& rhs){
+        for(size_t i = 0; i < nodes.size(); i++){
+            nodes.at(i) = nodes.at(i) + rhs.nodes.at(i);
+        }
+        usedCpusEnergy += rhs.usedCpusEnergy;
+        unusedCpusEnergy += rhs.unusedCpusEnergy;
+        // actual addition of rhs to *this
+        return *this;
+    }
+
+    MonitoredSample& operator/=(double c){
+        for(size_t i = 0; i < nodes.size(); i++){
+            nodes.at(i) = nodes.at(i) / c;
+        }
+        usedCpusEnergy /= c;
+        unusedCpusEnergy /= c;
+        return *this;
+
+    }
+}MonitoredSample;
+
+inline MonitoredSample operator+(MonitoredSample lhs, const MonitoredSample& rhs){
+    lhs += rhs;
+    return lhs;
+}
+
+inline MonitoredSample operator/(MonitoredSample lhs, double c){
+    lhs /= c;
+    return lhs;
+}
+
 /*!
  * \internal
  * \class AdaptivityManagerFarm
@@ -284,6 +364,8 @@ typedef struct FarmConfiguration{
  */
 template<typename lb_t=ff_loadbalancer, typename gt_t=ff_gatherer>
 class AdaptivityManagerFarm: public utils::Thread{
+    friend class PredictorSimple;
+    friend class PredictorLinearRegression;
 private:
     utils::Monitor _monitor; ///< Used to let the manager stop safe.
     adp_ff_farm<lb_t, gt_t>* _farm; ///< The managed farm.
@@ -292,6 +374,7 @@ private:
     energy::Energy* _energy; ///< The energy module.
     task::TasksManager* _task; ///< The task module.
     topology::Topology* _topology; ///< The topology module.
+    uint _numPhysicalCores; ///< Number of physical cores.
     adp_ff_node* _emitter; ///< The emitter (if present).
     adp_ff_node* _collector; ///< The collector (if present).
     std::vector<adp_ff_node*> _activeWorkers; ///< The currently running workers.
@@ -316,18 +399,18 @@ private:
     std::vector<cpufreq::Domain*> _scalableDomains; ///< The domains on which frequency scaling is applied.
     cpufreq::VoltageTable _voltageTable; ///< The voltage table.
     std::vector<cpufreq::Frequency> _availableFrequencies; ///< The available frequencies on this machine.
-    std::vector<std::vector<NodeSample> > _nodeSamples; ///< The samples taken from the active workers.
-    std::vector<energy::JoulesCpu> _usedCpusEnergySamples; ///< The energy samples taken from the used CPUs.
-    std::vector<energy::JoulesCpu> _unusedCpusEnergySamples; ///< The energy samples taken from the unused CPUs.
-    size_t _elapsedSamples; ///< The number of registered samples up to now.
-    double _averageTasks; ///< The last value registered for average tasks processed.
-    double _averageUtilization; ///< The last value registered for average utilization.
+    Window<MonitoredSample> _monitoredSamples; ///< Monitored samples;
+    double _averageTasks; ///< The last value registered for average tasks per sampling interval processed.
+    double _averageUtilization; ///< The last value registered for average utilization per sampling interval.
     double _averageCoresUtilization; ///< The last value registered for average cores utilization (percentage of the average utilization).
-    energy::JoulesCpu _usedJoules; ///< Joules consumed by the used virtual cores.
-    energy::JoulesCpu _unusedJoules; ///< Joules consumed by the unused virtual cores.
+    energy::JoulesCpu _usedJoules; ///< Average Joules consumed by the used virtual cores per sampling interval.
+    energy::JoulesCpu _unusedJoules; ///< Average Joules consumed by the unused virtual cores per sampling interval.
     uint64_t _remainingTasks; ///< When contract is CONTRACT_COMPLETION_TIME, represent the number of tasks that
                              ///< still needs to be processed by the application.
     time_t _deadline; ///< When contract is CONTRACT_COMPLETION_TIME, represent the deadline of the application.
+
+    Predictor* _primaryPredictor; ///< The predictor of the primary value.
+    Predictor* _secondaryPredictor; ///< The predictor of the secondary value.
 
     /**
      * If possible, finds a set of physical cores belonging to domains different from
@@ -655,6 +738,7 @@ private:
         updateUsedCpus();
         applyUnusedVirtualCoresStrategy();
 
+        _availableFrequencies.push_back(1.0); // Insert dummy constant frequency
         if(_p.strategyFrequencies != STRATEGY_FREQUENCY_NO){
             if(_p.strategyFrequencies != STRATEGY_FREQUENCY_OS){
                 /** We suppose that all the domains have the same available frequencies. **/
@@ -670,64 +754,41 @@ private:
      * Updates the monitored values.
      */
     void updateMonitoredValues(){
-        NodeSample sample;
-
-        double workerAverageTasks;
-        double workerAverageUtilization;
-        double workerAverageCoreUtilization;
-
         _averageTasks = 0;
         _averageUtilization = 0;
         _averageCoresUtilization = 0;
         _usedJoules.zero();
         _unusedJoules.zero();
 
-        uint numStoredSamples = (_elapsedSamples < _p.numSamples)?_elapsedSamples:_p.numSamples;
-        /****************** Bandwidth and utilization ******************/
-        for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
-            workerAverageTasks = 0;
-            workerAverageUtilization = 0;
-            workerAverageCoreUtilization = 0;
-            for(size_t j = 0; j < numStoredSamples; j++){
-                sample = _nodeSamples.at(i).at(j);
-                workerAverageTasks += sample.tasksCount;
-                workerAverageUtilization += sample.loadPercentage;
-                workerAverageCoreUtilization += sample.corePercentage;
-            }
-            _averageTasks += (workerAverageTasks / (double) numStoredSamples);
-            _averageUtilization += (workerAverageUtilization / numStoredSamples);
-            _averageCoresUtilization += (workerAverageCoreUtilization / numStoredSamples);
-        }
-        _averageUtilization /= _currentConfiguration.numWorkers;
-        _averageCoresUtilization /= _currentConfiguration.numWorkers;
-
-        /****************** Energy ******************/
-        for(size_t i = 0; i < numStoredSamples; i++){
-        	_usedJoules += _usedCpusEnergySamples.at(i);
-        	_unusedJoules += _unusedCpusEnergySamples.at(i);
-        }
-        _usedJoules /= (double) numStoredSamples;
-        _unusedJoules /= (double) numStoredSamples;
+        MonitoredSample average = _monitoredSamples.average();
+        NodeSample nodesAvg = average.getAverageNodesSamples();
+        _averageTasks = nodesAvg.tasksCount * _currentConfiguration.numWorkers;
+        _averageCoresUtilization = nodesAvg.corePercentage;
+        _averageUtilization = nodesAvg.loadPercentage;
+        _usedJoules = average.usedCpusEnergy;
+        _unusedJoules = average.unusedCpusEnergy;
     }
 
     /**
-     * Checks if the contract requested by the user has been violated.
-     * @return true if the contract has been violated, false otherwise.
+     * Returns the monitored value according to the required contract.
+     * @return The monitored value according to the required contract.
      */
-    bool isContractViolated() const{
+    double getMonitoredValue() const{
         switch(_p.contractType){
-            case CONTRACT_UTILIZATION:{
-                return isContractViolated(_averageUtilization);
+            case CONTRACT_PERF_UTILIZATION:{
+                return _averageUtilization;
             }break;
-            case CONTRACT_BANDWIDTH:
-            case CONTRACT_COMPLETION_TIME:{
-                return isContractViolated(_averageTasks / (double) _p.samplingInterval);
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                return _averageTasks / (double) _p.samplingInterval;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                return (_usedJoules.cores + _unusedJoules.cores) / (double) _p.samplingInterval;
             }break;
             default:{
-                return false;
+                return 0;
             }break;
         }
-        return false;
     }
 
     /**
@@ -738,17 +799,20 @@ private:
      */
     bool isContractViolated(double monitoredValue) const{
         switch(_p.contractType){
-            case CONTRACT_UTILIZATION:{
+            case CONTRACT_PERF_UTILIZATION:{
                 return monitoredValue < _p.underloadThresholdFarm ||
                        monitoredValue > _p.overloadThresholdFarm;
             }break;
-            case CONTRACT_BANDWIDTH:{
+            case CONTRACT_PERF_BANDWIDTH:{
                 double offset = (_p.requiredBandwidth * _p.maxBandwidthVariation) / 100.0;
                 return monitoredValue < _p.requiredBandwidth ||
                        monitoredValue > _p.requiredBandwidth + offset;
             }break;
-            case CONTRACT_COMPLETION_TIME:{
+            case CONTRACT_PERF_COMPLETION_TIME:{
                 return monitoredValue < _p.requiredBandwidth;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                return monitoredValue < _p.powerBudget;
             }break;
             default:{
                 return false;
@@ -758,62 +822,15 @@ private:
     }
 
     /**
-     * Returns the estimated monitored value at a specific configuration.
-     * @param configuration A possible future configuration.
-     * @return The estimated monitored value at a specific configuration.
+     * Returns the voltage at a specific configuration.
+     * @param configuration The configuration.
+     * @return The voltage at that configuration.
      */
-    double getEstimatedMonitoredValue(const FarmConfiguration& configuration) const{
-        double scalingFactor = 0;
-        switch(_p.strategyFrequencies){
-            case STRATEGY_FREQUENCY_NO:
-            case STRATEGY_FREQUENCY_OS:{
-                scalingFactor = (double) configuration.numWorkers /
-                                (double) _currentConfiguration.numWorkers;
-            }break;
-            case STRATEGY_FREQUENCY_CORES_CONSERVATIVE:
-            case STRATEGY_FREQUENCY_POWER_CONSERVATIVE:{
-                scalingFactor = (double)(configuration.frequency * configuration.numWorkers) /
-                                (double)(_currentConfiguration.frequency * _currentConfiguration.numWorkers);
-            }break;
-        }
-
-        switch(_p.contractType){
-            case CONTRACT_UTILIZATION:{
-                return _averageUtilization * (1.0 / scalingFactor);
-            }break;
-            case CONTRACT_BANDWIDTH:
-            case CONTRACT_COMPLETION_TIME:{
-                return (_averageTasks / (double) _p.samplingInterval) * scalingFactor;
-            }break;
-            default:{
-                ;
-            }break;
-        }
-        return 0;
-    }
-
-    /**
-     * Returns the estimated consumption at a specific configuration.
-     * @param configuration A possible future configuration.
-     * @return The estimated consumption at a specific configuration. It may be
-     *         watts or joules according to the required contract.
-     */
-    double getEstimatedConsumption(const FarmConfiguration& configuration) const{
+    double getVoltage(const FarmConfiguration& configuration) const{
         cpufreq::VoltageTableKey key(configuration.numWorkers, configuration.frequency);
         cpufreq::VoltageTableIterator it = _voltageTable.find(key);
         if(it != _voltageTable.end()){
-            cpufreq::Voltage v = it->second;
-            double watts = configuration.numWorkers*configuration.frequency*v*v;
-            if(_p.contractType == CONTRACT_COMPLETION_TIME){
-                time_t now = time(NULL);
-                if(_deadline > now){
-                    return watts * (_deadline - now);
-                }else{
-                    return watts;
-                }
-            }else{
-                return watts;
-            }
+            return it->second;
         }else{
             throw std::runtime_error("Frequency and/or number of virtual cores not found in voltage table.");
         }
@@ -826,31 +843,54 @@ private:
      * @return True if x is a best suboptimal monitored value than y, false otherwise.
      */
     bool isBestSuboptimalValue(double x, double y) const{
-        double distanceX, distanceY;
         switch(_p.contractType){
-            case CONTRACT_UTILIZATION:{
+            case CONTRACT_PERF_UTILIZATION:{
                 // Concerning utilization factors, if both are suboptimal, we prefer the closest to the lower bound.
+                double distanceX, distanceY;
                 distanceX = _p.underloadThresholdFarm - x;
                 distanceY = _p.underloadThresholdFarm - y;
+                if(distanceX > 0 && distanceY < 0){
+                    return true;
+                }else if(distanceX < 0 && distanceY > 0){
+                    return false;
+                }else{
+                    return std::abs(distanceX) < std::abs(distanceY);
+                }
             }break;
-            case CONTRACT_BANDWIDTH:
-            case CONTRACT_COMPLETION_TIME:{
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
                 // Concerning bandwidths, if both are suboptimal, we prefer the higher one.
-                distanceX = x - _p.requiredBandwidth;
-                distanceY = y - _p.requiredBandwidth;
+                return x > y;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                // Concerning power budgets, if both are suboptimal, we prefer the lowest one.
+                return x < y;
             }break;
             default:{
                 ;
             }break;
         }
+        return false;
+    }
 
-        if(distanceX > 0 && distanceY < 0){
-            return true;
-        }else if(distanceX < 0 && distanceY > 0){
-            return false;
-        }else{
-            return std::abs(distanceX) < std::abs(distanceY);
+    /**
+     * Returns true if x is a best secondary value than y, false otherwise.
+     */
+    bool isBestSecondaryValue(double x, double y) const{
+        switch(_p.contractType){
+            case CONTRACT_PERF_UTILIZATION:
+            case CONTRACT_PERF_COMPLETION_TIME:
+            case CONTRACT_PERF_BANDWIDTH:{
+                return x < y;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                return x > y;
+            }break;
+            default:{
+                ;
+            }break;
         }
+        return false;
     }
 
     /**
@@ -859,75 +899,63 @@ private:
      */
     FarmConfiguration getNewConfiguration() const{
         FarmConfiguration r;
-        double estimatedMonitoredValue = 0;
-        double bestSuboptimalValue;
+        double predictedMonitoredValue = 0;
+        double bestSuboptimalValue = getMonitoredValue();
+        FarmConfiguration bestSuboptimalConfiguration = _currentConfiguration;
+        bool feasibleSolutionFound = false;
+
+        double bestSecondaryValue;
         switch(_p.contractType){
-            case CONTRACT_UTILIZATION:{
-                bestSuboptimalValue = _averageUtilization;
+            case CONTRACT_PERF_UTILIZATION:
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                // We have to minimize the power/energy.
+                bestSecondaryValue = std::numeric_limits<double>::max();
             }break;
-            case CONTRACT_BANDWIDTH:
-            case CONTRACT_COMPLETION_TIME:{
-                bestSuboptimalValue = _averageTasks / (double) _p.samplingInterval;
+            case CONTRACT_POWER_BUDGET:{
+                // We have to maximize the bandwidth.
+                bestSecondaryValue = std::numeric_limits<double>::min();
             }break;
             default:{
                 ;
             }break;
         }
 
-        FarmConfiguration bestSuboptimalConfiguration = _currentConfiguration;
-        bool feasibleSolutionFound = false;
+        _primaryPredictor->prepareForPredictions();
+        _secondaryPredictor->prepareForPredictions();
+        double predictedSecondaryValue = 0;
+        unsigned int remainingTime = 0;
+        for(size_t i = 1; i <= _maxNumWorkers; i++){
+            for(size_t j = 0; j < _availableFrequencies.size(); j++){
+                FarmConfiguration examinedConfiguration(i, _availableFrequencies.at(j));
+                predictedMonitoredValue = _primaryPredictor->predict(examinedConfiguration);
+                switch(_p.contractType){
+                    case CONTRACT_PERF_COMPLETION_TIME:{
+                        remainingTime = (double) _remainingTasks / predictedMonitoredValue;
+                    }break;
+                    case CONTRACT_PERF_UTILIZATION:{
+                        predictedMonitoredValue = ((_averageTasks / _p.samplingInterval) / predictedMonitoredValue) * _averageUtilization;
+                    }break;
+                    default:{
+                        ;
+                    }
+                }
 
-        switch(_p.strategyFrequencies){
-            case STRATEGY_FREQUENCY_NO:
-            case STRATEGY_FREQUENCY_OS:{
-                for(size_t i = 1; i <= _maxNumWorkers; i++){
-                    FarmConfiguration examinedConfiguration(i);
-                    estimatedMonitoredValue = getEstimatedMonitoredValue(examinedConfiguration);
-                    if(!isContractViolated(estimatedMonitoredValue)){
+                if(!isContractViolated(predictedMonitoredValue)){
+                    predictedSecondaryValue = _secondaryPredictor->predict(examinedConfiguration);
+                    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+                        predictedSecondaryValue *= remainingTime;
+                    }
+                    if(isBestSecondaryValue(predictedSecondaryValue, bestSecondaryValue)){
+                        bestSecondaryValue = predictedSecondaryValue;
+                        r = examinedConfiguration;
                         feasibleSolutionFound = true;
-                        return examinedConfiguration;
-                    }else if(!feasibleSolutionFound && isBestSuboptimalValue(estimatedMonitoredValue, bestSuboptimalValue)){
-                        bestSuboptimalValue = estimatedMonitoredValue;
-                        bestSuboptimalConfiguration.numWorkers = i;
                     }
+                }else if(!feasibleSolutionFound && isBestSuboptimalValue(predictedMonitoredValue, bestSuboptimalValue)){
+                    bestSuboptimalValue = predictedMonitoredValue;
+                    bestSuboptimalConfiguration = examinedConfiguration;
                 }
-            }break;
-            case STRATEGY_FREQUENCY_CORES_CONSERVATIVE:{
-                for(size_t i = 1; i <= _maxNumWorkers; i++){
-                    for(size_t j = 0; j < _availableFrequencies.size(); j++){
-                        FarmConfiguration examinedConfiguration(i, _availableFrequencies.at(j));
-                        estimatedMonitoredValue = getEstimatedMonitoredValue(examinedConfiguration);
-                         if(!isContractViolated(estimatedMonitoredValue)){
-                             feasibleSolutionFound = true;
-                             return examinedConfiguration;
-                         }else if(!feasibleSolutionFound && isBestSuboptimalValue(estimatedMonitoredValue, bestSuboptimalValue)){
-                             bestSuboptimalValue = estimatedMonitoredValue;
-                             bestSuboptimalConfiguration = examinedConfiguration;
-                         }
-                    }
-                }
-            }break;
-            case STRATEGY_FREQUENCY_POWER_CONSERVATIVE:{
-                double minEstimatedPower = std::numeric_limits<double>::max();
-                double estimatedPower = 0;
-                for(size_t i = 1; i <= _maxNumWorkers; i++){
-                    for(size_t j = 0; j < _availableFrequencies.size(); j++){
-                        FarmConfiguration examinedConfiguration(i, _availableFrequencies.at(j));
-                        estimatedMonitoredValue = getEstimatedMonitoredValue(examinedConfiguration);
-                        if(!isContractViolated(estimatedMonitoredValue)){
-                            estimatedPower = getEstimatedConsumption(examinedConfiguration);
-                            if(estimatedPower < minEstimatedPower){
-                                minEstimatedPower = estimatedPower;
-                                r = examinedConfiguration;
-                                feasibleSolutionFound = true;
-                            }
-                        }else if(!feasibleSolutionFound && isBestSuboptimalValue(estimatedMonitoredValue, bestSuboptimalValue)){
-                            bestSuboptimalValue = estimatedMonitoredValue;
-                            bestSuboptimalConfiguration = examinedConfiguration;
-                        }
-                    }
-                }
-            }break;
+            }
         }
 
         if(feasibleSolutionFound){
@@ -982,6 +1010,11 @@ private:
             throw std::runtime_error("AdaptivityManagerFarm: fatal error, trying to activate more "
                                      "workers than the maximum allowed.");
         }
+
+        /****************** Refine the model ******************/
+        _primaryPredictor->refine();
+        _secondaryPredictor->refine();
+
         /****************** Workers change started ******************/
         if(_currentConfiguration.numWorkers != configuration.numWorkers){
             std::vector<cpufreq::RollbackPoint> rollbackPoints;
@@ -1071,11 +1104,12 @@ private:
      * @param nextSampleIndex The index where to store the new sample.
      * @return false if the farm is not running anymore, true otherwise.
      **/
-    bool storeNewSamples(size_t nextSampleIndex){
+    bool storeNewSamples(){
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             _activeWorkers.at(i)->askForSample();
         }
 
+        MonitoredSample sample;
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             NodeSample ns;
             bool workerRunning = _activeWorkers.at(i)->getSampleResponse(ns);
@@ -1083,7 +1117,7 @@ private:
                 return false;
             }
 
-            if(_p.contractType == CONTRACT_COMPLETION_TIME){
+            if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
                 if(_remainingTasks > ns.tasksCount){
                     _remainingTasks -= ns.tasksCount;
                 }else{
@@ -1091,22 +1125,60 @@ private:
                 }
             }
 
-            _nodeSamples.at(i).at(nextSampleIndex) = ns;
+            sample.nodes.push_back(ns);
         }
 
-        _usedCpusEnergySamples.at(nextSampleIndex).zero();
+        sample.usedCpusEnergy.zero();
         for(size_t i = 0; i < _usedCpus.size(); i++){
             energy::CounterCpu* currentCounter = _energy->getCounterCpu(_usedCpus.at(i));
-            _usedCpusEnergySamples.at(nextSampleIndex) += currentCounter->getJoules();
+            sample.usedCpusEnergy += currentCounter->getJoules();
         }
-        _unusedCpusEnergySamples.at(nextSampleIndex).zero();
+        sample.unusedCpusEnergy.zero();
         for(size_t i = 0; i < _unusedCpus.size(); i++){
             energy::CounterCpu* currentCounter = _energy->getCounterCpu(_unusedCpus.at(i));
-            _unusedCpusEnergySamples.at(nextSampleIndex) += currentCounter->getJoules();
+            sample.unusedCpusEnergy += currentCounter->getJoules();
         }
         _energy->resetCountersCpu();
 
+        _monitoredSamples.add(sample);
+
         return true;
+    }
+
+    /**
+     * Initializes the predictors
+     */
+    void initPredictors(){
+        PredictorType primary, secondary;
+        switch(_p.contractType){
+            case CONTRACT_PERF_UTILIZATION:
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                primary = PREDICTION_BANDWIDTH;
+                secondary = PREDICTION_POWER;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                primary = PREDICTION_POWER;
+                secondary = PREDICTION_BANDWIDTH;
+            }break;
+            default:{
+                return;
+            }break;
+        }
+
+        switch(_p.strategyPrediction){
+            case STRATEGY_PREDICTION_SIMPLE:{
+                _primaryPredictor = new PredictorSimple(primary, *this);
+                _secondaryPredictor = new PredictorSimple(secondary, *this);
+            }break;
+            case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
+                _primaryPredictor = new PredictorLinearRegression(primary, *this);
+                _secondaryPredictor = new PredictorLinearRegression(secondary, *this);
+            }break;
+            default:{
+                ;
+            }break;
+        }
     }
 
 public:
@@ -1123,6 +1195,7 @@ public:
         _energy(_p.mammut.getInstanceEnergy()),
         _task(_p.mammut.getInstanceTask()),
         _topology(_p.mammut.getInstanceTopology()),
+        _numPhysicalCores(_topology->getPhysicalCores().size()),
         _emitter(_farm->getAdaptiveEmitter()),
         _collector(_farm->getAdaptiveCollector()),
         _activeWorkers(_farm->getAdaptiveWorkers()),
@@ -1133,7 +1206,7 @@ public:
         _availableVirtualCores(getAvailableVirtualCores()),
         _emitterVirtualCore(NULL),
         _collectorVirtualCore(NULL),
-        _elapsedSamples(0){
+        _monitoredSamples(_p.numSamples){
         /** If voltage table file is specified, then load the table. **/
         if(_p.voltageTableFile.compare("")){
             cpufreq::loadVoltageTable(_voltageTable, _p.voltageTableFile);
@@ -1174,30 +1247,23 @@ public:
 
         mapAndSetFrequencies();
 
-        _nodeSamples.resize(_activeWorkers.size());
-        _usedCpusEnergySamples.resize(_p.numSamples);
-        _unusedCpusEnergySamples.resize(_p.numSamples);
-        for(size_t i = 0; i < _activeWorkers.size(); i++){
-            _nodeSamples.at(i).resize(_p.numSamples);
-        }
-
         _energy->resetCountersCpu();
         _p.observer->_startMonitoringMs = utils::getMillisecondsTime();
 
-        size_t nextSampleIndex = 0;
         uint64_t samplesToDiscard = _p.samplesToDiscard;
         double lastOverheadMs = 0;
         double startOverheadMs = 0;
         double microsecsSleep = 0;
-        if(_p.contractType == CONTRACT_COMPLETION_TIME){
+        if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
             _remainingTasks = _p.expectedTasksNumber;
             _deadline = time(NULL) + _p.requiredCompletionTime;
         }
 
+        initPredictors();
+
         if(_p.contractType == CONTRACT_NONE){
             _monitor.wait();
-            storeNewSamples(0);
-            _elapsedSamples = 1;
+            storeNewSamples();
             updateMonitoredValues();
             observe();
         }else{
@@ -1211,11 +1277,11 @@ public:
 
                 startOverheadMs = utils::getMillisecondsTime();
 
-                if(!storeNewSamples(nextSampleIndex)){
+                if(!storeNewSamples()){
                     goto controlLoopEnd;
                 }
 
-                if(_p.contractType == CONTRACT_COMPLETION_TIME){
+                if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
                     time_t now = time(NULL);
                     if(now >= _deadline){
                         _p.requiredBandwidth = std::numeric_limits<double>::max();
@@ -1225,18 +1291,16 @@ public:
                 }
 
                 if(!samplesToDiscard){
-                    ++_elapsedSamples;
-                    nextSampleIndex = (nextSampleIndex + 1) % _p.numSamples;
                     updateMonitoredValues();
                     observe();
                 }else{
                     --samplesToDiscard;
                 }
 
-                if((_elapsedSamples > _p.numSamples) && isContractViolated()){
+                if((_monitoredSamples.size() >= _p.numSamples) &&
+                   isContractViolated(getMonitoredValue())){
                     changeConfiguration(getNewConfiguration());
-                    _elapsedSamples = 0;
-                    nextSampleIndex = 0;
+                    _monitoredSamples.reset();
                     samplesToDiscard = _p.samplesToDiscard;
                 }
 
