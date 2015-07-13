@@ -46,6 +46,7 @@
 
 
 #include "parameters.hpp"
+#include "predictors.hpp"
 #include "node.hpp"
 #include "utils.hpp"
 
@@ -156,7 +157,7 @@ public:
     		    ff_node* const collector = NULL, bool inputCh = false):
 		ff_farm<lb_t, gt_t>::ff_farm(w, emitter, collector, inputCh){
 		construct();
-	}
+    }
 
     /**
      * Builds the adaptive farm.
@@ -274,40 +275,6 @@ typedef struct FarmConfiguration{
     FarmConfiguration():numWorkers(0), frequency(0){;}
     FarmConfiguration(uint numWorkers, cpufreq::Frequency frequency = 0):numWorkers(numWorkers), frequency(frequency){;}
 }FarmConfiguration;
-
-/**
- * Type of predictor.
- */
-typedef enum PredictorType{
-    PREDICTION_BANDWIDTH = 0,
-    PREDICTION_POWER
-}PredictorType;
-
-/*!
- * Represents a generic predictor.
- */
-class Predictor{
-public:
-    virtual ~Predictor(){;}
-
-    /**
-     * If possible, refines the model with the information obtained on the current
-     * configuration.
-     */
-    virtual void refine(){;}
-
-    /**
-     * Prepare the predictor to accept a set of prediction requests.
-     */
-    virtual void prepareForPredictions() = 0;
-
-    /**
-     * Predicts the value at a specific configuration.
-     * @param configuration The configuration.
-     * @return The predicted value at a specific configuration.
-     */
-    virtual double predict(const FarmConfiguration& configuration) = 0;
-};
 
 typedef struct MonitoredSample{
     std::vector<NodeSample> nodes; ///< The samples taken from the active workers (one per worker).

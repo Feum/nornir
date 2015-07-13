@@ -32,15 +32,56 @@
 #ifndef PREDICTORS_HPP_
 #define PREDICTORS_HPP_
 
+#include "utils.hpp"
 
-#include "farm.hpp"
+#include <ff/farm.hpp>
 
 #include <mlpack/core.hpp>
 #include <mlpack/methods/linear_regression/linear_regression.hpp>
+
 using namespace mlpack::regression;
 
 namespace adpff{
 
+template<typename lb_t, typename gt_t>
+class AdaptivityManagerFarm;
+
+class FarmConfiguration;
+
+
+/**
+ * Type of predictor.
+ */
+typedef enum PredictorType{
+    PREDICTION_BANDWIDTH = 0,
+    PREDICTION_POWER
+}PredictorType;
+
+/*!
+ * Represents a generic predictor.
+ */
+class Predictor{
+public:
+    virtual ~Predictor(){;}
+
+    /**
+     * If possible, refines the model with the information obtained on the current
+     * configuration.
+     */
+    virtual void refine(){;}
+
+    /**
+     * Prepare the predictor to accept a set of prediction requests.
+     */
+    virtual void prepareForPredictions() = 0;
+
+    /**
+     * Predicts the value at a specific configuration.
+     * @param configuration The configuration.
+     * @return The predicted value at a specific configuration.
+     */
+    virtual double predict(const FarmConfiguration& configuration) = 0;
+};
 
 /**
  * Represents a sample to be used in the regression.
@@ -52,7 +93,7 @@ public:
      * @param manager The adaptive farm manager.
      * @param configuration The configuration to insert as data.
      */
-    virtual void init(const AdaptivityManagerFarm<>& manager, FarmConfiguration configuration) = 0;
+    virtual void init(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration) = 0;
 
     /**
      * Transforms this sample into an Armadillo's row.
@@ -74,31 +115,13 @@ private:
     double _scalFactorPhysical;
     double _scalFactorWorkers;
 public:
-    void init(const AdaptivityManagerFarm<>& manager, FarmConfiguration configuration){
-        double usedPhysicalCores = std::min(configuration.numWorkers, manager._numPhysicalCores);
-        _physicalCoresInverse = 1.0 / usedPhysicalCores;
-        _workersInverse = 1.0 / (double)configuration.numWorkers;
-        _frequencyInverse = 1.0 / (double) configuration.frequency;
-        _scalFactorPhysical = ( usedPhysicalCores * ((double)configuration.frequency / (double)manager._availableFrequencies.at(0)));
-        _scalFactorWorkers = ((double) configuration.numWorkers * ((double)configuration.frequency / (double)manager._availableFrequencies.at(0)));
-    }
+    void init(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration);
 
-    RegressionDataBandwidth():_physicalCoresInverse(0), _workersInverse(0),
-                              _frequencyInverse(0), _scalFactorPhysical(0), _scalFactorWorkers(0){;}
+    RegressionDataBandwidth();
 
-    RegressionDataBandwidth(const AdaptivityManagerFarm<>& manager, FarmConfiguration configuration){
-        init(manager, configuration);
-    }
+    RegressionDataBandwidth(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration);
 
-    arma::subview_row toArmaRow() const{
-        arma::subview_row row;
-        row(0) = _physicalCoresInverse;
-        row(1) = _workersInverse;
-        row(2) = _frequencyInverse;
-        row(3) = _scalFactorPhysical;
-        row(4) = _scalFactorWorkers;
-        return row;
-    }
+    arma::subview_row toArmaRow() const;
 };
 
 /**
@@ -112,29 +135,13 @@ private:
     double _voltagePerUnusedSockets;
     double _dynamicPowerModel;
 public:
-    void init(const AdaptivityManagerFarm<>& manager, FarmConfiguration configuration){
-        double usedPhysicalCores = std::min(configuration.numWorkers, manager._numPhysicalCores);
-        double voltage = manager.getVoltage(configuration);
-        _contextes = std::ceil((double)configuration.numWorkers / usedPhysicalCores);
-        _voltagePerUsedSockets = voltage * (double) manager._usedCpus.size();
-        _voltagePerUnusedSockets = voltage * (double) manager._unusedCpus.size();
-        _dynamicPowerModel = (usedPhysicalCores*configuration.frequency*voltage*voltage)/1000000.0;
-    }
+    void init(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration);
 
-    RegressionDataPower():_contextes(0), _voltagePerUsedSockets(0), _voltagePerUnusedSockets(0), _dynamicPowerModel(0){;}
+    RegressionDataPower();
 
-    RegressionDataPower(const AdaptivityManagerFarm<>& manager, FarmConfiguration configuration){
-        init(manager, configuration);
-    }
+    RegressionDataPower(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration);
 
-    arma::subview_row toArmaRow() const{
-        arma::subview_row row;
-        row(0) = _contextes;
-        row(1) = _voltagePerUsedSockets;
-        row(2) = _voltagePerUnusedSockets;
-        row(3) = _dynamicPowerModel;
-        return row;
-    }
+    arma::subview_row toArmaRow() const;
 };
 
 /*
@@ -151,73 +158,15 @@ private:
     Window<double> _responses; ///< The responses to be used in the regression.
     RegressionData* _predictionInput; ///< Input to be used for predicting a value.
 public:
-    PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm<>& manager):
-        _type(type), _manager(manager), _dataIndex(0), _dataSize(0),
-        _responses(_manager._p.numRegressionPoints){
-        _data = new RegressionData*[_manager._p.numRegressionPoints];
+    PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm<>& manager);
 
-        switch(_type){
-            case PREDICTION_BANDWIDTH:{
-                for(size_t i = 0; i < _manager._p.numRegressionPoints; i++){
-                    _data[i] = new RegressionDataBandwidth();
-                }
-                _predictionInput = new RegressionDataBandwidth();
-            }break;
-            case PREDICTION_POWER:{
-                for(size_t i = 0; i < _manager._p.numRegressionPoints; i++){
-                    _data[i] = new RegressionDataPower();
-                }
-                _predictionInput = new RegressionDataPower();
-            }break;
-        }
-    }
+    ~PredictorLinearRegression();
 
-    ~PredictorLinearRegression(){
-        for(size_t i = 0; i < _manager._p.numRegressionPoints; i++){
-            delete _data[i];
-        }
-        delete[] _data;
-        delete _predictionInput;
-    }
+    void refine();
 
-    void refine(){
-        _data[_dataIndex]->init(_manager, _manager._currentConfiguration);
-        switch(_type){
-            case PREDICTION_BANDWIDTH:{
-                _responses.add(_manager._averageTasks / (double) _manager._p.samplingInterval); //TODO: Probabilmente bisognerebbe usare il Ts
-            }break;
-            case PREDICTION_POWER:{
-                _responses.add((_manager._usedJoules.cores / _manager._p.samplingInterval) +
-                               (_manager._unusedJoules.cores /_manager._p.samplingInterval)); //TODO: Probabilmente si può evitare di dividere per il sampling interval
-            }break;
-        }
-        _dataIndex = (_dataIndex + 1) % _manager._p.numRegressionPoints;
-        if(_dataSize < _manager._p.numRegressionPoints){
-            ++_dataSize;
-        }
-    }
+    void prepareForPredictions();
 
-    void prepareForPredictions(){
-        arma::mat dataMl;
-        arma::vec responsesMl;
-
-        for(size_t i = 0; i < _dataSize; i++){
-            dataMl.row(i) = _data[i]->toArmaRow();
-            responsesMl(i) = _responses[i];
-        }
-
-        _lr(dataMl, responsesMl);
-    }
-
-    double predict(const FarmConfiguration& configuration){
-        _predictionInput->init(_manager, configuration);
-        arma::mat predictionInputMl;
-        arma::vec result;
-        predictionInputMl.row(0) = _predictionInput->toArmaRow();
-
-        _lr.Predict(predictionInputMl, result);
-        return result.at(0);
-    }
+    double predict(const FarmConfiguration& configuration);
 };
 
 /*
@@ -233,38 +182,15 @@ private:
     const AdaptivityManagerFarm<>& _manager;
     time_t _now;
 
-    double getScalingFactor(const FarmConfiguration& configuration){
-        return (double)(configuration.frequency * configuration.numWorkers) /
-               (double)(_manager._currentConfiguration.frequency * _manager._currentConfiguration.numWorkers);
-    }
+    double getScalingFactor(const FarmConfiguration& configuration);
 
-    double getPowerPrediction(const FarmConfiguration& configuration){
-        cpufreq::Voltage v = _manager.getVoltage(configuration);
-        return configuration.numWorkers*configuration.frequency*v*v;
-    }
+    double getPowerPrediction(const FarmConfiguration& configuration);
 public:
-    PredictorSimple(PredictorType type, const AdaptivityManagerFarm<>& manager):
-        _type(type), _manager(manager), _now(0){
-        ;
-    }
+    PredictorSimple(PredictorType type, const AdaptivityManagerFarm<>& manager);
 
-    void prepareForPredictions(){
-        _now = time(NULL);
-    }
+    void prepareForPredictions();
 
-    double predict(const FarmConfiguration& configuration){
-        switch(_type){
-            case PREDICTION_UTILIZATION:{
-                return _manager.getMonitoredValue() * (1.0 / getScalingFactor(configuration));
-            }break;
-            case PREDICTION_BANDWIDTH:{
-                return _manager.getMonitoredValue() * getScalingFactor(configuration);
-            }break;
-            case PREDICTION_POWER:{
-                return getPowerPrediction(configuration);
-            }break;
-        }
-    }
+    double predict(const FarmConfiguration& configuration);
 };
 
 };
