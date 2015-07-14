@@ -62,9 +62,6 @@
 namespace adpff{
 
 class AdaptivityParameters;
-class adp_ff_node;
-
-template<typename lb_t, typename gt_t>
 class AdaptivityManagerFarm;
 
 using namespace ff;
@@ -77,7 +74,6 @@ using namespace mammut;
  * for each observed statistic.
  */
 class adp_ff_farm_observer{
-    template<typename lb_t, typename gt_t>
     friend class AdaptivityManagerFarm;
 protected:
     size_t _numberOfWorkers;
@@ -85,16 +81,14 @@ protected:
     topology::VirtualCore* _emitterVirtualCore;
     std::vector<topology::VirtualCore*> _workersVirtualCore;
     topology::VirtualCore* _collectorVirtualCore;
-    double _currentTasks;
-    double _currentUtilization;
-    double _currentCoresUtilization;
-    energy::JoulesCpu _usedJoules;
-    energy::JoulesCpu _unusedJoules;
+    double _averageBandwidth;
+    double _averageUtilization;
+    energy::JoulesCpu _averageWatts;
     unsigned int _startMonitoringMs;
 public:
     adp_ff_farm_observer():_numberOfWorkers(0), _currentFrequency(0), _emitterVirtualCore(NULL),
-                         _collectorVirtualCore(NULL), _currentTasks(0), _currentUtilization(0),
-                         _currentCoresUtilization(0){;}
+                         _collectorVirtualCore(NULL), _averageBandwidth(0), _averageUtilization(0),
+                         _startMonitoringMs(0){;}
     virtual ~adp_ff_farm_observer(){;}
     virtual void observe(){;}
 };
@@ -107,46 +101,24 @@ public:
  */
 template<typename lb_t=ff_loadbalancer, typename gt_t=ff_gatherer>
 class adp_ff_farm: public ff_farm<lb_t, gt_t>{
-    friend class AdaptivityManagerFarm<lb_t, gt_t>;
-public:
-    void setAdaptivityParameters(AdaptivityParameters adaptivityParameters){
-		_adaptivityParameters = adaptivityParameters;
-		uint validationRes = _adaptivityParameters.validate();
-		if(validationRes != VALIDATION_OK){
-			throw std::runtime_error("AdaptiveFarm: invalid AdaptivityParameters: " + utils::intToString(validationRes));
-		}
-	}
+    friend class AdaptivityManagerFarm;
 private:
     std::vector<adp_ff_node*> _adaptiveWorkers;
     adp_ff_node* _adaptiveEmitter;
     adp_ff_node* _adaptiveCollector;
     bool _firstRun;
     AdaptivityParameters _adaptivityParameters;
-    AdaptivityManagerFarm<lb_t, gt_t>* _adaptivityManager;
+    AdaptivityManagerFarm* _adaptivityManager;
 
-    void construct(){
-        _adaptiveEmitter = NULL;
-        _adaptiveCollector = NULL;
-        _firstRun = true;
-        _adaptivityManager = NULL;
-    }
+    void construct();
 
-    void construct(AdaptivityParameters adaptivityParameters){
-    	construct();
-        setAdaptivityParameters(adaptivityParameters);
-    }
+    void construct(AdaptivityParameters adaptivityParameters);
 
-    std::vector<adp_ff_node*> getAdaptiveWorkers() const{
-        return _adaptiveWorkers;
-    }
+    std::vector<adp_ff_node*> getAdaptiveWorkers() const;
 
-    adp_ff_node* getAdaptiveEmitter() const{
-        return _adaptiveEmitter;
-    }
+    adp_ff_node* getAdaptiveEmitter() const;
 
-    adp_ff_node* getAdaptiveCollector() const{
-        return _adaptiveCollector;
-    }
+    adp_ff_node* getAdaptiveCollector() const;
 public:
 
     /**
@@ -154,10 +126,7 @@ public:
      * For parameters documentation, see fastflow's farm documentation.
      */
     adp_ff_farm(std::vector<ff_node*>& w, ff_node* const emitter = NULL,
-    		    ff_node* const collector = NULL, bool inputCh = false):
-		ff_farm<lb_t, gt_t>::ff_farm(w, emitter, collector, inputCh){
-		construct();
-    }
+    		    ff_node* const collector = NULL, bool inputCh = false);
 
     /**
      * Builds the adaptive farm.
@@ -168,10 +137,7 @@ public:
                           int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
                           bool workerCleanup = false,
                           int maxNumWorkers = ff_farm<lb_t, gt_t>::DEF_MAX_NUM_WORKERS,
-                          bool fixedSize = false):
-		ff_farm<lb_t, gt_t>::ff_farm(inputCh, inBufferEntries, outBufferEntries, workerCleanup, maxNumWorkers, fixedSize){
-		construct();
-	}
+                          bool fixedSize = false);
 
     /**
      * Builds the adaptive farm.
@@ -179,10 +145,7 @@ public:
      * @param adaptivityParameters Parameters that will be used by the farm to take reconfiguration decisions.
      */
     adp_ff_farm(AdaptivityParameters adaptivityParameters, std::vector<ff_node*>& w,
-                 ff_node* const emitter = NULL, ff_node* const collector = NULL, bool inputCh = false):
-		ff_farm<lb_t, gt_t>::ff_farm(w, emitter, collector, inputCh){
-		construct(adaptivityParameters);
-	}
+                 ff_node* const emitter = NULL, ff_node* const collector = NULL, bool inputCh = false);
 
     /**
      * Builds the adaptive farm.
@@ -194,72 +157,28 @@ public:
                           int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
                           bool workerCleanup = false,
                           int maxNumWorkers = ff_farm<lb_t, gt_t>::DEF_MAX_NUM_WORKERS,
-                          bool fixedSize = false):
-		ff_farm<lb_t, gt_t>::ff_farm(inputCh, inBufferEntries, outBufferEntries, workerCleanup, maxNumWorkers, fixedSize){
-		construct(adaptivityParameters);
-	}
+                          bool fixedSize = false);
 
     /**
      * Destroyes this adaptive farm.
      */
-    ~adp_ff_farm(){
-        ;
-    }
+    ~adp_ff_farm();
 
-    void firstRunBefore(){
-        if(_firstRun){
-            svector<ff_node*> workers = ff_farm<lb_t, gt_t>::getWorkers();
-            for(size_t i = 0; i < workers.size(); i++){
-                _adaptiveWorkers.push_back(static_cast<adp_ff_node*>(workers[i]));
-                _adaptiveWorkers.at(i)->initMammutModules(_adaptivityParameters.mammut);
-            }
+    void setAdaptivityParameters(AdaptivityParameters adaptivityParameters);
 
-            _adaptiveEmitter = static_cast<adp_ff_node*>(ff_farm<lb_t, gt_t>::getEmitter());
-            if(_adaptiveEmitter){
-                _adaptiveEmitter->initMammutModules(_adaptivityParameters.mammut);
-            }
+    void firstRunBefore();
 
-            _adaptiveCollector = static_cast<adp_ff_node*>(ff_farm<lb_t, gt_t>::getCollector());
-            if(_adaptiveCollector){
-                _adaptiveCollector->initMammutModules(_adaptivityParameters.mammut);
-            }
-        }
-    }
-
-
-    void firstRunAfter(){
-        if(_firstRun){
-            _firstRun = false;
-            _adaptivityManager = new AdaptivityManagerFarm<lb_t, gt_t>(this, _adaptivityParameters);
-            _adaptivityManager->start();
-        }
-    }
+    void firstRunAfter();
 
     /**
      * Runs this farm.
      */
-    int run(bool skip_init=false){
-    	firstRunBefore();
-        int r = ff_farm<lb_t, gt_t>::run(skip_init);
-        if(r){
-            return r;
-        }
-        firstRunAfter();
-        return r;
-    }
+    int run(bool skip_init=false);
 
     /**
      * Waits this farm for completion.
      */
-    int wait(){
-        int r = ff_farm<lb_t, gt_t>::wait();
-        if(_adaptivityManager){
-            _adaptivityManager->stop();
-            _adaptivityManager->join();
-            delete _adaptivityManager;
-        }
-        return r;
-    }
+    int wait();
 };
 
 /*!
@@ -276,37 +195,40 @@ typedef struct FarmConfiguration{
     FarmConfiguration(uint numWorkers, cpufreq::Frequency frequency = 0):numWorkers(numWorkers), frequency(frequency){;}
 }FarmConfiguration;
 
+inline bool operator==(const FarmConfiguration& lhs, const FarmConfiguration& rhs){
+    return lhs.numWorkers == rhs.numWorkers &&
+           lhs.frequency == rhs.frequency;
+}
+inline bool operator!=(const FarmConfiguration& lhs, const FarmConfiguration& rhs){return !operator==(lhs,rhs);}
+
 typedef struct MonitoredSample{
-    std::vector<NodeSample> nodes; ///< The samples taken from the active workers (one per worker).
-    energy::JoulesCpu usedCpusEnergy; ///< Energy consumed by active CPUs.
-    energy::JoulesCpu unusedCpusEnergy; ///< Energy consumed by inactive CPUs.
+    std::vector<WorkerSample> workers; ///< The samples taken from the active workers (one per worker).
+    energy::JoulesCpu totalJoules; ///< Energy consumed by all the CPUs.
 
-
-    NodeSample getAverageNodesSamples() const{
-        NodeSample ns;
-        for(size_t i = 0; i < nodes.size(); i++){
-            ns += nodes.at(i);
+    WorkerSample collapseWorkersSamples() const{
+        WorkerSample ws;
+        for(size_t i = 0; i < workers.size(); i++){
+            ws += workers.at(i);
         }
-        ns /= nodes.size();
-        return ns;
+        return ws;
     }
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
-        for(size_t i = 0; i < nodes.size(); i++){
-            nodes.at(i) = nodes.at(i) + rhs.nodes.at(i);
+        if(!workers.size()){
+            workers.resize(rhs.workers.size(), WorkerSample());
         }
-        usedCpusEnergy += rhs.usedCpusEnergy;
-        unusedCpusEnergy += rhs.unusedCpusEnergy;
-        // actual addition of rhs to *this
+        for(size_t i = 0; i < std::min(workers.size(), rhs.workers.size()); i++){
+            workers.at(i) = workers.at(i) + rhs.workers.at(i);
+        }
+        totalJoules += rhs.totalJoules;
         return *this;
     }
 
     MonitoredSample& operator/=(double c){
-        for(size_t i = 0; i < nodes.size(); i++){
-            nodes.at(i) = nodes.at(i) / c;
+        for(size_t i = 0; i < workers.size(); i++){
+            workers.at(i) = workers.at(i) / c;
         }
-        usedCpusEnergy /= c;
-        unusedCpusEnergy /= c;
+        totalJoules /= c;
         return *this;
 
     }
@@ -329,19 +251,23 @@ inline MonitoredSample operator/(MonitoredSample lhs, double c){
  *
  * This class manages the adaptivity in farm based computations.
  */
-template<typename lb_t=ff_loadbalancer, typename gt_t=ff_gatherer>
 class AdaptivityManagerFarm: public utils::Thread{
     friend class PredictorSimple;
     friend class PredictorLinearRegression;
+    friend class RegressionDataServiceTime;
+    friend class RegressionDataPower;
 private:
     utils::Monitor _monitor; ///< Used to let the manager stop safe.
-    adp_ff_farm<lb_t, gt_t>* _farm; ///< The managed farm.
+    adp_ff_farm<>* _farm; ///< The managed farm.
     AdaptivityParameters _p; ///< The parameters used to take management decisions.
     cpufreq::CpuFreq* _cpufreq; ///< The cpufreq module.
     energy::Energy* _energy; ///< The energy module.
     task::TasksManager* _task; ///< The task module.
     topology::Topology* _topology; ///< The topology module.
+    uint _numCpus; ///< Number of CPUs
     uint _numPhysicalCores; ///< Number of physical cores.
+    uint _numPhysicalCoresPerCpu; ///< Number of physical cores per CPU.
+    uint _numVirtualCoresPerPhysicalCore; ///< Number of virtual cores per physical core.
     adp_ff_node* _emitter; ///< The emitter (if present).
     adp_ff_node* _collector; ///< The collector (if present).
     std::vector<adp_ff_node*> _activeWorkers; ///< The currently running workers.
@@ -367,11 +293,10 @@ private:
     cpufreq::VoltageTable _voltageTable; ///< The voltage table.
     std::vector<cpufreq::Frequency> _availableFrequencies; ///< The available frequencies on this machine.
     Window<MonitoredSample> _monitoredSamples; ///< Monitored samples;
-    double _averageTasks; ///< The last value registered for average tasks per sampling interval processed.
-    double _averageUtilization; ///< The last value registered for average utilization per sampling interval.
-    double _averageCoresUtilization; ///< The last value registered for average cores utilization (percentage of the average utilization).
-    energy::JoulesCpu _usedJoules; ///< Average Joules consumed by the used virtual cores per sampling interval.
-    energy::JoulesCpu _unusedJoules; ///< Average Joules consumed by the unused virtual cores per sampling interval.
+    double _totalTasks; ///< The number of tasks processed since the last reconfiguration.
+    double _averageBandwidth; ///< The average tasks per second processed during last time window (samplingInterval * numSamples).
+    double _averageUtilization; ///< The average utilization during last time window (samplingInterval * numSamples).
+    energy::JoulesCpu _averageWatts; ///< Average Watts during last time window (samplingInterval * numSamples).
     uint64_t _remainingTasks; ///< When contract is CONTRACT_COMPLETION_TIME, represent the number of tasks that
                              ///< still needs to be processed by the application.
     time_t _deadline; ///< When contract is CONTRACT_COMPLETION_TIME, represent the deadline of the application.
@@ -438,8 +363,13 @@ private:
                 std::vector<topology::Cpu*> cpus = _topology->getCpus();
 
                 size_t virtualUsed = 0;
-                size_t virtualPerPhysical = _topology->getVirtualCores().size() /
-                                            _topology->getPhysicalCores().size();
+                size_t virtualPerPhysical;
+                if(_p.strategyHyperthreading != STRATEGY_HT_NO){
+                    virtualPerPhysical = _topology->getVirtualCores().size() /
+                                         _topology->getPhysicalCores().size();
+                }else{
+                    virtualPerPhysical = 1;
+                }
                 while(virtualUsed < virtualPerPhysical){
                     for(size_t i = 0; i < cpus.size(); i++){
                         std::vector<topology::PhysicalCore*> physicalCores = cpus.at(i)->getPhysicalCores();
@@ -721,19 +651,16 @@ private:
      * Updates the monitored values.
      */
     void updateMonitoredValues(){
-        _averageTasks = 0;
+        _averageBandwidth = 0;
         _averageUtilization = 0;
-        _averageCoresUtilization = 0;
-        _usedJoules.zero();
-        _unusedJoules.zero();
+        _averageWatts.zero();
 
         MonitoredSample average = _monitoredSamples.average();
-        NodeSample nodesAvg = average.getAverageNodesSamples();
-        _averageTasks = nodesAvg.tasksCount * _currentConfiguration.numWorkers;
-        _averageCoresUtilization = nodesAvg.corePercentage;
-        _averageUtilization = nodesAvg.loadPercentage;
-        _usedJoules = average.usedCpusEnergy;
-        _unusedJoules = average.unusedCpusEnergy;
+        WorkerSample workersSum = average.collapseWorkersSamples();
+
+        _averageBandwidth = workersSum.tasksCount / (double) _p.samplingInterval;
+        _averageUtilization = workersSum.loadPercentage / _currentConfiguration.numWorkers;
+        _averageWatts = average.totalJoules / (double) _p.samplingInterval;
     }
 
     /**
@@ -747,10 +674,10 @@ private:
             }break;
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
-                return _averageTasks / (double) _p.samplingInterval;
+                return _averageBandwidth;
             }break;
             case CONTRACT_POWER_BUDGET:{
-                return (_usedJoules.cores + _unusedJoules.cores) / (double) _p.samplingInterval;
+                return _averageWatts.cores;
             }break;
             default:{
                 return 0;
@@ -779,7 +706,7 @@ private:
                 return monitoredValue < _p.requiredBandwidth;
             }break;
             case CONTRACT_POWER_BUDGET:{
-                return monitoredValue < _p.powerBudget;
+                return monitoredValue > _p.powerBudget;
             }break;
             default:{
                 return false;
@@ -871,7 +798,7 @@ private:
         FarmConfiguration bestSuboptimalConfiguration = _currentConfiguration;
         bool feasibleSolutionFound = false;
 
-        double bestSecondaryValue;
+        double bestSecondaryValue = 0;
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:
             case CONTRACT_PERF_BANDWIDTH:
@@ -901,7 +828,7 @@ private:
                         remainingTime = (double) _remainingTasks / predictedMonitoredValue;
                     }break;
                     case CONTRACT_PERF_UTILIZATION:{
-                        predictedMonitoredValue = ((_averageTasks / _p.samplingInterval) / predictedMonitoredValue) * _averageUtilization;
+                        predictedMonitoredValue = (_averageBandwidth / predictedMonitoredValue) * _averageUtilization;
                     }break;
                     default:{
                         ;
@@ -979,8 +906,10 @@ private:
         }
 
         /****************** Refine the model ******************/
-        _primaryPredictor->refine();
-        _secondaryPredictor->refine();
+        if(configuration != _currentConfiguration){
+            _primaryPredictor->refine();
+            _secondaryPredictor->refine();
+        }
 
         /****************** Workers change started ******************/
         if(_currentConfiguration.numWorkers != configuration.numWorkers){
@@ -1023,6 +952,7 @@ private:
             /** Stops farm. **/
             _emitter->produceNull();
             _farm->wait_freezing();
+
             /** Notify the nodes that a reconfiguration is happening. **/
             _emitter->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
             for(uint i = 0; i < configuration.numWorkers; i++){
@@ -1047,6 +977,10 @@ private:
         }
         /****************** P-state change terminated ******************/
         _currentConfiguration = configuration;
+
+        /****************** Clean state ******************/
+        _monitoredSamples.reset();
+        _totalTasks = 0;
     }
 
     /** Send data to observer. **/
@@ -1057,11 +991,9 @@ private:
             _p.observer->_emitterVirtualCore = _emitterVirtualCore;
             _p.observer->_workersVirtualCore = _activeWorkersVirtualCores;
             _p.observer->_collectorVirtualCore = _collectorVirtualCore;
-            _p.observer->_currentTasks = _averageTasks;
-            _p.observer->_currentUtilization = _averageUtilization;
-            _p.observer->_currentCoresUtilization = _averageCoresUtilization;
-            _p.observer->_usedJoules = _usedJoules;
-            _p.observer->_unusedJoules = _unusedJoules;
+            _p.observer->_averageBandwidth = _averageBandwidth;
+            _p.observer->_averageUtilization = _averageUtilization;
+            _p.observer->_averageWatts = _averageWatts;
             _p.observer->observe();
         }
     }
@@ -1078,11 +1010,13 @@ private:
 
         MonitoredSample sample;
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
-            NodeSample ns;
+            WorkerSample ns;
             bool workerRunning = _activeWorkers.at(i)->getSampleResponse(ns);
             if(!workerRunning){
                 return false;
             }
+
+            _totalTasks += ns.tasksCount;
 
             if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
                 if(_remainingTasks > ns.tasksCount){
@@ -1091,24 +1025,20 @@ private:
                     _remainingTasks = 0;
                 }
             }
-
-            sample.nodes.push_back(ns);
+            sample.workers.push_back(ns);
         }
 
-        sample.usedCpusEnergy.zero();
+        sample.totalJoules.zero();
         for(size_t i = 0; i < _usedCpus.size(); i++){
             energy::CounterCpu* currentCounter = _energy->getCounterCpu(_usedCpus.at(i));
-            sample.usedCpusEnergy += currentCounter->getJoules();
+            sample.totalJoules += currentCounter->getJoules();
         }
-        sample.unusedCpusEnergy.zero();
         for(size_t i = 0; i < _unusedCpus.size(); i++){
             energy::CounterCpu* currentCounter = _energy->getCounterCpu(_unusedCpus.at(i));
-            sample.unusedCpusEnergy += currentCounter->getJoules();
+            sample.totalJoules += currentCounter->getJoules();
         }
         _energy->resetCountersCpu();
-
         _monitoredSamples.add(sample);
-
         return true;
     }
 
@@ -1155,14 +1085,17 @@ public:
      * @param farm The farm to be managed.
      * @param adaptivityParameters The parameters to be used for adaptivity decisions.
      */
-    AdaptivityManagerFarm(adp_ff_farm<lb_t, gt_t>* farm, AdaptivityParameters adaptivityParameters):
+    AdaptivityManagerFarm(adp_ff_farm<>* farm, AdaptivityParameters adaptivityParameters):
         _farm(farm),
         _p(adaptivityParameters),
         _cpufreq(_p.mammut.getInstanceCpuFreq()),
         _energy(_p.mammut.getInstanceEnergy()),
         _task(_p.mammut.getInstanceTask()),
         _topology(_p.mammut.getInstanceTopology()),
+        _numCpus(_topology->getCpus().size()),
         _numPhysicalCores(_topology->getPhysicalCores().size()),
+        _numPhysicalCoresPerCpu(_topology->getCpu(0)->getPhysicalCores().size()),
+        _numVirtualCoresPerPhysicalCore(_topology->getPhysicalCore(0)->getVirtualCores().size()),
         _emitter(_farm->getAdaptiveEmitter()),
         _collector(_farm->getAdaptiveCollector()),
         _activeWorkers(_farm->getAdaptiveWorkers()),
@@ -1227,6 +1160,9 @@ public:
         }
 
         initPredictors();
+        int remainingCalibrationSteps = (_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR)?_p.numRegressionPoints:0;
+        FarmConfiguration nextConfiguration;
+        bool reconfigurationRequired = false;
 
         if(_p.contractType == CONTRACT_NONE){
             _monitor.wait();
@@ -1264,11 +1200,40 @@ public:
                     --samplesToDiscard;
                 }
 
-                if((_monitoredSamples.size() >= _p.numSamples) &&
-                   isContractViolated(getMonitoredValue())){
-                    changeConfiguration(getNewConfiguration());
-                    _monitoredSamples.reset();
+                if(remainingCalibrationSteps >= 0){
+                    //TODO: Riscrivere meglio
+                    if(_totalTasks >= _p.numStabilizationTasks && _monitoredSamples.size() >= _p.numSamples){
+                        FarmConfiguration calibrationPoints[] = {
+                                {2, _availableFrequencies.at(0)},
+                                {1, _availableFrequencies.at(1)},
+                                {3, _availableFrequencies.at(2)},
+                                {4, _availableFrequencies.at(3)},
+                                {2, _availableFrequencies.at(4)},
+                                //{8, _availableFrequencies.at(0)},
+                                //{14, _availableFrequencies.at(5)},
+                                //{17, _availableFrequencies.at(2)},
+                                //{23, _availableFrequencies.at(8)}
+                        };
+                        reconfigurationRequired = true;
+
+                        if(remainingCalibrationSteps){
+                            nextConfiguration = calibrationPoints[_p.numRegressionPoints - remainingCalibrationSteps];
+                            std::cout << "Forcing calibration to " << nextConfiguration.numWorkers << ", " << nextConfiguration.frequency << std::endl;
+                        }else{
+                            nextConfiguration = getNewConfiguration();
+                        }
+                        --remainingCalibrationSteps;
+                    }
+                }else if((_monitoredSamples.size() >= _p.numSamples) && isContractViolated(getMonitoredValue())){
+                    std::cout << "Contract violated" << std::endl;
+                    reconfigurationRequired = true;
+                    nextConfiguration = getNewConfiguration();
+                }
+
+                if(reconfigurationRequired){
+                    changeConfiguration(nextConfiguration);
                     samplesToDiscard = _p.samplesToDiscard;
+                    reconfigurationRequired = false;
                 }
 
                 lastOverheadMs = utils::getMillisecondsTime() - startOverheadMs;
@@ -1293,6 +1258,138 @@ public:
         return _monitor.predicate();
     }
 };
+
+template <typename lb_t, typename gt_t>
+void adp_ff_farm<lb_t, gt_t>::construct(){
+    _adaptiveEmitter = NULL;
+    _adaptiveCollector = NULL;
+    _firstRun = true;
+    _adaptivityManager = NULL;
+}
+
+template <typename lb_t, typename gt_t>
+void adp_ff_farm<lb_t, gt_t>::construct(AdaptivityParameters adaptivityParameters){
+    construct();
+    setAdaptivityParameters(adaptivityParameters);
+}
+
+template <typename lb_t, typename gt_t>
+std::vector<adp_ff_node*> adp_ff_farm<lb_t, gt_t>::getAdaptiveWorkers() const{
+    return _adaptiveWorkers;
+}
+
+template <typename lb_t, typename gt_t>
+adp_ff_node* adp_ff_farm<lb_t, gt_t>::getAdaptiveEmitter() const{
+    return _adaptiveEmitter;
+}
+
+template <typename lb_t, typename gt_t>
+adp_ff_node* adp_ff_farm<lb_t, gt_t>::getAdaptiveCollector() const{
+    return _adaptiveCollector;
+}
+
+template <typename lb_t, typename gt_t>
+adp_ff_farm<lb_t, gt_t>::adp_ff_farm(std::vector<ff_node*>& w, ff_node* const emitter,
+                                     ff_node* const collector, bool inputCh):
+    ff_farm<lb_t, gt_t>::ff_farm(w, emitter, collector, inputCh){
+    construct();
+}
+
+template <typename lb_t, typename gt_t>
+adp_ff_farm<lb_t, gt_t>::adp_ff_farm(bool inputCh,
+                      int inBufferEntries,
+                      int outBufferEntries,
+                      bool workerCleanup,
+                      int maxNumWorkers,
+                      bool fixedSize):
+    ff_farm<lb_t, gt_t>::ff_farm(inputCh, inBufferEntries, outBufferEntries, workerCleanup, maxNumWorkers, fixedSize){
+    construct();
+}
+
+template <typename lb_t, typename gt_t>
+adp_ff_farm<lb_t, gt_t>::adp_ff_farm(AdaptivityParameters adaptivityParameters, std::vector<ff_node*>& w,
+             ff_node* const emitter, ff_node* const collector, bool inputCh):
+    ff_farm<lb_t, gt_t>::ff_farm(w, emitter, collector, inputCh){
+    construct(adaptivityParameters);
+}
+
+template <typename lb_t, typename gt_t>
+adp_ff_farm<lb_t, gt_t>::adp_ff_farm(AdaptivityParameters adaptivityParameters, bool inputCh,
+                      int inBufferEntries,
+                      int outBufferEntries,
+                      bool workerCleanup,
+                      int maxNumWorkers,
+                      bool fixedSize):
+    ff_farm<lb_t, gt_t>::ff_farm(inputCh, inBufferEntries, outBufferEntries, workerCleanup, maxNumWorkers, fixedSize){
+    construct(adaptivityParameters);
+}
+
+template <typename lb_t, typename gt_t>
+adp_ff_farm<lb_t, gt_t>::~adp_ff_farm(){
+    ;
+}
+
+template <typename lb_t, typename gt_t>
+void adp_ff_farm<lb_t, gt_t>::setAdaptivityParameters(AdaptivityParameters adaptivityParameters){
+    _adaptivityParameters = adaptivityParameters;
+    uint validationRes = _adaptivityParameters.validate();
+    if(validationRes != VALIDATION_OK){
+        throw std::runtime_error("AdaptiveFarm: invalid AdaptivityParameters: " + utils::intToString(validationRes));
+    }
+}
+
+template <typename lb_t, typename gt_t>
+void adp_ff_farm<lb_t, gt_t>::firstRunBefore(){
+    if(_firstRun){
+        svector<ff_node*> workers = ff_farm<lb_t, gt_t>::getWorkers();
+        for(size_t i = 0; i < workers.size(); i++){
+            _adaptiveWorkers.push_back(static_cast<adp_ff_node*>(workers[i]));
+            _adaptiveWorkers.at(i)->initMammutModules(_adaptivityParameters.mammut);
+        }
+
+        _adaptiveEmitter = static_cast<adp_ff_node*>(ff_farm<lb_t, gt_t>::getEmitter());
+        if(_adaptiveEmitter){
+            _adaptiveEmitter->initMammutModules(_adaptivityParameters.mammut);
+        }
+
+        _adaptiveCollector = static_cast<adp_ff_node*>(ff_farm<lb_t, gt_t>::getCollector());
+        if(_adaptiveCollector){
+            _adaptiveCollector->initMammutModules(_adaptivityParameters.mammut);
+        }
+    }
+}
+
+template <typename lb_t, typename gt_t>
+void adp_ff_farm<lb_t, gt_t>::firstRunAfter(){
+    if(_firstRun){
+        _firstRun = false;
+        _adaptivityManager = new AdaptivityManagerFarm(this, _adaptivityParameters);
+        _adaptivityManager->start();
+    }
+}
+
+template <typename lb_t, typename gt_t>
+int adp_ff_farm<lb_t, gt_t>::run(bool skip_init){
+    firstRunBefore();
+    int r = ff_farm<lb_t, gt_t>::run(skip_init);
+    if(r){
+        return r;
+    }
+    firstRunAfter();
+    return r;
+}
+
+template <typename lb_t, typename gt_t>
+int adp_ff_farm<lb_t, gt_t>::wait(){
+    int r = 0;
+    //int r = ff_farm<lb_t, gt_t>::wait();
+    if(_adaptivityManager){
+        //_adaptivityManager->stop();
+        _adaptivityManager->join();
+        delete _adaptivityManager;
+    }
+    return r;
+}
 
 }
 

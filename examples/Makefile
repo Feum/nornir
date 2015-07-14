@@ -1,7 +1,7 @@
-MAMMUTROOT           = /home/desensi/Mammut
-export INCS          = -I$(realpath ..) -I$(MAMMUTROOT)
-export LIBS          = -lpthread -L$(MAMMUTROOT)/mammut -lmammut -lprotobuf-lite -lrt
-APPS                 = cholesky pbzip2 matmul
+MAMMUTROOT           = /home/daniele/Mammut
+export INCS          = -I$(realpath ..) -I$(MAMMUTROOT) -I/usr/include/libxml2
+export LIBS          = -lpthread -L$(MAMMUTROOT)/mammut -lmammut -lprotobuf-lite -lrt -lmlpack -llapack -lblas
+APPS                 = pbzip2  #cholesky matmul
 
 .PHONY: all clean cleanall
 

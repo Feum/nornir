@@ -49,33 +49,30 @@ using namespace mammut;
  *
  * This struct represents a sample of values taken from an adaptive node.
  */
-typedef struct NodeSample{
+typedef struct WorkerSample{
     double loadPercentage; ///< The percentage of time that the node spent on svc().
-    uint64_t tasksCount; ///< The number of computed tasks.
-    double corePercentage; ///< The percentage of time that the node spent on the core while it was in svc().
-    NodeSample():loadPercentage(0), tasksCount(0), corePercentage(0){;}
+    double tasksCount; ///< The number of computed tasks.
+    WorkerSample():loadPercentage(0), tasksCount(0){;}
 
-    NodeSample& operator+=(const NodeSample& rhs){
+    WorkerSample& operator+=(const WorkerSample& rhs){
         loadPercentage += rhs.loadPercentage;
         tasksCount += rhs.tasksCount;
-        corePercentage += rhs.corePercentage;
         return *this;
     }
 
-    NodeSample& operator/=(double c){
+    WorkerSample& operator/=(double c){
         loadPercentage /= c;
         tasksCount /= c;
-        corePercentage /= c;
         return *this;
     }
 }NodeSample;
 
-inline NodeSample operator+(NodeSample lhs, const NodeSample& rhs){
+inline WorkerSample operator+(WorkerSample lhs, const WorkerSample& rhs){
     lhs += rhs;
     return lhs;
 }
 
-inline NodeSample operator/(NodeSample lhs, double c){
+inline WorkerSample operator/(WorkerSample lhs, double c){
     lhs /= c;
     return lhs;
 }
@@ -101,7 +98,6 @@ private:
     template<typename lb_t, typename gt_t>
     friend class adp_ff_farm;
 
-    template<typename lb_t, typename gt_t>
     friend class AdaptivityManagerFarm;
 
     Mammut _mammut;
@@ -115,7 +111,7 @@ private:
     ticks _workTicks;
     ticks _startTicks;
     ManagementRequest _managementRequest;
-    NodeSample _sampleResponse;
+    WorkerSample _sampleResponse;
     ff::SWSR_Ptr_Buffer _managementQ; ///< Queue used by the manager to notify that a request
                                       ///< is present on _managementRequest.
     ff::SWSR_Ptr_Buffer _responseQ; ///< Queue used by the node to notify that a response is
@@ -170,7 +166,7 @@ private:
      * been called.
      * @return true if the node is running, false otherwise.
      */
-     bool getSampleResponse(NodeSample& sample){
+     bool getSampleResponse(WorkerSample& sample){
 		int dummy;
 		int* dummyPtr = &dummy;
 		while(!_responseQ.pop((void**) &dummyPtr)){
@@ -197,18 +193,12 @@ private:
         int dummy;
         int* dummyPtr = &dummy;
         ticks now = getticks();
-        double totalCorePercentage = 0;
         _sampleResponse.loadPercentage = ((double) (_workTicks)
                 / (double) ((now - _startTicks))) * 100.0;
         _sampleResponse.tasksCount = _tasksCount;
-        _thread->getCoreUsage(totalCorePercentage);
-        _sampleResponse.corePercentage = ((totalCorePercentage
-                - (100.0 - _sampleResponse.loadPercentage))
-                / _sampleResponse.loadPercentage) * 100.0;
         _workTicks = 0;
         _startTicks = now;
         _tasksCount = 0;
-        _thread->resetCoreUsage();
         _responseQ.push(dummyPtr);
     }
 

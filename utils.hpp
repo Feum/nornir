@@ -88,6 +88,11 @@ public:
 
     T average() const{
         T r;
+
+        if(!_storedValues){
+            return r;
+        }
+
         for(size_t i = 0; i < _storedValues; i++){
             r += _windowImpl[i];
         }
@@ -96,6 +101,6 @@ public:
 
 };
 
-};
+}
 
 #endif /* UTILS_HPP_ */

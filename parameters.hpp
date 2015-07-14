@@ -45,8 +45,12 @@ using namespace mammut;
 typedef enum{
     CONTRACT_NONE = 0, ///< No contract required.
     CONTRACT_PERF_UTILIZATION, ///< A specific utilization (expressed by two bounds [X, Y]) is requested.
-    CONTRACT_PERF_BANDWIDTH, ///< A specific minimum bandwidth is requested.
-    CONTRACT_PERF_COMPLETION_TIME, ///< A specific maximum completion time is requested.
+                               ///< Under this constraint, the configuration with minimum power consumption
+                               ///< is chosen.
+    CONTRACT_PERF_BANDWIDTH, ///< A specific minimum bandwidth is requested. Under this constraint, the
+                             ///< configuration with minimum power consumption is chosen.
+    CONTRACT_PERF_COMPLETION_TIME, ///< A specific maximum completion time is requested. Under this constraint, the
+                                   ///< configuration with minimum energy consumption is chosen.
     CONTRACT_POWER_BUDGET ///< A specific maximum cores power is requested. Under this constraint, the configuration
                           ///< with best performance is chosen.
 }ContractType;
@@ -74,6 +78,13 @@ typedef enum{
     STRATEGY_MAPPING_CACHE_EFFICIENT ///< Tries to make good use of the shared caches.
                                      ///< Particularly useful when threads have large working sets.
 }StrategyMapping;
+
+/// Possible hyperthreading strategies.
+typedef enum{
+    STRATEGY_HT_NO = 0, ///< Hyperthreading is not used.
+    STRATEGY_HT_YES_SOONER, ///< Hyperthreading is used since the beginning.
+    STRATEGY_HT_YES_LATER ///< Hyperthreading is used only when we used all the physical cores.
+}StrategyHyperthreading;
 
 /// Possible strategies to apply for unused virtual cores. For unused virtual cores we mean
 /// those never used or those used only on some conditions.
@@ -140,15 +151,15 @@ private:
     template<typename lb_t, typename gt_t>
     friend class adp_ff_farm;
 
-    template<typename lb_t, typename gt_t>
     friend class AdaptivityManagerFarm;
 
     /**
      * Sets default parameters
      */
     void setDefault(){
-        contractType = CONTRACT_PERF_UTILIZATION;
+        contractType = CONTRACT_NONE;
         strategyMapping = STRATEGY_MAPPING_LINEAR;
+        strategyHyperthreading = STRATEGY_HT_NO;
         strategyFrequencies = STRATEGY_FREQUENCY_NO;
         strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
@@ -174,14 +185,16 @@ private:
         expectedTasksNumber = 0;
         powerBudget = 0;
         numRegressionPoints = 0;
+        numStabilizationTasks = 0;
         voltageTableFile = "";
         observer = NULL;
     }
 public:
     mammut::Mammut mammut; ///< The mammut modules handler.
     ContractType contractType; ///< The contract type that must be respected by the application
-                               ///< [default = CONTRACT_UTILIZATION].
+                               ///< [default = CONTRACT_NONE].
     StrategyMapping strategyMapping; ///< The mapping strategy [default = STRATEGY_MAPPING_LINEAR].
+    StrategyHyperthreading strategyHyperthreading; ///< The hyperthreading strategy [default = STRATEGY_HT_NO].
     StrategyFrequencies strategyFrequencies; ///< The frequency strategy. It can be different from
                                              ///< STRATEGY_FREQUENCY_NO only if strategyMapping is
                                              ///< different from STRATEGY_MAPPING_NO [default = STRATEGY_FREQUENCY_NO].
@@ -231,9 +244,12 @@ public:
     double powerBudget;           ///< The maximum cores power to be used. It is
                                   ///< valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
     std::string voltageTableFile; ///< The file containing the voltage table. It is mandatory when
-                                  ///< strategyFrequencies is STRATEGY_FREQUENCY_POWER_CONSERVATIVE [default = unused].
+                                  ///< strategyFrequencies is STRATEGY_FREQUENCY_YES or when contract is [default = unused].
     unsigned int numRegressionPoints; ///< Points to be used for regression when strategyPrediction is
                                       ///< STRATEGY_PREDICTION_REGRESSION_LINEAR [default = unused].
+    unsigned int numStabilizationTasks; ///< Number of tasks to be processed in each configuration during the
+                                        ///< calibration phase when strategyPrediction is
+                                        ///< STRATEGY_PREDICTION_REGRESSION_LINEAR [default = unused].
     adp_ff_farm_observer* observer; ///< The observer object. It will be called every samplingInterval seconds
                                    ///< to monitor the adaptivity behaviour [default = NULL].
 
@@ -284,6 +300,11 @@ public:
 		if(node){
 			strategyMapping = (StrategyMapping) utils::stringToInt(node->value());
 		}
+
+        node = root->first_node("strategyHyperthreading");
+        if(node){
+            strategyHyperthreading = (StrategyHyperthreading) utils::stringToInt(node->value());
+        }
 
 		node = root->first_node("strategyFrequencies");
 		if(node){
@@ -408,6 +429,11 @@ public:
         node = root->first_node("numRegressionPoints");
         if(node){
             numRegressionPoints = utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("numStabilizationTasks");
+        if(node){
+            numStabilizationTasks = utils::stringToInt(node->value());
         }
 
 		node = root->first_node("voltageTableFile");
@@ -574,8 +600,13 @@ public:
         }
 
         /** Validate linear regression. **/
-        if(strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR && numRegressionPoints == 0){
+        if(strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR && (numRegressionPoints == 0 || numStabilizationTasks == 0)){
             return VALIDATION_WRONG_REGRESSION_PARAMETERS;
+        }
+
+        /** Validate Hyperthreading strategies. **/
+        if(strategyHyperthreading == STRATEGY_HT_YES_SOONER){
+            throw std::runtime_error("Not yet supported.");
         }
 
         return VALIDATION_OK;

@@ -35,62 +35,154 @@
 #include "predictors.hpp"
 #include "farm.hpp"
 
+#if 1
+#define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
+#else
+#define DEBUG(x)
+#endif
+
+
 namespace adpff{
 
 
 /**************** PredictorLinearRegression ****************/
 
-void RegressionDataBandwidth::init(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration){
-    double usedPhysicalCores = std::min(configuration.numWorkers, manager._numPhysicalCores);
-    _physicalCoresInverse = 1.0 / usedPhysicalCores;
-    _workersInverse = 1.0 / (double)configuration.numWorkers;
-    _frequencyInverse = 1.0 / (double) configuration.frequency;
-    _scalFactorPhysical = ( usedPhysicalCores * ((double)configuration.frequency / (double)manager._availableFrequencies.at(0)));
-    _scalFactorWorkers = ((double) configuration.numWorkers * ((double)configuration.frequency / (double)manager._availableFrequencies.at(0)));
+void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
+    _numPredictors = 0;
+
+    double usedPhysicalCores = std::min(configuration.numWorkers, _manager._numPhysicalCores);
+    /*
+    _physicalCores = usedPhysicalCores;
+    ++_numPredictors;
+     */
+    _invScalFactorPhysical = 1.0 / (usedPhysicalCores * ((double)configuration.frequency /
+                                                         (double)_manager._availableFrequencies.at(0)));
+    ++_numPredictors;
+
+    /*
+    if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
+        _workers = (double)configuration.numWorkers;
+        ++_numPredictors;
+
+        _invScalFactorWorkers = 1.0 / ((double) configuration.numWorkers * ((double)configuration.frequency /
+                                                                            (double)_manager._availableFrequencies.at(0)));
+        ++_numPredictors;
+    }
+    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
+        _frequency = configuration.frequency;
+        ++_numPredictors;
+    }*/
 }
 
-RegressionDataBandwidth::RegressionDataBandwidth():_physicalCoresInverse(0), _workersInverse(0),
-                          _frequencyInverse(0), _scalFactorPhysical(0), _scalFactorWorkers(0){;}
+RegressionDataServiceTime::RegressionDataServiceTime(const AdaptivityManagerFarm& manager):
+                                                   _manager(manager),
+                                                   _physicalCores(0), _invScalFactorPhysical(0),
+                                                   _workers(0), _invScalFactorWorkers(0),
+                                                   _frequency(0),
+                                                   _numPredictors(0){;}
 
-RegressionDataBandwidth::RegressionDataBandwidth(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration){
-    init(manager, configuration);
+RegressionDataServiceTime::RegressionDataServiceTime(const AdaptivityManagerFarm& manager, const FarmConfiguration& configuration):
+            _manager(manager){
+    init(configuration);
 }
 
-arma::subview_row RegressionDataBandwidth::toArmaRow() const{
-    arma::subview_row row;
-    row(0) = _physicalCoresInverse;
-    row(1) = _workersInverse;
-    row(2) = _frequencyInverse;
-    row(3) = _scalFactorPhysical;
-    row(4) = _scalFactorWorkers;
-    return row;
+uint RegressionDataServiceTime::getNumPredictors() const{
+    return _numPredictors;
 }
 
-void RegressionDataPower::init(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration){
-    double usedPhysicalCores = std::min(configuration.numWorkers, manager._numPhysicalCores);
-    double voltage = manager.getVoltage(configuration);
-    _contextes = std::ceil((double)configuration.numWorkers / usedPhysicalCores);
-    _voltagePerUsedSockets = voltage * (double) manager._usedCpus.size();
-    _voltagePerUnusedSockets = voltage * (double) manager._unusedCpus.size();
-    _dynamicPowerModel = (usedPhysicalCores*configuration.frequency*voltage*voltage)/1000000.0;
+void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) const{
+    size_t rowId = 0;
+    //TODO: !!!
+    //matrix(rowId++, columnId) = _physicalCores;
+    matrix(rowId++, columnId) = _invScalFactorPhysical;
+    /*if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
+        matrix(rowId++, columnId) = _workers;
+        matrix(rowId++, columnId) = _invScalFactorWorkers;
+    }
+    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
+        matrix(rowId++, columnId) = _frequency;
+    }*/
 }
 
-RegressionDataPower::RegressionDataPower():_contextes(0), _voltagePerUsedSockets(0), _voltagePerUnusedSockets(0), _dynamicPowerModel(0){;}
+void RegressionDataPower::init(const FarmConfiguration& configuration){
+    _numPredictors = 0;
+    double usedPhysicalCores = std::min(configuration.numWorkers, _manager._numPhysicalCores);
 
-RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration){
-    init(manager, configuration);
+    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
+        double voltage = _manager.getVoltage(configuration);
+        uint usedCpus;
+        if(_manager._p.strategyMapping == STRATEGY_MAPPING_LINEAR){
+            switch(_manager._p.strategyHyperthreading){
+                case STRATEGY_HT_NO:{
+                    usedCpus = std::ceil((double) configuration.numWorkers /
+                                         (double) _manager._numPhysicalCoresPerCpu);
+                }break;
+                case STRATEGY_HT_YES_LATER:{
+                    usedCpus = std::ceil((double) configuration.numWorkers /
+                                         (double) _manager._numPhysicalCoresPerCpu);
+                    if(configuration.numWorkers > _manager._numPhysicalCores){
+                        _additionalContextes = configuration.numWorkers - _manager._numPhysicalCores;
+                        _additionalContextes = std::min(_additionalContextes, _manager._numVirtualCoresPerPhysicalCore*_manager._numPhysicalCores);
+                    }else{
+                        _additionalContextes = 0;
+                    }
+                    ++_numPredictors;
+                }break;
+                case STRATEGY_HT_YES_SOONER:{
+                    usedCpus = std::ceil((double) configuration.numWorkers /
+                                         ((double) _manager._numPhysicalCoresPerCpu * (double) _manager._numVirtualCoresPerPhysicalCore));
+                }break;
+            }
+        }else{
+            ; //TODO
+        }
+        usedCpus = std::max(usedCpus, _manager._numCpus);
+        uint unusedCpus = _manager._numCpus - usedCpus;
+
+        _voltagePerUsedSockets = voltage * (double) usedCpus;
+        ++_numPredictors;
+
+        if(_manager._numCpus > 1){
+            _voltagePerUnusedSockets = voltage * (double) unusedCpus;
+            ++_numPredictors;
+        }
+
+        _dynamicPowerModel = (usedPhysicalCores*configuration.frequency*voltage*voltage);
+        ++_numPredictors;
+    }else{
+        _dynamicPowerModel = usedPhysicalCores;
+        ++_numPredictors;
+    }
 }
 
-arma::subview_row RegressionDataPower::toArmaRow() const{
-    arma::subview_row row;
-    row(0) = _contextes;
-    row(1) = _voltagePerUsedSockets;
-    row(2) = _voltagePerUnusedSockets;
-    row(3) = _dynamicPowerModel;
-    return row;
+RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm& manager):
+        _manager(manager), _dynamicPowerModel(0), _voltagePerUsedSockets(0),
+        _voltagePerUnusedSockets(0), _additionalContextes(0), _numPredictors(0){;}
+
+RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm& manager, const FarmConfiguration& configuration):
+            _manager(manager){
+    init(configuration);
 }
 
-PredictorLinearRegression::PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm<>& manager):
+uint RegressionDataPower::getNumPredictors() const{
+    return _numPredictors;
+}
+
+void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
+    size_t rowId = 0;
+    matrix(rowId++, columnId) = _dynamicPowerModel;
+    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
+        matrix(rowId++, columnId) = _voltagePerUsedSockets;
+        if(_manager._numCpus > 1){
+            matrix(rowId++, columnId) = _voltagePerUnusedSockets;
+        }
+    }
+    if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
+        matrix(rowId++, columnId) = _additionalContextes;
+    }
+}
+
+PredictorLinearRegression::PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm& manager):
                                                     _type(type), _manager(manager), _dataIndex(0), _dataSize(0),
                                                     _responses(_manager._p.numRegressionPoints){
     _data = new RegressionData*[_manager._p.numRegressionPoints];
@@ -98,20 +190,20 @@ PredictorLinearRegression::PredictorLinearRegression(PredictorType type, const A
     switch(_type){
         case PREDICTION_BANDWIDTH:{
             for(size_t i = 0; i < _manager._p.numRegressionPoints; i++){
-                _data[i] = new RegressionDataBandwidth();
+                _data[i] = new RegressionDataServiceTime(_manager);
             }
-            _predictionInput = new RegressionDataBandwidth();
+            _predictionInput = new RegressionDataServiceTime(_manager);
         }break;
         case PREDICTION_POWER:{
             for(size_t i = 0; i < _manager._p.numRegressionPoints; i++){
-                _data[i] = new RegressionDataPower();
+                _data[i] = new RegressionDataPower(_manager);
             }
-            _predictionInput = new RegressionDataPower();
+            _predictionInput = new RegressionDataPower(_manager);
         }break;
     }
 }
 
-PredictorLinearRegression~PredictorLinearRegression(){
+PredictorLinearRegression::~PredictorLinearRegression(){
     for(size_t i = 0; i < _manager._p.numRegressionPoints; i++){
         delete _data[i];
     }
@@ -120,16 +212,20 @@ PredictorLinearRegression~PredictorLinearRegression(){
 }
 
 void PredictorLinearRegression::refine(){
-    _data[_dataIndex]->init(_manager, _manager._currentConfiguration);
+    _data[_dataIndex]->init(_manager._currentConfiguration);
+    double response = 0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            _responses.add(_manager._averageTasks / (double) _manager._p.samplingInterval); //TODO: Probabilmente bisognerebbe usare il Ts
+            response = 1.0 / _manager._averageBandwidth;
         }break;
         case PREDICTION_POWER:{
-            _responses.add((_manager._usedJoules.cores / _manager._p.samplingInterval) +
-                           (_manager._unusedJoules.cores /_manager._p.samplingInterval)); //TODO: Probabilmente si può evitare di dividere per il sampling interval
+            response = _manager._averageWatts.cores;
         }break;
     }
+    _responses.add(response);
+    DEBUG("Refining with configuration [" << _manager._currentConfiguration.numWorkers << ", "
+                                          << _manager._currentConfiguration.frequency << "]: "
+                                          << response);
     _dataIndex = (_dataIndex + 1) % _manager._p.numRegressionPoints;
     if(_dataSize < _manager._p.numRegressionPoints){
         ++_dataSize;
@@ -137,30 +233,41 @@ void PredictorLinearRegression::refine(){
 }
 
 void PredictorLinearRegression::prepareForPredictions(){
-    arma::mat dataMl;
-    arma::vec responsesMl;
+    if(!_dataSize){
+        return;
+    }
 
+    // One observation per column.
+    arma::mat dataMl(_data[0]->getNumPredictors(), _dataSize);
+    arma::vec responsesMl(_dataSize);
     for(size_t i = 0; i < _dataSize; i++){
-        dataMl.row(i) = _data[i]->toArmaRow();
+        _data[i]->toArmaRow(i, dataMl);
         responsesMl(i) = _responses[i];
     }
 
-    _lr(dataMl, responsesMl);
+    _lr = LinearRegression(dataMl, responsesMl);
+    DEBUG("========================== Preparing for predictions: ========================== ");
 }
 
 double PredictorLinearRegression::predict(const FarmConfiguration& configuration){
-    _predictionInput->init(_manager, configuration);
-    arma::mat predictionInputMl;
-    arma::vec result;
-    predictionInputMl.row(0) = _predictionInput->toArmaRow();
+    _predictionInput->init(configuration);
+
+    // One observation per column.
+    arma::mat predictionInputMl(_predictionInput->getNumPredictors(), 1);
+    arma::vec result(1);
+    _predictionInput->toArmaRow(0, predictionInputMl);
 
     _lr.Predict(predictionInputMl, result);
+    if(_type == PREDICTION_BANDWIDTH){
+        result.at(0) = 1.0 / result.at(0);
+    }
+    DEBUG("Prediction at configuration [" << configuration.numWorkers << ", " << configuration.frequency << "]: " << result.at(0));
     return result.at(0);
 }
     
 /**************** PredictorSimple ****************/
 
-PredictorSimple::PredictorSimple(PredictorType type, const AdaptivityManagerFarm<>& manager):
+PredictorSimple::PredictorSimple(PredictorType type, const AdaptivityManagerFarm& manager):
     _type(type), _manager(manager), _now(0){
     ;
 }
@@ -181,9 +288,6 @@ void PredictorSimple::prepareForPredictions(){
 
 double PredictorSimple::predict(const FarmConfiguration& configuration){
     switch(_type){
-        case PREDICTION_UTILIZATION:{
-            return _manager.getMonitoredValue() * (1.0 / getScalingFactor(configuration));
-        }break;
         case PREDICTION_BANDWIDTH:{
             return _manager.getMonitoredValue() * getScalingFactor(configuration);
         }break;
@@ -191,6 +295,7 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
             return getPowerPrediction(configuration);
         }break;
     }
+    return 0.0;
 }
 
 }

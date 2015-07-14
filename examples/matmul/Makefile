@@ -31,7 +31,7 @@ LINK_OPT             =
 VERSION              = 
 OPTIMIZE_FLAGS       = -O3 -finline-functions #-mavx
 OMP_FLAGS 	     = -fopenmp #-openmp
-CXXFLAGS             = -DNO_CMAKE_CONFIG -Wall #-DALLOCATOR_STATS #-DTRACE_FASTFLOW
+CXXFLAGS             = -std=c++11 -DNO_CMAKE_CONFIG -Wall #-DALLOCATOR_STATS #-DTRACE_FASTFLOW
 CFLAGS               =
 LDFLAGS              = 
 #INCS                 = -I../../ -I/home/desensi/include -I/home/desensi/Mammut -I/home/desensi/adaptivefastflow

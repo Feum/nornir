@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <vector>
 #include <farm.hpp>
+#include <predictors_impl.hpp>
 #include <mammut/mammut.hpp>
 #include <mammut/utils.hpp>
 
@@ -55,16 +56,16 @@ public:
         _statsFile << "] ";
 
         _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
-        _statsFile << _currentTasks << " ";
-        _statsFile << _currentUtilization << " ";
+        _statsFile << _averageBandwidth << " ";
+        _statsFile << _averageUtilization << " ";
         _statsFile << _currentCoresUtilization << " ";
         _statsFile << std::endl;
         /****************** Energy ******************/
 
-        _energyFile << _usedJoules.cpu << " " << _usedJoules.cores << " " << _usedJoules.graphic << " " << _usedJoules.dram << " ";
+        _energyFile << _averageWatts.cpu << " " << _averageWatts.cores << " " << _averageWatts.graphic << " " << _averageWatts.dram << " ";
         _energyFile << _unusedJoules.cpu << " " << _unusedJoules.cores << " " << _unusedJoules.graphic << " " << _unusedJoules.dram << " ";
         _energyFile << std::endl;
-        _totalUsedJoules += _usedJoules;
+        _totalUsedJoules += _averageWatts;
         _totalUnusedJoules += _unusedJoules;
     }
 };

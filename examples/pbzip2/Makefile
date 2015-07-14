@@ -5,7 +5,7 @@ FF_HOME = /home/desensi/include/
 
 # Compiler to use
 CC = g++
-CFLAGS = -DNO_CMAKE_CONFIG -O2 -finline-functions
+CFLAGS = -DNO_CMAKE_CONFIG -O2 -finline-functions --std=c++11
 
 # Comment out CFLAGS line below for compatability mode for 32bit file sizes
 # (less than 2GB) and systems that have compilers that treat int as 64bit

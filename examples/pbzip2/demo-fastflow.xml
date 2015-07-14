@@ -23,15 +23,18 @@
     <requiredBandwidth>0</requiredBandwidth>
     <maxBandwidthVariation>0</maxBandwidthVariation>
     <voltageTableFile>voltage.txt</voltageTableFile>
-
     <contractType>2</contractType>
     <strategyFrequencies>3</strategyFrequencies>
     <voltageTableFile>voltage.txt</voltageTableFile> -->
-    <contractType>0</contractType>
+    
+    <samplingInterval>2</samplingInterval>
     <samplesToDiscard>2</samplesToDiscard>
-    <numSamples>4</numSamples>
-    <requiredCompletionTime>0</requiredCompletionTime>
-    <expectedTasksNumber>2020</expectedTasksNumber>
-<!-- <strategyUnusedVirtualCore>3</strategyUnusedVirtualCore>  
-    <strategyInactiveVirtualCore>3</strategyInactiveVirtualCore> -->
+    <contractType>4</contractType>
+    <voltageTableFile>voltage.txt</voltageTableFile>
+	<powerBudget>30</powerBudget>
+	<numRegressionPoints>4</numRegressionPoints>
+	<numStabilizationTasks>50</numStabilizationTasks>
+	<strategyFrequencies>0</strategyFrequencies>
+	<strategyMapping>2</strategyMapping>
+	<strategyPrediction>1</strategyPrediction> 
 </adaptivityParameters>

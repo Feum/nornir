@@ -34,7 +34,7 @@
 #include <iostream>
 #include <fstream>
 #include "../farm.hpp"
-#include "../parallel_for.hpp"
+#include "../predictors_impl.hpp"
 
 using namespace ff;
 
@@ -54,7 +54,7 @@ public:
         if(!_energyFile.is_open()){
             throw std::runtime_error("Obs: Impossible to open energy file.");
         }
-        _energyFile << "# UsedVCCpuEnergy UsedVCCoresEnergy UsedVCGraphicEnergy UsedVCDRAMEnergy NotusedVCCpuEnergy NotusedVCCoresEnergy NotusedVCGraphicEnergy NotusedVCDRAMEnergy " << std::endl;
+        _energyFile << "# UsedVCCpuEnergy UsedVCCoresEnergy UsedVCGraphicEnergy UsedVCDRAMEnergy " << std::endl;
     }
 
     ~Obs(){
@@ -81,14 +81,16 @@ public:
         _statsFile << "] ";
 
         _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
-        _statsFile << _currentTasks << " ";
-        _statsFile << _currentUtilization << " ";
+        _statsFile << _averageBandwidth << " ";
+        _statsFile << _averageUtilization << " ";
 
         _statsFile << std::endl;
 
         /****************** Energy ******************/
-        _energyFile << _usedJoules.cpu << " " << _usedJoules.cores << " " << _usedJoules.graphic << " " << _usedJoules.dram << " ";
-        _energyFile << _unusedJoules.cpu << " " << _unusedJoules.cores << " " << _unusedJoules.graphic << " " << _unusedJoules.dram << " ";
+        _energyFile << _averageWatts.cpu << " "
+                    << _averageWatts.cores << " "
+                    << _averageWatts.graphic << " "
+                    << _averageWatts.dram;
         _energyFile << std::endl;
     }
 };
@@ -130,10 +132,13 @@ public:
     Emitter(int max_task):ntask(max_task) {};
 
     void * adp_svc(void *) {
-        sleep(2);
+        sleep(1);
         int * task = new int(ntask);
         --ntask;
-        if (ntask<0) return NULL;
+        if (ntask<0){
+            std::cout << "Emitter finished" << std::endl;
+            return NULL;
+        }
         return task;
     }
 private:

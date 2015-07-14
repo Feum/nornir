@@ -27,5 +27,13 @@
     <maxBandwidthVariation>0</maxBandwidthVariation>
     <voltageTableFile>voltage.txt</voltageTableFile>
     -->
-    <samplesToDiscard>1</samplesToDiscard>
+    <contractType>4</contractType>
+    <samplesToDiscard>0</samplesToDiscard>
+    <voltageTableFile>voltage.txt</voltageTableFile>
+	<powerBudget>30</powerBudget>
+	<numRegressionPoints>5</numRegressionPoints>
+	<numStabilizationTasks>5</numStabilizationTasks>
+	<strategyFrequencies>0</strategyFrequencies>
+	<strategyMapping>2</strategyMapping>
+	<strategyPrediction>1</strategyPrediction> 
 </adaptivityParameters>

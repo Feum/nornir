@@ -43,11 +43,8 @@ using namespace mlpack::regression;
 
 namespace adpff{
 
-template<typename lb_t, typename gt_t>
 class AdaptivityManagerFarm;
-
 class FarmConfiguration;
-
 
 /**
  * Type of predictor.
@@ -90,15 +87,20 @@ class RegressionData{
 public:
     /**
      * Initializes the regression data.
-     * @param manager The adaptive farm manager.
      * @param configuration The configuration to insert as data.
      */
-    virtual void init(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration) = 0;
+    virtual void init(const FarmConfiguration& configuration) = 0;
 
     /**
      * Transforms this sample into an Armadillo's row.
      */
-    virtual arma::subview_row toArmaRow() const = 0;
+    virtual void toArmaRow(size_t rowId, arma::mat& matrix) const = 0;
+
+    /**
+     * Gets the number of predictors.
+     * @return The number of predictors.
+     */
+    virtual uint getNumPredictors() const = 0;
 
     virtual ~RegressionData(){;}
 };
@@ -107,21 +109,26 @@ public:
  * A row of the data matrix to be used in linear
  * regression for prediction of bandwidth.
  */
-class RegressionDataBandwidth: public RegressionData{
+class RegressionDataServiceTime: public RegressionData{
 private:
-    unsigned int _physicalCoresInverse;
-    unsigned int _workersInverse;
-    double _frequencyInverse;
-    double _scalFactorPhysical;
-    double _scalFactorWorkers;
+    const AdaptivityManagerFarm& _manager;
+    double _physicalCores;
+    double _invScalFactorPhysical;
+    double _workers;
+    double _invScalFactorWorkers;
+    double _frequency;
+
+    uint _numPredictors;
 public:
-    void init(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration);
+    void init(const FarmConfiguration& configuration);
 
-    RegressionDataBandwidth();
+    RegressionDataServiceTime(const AdaptivityManagerFarm& manager);
 
-    RegressionDataBandwidth(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration);
+    RegressionDataServiceTime(const AdaptivityManagerFarm& manager, const FarmConfiguration& configuration);
 
-    arma::subview_row toArmaRow() const;
+    uint getNumPredictors() const;
+
+    void toArmaRow(size_t rowId, arma::mat& matrix) const;
 };
 
 /**
@@ -130,18 +137,23 @@ public:
  */
 class RegressionDataPower: public RegressionData{
 private:
-    unsigned int _contextes;
+    const AdaptivityManagerFarm& _manager;
+    double _dynamicPowerModel;
     double _voltagePerUsedSockets;
     double _voltagePerUnusedSockets;
-    double _dynamicPowerModel;
+    unsigned int _additionalContextes;
+
+    uint _numPredictors;
 public:
-    void init(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration);
+    void init(const FarmConfiguration& configuration);
 
-    RegressionDataPower();
+    RegressionDataPower(const AdaptivityManagerFarm& manager);
 
-    RegressionDataPower(const AdaptivityManagerFarm<>& manager, const FarmConfiguration& configuration);
+    RegressionDataPower(const AdaptivityManagerFarm& manager, const FarmConfiguration& configuration);
 
-    arma::subview_row toArmaRow() const;
+    uint getNumPredictors() const;
+
+    void toArmaRow(size_t rowId, arma::mat& matrix) const;
 };
 
 /*
@@ -150,7 +162,7 @@ public:
 class PredictorLinearRegression: public Predictor{
 private:
     PredictorType _type;
-    const AdaptivityManagerFarm<>& _manager;
+    const AdaptivityManagerFarm& _manager;
     LinearRegression _lr;
     RegressionData** _data;
     size_t _dataIndex;
@@ -158,7 +170,7 @@ private:
     Window<double> _responses; ///< The responses to be used in the regression.
     RegressionData* _predictionInput; ///< Input to be used for predicting a value.
 public:
-    PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm<>& manager);
+    PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm& manager);
 
     ~PredictorLinearRegression();
 
@@ -179,21 +191,21 @@ public:
 class PredictorSimple: public Predictor{
 private:
     PredictorType _type;
-    const AdaptivityManagerFarm<>& _manager;
+    const AdaptivityManagerFarm& _manager;
     time_t _now;
 
     double getScalingFactor(const FarmConfiguration& configuration);
 
     double getPowerPrediction(const FarmConfiguration& configuration);
 public:
-    PredictorSimple(PredictorType type, const AdaptivityManagerFarm<>& manager);
+    PredictorSimple(PredictorType type, const AdaptivityManagerFarm& manager);
 
     void prepareForPredictions();
 
     double predict(const FarmConfiguration& configuration);
 };
 
-};
+}
 
 
 #endif /* PREDICTORS_HPP_ */
