@@ -250,6 +250,7 @@ class AdaptivityManagerFarm: public utils::Thread{
     friend class PredictorLinearRegression;
     friend class RegressionDataServiceTime;
     friend class RegressionDataPower;
+    friend class CalibratorSpread;
 private:
     utils::Monitor _monitor; ///< Used to let the manager stop safe.
     adp_ff_farm<>* _farm; ///< The managed farm.
@@ -298,6 +299,7 @@ private:
 
     Predictor* _primaryPredictor; ///< The predictor of the primary value.
     Predictor* _secondaryPredictor; ///< The predictor of the secondary value.
+    Calibrator* _calibrator; ///< The calibrator of the predictors.
 
     /**
      * If possible, finds a set of physical cores belonging to domains different from
@@ -635,6 +637,14 @@ private:
             if(_p.strategyFrequencies != STRATEGY_FREQUENCY_OS){
                 /** We suppose that all the domains have the same available frequencies. **/
                 _availableFrequencies = _cpufreq->getDomains().at(0)->getAvailableFrequencies();
+
+                /** Remove turbo boost frequency. **/
+                if(!_p.turboBoost){
+                    if(utils::intToString(_availableFrequencies.back()).at(3) == '1'){
+                        _availableFrequencies.pop_back();
+                    }
+                }
+
                 /** Sets the current frequency to the highest possible. **/
                 _currentConfiguration.frequency = _availableFrequencies.back();
             }
@@ -974,6 +984,7 @@ private:
         _currentConfiguration = configuration;
 
         /****************** Clean state ******************/
+        _lastStoredSampleMs = utils::getMillisecondsTime();
         _monitoredSamples.reset();
         _totalTasks = 0;
     }
@@ -995,9 +1006,10 @@ private:
 
     /**
      * Store a new sample.
+     * @param store If false, the sample is collected but not stored.
      * @return false if the farm is not running anymore, true otherwise.
      **/
-    bool storeNewSample(){
+    bool storeNewSample(bool store = true){
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             _activeWorkers.at(i)->askForSample();
         }
@@ -1037,7 +1049,9 @@ private:
         _lastStoredSampleMs = now;
 
         _energy->resetCountersCpu();
-        _monitoredSamples.add(sample);
+        if(store){
+            _monitoredSamples.add(sample);
+        }
         return true;
     }
 
@@ -1066,10 +1080,12 @@ private:
             case STRATEGY_PREDICTION_SIMPLE:{
                 _primaryPredictor = new PredictorSimple(primary, *this);
                 _secondaryPredictor = new PredictorSimple(secondary, *this);
+                _calibrator = NULL;
             }break;
             case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
                 _primaryPredictor = new PredictorLinearRegression(primary, *this);
                 _secondaryPredictor = new PredictorLinearRegression(secondary, *this);
+                _calibrator = new CalibratorSpread(*this);
             }break;
             default:{
                 ;
@@ -1161,6 +1177,11 @@ public:
 
         initPredictors();
         int remainingCalibrationSteps = (_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR)?_p.numRegressionPoints:0;
+        std::vector<FarmConfiguration> calibrationPoints;
+        if(remainingCalibrationSteps){
+            calibrationPoints = _calibrator->getCalibrationPoints();
+        }
+
         FarmConfiguration nextConfiguration;
         bool reconfigurationRequired = false;
 
@@ -1179,6 +1200,12 @@ public:
                 }
                 usleep(microsecsSleep);
 
+                if(samplesToDiscard){
+                    --samplesToDiscard;
+                    storeNewSample(false);
+                    continue;
+                }
+
                 if(!storeNewSample()){
                     goto controlLoopEnd;
                 }
@@ -1192,31 +1219,16 @@ public:
                     }
                 }
 
-                if(!samplesToDiscard){
-                    updateMonitoredValues();
-                    observe();
-                }else{
-                    --samplesToDiscard;
-                }
+                updateMonitoredValues();
+                observe();
 
                 if(remainingCalibrationSteps >= 0){
                     //TODO: Riscrivere meglio
                     if(_totalTasks >= _p.numStabilizationTasks && _monitoredSamples.size() >= _p.numSamples){
-                        FarmConfiguration calibrationPoints[] = {
-                                {2, _availableFrequencies.at(0)},
-                                {1, _availableFrequencies.at(1)},
-                                {3, _availableFrequencies.at(2)},
-                                {4, _availableFrequencies.at(3)},
-                                {2, _availableFrequencies.at(4)},
-                                //{8, _availableFrequencies.at(0)},
-                                //{14, _availableFrequencies.at(5)},
-                                //{17, _availableFrequencies.at(2)},
-                                //{23, _availableFrequencies.at(8)}
-                        };
                         reconfigurationRequired = true;
 
                         if(remainingCalibrationSteps){
-                            nextConfiguration = calibrationPoints[_p.numRegressionPoints - remainingCalibrationSteps];
+                            nextConfiguration = calibrationPoints.at(_p.numRegressionPoints - remainingCalibrationSteps);
                             std::cout << "Forcing calibration to " << nextConfiguration.numWorkers << ", " << nextConfiguration.frequency << std::endl;
                         }else{
                             nextConfiguration = getNewConfiguration();

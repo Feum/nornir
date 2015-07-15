@@ -205,6 +205,29 @@ public:
     double predict(const FarmConfiguration& configuration);
 };
 
+
+/**
+ * Used to obtain calibration points.
+ */
+class Calibrator{
+public:
+    virtual ~Calibrator(){;}
+
+    virtual std::vector<FarmConfiguration> getCalibrationPoints() = 0;
+};
+
+/**
+ * It chooses the calibration points such to cover the maximum number
+ * of possible configurations choices.
+ */
+class CalibratorSpread: public Calibrator{
+private:
+    const AdaptivityManagerFarm& _manager;
+public:
+    CalibratorSpread(const AdaptivityManagerFarm& manager);
+    std::vector<FarmConfiguration> getCalibrationPoints();
+};
+
 }
 
 

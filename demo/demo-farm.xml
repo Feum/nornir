@@ -32,7 +32,7 @@
     <samplesToDiscard>0</samplesToDiscard>
     <voltageTableFile>voltage.txt</voltageTableFile>
 	<powerBudget>30</powerBudget>
-	<numRegressionPoints>5</numRegressionPoints>
+	<numRegressionPoints>4</numRegressionPoints>
 	<numStabilizationTasks>5</numStabilizationTasks>
 	<strategyFrequencies>0</strategyFrequencies>
 	<strategyMapping>2</strategyMapping>

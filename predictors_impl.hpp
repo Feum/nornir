@@ -246,6 +246,7 @@ void PredictorLinearRegression::prepareForPredictions(){
     }
 
     _lr = LinearRegression(dataMl, responsesMl);
+    DEBUG("Error in model: " << _lr.ComputeError(dataMl, responsesMl));
     DEBUG("========================== Preparing for predictions: ========================== ");
 }
 
@@ -296,6 +297,42 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
         }break;
     }
     return 0.0;
+}
+
+CalibratorSpread::CalibratorSpread(const AdaptivityManagerFarm& manager):_manager(manager){;}
+
+std::vector<FarmConfiguration> CalibratorSpread::getCalibrationPoints(){
+    /*
+     * If I need X points, I split the interval into X - 1 parts and I took
+     * the intervals' bounds as points.
+     *
+     * E.g. X = 4:
+     *
+     * P1   P2   P3   P4
+     * |----|----|----|
+     *
+     */
+    size_t numWorkers = _manager._maxNumWorkers ;
+    std::vector<cpufreq::Frequency> frequencies = _manager._availableFrequencies;
+    size_t numFrequencies = frequencies.size();
+    size_t m = _manager._p.numRegressionPoints - 1;
+
+    std::vector<FarmConfiguration> r;
+
+    size_t nextWorkerId = 1;
+    size_t nextFrequencyIndex = 0;
+
+    for(size_t i = 0; i < m; i++){
+        r.push_back(FarmConfiguration(nextWorkerId, frequencies.at(nextFrequencyIndex)));
+        DEBUG("Calibration point: [" << r.back().numWorkers << ", " << r.back().frequency << "]");
+
+        nextWorkerId += ((numWorkers*i+numWorkers)/m - (numWorkers*i)/m);
+        nextFrequencyIndex += ((numFrequencies*i+numFrequencies)/m - (numFrequencies*i)/m);
+    }
+
+    r.push_back(FarmConfiguration(numWorkers, frequencies.at(numFrequencies - 1)));
+    DEBUG("Calibration point: [" << r.back().numWorkers << ", " << r.back().frequency << "]");
+    return r;
 }
 
 }
