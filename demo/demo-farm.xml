@@ -27,6 +27,7 @@
     <maxBandwidthVariation>0</maxBandwidthVariation>
     <voltageTableFile>voltage.txt</voltageTableFile>
     -->
+    <samplingInterval>1</samplingInterval>
     <contractType>4</contractType>
     <samplesToDiscard>0</samplesToDiscard>
     <voltageTableFile>voltage.txt</voltageTableFile>

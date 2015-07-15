@@ -202,8 +202,15 @@ inline bool operator==(const FarmConfiguration& lhs, const FarmConfiguration& rh
 inline bool operator!=(const FarmConfiguration& lhs, const FarmConfiguration& rhs){return !operator==(lhs,rhs);}
 
 typedef struct MonitoredSample{
+    double durationSec; ///< The duration of the sample (in seconds). Indeed, since some task may require longer time to
+                        ///< be processed, the worker may reply later to the monitoring request. Accordingly,
+                        ///< some sample may last longer than others. For this reason, we store explicitely each
+                        ///< length and we do not rely on _p.samplingInterval since the duration of a sample may
+                        ///< be longer than _p.samplingInterval.
     std::vector<WorkerSample> workers; ///< The samples taken from the active workers (one per worker).
     energy::JoulesCpu totalJoules; ///< Energy consumed by all the CPUs.
+
+    MonitoredSample():durationSec(0){;}
 
     WorkerSample collapseWorkersSamples() const{
         WorkerSample ws;
@@ -214,6 +221,7 @@ typedef struct MonitoredSample{
     }
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
+        durationSec += rhs.durationSec;
         if(!workers.size()){
             workers.resize(rhs.workers.size(), WorkerSample());
         }
@@ -223,24 +231,10 @@ typedef struct MonitoredSample{
         totalJoules += rhs.totalJoules;
         return *this;
     }
-
-    MonitoredSample& operator/=(double c){
-        for(size_t i = 0; i < workers.size(); i++){
-            workers.at(i) = workers.at(i) / c;
-        }
-        totalJoules /= c;
-        return *this;
-
-    }
 }MonitoredSample;
 
 inline MonitoredSample operator+(MonitoredSample lhs, const MonitoredSample& rhs){
     lhs += rhs;
-    return lhs;
-}
-
-inline MonitoredSample operator/(MonitoredSample lhs, double c){
-    lhs /= c;
     return lhs;
 }
 
@@ -294,12 +288,13 @@ private:
     std::vector<cpufreq::Frequency> _availableFrequencies; ///< The available frequencies on this machine.
     Window<MonitoredSample> _monitoredSamples; ///< Monitored samples;
     double _totalTasks; ///< The number of tasks processed since the last reconfiguration.
-    double _averageBandwidth; ///< The average tasks per second processed during last time window (samplingInterval * numSamples).
-    double _averageUtilization; ///< The average utilization during last time window (samplingInterval * numSamples).
-    energy::JoulesCpu _averageWatts; ///< Average Watts during last time window (samplingInterval * numSamples).
+    double _averageBandwidth; ///< The average tasks per second processed during last time window.
+    double _averageUtilization; ///< The average utilization during last time window.
+    energy::JoulesCpu _averageWatts; ///< Average Watts during last time window.
     uint64_t _remainingTasks; ///< When contract is CONTRACT_COMPLETION_TIME, represent the number of tasks that
                              ///< still needs to be processed by the application.
     time_t _deadline; ///< When contract is CONTRACT_COMPLETION_TIME, represent the deadline of the application.
+    double _lastStoredSampleMs; ///< Milliseconds timestamp of the last store of a sample.
 
     Predictor* _primaryPredictor; ///< The predictor of the primary value.
     Predictor* _secondaryPredictor; ///< The predictor of the secondary value.
@@ -655,12 +650,12 @@ private:
         _averageUtilization = 0;
         _averageWatts.zero();
 
-        MonitoredSample average = _monitoredSamples.average();
-        WorkerSample workersSum = average.collapseWorkersSamples();
+        MonitoredSample sum = _monitoredSamples.sum();
+        WorkerSample workersSum = sum.collapseWorkersSamples();
 
-        _averageBandwidth = workersSum.tasksCount / (double) _p.samplingInterval;
-        _averageUtilization = workersSum.loadPercentage / _currentConfiguration.numWorkers;
-        _averageWatts = average.totalJoules / (double) _p.samplingInterval;
+        _averageBandwidth = workersSum.tasksCount / sum.durationSec;
+        _averageUtilization = workersSum.loadPercentage / (double)(_monitoredSamples.size() * _currentConfiguration.numWorkers);
+        _averageWatts = sum.totalJoules / sum.durationSec;
     }
 
     /**
@@ -999,11 +994,10 @@ private:
     }
 
     /**
-     * Asks the workers for samples.
-     * @param nextSampleIndex The index where to store the new sample.
+     * Store a new sample.
      * @return false if the farm is not running anymore, true otherwise.
      **/
-    bool storeNewSamples(){
+    bool storeNewSample(){
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             _activeWorkers.at(i)->askForSample();
         }
@@ -1037,6 +1031,11 @@ private:
             energy::CounterCpu* currentCounter = _energy->getCounterCpu(_unusedCpus.at(i));
             sample.totalJoules += currentCounter->getJoules();
         }
+
+        double now = utils::getMillisecondsTime();
+        sample.durationSec = (now - _lastStoredSampleMs) / 1000.0;
+        _lastStoredSampleMs = now;
+
         _energy->resetCountersCpu();
         _monitoredSamples.add(sample);
         return true;
@@ -1148,12 +1147,13 @@ public:
         mapAndSetFrequencies();
 
         _energy->resetCountersCpu();
-        _p.observer->_startMonitoringMs = utils::getMillisecondsTime();
+
 
         uint64_t samplesToDiscard = _p.samplesToDiscard;
-        double lastOverheadMs = 0;
-        double startOverheadMs = 0;
         double microsecsSleep = 0;
+        _lastStoredSampleMs = utils::getMillisecondsTime();
+        _p.observer->_startMonitoringMs = _lastStoredSampleMs;
+
         if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
             _remainingTasks = _p.expectedTasksNumber;
             _deadline = time(NULL) + _p.requiredCompletionTime;
@@ -1166,21 +1166,20 @@ public:
 
         if(_p.contractType == CONTRACT_NONE){
             _monitor.wait();
-            storeNewSamples();
+            storeNewSample();
             updateMonitoredValues();
             observe();
         }else{
             while(!mustStop()){
+                double overheadMs = utils::getMillisecondsTime() - _lastStoredSampleMs;
                 microsecsSleep = (double)_p.samplingInterval*(double)MAMMUT_MICROSECS_IN_SEC -
-                                 lastOverheadMs*(double)MAMMUT_MICROSECS_IN_MILLISEC;
+                                  overheadMs*(double)MAMMUT_MICROSECS_IN_MILLISEC;
                 if(microsecsSleep < 0){
                     microsecsSleep = 0;
                 }
                 usleep(microsecsSleep);
 
-                startOverheadMs = utils::getMillisecondsTime();
-
-                if(!storeNewSamples()){
+                if(!storeNewSample()){
                     goto controlLoopEnd;
                 }
 
@@ -1225,7 +1224,6 @@ public:
                         --remainingCalibrationSteps;
                     }
                 }else if((_monitoredSamples.size() >= _p.numSamples) && isContractViolated(getMonitoredValue())){
-                    std::cout << "Contract violated" << std::endl;
                     reconfigurationRequired = true;
                     nextConfiguration = getNewConfiguration();
                 }
@@ -1235,8 +1233,6 @@ public:
                     samplesToDiscard = _p.samplesToDiscard;
                     reconfigurationRequired = false;
                 }
-
-                lastOverheadMs = utils::getMillisecondsTime() - startOverheadMs;
             }
         }
     controlLoopEnd:

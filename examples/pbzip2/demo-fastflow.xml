@@ -31,7 +31,7 @@
     <samplesToDiscard>2</samplesToDiscard>
     <contractType>4</contractType>
     <voltageTableFile>voltage.txt</voltageTableFile>
-	<powerBudget>30</powerBudget>
+	<powerBudget>20</powerBudget>
 	<numRegressionPoints>4</numRegressionPoints>
 	<numStabilizationTasks>50</numStabilizationTasks>
 	<strategyFrequencies>0</strategyFrequencies>

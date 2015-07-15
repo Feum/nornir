@@ -64,6 +64,7 @@ public:
         _windowImpl.clear();
         _windowImpl.resize(_span);
         _nextIndex = 0;
+        _storedValues = 0;
     }
 
     size_t size() const{
@@ -86,16 +87,23 @@ public:
         return _windowImpl.at(idx);
     }
 
-    T average() const{
+    T sum() const{
         T r;
-
-        if(!_storedValues){
-            return r;
-        }
 
         for(size_t i = 0; i < _storedValues; i++){
             r += _windowImpl[i];
         }
+
+        return r;
+    }
+
+    T average() const{
+        T r;
+        if(!_storedValues){
+            return r;
+        }
+
+        r = sum();
         return r / _storedValues;
     }
 

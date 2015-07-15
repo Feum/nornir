@@ -48,7 +48,7 @@ public:
         if(!_statsFile.is_open()){
             throw std::runtime_error("Obs: Impossible to open stats file.");
         }
-        _statsFile << "# [[EmitterVc][WorkersVc][CollectorVc]] NumWorkers,Frequency CurrentBandwidth CurrentUtilization" << std::endl;
+        _statsFile << "# Time [[EmitterVc][WorkersVc][CollectorVc]] NumWorkers,Frequency CurrentBandwidth CurrentUtilization" << std::endl;
 
         _energyFile.open("energy.txt");
         if(!_energyFile.is_open()){
@@ -64,6 +64,7 @@ public:
 
     void observe(){
         /****************** Stats ******************/
+        _statsFile << time(NULL) << " ";
         _statsFile << "[";
         if(_emitterVirtualCore){
             _statsFile << "[" << _emitterVirtualCore->getVirtualCoreId() << "]";
