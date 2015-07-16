@@ -202,6 +202,11 @@ private:
         _responseQ.push(dummyPtr);
     }
 
+    void resetCounters(){
+        _tasksCount = 0;
+        _workTicks = 0;
+        _startTicks = getticks();
+    }
 public:
     /**
      * Builds an adaptive node.
@@ -211,12 +216,10 @@ public:
     	  _thread(NULL),
     	  _threadCreationPerformed(false),
     	  _threadRunning(false),
-    	  _tasksCount(0),
-    	  _workTicks(0),
-    	  _startTicks(getticks()),
     	  _managementRequest(MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE),
     	  _managementQ(1),
     	  _responseQ(1){
+        resetCounters();
     	_managementQ.init();
     	_responseQ.init();
     }
@@ -270,6 +273,7 @@ public:
             _threadCreated.notifyAll();
             _threadCreationPerformed = true;
         }
+        resetCounters();
         return adp_svc_init();
     }
 

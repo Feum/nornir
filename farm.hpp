@@ -957,6 +957,12 @@ private:
             /** Stops farm. **/
             _emitter->produceNull();
             _farm->wait_freezing();
+            /**
+             * When workers stops, they update their last sample.
+             * Accordingly, we do not need to ask them but we can just
+             * retrieve the samples.
+             */
+            storeNewSample(false, false);
 
             /** Notify the nodes that a reconfiguration is happening. **/
             _emitter->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
@@ -986,6 +992,7 @@ private:
         /****************** Clean state ******************/
         _lastStoredSampleMs = utils::getMillisecondsTime();
         _monitoredSamples.reset();
+        _energy->resetCountersCpu();
         _totalTasks = 0;
     }
 
@@ -1005,33 +1012,59 @@ private:
     }
 
     /**
-     * Store a new sample.
-     * @param store If false, the sample is collected but not stored.
-     * @return false if the farm is not running anymore, true otherwise.
-     **/
-    bool storeNewSample(bool store = true){
+     * Asks the workers for their samples.
+     */
+    void askForWorkersSamples(){
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             _activeWorkers.at(i)->askForSample();
         }
+    }
 
-        MonitoredSample sample;
+    /**
+     * Obtain workers samples.
+     * @param samples A vector of workers samples. It will be filled by this call.
+     * @return True if all the workers are still running, false otherwise.
+     */
+    bool getWorkersSamples(std::vector<WorkerSample>& samples){
+        samples.clear();
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             WorkerSample ns;
             bool workerRunning = _activeWorkers.at(i)->getSampleResponse(ns);
             if(!workerRunning){
                 return false;
             }
+            samples.push_back(ns);
+        }
+        return true;
+    }
 
-            _totalTasks += ns.tasksCount;
 
-            if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-                if(_remainingTasks > ns.tasksCount){
-                    _remainingTasks -= ns.tasksCount;
-                }else{
-                    _remainingTasks = 0;
-                }
+    /**
+     * Store a new sample.
+     * @param store If false, the sample is collected but not stored.
+     * @return false if the farm is not running anymore, true otherwise.
+     **/
+    bool storeNewSample(bool store = true, bool askWorkers = true){
+        if(askWorkers){
+            askForWorkersSamples();
+        }
+
+        MonitoredSample sample;
+        if(!getWorkersSamples(sample.workers)){
+            return false;
+        }
+
+        double tasksCount = 0;
+        for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
+            tasksCount += sample.workers.at(i).tasksCount;
+        }
+        _totalTasks += tasksCount;
+        if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+            if(_remainingTasks > tasksCount){
+                _remainingTasks -= tasksCount;
+            }else{
+                _remainingTasks = 0;
             }
-            sample.workers.push_back(ns);
         }
 
         sample.totalJoules.zero();
