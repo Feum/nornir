@@ -13,8 +13,7 @@
     <sensitiveEmitter>1</sensitiveEmitter>
     <sensitiveCollector>1</sensitiveCollector>
     <numSamples>10</numSamples>
-    <samplesToDiscard>1</samplesToDiscard>
-    <samplingInterval>1</samplingInterval>    
+    <samplingInterval>1000</samplingInterval>    
     <underloadThresholdFarm>80</underloadThresholdFarm>
     <overloadThresholdFarm>90</overloadThresholdFarm>
     <underloadThresholdWorker>80</underloadThresholdWorker>
@@ -27,8 +26,6 @@
     <strategyFrequencies>3</strategyFrequencies>
     <voltageTableFile>voltage.txt</voltageTableFile> -->
     
-    <samplingInterval>2</samplingInterval>
-    <samplesToDiscard>2</samplesToDiscard>
     <contractType>4</contractType>
     <voltageTableFile>voltage.txt</voltageTableFile>
 	<powerBudget>20</powerBudget>

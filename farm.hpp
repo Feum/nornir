@@ -136,7 +136,7 @@ public:
                           int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
                           int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
                           bool workerCleanup = false,
-                          int maxNumWorkers = ff_farm<lb_t, gt_t>::DEF_MAX_NUM_WORKERS,
+                          int maxNumWorkers = DEF_MAX_NUM_WORKERS,
                           bool fixedSize = false);
 
     /**
@@ -156,7 +156,7 @@ public:
                           int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
                           int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
                           bool workerCleanup = false,
-                          int maxNumWorkers = ff_farm<lb_t, gt_t>::DEF_MAX_NUM_WORKERS,
+                          int maxNumWorkers = DEF_MAX_NUM_WORKERS,
                           bool fixedSize = false);
 
     /**
@@ -202,15 +202,15 @@ inline bool operator==(const FarmConfiguration& lhs, const FarmConfiguration& rh
 inline bool operator!=(const FarmConfiguration& lhs, const FarmConfiguration& rhs){return !operator==(lhs,rhs);}
 
 typedef struct MonitoredSample{
-    double durationSec; ///< The duration of the sample (in seconds). Indeed, since some task may require longer time to
-                        ///< be processed, the worker may reply later to the monitoring request. Accordingly,
-                        ///< some sample may last longer than others. For this reason, we store explicitely each
-                        ///< length and we do not rely on _p.samplingInterval since the duration of a sample may
-                        ///< be longer than _p.samplingInterval.
+    double durationMilliSec; ///< The duration of the sample (in milliseconds). Indeed, since some task may require longer time to
+                             ///< be processed, the worker may reply later to the monitoring request. Accordingly,
+                             ///< some sample may last longer than others. For this reason, we store explicitely each
+                             ///< length and we do not rely on _p.samplingInterval since the duration of a sample may
+                             ///< be longer than _p.samplingInterval.
     std::vector<WorkerSample> workers; ///< The samples taken from the active workers (one per worker).
     energy::JoulesCpu totalJoules; ///< Energy consumed by all the CPUs.
 
-    MonitoredSample():durationSec(0){;}
+    MonitoredSample():durationMilliSec(0){;}
 
     WorkerSample collapseWorkersSamples() const{
         WorkerSample ws;
@@ -221,7 +221,7 @@ typedef struct MonitoredSample{
     }
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
-        durationSec += rhs.durationSec;
+        durationMilliSec += rhs.durationMilliSec;
         if(!workers.size()){
             workers.resize(rhs.workers.size(), WorkerSample());
         }
@@ -663,9 +663,9 @@ private:
         MonitoredSample sum = _monitoredSamples.sum();
         WorkerSample workersSum = sum.collapseWorkersSamples();
 
-        _averageBandwidth = workersSum.tasksCount / sum.durationSec;
+        _averageBandwidth = workersSum.tasksCount / (sum.durationMilliSec / 1000.0);
         _averageUtilization = workersSum.loadPercentage / (double)(_monitoredSamples.size() * _currentConfiguration.numWorkers);
-        _averageWatts = sum.totalJoules / sum.durationSec;
+        _averageWatts = sum.totalJoules / (sum.durationMilliSec / 1000.0);
     }
 
     /**
@@ -926,6 +926,24 @@ private:
                 }
             }
 
+            /** Stops farm. **/
+            _emitter->produceNull();
+            _farm->wait_freezing();
+            /**
+             * When workers stops, they update their last sample.
+             * Accordingly, we do not need to ask them but we can just
+             * retrieve the samples.
+             */
+            storeNewSample(false);
+
+            /** Notify the nodes that a reconfiguration is happening. **/
+            _emitter->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
+            for(uint i = 0; i < configuration.numWorkers; i++){
+                _activeWorkers.at(i)->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
+            }
+            if(_collector){
+                _collector->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
+            }
 
             if(_currentConfiguration.numWorkers > configuration.numWorkers){
                 /** Move workers from active to inactive. **/
@@ -954,24 +972,6 @@ private:
 
             updateUsedCpus();
 
-            /** Stops farm. **/
-            _emitter->produceNull();
-            _farm->wait_freezing();
-            /**
-             * When workers stops, they update their last sample.
-             * Accordingly, we do not need to ask them but we can just
-             * retrieve the samples.
-             */
-            storeNewSample(false, false);
-
-            /** Notify the nodes that a reconfiguration is happening. **/
-            _emitter->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
-            for(uint i = 0; i < configuration.numWorkers; i++){
-                _activeWorkers.at(i)->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
-            }
-            if(_collector){
-                _collector->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
-            }
             /** Start the farm again. **/
             _farm->run_then_freeze(configuration.numWorkers);
             //TODO: Se la farm non è stata avviata con la run_then_freeze questo potrebbe essere un problema.
@@ -1029,8 +1029,7 @@ private:
         samples.clear();
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             WorkerSample ns;
-            bool workerRunning = _activeWorkers.at(i)->getSampleResponse(ns);
-            if(!workerRunning){
+            if(!_activeWorkers.at(i)->getSampleResponse(ns)){
                 return false;
             }
             samples.push_back(ns);
@@ -1041,10 +1040,10 @@ private:
 
     /**
      * Store a new sample.
-     * @param store If false, the sample is collected but not stored.
+     * @param askWorkers If false, the request to the worker is not sent.
      * @return false if the farm is not running anymore, true otherwise.
      **/
-    bool storeNewSample(bool store = true, bool askWorkers = true){
+    bool storeNewSample(bool askWorkers = true){
         if(askWorkers){
             askForWorkersSamples();
         }
@@ -1078,13 +1077,11 @@ private:
         }
 
         double now = utils::getMillisecondsTime();
-        sample.durationSec = (now - _lastStoredSampleMs) / 1000.0;
+        sample.durationMilliSec = (now - _lastStoredSampleMs);
         _lastStoredSampleMs = now;
 
         _energy->resetCountersCpu();
-        if(store){
-            _monitoredSamples.add(sample);
-        }
+        _monitoredSamples.add(sample);
         return true;
     }
 
@@ -1194,11 +1191,8 @@ public:
         }
 
         mapAndSetFrequencies();
-
         _energy->resetCountersCpu();
 
-
-        uint64_t samplesToDiscard = _p.samplesToDiscard;
         double microsecsSleep = 0;
         _lastStoredSampleMs = utils::getMillisecondsTime();
         _p.observer->_startMonitoringMs = _lastStoredSampleMs;
@@ -1226,18 +1220,11 @@ public:
         }else{
             while(!mustStop()){
                 double overheadMs = utils::getMillisecondsTime() - _lastStoredSampleMs;
-                microsecsSleep = (double)_p.samplingInterval*(double)MAMMUT_MICROSECS_IN_SEC -
-                                  overheadMs*(double)MAMMUT_MICROSECS_IN_MILLISEC;
+                microsecsSleep = ((double)_p.samplingInterval - overheadMs)*(double)MAMMUT_MICROSECS_IN_MILLISEC;
                 if(microsecsSleep < 0){
                     microsecsSleep = 0;
                 }
                 usleep(microsecsSleep);
-
-                if(samplesToDiscard){
-                    --samplesToDiscard;
-                    storeNewSample(false);
-                    continue;
-                }
 
                 if(!storeNewSample()){
                     goto controlLoopEnd;
@@ -1275,7 +1262,6 @@ public:
 
                 if(reconfigurationRequired){
                     changeConfiguration(nextConfiguration);
-                    samplesToDiscard = _p.samplesToDiscard;
                     reconfigurationRequired = false;
                 }
             }

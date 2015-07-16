@@ -173,8 +173,7 @@ private:
         fastReconfiguration = false;
         migrateCollector = false;
         numSamples = 10;
-        samplesToDiscard = 1;
-        samplingInterval = 1;
+        samplingInterval = 1000;
         underloadThresholdFarm = 80.0;
         overloadThresholdFarm = 90.0;
         underloadThresholdWorker = 80.0;
@@ -220,9 +219,8 @@ public:
     bool migrateCollector; ///< If true, when a reconfiguration occur, the collector is migrated to a
                            ///< different virtual core (if needed) [default = false].
     uint32_t numSamples; ///< The number of samples used to take reconfiguration decisions [default = 10].
-    uint32_t samplesToDiscard; ///< The number of samples discarded after a reconfiguration [default =  1].
-    uint32_t samplingInterval; ///<  The length of the sampling interval (in seconds) over which
-                               ///< the reconfiguration decisions are taken [default = 1].
+    uint32_t samplingInterval; ///< The length of the sampling interval (in milliseconds) for
+                              ///< the data reading [default = 1000].
     double underloadThresholdFarm; ///< The underload threshold for the entire farm. It is valid only if
                                    ///< contractType is CONTRACT_UTILIZATION [default = 80.0].
     double overloadThresholdFarm; ///< The overload threshold for the entire farm. It is valid only if
@@ -250,7 +248,7 @@ public:
     unsigned int numStabilizationTasks; ///< Number of tasks to be processed in each configuration during the
                                         ///< calibration phase when strategyPrediction is
                                         ///< STRATEGY_PREDICTION_REGRESSION_LINEAR [default = unused].
-    adp_ff_farm_observer* observer; ///< The observer object. It will be called every samplingInterval seconds
+    adp_ff_farm_observer* observer; ///< The observer object. It will be called every samplingInterval milliseconds
                                    ///< to monitor the adaptivity behaviour [default = NULL].
 
     /**
@@ -364,11 +362,6 @@ public:
 		node = root->first_node("numSamples");
 		if(node){
 			numSamples = utils::stringToInt(node->value());
-		}
-
-		node = root->first_node("samplesToDiscard");
-		if(node){
-			samplesToDiscard = utils::stringToInt(node->value());
 		}
 
 		node = root->first_node("samplingInterval");

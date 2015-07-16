@@ -14,7 +14,6 @@
     <sensitiveEmitter>1</sensitiveEmitter>
     <sensitiveCollector>1</sensitiveCollector>
     <numSamples>10</numSamples>
-    <samplesToDiscard>1</samplesToDiscard>
     <samplingInterval>1</samplingInterval>    
     <underloadThresholdFarm>80</underloadThresholdFarm>
     <overloadThresholdFarm>90</overloadThresholdFarm>
@@ -27,9 +26,8 @@
     <maxBandwidthVariation>0</maxBandwidthVariation>
     <voltageTableFile>voltage.txt</voltageTableFile>
     -->
-    <samplingInterval>1</samplingInterval>
+    <samplingInterval>1000</samplingInterval>
     <contractType>4</contractType>
-    <samplesToDiscard>0</samplesToDiscard>
     <voltageTableFile>voltage.txt</voltageTableFile>
 	<powerBudget>30</powerBudget>
 	<numRegressionPoints>4</numRegressionPoints>
