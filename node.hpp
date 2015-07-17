@@ -52,28 +52,19 @@ using namespace mammut;
 typedef struct WorkerSample{
     double loadPercentage; ///< The percentage of time that the node spent on svc().
     double tasksCount; ///< The number of computed tasks.
-    WorkerSample():loadPercentage(0), tasksCount(0){;}
+    double serviceTime; ///< The average service time (in ticks).
+    WorkerSample():loadPercentage(0), tasksCount(0), serviceTime(0){;}
 
     WorkerSample& operator+=(const WorkerSample& rhs){
         loadPercentage += rhs.loadPercentage;
         tasksCount += rhs.tasksCount;
-        return *this;
-    }
-
-    WorkerSample& operator/=(double c){
-        loadPercentage /= c;
-        tasksCount /= c;
+        serviceTime += rhs.serviceTime;
         return *this;
     }
 }NodeSample;
 
 inline WorkerSample operator+(WorkerSample lhs, const WorkerSample& rhs){
     lhs += rhs;
-    return lhs;
-}
-
-inline WorkerSample operator/(WorkerSample lhs, double c){
-    lhs /= c;
     return lhs;
 }
 
@@ -196,6 +187,7 @@ private:
         _sampleResponse.loadPercentage = ((double) (_workTicks)
                 / (double) ((now - _startTicks))) * 100.0;
         _sampleResponse.tasksCount = _tasksCount;
+        _sampleResponse.serviceTime = (double)_workTicks / (double)_tasksCount;
         _workTicks = 0;
         _startTicks = now;
         _tasksCount = 0;

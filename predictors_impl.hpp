@@ -35,6 +35,7 @@
 #include "predictors.hpp"
 #include "farm.hpp"
 
+#undef DEBUG
 #if 1
 #define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
 #else
@@ -183,36 +184,45 @@ void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
 }
 
 PredictorLinearRegression::PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm& manager):
-                                                    _type(type), _manager(manager), _dataIndex(0), _dataSize(0),
-                                                    _responses(_manager._p.numRegressionPoints){
-    _data = new RegressionData*[_manager._p.numRegressionPoints];
-
+                                                    _type(type), _manager(manager){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            for(size_t i = 0; i < _manager._p.numRegressionPoints; i++){
-                _data[i] = new RegressionDataServiceTime(_manager);
-            }
             _predictionInput = new RegressionDataServiceTime(_manager);
         }break;
         case PREDICTION_POWER:{
-            for(size_t i = 0; i < _manager._p.numRegressionPoints; i++){
-                _data[i] = new RegressionDataPower(_manager);
-            }
             _predictionInput = new RegressionDataPower(_manager);
         }break;
     }
 }
 
 PredictorLinearRegression::~PredictorLinearRegression(){
-    for(size_t i = 0; i < _manager._p.numRegressionPoints; i++){
-        delete _data[i];
-    }
-    delete[] _data;
+    clear();
     delete _predictionInput;
 }
 
+void PredictorLinearRegression::clear(){
+    for(size_t i = 0; i < _data.size(); i++){
+        delete _data.at(i);
+    }
+}
+
+uint PredictorLinearRegression::getMinimumPointsNeeded(){
+    //TODO: Brutto a vedersi, ripulire
+    _predictionInput->init(_manager._currentConfiguration);
+    return std::max<uint>(_predictionInput->getNumPredictors(), 2);
+}
+
 void PredictorLinearRegression::refine(){
-    _data[_dataIndex]->init(_manager._currentConfiguration);
+    RegressionData* rd = NULL;
+    switch(_type){
+        case PREDICTION_BANDWIDTH:{
+            rd = new RegressionDataServiceTime(_manager, _manager._currentConfiguration);
+        }break;
+        case PREDICTION_POWER:{
+            rd = new RegressionDataPower(_manager, _manager._currentConfiguration);
+        }break;
+    }
+    _data.push_back(rd);
     double response = 0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
@@ -222,25 +232,21 @@ void PredictorLinearRegression::refine(){
             response = _manager._averageWatts.cores;
         }break;
     }
-    _responses.add(response);
+    _responses.push_back(response);
     DEBUG("Refining with configuration [" << _manager._currentConfiguration.numWorkers << ", "
                                           << _manager._currentConfiguration.frequency << "]: "
                                           << response);
-    _dataIndex = (_dataIndex + 1) % _manager._p.numRegressionPoints;
-    if(_dataSize < _manager._p.numRegressionPoints){
-        ++_dataSize;
-    }
 }
 
 void PredictorLinearRegression::prepareForPredictions(){
-    if(!_dataSize){
+    if(!_data.size()){
         return;
     }
 
     // One observation per column.
-    arma::mat dataMl(_data[0]->getNumPredictors(), _dataSize);
-    arma::vec responsesMl(_dataSize);
-    for(size_t i = 0; i < _dataSize; i++){
+    arma::mat dataMl(_data[0]->getNumPredictors(), _data.size());
+    arma::vec responsesMl(_data.size());
+    for(size_t i = 0; i < _data.size(); i++){
         _data[i]->toArmaRow(i, dataMl);
         responsesMl(i) = _responses[i];
     }
@@ -269,7 +275,7 @@ double PredictorLinearRegression::predict(const FarmConfiguration& configuration
 /**************** PredictorSimple ****************/
 
 PredictorSimple::PredictorSimple(PredictorType type, const AdaptivityManagerFarm& manager):
-    _type(type), _manager(manager), _now(0){
+    _type(type), _manager(manager){
     ;
 }
 
@@ -284,13 +290,13 @@ double PredictorSimple::getPowerPrediction(const FarmConfiguration& configuratio
 }
 
 void PredictorSimple::prepareForPredictions(){
-    _now = time(NULL);
+    ;
 }
 
 double PredictorSimple::predict(const FarmConfiguration& configuration){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            return _manager.getMonitoredValue() * getScalingFactor(configuration);
+            return _manager._averageBandwidth * getScalingFactor(configuration);
         }break;
         case PREDICTION_POWER:{
             return getPowerPrediction(configuration);
@@ -301,7 +307,7 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
 
 CalibratorSpread::CalibratorSpread(const AdaptivityManagerFarm& manager):_manager(manager){;}
 
-std::vector<FarmConfiguration> CalibratorSpread::getCalibrationPoints(){
+std::vector<FarmConfiguration> CalibratorSpread::getPoints(){
     /*
      * If I need X points, I split the interval into X - 1 parts and I took
      * the intervals' bounds as points.
@@ -315,25 +321,34 @@ std::vector<FarmConfiguration> CalibratorSpread::getCalibrationPoints(){
     size_t numWorkers = _manager._maxNumWorkers ;
     std::vector<cpufreq::Frequency> frequencies = _manager._availableFrequencies;
     size_t numFrequencies = frequencies.size();
-    size_t m = _manager._p.numRegressionPoints - 1;
+    size_t m = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
+                        _manager._secondaryPredictor->getMinimumPointsNeeded()) - 1;
+    if(!m){
+        throw std::runtime_error("getCalibrationPoints: we can't apply regression with only 1 point.");
+    }
 
-    std::vector<FarmConfiguration> r;
+    std::vector<FarmConfiguration> points;
 
     size_t nextWorkerId = 1;
     size_t nextFrequencyIndex = 0;
 
     for(size_t i = 0; i < m; i++){
-        r.push_back(FarmConfiguration(nextWorkerId, frequencies.at(nextFrequencyIndex)));
-        DEBUG("Calibration point: [" << r.back().numWorkers << ", " << r.back().frequency << "]");
+        points.push_back(FarmConfiguration(nextWorkerId, frequencies.at(nextFrequencyIndex)));
 
         nextWorkerId += ((numWorkers*i+numWorkers)/m - (numWorkers*i)/m);
         nextFrequencyIndex += ((numFrequencies*i+numFrequencies)/m - (numFrequencies*i)/m);
     }
 
-    r.push_back(FarmConfiguration(numWorkers, frequencies.at(numFrequencies - 1)));
-    DEBUG("Calibration point: [" << r.back().numWorkers << ", " << r.back().frequency << "]");
-    return r;
+    points.push_back(FarmConfiguration(numWorkers, frequencies.at(numFrequencies - 1)));
+
+
+
+    for(size_t i = 0; i < points.size(); i++){
+        DEBUG("Calibration point: [" << points.back().numWorkers << ", " << points.back().frequency << "]");
+    }
+    return points;
 }
+
 
 }
 

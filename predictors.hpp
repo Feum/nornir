@@ -47,40 +47,6 @@ class AdaptivityManagerFarm;
 class FarmConfiguration;
 
 /**
- * Type of predictor.
- */
-typedef enum PredictorType{
-    PREDICTION_BANDWIDTH = 0,
-    PREDICTION_POWER
-}PredictorType;
-
-/*!
- * Represents a generic predictor.
- */
-class Predictor{
-public:
-    virtual ~Predictor(){;}
-
-    /**
-     * If possible, refines the model with the information obtained on the current
-     * configuration.
-     */
-    virtual void refine(){;}
-
-    /**
-     * Prepare the predictor to accept a set of prediction requests.
-     */
-    virtual void prepareForPredictions() = 0;
-
-    /**
-     * Predicts the value at a specific configuration.
-     * @param configuration The configuration.
-     * @return The predicted value at a specific configuration.
-     */
-    virtual double predict(const FarmConfiguration& configuration) = 0;
-};
-
-/**
  * Represents a sample to be used in the regression.
  */
 class RegressionData{
@@ -156,6 +122,55 @@ public:
     void toArmaRow(size_t rowId, arma::mat& matrix) const;
 };
 
+
+/**
+ * Type of predictor.
+ */
+typedef enum PredictorType{
+    PREDICTION_BANDWIDTH = 0,
+    PREDICTION_POWER
+}PredictorType;
+
+/*!
+ * Represents a generic predictor.
+ */
+class Predictor{
+public:
+    virtual ~Predictor(){;}
+
+    /**
+     * Gets the number of minimum points needed.
+     * Let this number be x. The user need to call
+     * refine() method at least x times before
+     * starting doing predictions.
+     */
+    virtual uint getMinimumPointsNeeded(){return 0;}
+
+    /**
+     * Clears the predictor removing all the collected
+     * data
+     */
+    virtual void clear(){;}
+
+    /**
+     * If possible, refines the model with the information obtained on the current
+     * configuration.
+     */
+    virtual void refine(){;}
+
+    /**
+     * Prepare the predictor to accept a set of prediction requests.
+     */
+    virtual void prepareForPredictions() = 0;
+
+    /**
+     * Predicts the value at a specific configuration.
+     * @param configuration The configuration.
+     * @return The predicted value at a specific configuration.
+     */
+    virtual double predict(const FarmConfiguration& configuration) = 0;
+};
+
 /*
  * Represents a linear regression predictor.
  */
@@ -164,15 +179,17 @@ private:
     PredictorType _type;
     const AdaptivityManagerFarm& _manager;
     LinearRegression _lr;
-    RegressionData** _data;
-    size_t _dataIndex;
-    size_t _dataSize;
-    Window<double> _responses; ///< The responses to be used in the regression.
+    std::vector<RegressionData*> _data;
+    std::vector<double> _responses; ///< The responses to be used in the regression.
     RegressionData* _predictionInput; ///< Input to be used for predicting a value.
 public:
     PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm& manager);
 
     ~PredictorLinearRegression();
+
+    void clear();
+
+    uint getMinimumPointsNeeded();
 
     void refine();
 
@@ -192,7 +209,6 @@ class PredictorSimple: public Predictor{
 private:
     PredictorType _type;
     const AdaptivityManagerFarm& _manager;
-    time_t _now;
 
     double getScalingFactor(const FarmConfiguration& configuration);
 
@@ -213,7 +229,7 @@ class Calibrator{
 public:
     virtual ~Calibrator(){;}
 
-    virtual std::vector<FarmConfiguration> getCalibrationPoints() = 0;
+    virtual std::vector<FarmConfiguration> getPoints() = 0;
 };
 
 /**
@@ -225,7 +241,8 @@ private:
     const AdaptivityManagerFarm& _manager;
 public:
     CalibratorSpread(const AdaptivityManagerFarm& manager);
-    std::vector<FarmConfiguration> getCalibrationPoints();
+
+    std::vector<FarmConfiguration> getPoints();
 };
 
 }

@@ -183,8 +183,7 @@ private:
         requiredCompletionTime = 0;
         expectedTasksNumber = 0;
         powerBudget = 0;
-        numRegressionPoints = 0;
-        numStabilizationTasks = 0;
+        maxPredictionError = 10.0;
         voltageTableFile = "";
         observer = NULL;
     }
@@ -241,13 +240,9 @@ public:
                                   ///< valid only if contractType is CONTRACT_COMPLETION_TIME [default = unused].
     double powerBudget;           ///< The maximum cores power to be used. It is
                                   ///< valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
+    double maxPredictionError; ///< Maximum error percentage allowed for prediction [default = 10.0].
     std::string voltageTableFile; ///< The file containing the voltage table. It is mandatory when
                                   ///< strategyFrequencies is STRATEGY_FREQUENCY_YES or when contract is [default = unused].
-    unsigned int numRegressionPoints; ///< Points to be used for regression when strategyPrediction is
-                                      ///< STRATEGY_PREDICTION_REGRESSION_LINEAR [default = unused].
-    unsigned int numStabilizationTasks; ///< Number of tasks to be processed in each configuration during the
-                                        ///< calibration phase when strategyPrediction is
-                                        ///< STRATEGY_PREDICTION_REGRESSION_LINEAR [default = unused].
     adp_ff_farm_observer* observer; ///< The observer object. It will be called every samplingInterval milliseconds
                                    ///< to monitor the adaptivity behaviour [default = NULL].
 
@@ -419,14 +414,9 @@ public:
             powerBudget = utils::stringToInt(node->value());
         }
 
-        node = root->first_node("numRegressionPoints");
+        node = root->first_node("maxPredictionError");
         if(node){
-            numRegressionPoints = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("numStabilizationTasks");
-        if(node){
-            numStabilizationTasks = utils::stringToInt(node->value());
+            maxPredictionError = utils::stringToDouble(node->value());
         }
 
 		node = root->first_node("voltageTableFile");
@@ -593,7 +583,7 @@ public:
         }
 
         /** Validate linear regression. **/
-        if(strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR && (numRegressionPoints == 0 || numStabilizationTasks == 0)){
+        if(strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR){
             return VALIDATION_WRONG_REGRESSION_PARAMETERS;
         }
 

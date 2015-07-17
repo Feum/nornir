@@ -59,6 +59,13 @@
 #include <iostream>
 #include <limits>
 
+#undef DEBUG
+#if 1
+#define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
+#else
+#define DEBUG(x)
+#endif
+
 namespace adpff{
 
 class AdaptivityParameters;
@@ -289,6 +296,7 @@ private:
     std::vector<cpufreq::Frequency> _availableFrequencies; ///< The available frequencies on this machine.
     Window<MonitoredSample> _monitoredSamples; ///< Monitored samples;
     double _totalTasks; ///< The number of tasks processed since the last reconfiguration.
+    double _averageServiceTime; ///< The average service time (ticks) during the last time window.
     double _averageBandwidth; ///< The average tasks per second processed during last time window.
     double _averageUtilization; ///< The average utilization during last time window.
     energy::JoulesCpu _averageWatts; ///< Average Watts during last time window.
@@ -297,9 +305,13 @@ private:
     time_t _deadline; ///< When contract is CONTRACT_COMPLETION_TIME, represent the deadline of the application.
     double _lastStoredSampleMs; ///< Milliseconds timestamp of the last store of a sample.
 
+    Calibrator* _calibrator; ///< The calibrator of the predictors.
     Predictor* _primaryPredictor; ///< The predictor of the primary value.
     Predictor* _secondaryPredictor; ///< The predictor of the secondary value.
-    Calibrator* _calibrator; ///< The calibrator of the predictors.
+    double _primaryPrediction; ///< The prediction done for the primary value for the chosen configuration.
+    double _secondaryPrediction; ///< The prediction done for the secondary value for the chosen configuration.
+    double _primaryError; ///< The last error (percentage) in primary value predictor.
+    double _secondaryError; ///< The last error (percentage) in secondary value predictor.
 
     /**
      * If possible, finds a set of physical cores belonging to domains different from
@@ -656,6 +668,7 @@ private:
      * Updates the monitored values.
      */
     void updateMonitoredValues(){
+        _averageServiceTime = 0;
         _averageBandwidth = 0;
         _averageUtilization = 0;
         _averageWatts.zero();
@@ -663,16 +676,17 @@ private:
         MonitoredSample sum = _monitoredSamples.sum();
         WorkerSample workersSum = sum.collapseWorkersSamples();
 
+        _averageServiceTime = workersSum.serviceTime / (double)(_monitoredSamples.size() * _currentConfiguration.numWorkers);
         _averageBandwidth = workersSum.tasksCount / (sum.durationMilliSec / 1000.0);
         _averageUtilization = workersSum.loadPercentage / (double)(_monitoredSamples.size() * _currentConfiguration.numWorkers);
         _averageWatts = sum.totalJoules / (sum.durationMilliSec / 1000.0);
     }
 
     /**
-     * Returns the monitored value according to the required contract.
-     * @return The monitored value according to the required contract.
+     * Returns the primary value according to the required contract.
+     * @return The primary value according to the required contract.
      */
-    double getMonitoredValue() const{
+    double getPrimaryValue() const{
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
                 return _averageUtilization;
@@ -691,27 +705,47 @@ private:
     }
 
     /**
-     * Checks if a specific monitored value violates the contract requested
+     * Returns the secondary value according to the required contract.
+     * @return The secondary value according to the required contract.
+     */
+    double getSecondaryValue() const{
+        switch(_p.contractType){
+            case CONTRACT_PERF_UTILIZATION:
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                return _averageWatts.cores;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                return _averageBandwidth;
+            }break;
+            default:{
+                return 0;
+            }break;
+        }
+    }
+
+    /**
+     * Checks if a specific primary value violates the contract requested
      * by the user.
-     * @param monitoredValue The monitored value.
+     * @param primaryValue The primary value.
      * @return true if the contract has been violated, false otherwise.
      */
-    bool isContractViolated(double monitoredValue) const{
+    bool isContractViolated(double primaryValue) const{
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
-                return monitoredValue < _p.underloadThresholdFarm ||
-                       monitoredValue > _p.overloadThresholdFarm;
+                return primaryValue < _p.underloadThresholdFarm ||
+                       primaryValue > _p.overloadThresholdFarm;
             }break;
             case CONTRACT_PERF_BANDWIDTH:{
                 double offset = (_p.requiredBandwidth * _p.maxBandwidthVariation) / 100.0;
-                return monitoredValue < _p.requiredBandwidth ||
-                       monitoredValue > _p.requiredBandwidth + offset;
+                return primaryValue < _p.requiredBandwidth ||
+                       primaryValue > _p.requiredBandwidth + offset;
             }break;
             case CONTRACT_PERF_COMPLETION_TIME:{
-                return monitoredValue < _p.requiredBandwidth;
+                return primaryValue < _p.requiredBandwidth;
             }break;
             case CONTRACT_POWER_BUDGET:{
-                return monitoredValue > _p.powerBudget;
+                return primaryValue > _p.powerBudget;
             }break;
             default:{
                 return false;
@@ -796,10 +830,17 @@ private:
      * Computes the new configuration of the farm after a contract violation.
      * @return The new configuration.
      */
-    FarmConfiguration getNewConfiguration() const{
+    FarmConfiguration getNewConfiguration(){
         FarmConfiguration r;
-        double predictedMonitoredValue = 0;
-        double bestSuboptimalValue = getMonitoredValue();
+        double currentPrimaryPrediction = 0;
+        double currentSecondaryPrediction = 0;
+
+        double primaryPrediction = 0;
+        double secondaryPrediction = 0;
+        double primaryPredictionSub = 0;
+        double secondaryPredictionSub = 0;
+
+        double bestSuboptimalValue = getPrimaryValue();
         FarmConfiguration bestSuboptimalConfiguration = _currentConfiguration;
         bool feasibleSolutionFound = false;
 
@@ -822,44 +863,52 @@ private:
 
         _primaryPredictor->prepareForPredictions();
         _secondaryPredictor->prepareForPredictions();
-        double predictedSecondaryValue = 0;
+
         unsigned int remainingTime = 0;
         for(size_t i = 1; i <= _maxNumWorkers; i++){
             for(size_t j = 0; j < _availableFrequencies.size(); j++){
                 FarmConfiguration examinedConfiguration(i, _availableFrequencies.at(j));
-                predictedMonitoredValue = _primaryPredictor->predict(examinedConfiguration);
+                currentPrimaryPrediction = _primaryPredictor->predict(examinedConfiguration);
                 switch(_p.contractType){
                     case CONTRACT_PERF_COMPLETION_TIME:{
-                        remainingTime = (double) _remainingTasks / predictedMonitoredValue;
+                        remainingTime = (double) _remainingTasks / currentPrimaryPrediction;
                     }break;
                     case CONTRACT_PERF_UTILIZATION:{
-                        predictedMonitoredValue = (_averageBandwidth / predictedMonitoredValue) * _averageUtilization;
+                        currentPrimaryPrediction = (_averageBandwidth / currentPrimaryPrediction) * _averageUtilization;
                     }break;
                     default:{
                         ;
                     }
                 }
 
-                if(!isContractViolated(predictedMonitoredValue)){
-                    predictedSecondaryValue = _secondaryPredictor->predict(examinedConfiguration);
+                if(!isContractViolated(currentPrimaryPrediction)){
+                    currentSecondaryPrediction = _secondaryPredictor->predict(examinedConfiguration);
                     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-                        predictedSecondaryValue *= remainingTime;
+                        currentSecondaryPrediction *= remainingTime;
                     }
-                    if(isBestSecondaryValue(predictedSecondaryValue, bestSecondaryValue)){
-                        bestSecondaryValue = predictedSecondaryValue;
+                    if(isBestSecondaryValue(currentSecondaryPrediction, bestSecondaryValue)){
+                        bestSecondaryValue = currentSecondaryPrediction;
                         r = examinedConfiguration;
                         feasibleSolutionFound = true;
+                        primaryPrediction = currentPrimaryPrediction;
+                        secondaryPrediction = currentSecondaryPrediction;
                     }
-                }else if(!feasibleSolutionFound && isBestSuboptimalValue(predictedMonitoredValue, bestSuboptimalValue)){
-                    bestSuboptimalValue = predictedMonitoredValue;
+                }else if(!feasibleSolutionFound && isBestSuboptimalValue(currentPrimaryPrediction, bestSuboptimalValue)){
+                    bestSuboptimalValue = currentPrimaryPrediction;
                     bestSuboptimalConfiguration = examinedConfiguration;
+                    primaryPredictionSub = currentPrimaryPrediction;
+                    secondaryPredictionSub = currentSecondaryPrediction;
                 }
             }
         }
 
         if(feasibleSolutionFound){
+            _primaryPrediction = primaryPrediction;
+            _secondaryPrediction = secondaryPrediction;
             return r;
         }else{
+            _primaryPrediction = primaryPredictionSub;
+            _secondaryPrediction = secondaryPredictionSub;
             return bestSuboptimalConfiguration;
         }
     }
@@ -1152,7 +1201,9 @@ public:
         _availableVirtualCores(getAvailableVirtualCores()),
         _emitterVirtualCore(NULL),
         _collectorVirtualCore(NULL),
-        _monitoredSamples(_p.numSamples){
+        _monitoredSamples(_p.numSamples),
+        _primaryError(100.0),
+        _secondaryError(100.0){
         /** If voltage table file is specified, then load the table. **/
         if(_p.voltageTableFile.compare("")){
             cpufreq::loadVoltageTable(_voltageTable, _p.voltageTableFile);
@@ -1204,14 +1255,14 @@ public:
         }
 
         initPredictors();
-        int remainingCalibrationSteps = (_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR)?_p.numRegressionPoints:0;
         std::vector<FarmConfiguration> calibrationPoints;
-        if(remainingCalibrationSteps){
-            calibrationPoints = _calibrator->getCalibrationPoints();
+        if(_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR){
+            calibrationPoints = _calibrator->getPoints();
         }
 
         FarmConfiguration nextConfiguration;
         bool reconfigurationRequired = false;
+        bool forceReconfiguration = false;
 
         if(_p.contractType == CONTRACT_NONE){
             _monitor.wait();
@@ -1243,20 +1294,33 @@ public:
                 updateMonitoredValues();
                 observe();
 
+                //TODO: Do something smarter
+                if(_monitoredSamples.size() == _p.numSamples - 1){
+                    if(!calibrationPoints.size()){
+                        _primaryError = std::abs((getPrimaryValue() - _primaryPrediction)/getPrimaryValue())*100.0;
+                        _secondaryError = std::abs((getSecondaryValue() - _secondaryPrediction)/getSecondaryValue())*100.0;
+                        DEBUG("Primary error: " << _primaryError << " Secondary error: " << _secondaryError);
+                    }
+                }
+
                 if(_monitoredSamples.size() >= _p.numSamples){
-                    if(remainingCalibrationSteps < 0){
-                        if(isContractViolated(getMonitoredValue())){
+                    if(!calibrationPoints.size()){
+                        if(isContractViolated(getPrimaryValue()) || forceReconfiguration ||
+                           _primaryError > _p.maxPredictionError || _primaryError > _p.maxPredictionError){
                             reconfigurationRequired = true;
                             nextConfiguration = getNewConfiguration();
                         }
-                    }else if(_totalTasks >= _p.numStabilizationTasks){
-                        reconfigurationRequired = true;
-                        if(remainingCalibrationSteps){
-                            nextConfiguration = calibrationPoints.at(_p.numRegressionPoints - remainingCalibrationSteps);
-                        }else{
-                            nextConfiguration = getNewConfiguration();
+                    }else{
+                        if(calibrationPoints.size()){
+                            nextConfiguration = calibrationPoints.back();
+                            calibrationPoints.pop_back();
+                            reconfigurationRequired = true;
                         }
-                        --remainingCalibrationSteps;
+
+                        if(!calibrationPoints.size()){
+                            /** Calibration finished. **/
+                            forceReconfiguration = true;
+                        }
                     }
                 }
 
