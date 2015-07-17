@@ -936,15 +936,6 @@ private:
              */
             storeNewSample(false);
 
-            /** Notify the nodes that a reconfiguration is happening. **/
-            _emitter->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
-            for(uint i = 0; i < configuration.numWorkers; i++){
-                _activeWorkers.at(i)->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
-            }
-            if(_collector){
-                _collector->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
-            }
-
             if(_currentConfiguration.numWorkers > configuration.numWorkers){
                 /** Move workers from active to inactive. **/
                 uint workersNumDiff = _currentConfiguration.numWorkers - configuration.numWorkers;
@@ -971,6 +962,16 @@ private:
             }
 
             updateUsedCpus();
+
+            /** Notify the nodes that a reconfiguration is happening. **/
+            _emitter->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
+            for(uint i = 0; i < configuration.numWorkers; i++){
+                _activeWorkers.at(i)->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
+            }
+            if(_collector){
+                _collector->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
+            }
+
 
             /** Start the farm again. **/
             _farm->run_then_freeze(configuration.numWorkers);
@@ -1242,22 +1243,19 @@ public:
                 updateMonitoredValues();
                 observe();
 
-                if(remainingCalibrationSteps >= 0){
-                    //TODO: Riscrivere meglio
-                    if(_totalTasks >= _p.numStabilizationTasks && _monitoredSamples.size() >= _p.numSamples){
+                if(_monitoredSamples.size() >= _p.numSamples){
+                    if((remainingCalibrationSteps < 0) && isContractViolated(getMonitoredValue())){
                         reconfigurationRequired = true;
-
+                        nextConfiguration = getNewConfiguration();
+                    }else if(_totalTasks >= _p.numStabilizationTasks){
+                        reconfigurationRequired = true;
                         if(remainingCalibrationSteps){
                             nextConfiguration = calibrationPoints.at(_p.numRegressionPoints - remainingCalibrationSteps);
-                            std::cout << "Forcing calibration to " << nextConfiguration.numWorkers << ", " << nextConfiguration.frequency << std::endl;
                         }else{
                             nextConfiguration = getNewConfiguration();
                         }
                         --remainingCalibrationSteps;
                     }
-                }else if((_monitoredSamples.size() >= _p.numSamples) && isContractViolated(getMonitoredValue())){
-                    reconfigurationRequired = true;
-                    nextConfiguration = getNewConfiguration();
                 }
 
                 if(reconfigurationRequired){
