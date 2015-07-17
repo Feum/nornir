@@ -1244,9 +1244,11 @@ public:
                 observe();
 
                 if(_monitoredSamples.size() >= _p.numSamples){
-                    if((remainingCalibrationSteps < 0) && isContractViolated(getMonitoredValue())){
-                        reconfigurationRequired = true;
-                        nextConfiguration = getNewConfiguration();
+                    if(remainingCalibrationSteps < 0){
+                        if(isContractViolated(getMonitoredValue())){
+                            reconfigurationRequired = true;
+                            nextConfiguration = getNewConfiguration();
+                        }
                     }else if(_totalTasks >= _p.numStabilizationTasks){
                         reconfigurationRequired = true;
                         if(remainingCalibrationSteps){
