@@ -149,7 +149,7 @@ using namespace ff;
       if (name.getnw()>1) {                                                       \
         name.setF(F_##name);                                                      \
         if (name.run_and_wait_end()<0) {                                          \
-			::ff::error("running parallel for\n");                                      \
+            ::ff::error("running parallel for\n");                                      \
         }                                                                         \
       } else F_##name(name.startIdx(),name.stopIdx(),0,0);                        \
     }
@@ -184,7 +184,7 @@ using namespace ff;
           auto ovar_##name = var;                                                 \
           name.setF(F_##name,idtt_##name);                                        \
           if (name.run_and_wait_end()<0) {                                        \
-			::ff::error("running forall_##name\n");                                     \
+            ::ff::error("running forall_##name\n");                                     \
           }                                                                       \
           var = ovar_##name;                                                      \
           for(size_t i=0;i<name.getnw();++i)  {                                   \
@@ -202,7 +202,7 @@ using namespace ff;
           auto ovar_##name = var;                                                 \
           name.setF(F_##name,idtt_##name);                                        \
           if (name.run_and_wait_end()<0)                                          \
-            ::ff::error("running ff_forall_farm (reduce F end)\n");	                  \
+            ::ff::error("running ff_forall_farm (reduce F end)\n");                   \
           var = ovar_##name;                                                      \
           for(size_t i=0;i<name.getnw();++i)  {                                   \
              F(var,name.getres(i));                                               \
@@ -292,7 +292,7 @@ using namespace ff;
     if (name->getnw()>1) {                                                               \
       name->setF(F_##name);                                                              \
       if (name->run_then_freeze(name->getnw())<0)                                        \
-		::ff::error("running ff_forall_farm (name)\n");                                       \
+        ::ff::error("running ff_forall_farm (name)\n");                                       \
       name->wait_freezing();                                                             \
     } else F_##name(name->startIdx(),name->stopIdx(),0,0);
 
@@ -301,7 +301,7 @@ using namespace ff;
     if (name->getnw()>1) {                                                               \
         name->setF(F_##name, type());                                                    \
         if (name->run_then_freeze(name->getnw())<0)                                      \
-		  ::ff::error("running ff_forall_farm (name)\n");                                      \
+          ::ff::error("running ff_forall_farm (name)\n");                                      \
         name->wait_freezing();                                                           \
     } else {                                                                             \
         F_##name(name->startIdx(),name->stopIdx(),0,type());                             \
@@ -335,7 +335,7 @@ using namespace ff;
           auto ovar_##name = var;                                                        \
           name->setF(F_##name,idtt_##name);                                              \
           if (name->run_then_freeze(name->getnw())<0)                                    \
-			::ff::error("running ff_forall_farm (name)\n");                                    \
+            ::ff::error("running ff_forall_farm (name)\n");                                    \
           name->wait_freezing();                                                         \
           var = ovar_##name;                                                             \
           for(size_t i=0;i<name->getnw();++i)  {                                         \
@@ -352,7 +352,7 @@ using namespace ff;
           auto ovar_##name = var;                                                        \
           name->setF(F_##name,idtt_##name);                                              \
           if (name->run_then_freeze(name->getnw())<0)                                    \
-			 ::ff::error("running ff_forall_farm (name)\n");                                   \
+             ::ff::error("running ff_forall_farm (name)\n");                                   \
           name->wait_freezing();                                                         \
           var = ovar_##name;                                                             \
           for(size_t i=0;i<name->getnw();++i)  {                                         \
@@ -377,12 +377,12 @@ using namespace ff;
 
 // parallel for task, it represents a range (start,end( of indexes
 struct forall_task_t {
-	forall_task_t() : end(0) {
-		start.store(0); // MA: consistency of store to be checked
-	}
+    forall_task_t() : end(0) {
+        start.store(0); // MA: consistency of store to be checked
+    }
     forall_task_t(const forall_task_t &t):end(t.end) {
-		start.store(t.start.load(std::memory_order_relaxed)); // MA: consistency of store to be checked
-	}
+        start.store(t.start.load(std::memory_order_relaxed)); // MA: consistency of store to be checked
+    }
     forall_task_t & operator=(const forall_task_t &t) {
         start=t.start.load(std::memory_order_relaxed), end=t.end;
         return *this;
@@ -394,16 +394,16 @@ struct forall_task_t {
 };
 struct dataPair {
     std::atomic_long ntask;
-	ALIGN_TO_PRE(CACHE_LINE_SIZE)
-	forall_task_t task;
-	ALIGN_TO_POST(CACHE_LINE_SIZE)
+    ALIGN_TO_PRE(CACHE_LINE_SIZE)
+    forall_task_t task;
+    ALIGN_TO_POST(CACHE_LINE_SIZE)
 
     dataPair():task() {
-		ntask.store(0); // MA: consistency of store to be checked
-	};
+        ntask.store(0); // MA: consistency of store to be checked
+    };
     dataPair(const dataPair &d):task(d.task) {
-		ntask.store(d.ntask.load(std::memory_order_relaxed)); // MA: consistency of store to be checked
-	}
+        ntask.store(d.ntask.load(std::memory_order_relaxed)); // MA: consistency of store to be checked
+    }
     dataPair& operator=(const dataPair &d) { ntask=d.ntask.load(std::memory_order_relaxed), task=d.task; return *this; }
 };
 
@@ -537,7 +537,7 @@ public:
     forall_Scheduler(ff_loadbalancer* lb, long start, long stop, long step, long chunk, size_t nw):
         lb(lb),_start(start),_stop(stop),_step(step),_chunk(chunk),totaltasks(0),_nw(nw),
         jump(0),skip1(false),workersspinwait(false),static_scheduling(false) {
-		maxid.store(-1); // MA: consistency of store to be checked
+        maxid.store(-1); // MA: consistency of store to be checked
         if (_chunk<=0) totaltasks = init_data_static(start,stop);
         else           totaltasks = init_data(start,stop);
         assert(totaltasks>=1);
@@ -545,7 +545,7 @@ public:
     forall_Scheduler(ff_loadbalancer* lb, size_t nw):
         lb(lb),_start(0),_stop(0),_step(1),_chunk(1),totaltasks(0),_nw(nw),
         jump(0),skip1(false),workersspinwait(false),static_scheduling(false) {
-		maxid.store(-1); // MA: consistency of store to be checked
+        maxid.store(-1); // MA: consistency of store to be checked
         totaltasks = init_data(0,0);
         assert(totaltasks==0);
     }
@@ -968,7 +968,7 @@ public:
     inline void disableScheduler(bool onoff=true) { removeSched=onoff; }
 
     inline int run_then_freeze(ssize_t nw_=-1) {
-    	firstRunBefore();
+        firstRunBefore();
         assert(skipwarmup == false);
         const ssize_t nwtostart = (nw_ == -1)?getNWorkers():nw_;
         auto r = -1;
@@ -996,7 +996,7 @@ public:
     }
 
     inline int run_and_wait_end() {
-    	firstRunBefore();
+        firstRunBefore();
         assert(spinwait == false);
         const size_t nwtostart = getnw();
         auto r= -1;
@@ -1098,15 +1098,15 @@ public:
      *                   in a round-robin fashion.
      */
     inline void setloop(long begin,long end,long step,long chunk,long nw,long completionTime = 0) {
-    	if(completionTime){
-			AdaptivityParameters ap;
-			ap.strategyFrequencies = STRATEGY_FREQUENCY_CORES_CONSERVATIVE;
-			//ap.strategyFrequencies = STRATEGY_FREQUENCY_POWER_CONSERVATIVE; //TODO
-			ap.contractType = CONTRACT_COMPLETION_TIME;
-			ap.expectedTasksNumber = end - begin + 1;
-			ap.requiredCompletionTime = completionTime;
-			setAdaptivityParameters(ap);
-    	}
+        if(completionTime){
+            AdaptivityParameters ap;
+            ap.strategyFrequencies = STRATEGY_FREQUENCY_CORES_CONSERVATIVE;
+            //ap.strategyFrequencies = STRATEGY_FREQUENCY_POWER_CONSERVATIVE; //TODO
+            ap.contractType = CONTRACT_COMPLETION_TIME;
+            ap.expectedTasksNumber = end - begin + 1;
+            ap.requiredCompletionTime = completionTime;
+            setAdaptivityParameters(ap);
+        }
 
         assert(nw<=(ssize_t)getNWorkers());
         forall_Scheduler *sched = (forall_Scheduler*)getEmitter();

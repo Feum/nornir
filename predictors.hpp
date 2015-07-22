@@ -221,6 +221,16 @@ public:
     double predict(const FarmConfiguration& configuration);
 };
 
+/**
+ * State of calibration.
+ * Used to track the process.
+ */
+typedef enum{
+    CALIBRATION_SEEDS = 0,
+    CALIBRATION_TRY_PREDICT,
+    CALIBRATION_EXTRA_POINT,
+    CALIBRATION_FINISHED
+}CalibrationState;
 
 /**
  * Used to obtain calibration points.
@@ -229,7 +239,7 @@ class Calibrator{
 public:
     virtual ~Calibrator(){;}
 
-    virtual std::vector<FarmConfiguration> getPoints() = 0;
+    virtual FarmConfiguration getNextConfiguration() = 0;
 };
 
 /**
@@ -238,11 +248,25 @@ public:
  */
 class CalibratorSpread: public Calibrator{
 private:
-    const AdaptivityManagerFarm& _manager;
-public:
-    CalibratorSpread(const AdaptivityManagerFarm& manager);
+    AdaptivityManagerFarm& _manager;
+    CalibrationState _state;
+    const std::vector<FarmConfiguration> _seeds;
+    size_t _nextSeed;
 
-    std::vector<FarmConfiguration> getPoints();
+    /**
+     * Gets the seeds points.
+     * @return The seedsPoints.
+     */
+    std::vector<FarmConfiguration> getSeeds();
+
+    /**
+     * Returns true if the error of the model is too high, false otherwise.
+     */
+    bool highError();
+public:
+    CalibratorSpread(AdaptivityManagerFarm& manager);
+
+    FarmConfiguration getNextConfiguration();
 };
 
 }

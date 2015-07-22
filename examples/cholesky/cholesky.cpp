@@ -38,6 +38,7 @@
 #include <fcntl.h>
 //#include <sys/mman.h>
 #include <farm.hpp>
+#include <predictors_impl.hpp>
 #include <cholconst.h>
 #include <complex.h>
 #include <common.h>

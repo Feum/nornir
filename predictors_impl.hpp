@@ -50,17 +50,16 @@ namespace adpff{
 
 void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
     _numPredictors = 0;
-
     double usedPhysicalCores = std::min(configuration.numWorkers, _manager._numPhysicalCores);
-    /*
+
     _physicalCores = usedPhysicalCores;
     ++_numPredictors;
-     */
+
     _invScalFactorPhysical = 1.0 / (usedPhysicalCores * ((double)configuration.frequency /
                                                          (double)_manager._availableFrequencies.at(0)));
     ++_numPredictors;
 
-    /*
+
     if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
         _workers = (double)configuration.numWorkers;
         ++_numPredictors;
@@ -69,6 +68,7 @@ void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
                                                                             (double)_manager._availableFrequencies.at(0)));
         ++_numPredictors;
     }
+    /*
     if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
         _frequency = configuration.frequency;
         ++_numPredictors;
@@ -94,12 +94,13 @@ uint RegressionDataServiceTime::getNumPredictors() const{
 void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) const{
     size_t rowId = 0;
     //TODO: !!!
-    //matrix(rowId++, columnId) = _physicalCores;
+    matrix(rowId++, columnId) = _physicalCores;
     matrix(rowId++, columnId) = _invScalFactorPhysical;
-    /*if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
+    if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
         matrix(rowId++, columnId) = _workers;
         matrix(rowId++, columnId) = _invScalFactorWorkers;
     }
+    /*
     if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
         matrix(rowId++, columnId) = _frequency;
     }*/
@@ -137,7 +138,7 @@ void RegressionDataPower::init(const FarmConfiguration& configuration){
         }else{
             ; //TODO
         }
-        usedCpus = std::max(usedCpus, _manager._numCpus);
+        usedCpus = std::min(usedCpus, _manager._numCpus);
         uint unusedCpus = _manager._numCpus - usedCpus;
 
         _voltagePerUsedSockets = voltage * (double) usedCpus;
@@ -204,6 +205,8 @@ void PredictorLinearRegression::clear(){
     for(size_t i = 0; i < _data.size(); i++){
         delete _data.at(i);
     }
+    _data.clear();
+    _responses.clear();
 }
 
 uint PredictorLinearRegression::getMinimumPointsNeeded(){
@@ -214,24 +217,20 @@ uint PredictorLinearRegression::getMinimumPointsNeeded(){
 
 void PredictorLinearRegression::refine(){
     RegressionData* rd = NULL;
+    double response = 0;
+
     switch(_type){
         case PREDICTION_BANDWIDTH:{
             rd = new RegressionDataServiceTime(_manager, _manager._currentConfiguration);
-        }break;
-        case PREDICTION_POWER:{
-            rd = new RegressionDataPower(_manager, _manager._currentConfiguration);
-        }break;
-    }
-    _data.push_back(rd);
-    double response = 0;
-    switch(_type){
-        case PREDICTION_BANDWIDTH:{
             response = 1.0 / _manager._averageBandwidth;
         }break;
         case PREDICTION_POWER:{
+            rd = new RegressionDataPower(_manager, _manager._currentConfiguration);
             response = _manager._averageWatts.cores;
         }break;
     }
+
+    _data.push_back(rd);
     _responses.push_back(response);
     DEBUG("Refining with configuration [" << _manager._currentConfiguration.numWorkers << ", "
                                           << _manager._currentConfiguration.frequency << "]: "
@@ -247,8 +246,8 @@ void PredictorLinearRegression::prepareForPredictions(){
     arma::mat dataMl(_data[0]->getNumPredictors(), _data.size());
     arma::vec responsesMl(_data.size());
     for(size_t i = 0; i < _data.size(); i++){
-        _data[i]->toArmaRow(i, dataMl);
-        responsesMl(i) = _responses[i];
+        _data.at(i)->toArmaRow(i, dataMl);
+        responsesMl(i) = _responses.at(i);
     }
 
     _lr = LinearRegression(dataMl, responsesMl);
@@ -268,7 +267,7 @@ double PredictorLinearRegression::predict(const FarmConfiguration& configuration
     if(_type == PREDICTION_BANDWIDTH){
         result.at(0) = 1.0 / result.at(0);
     }
-    DEBUG("Prediction at configuration [" << configuration.numWorkers << ", " << configuration.frequency << "]: " << result.at(0));
+    //    DEBUG("Prediction at configuration [" << configuration.numWorkers << ", " << configuration.frequency << "]: " << result.at(0));
     return result.at(0);
 }
     
@@ -305,9 +304,11 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
     return 0.0;
 }
 
-CalibratorSpread::CalibratorSpread(const AdaptivityManagerFarm& manager):_manager(manager){;}
+CalibratorSpread::CalibratorSpread(AdaptivityManagerFarm& manager):
+        _manager(manager), _state(CALIBRATION_SEEDS),
+        _seeds(getSeeds()), _nextSeed(0){;}
 
-std::vector<FarmConfiguration> CalibratorSpread::getPoints(){
+std::vector<FarmConfiguration> CalibratorSpread::getSeeds(){
     /*
      * If I need X points, I split the interval into X - 1 parts and I took
      * the intervals' bounds as points.
@@ -340,15 +341,73 @@ std::vector<FarmConfiguration> CalibratorSpread::getPoints(){
     }
 
     points.push_back(FarmConfiguration(numWorkers, frequencies.at(numFrequencies - 1)));
-
-
-
+    std::reverse(points.begin(), points.end());
     for(size_t i = 0; i < points.size(); i++){
-        DEBUG("Calibration point: [" << points.back().numWorkers << ", " << points.back().frequency << "]");
+        DEBUG("Calibration point: [" << points.at(i).numWorkers << ", " << points.at(i).frequency << "]");
     }
     return points;
 }
 
+bool CalibratorSpread::highError(){
+    double primaryError = std::abs((_manager.getPrimaryValue() - _manager._primaryPrediction)/_manager.getPrimaryValue())*100.0;
+    double secondaryError = std::abs((_manager.getSecondaryValue() - _manager._secondaryPrediction)/_manager.getSecondaryValue())*100.0;
+    DEBUG("Primary prediction: " << _manager._primaryPrediction << " Secondary prediction: " << _manager._secondaryPrediction);
+    DEBUG("Primary error: " << primaryError << " Secondary error: " << secondaryError);
+    return primaryError > _manager._p.maxPredictionError ||
+           secondaryError > _manager._p.maxPredictionError;
+}
+
+FarmConfiguration CalibratorSpread::getNextConfiguration(){
+    FarmConfiguration fc;
+    switch(_state){
+        case CALIBRATION_SEEDS:{
+            fc = _seeds.at(_nextSeed);
+            _nextSeed++;
+            if(_nextSeed == _seeds.size()){
+                _state = CALIBRATION_TRY_PREDICT;
+                DEBUG("========Movign to predict");
+            }
+        }break;
+        case CALIBRATION_TRY_PREDICT:{
+            fc = _manager.getNewConfiguration();
+            _state = CALIBRATION_EXTRA_POINT;
+            DEBUG("========Moving to extra");
+        }break;
+        case CALIBRATION_EXTRA_POINT:{
+            if(highError()){
+                fc = FarmConfiguration(((uint)(rand()*1000.0) % _manager._maxNumWorkers) + 1,
+                     _manager._availableFrequencies.at(((uint)(rand()*1000.0) % _manager._availableFrequencies.size())));
+                _state = CALIBRATION_TRY_PREDICT;
+                DEBUG("========High error");
+                DEBUG("========Moving to predict");
+            }else if(_manager.isContractViolated()){
+              DEBUG("========Contract violated");
+              fc = _manager.getNewConfiguration();
+              _state = CALIBRATION_TRY_PREDICT;
+              DEBUG("========Moving to predict");
+            }else{
+                fc = _manager.getNewConfiguration();
+                _state = CALIBRATION_FINISHED;
+                _manager._primaryPredictor->clear();
+                _manager._secondaryPredictor->clear();
+                DEBUG("========Movign to finished");
+            }
+        }break;
+        case CALIBRATION_FINISHED:{
+            if(highError()){
+                fc = _seeds.at(0);
+                _nextSeed = 1;
+                _state = CALIBRATION_SEEDS;
+                DEBUG("========Moving to seeds");
+            }else if(_manager.isContractViolated()){
+                fc = _manager.getNewConfiguration();
+            }else{
+                fc = _manager._currentConfiguration;
+            }
+        }break;
+    }
+    return fc;
+}
 
 }
 

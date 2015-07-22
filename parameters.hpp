@@ -135,8 +135,6 @@ typedef enum{
     VALIDATION_VOLTAGE_FILE_NEEDED, ///< strategyFrequencies is STRATEGY_FREQUENCY_POWER_CONSERVATIVE but the voltage file
                                     ///< has not been specified or it does not exist.
     VALIDATION_NO_FAST_RECONF, ///< Fast reconfiguration not available.
-    VALIDATION_WRONG_REGRESSION_PARAMETERS ///< If strategyPrediction is STRATEGY_PREDICTION_REGRESSION_LINEAR but the
-                                           ///< parameters are wrong.
 }AdaptivityParametersValidation;
 
 /*!
@@ -179,7 +177,6 @@ private:
         underloadThresholdWorker = 80.0;
         overloadThresholdWorker = 90.0;
         requiredBandwidth = 0;
-        maxBandwidthVariation = 5.0;
         requiredCompletionTime = 0;
         expectedTasksNumber = 0;
         powerBudget = 0;
@@ -230,10 +227,6 @@ public:
                                     ///< contractType is CONTRACT_UTILIZATION [default = 90.0].
     double requiredBandwidth; ///< The bandwidth required for the application (expressed as tasks/sec).
                               ///< It is valid only if contractType is CONTRACT_BANDWIDTH [default = unused].
-    double maxBandwidthVariation; ///< The allowed variation for bandwidth. The bandwidth will be kept
-                                  ///< Between [B, B + x] where B is 'requiredBandwidth' and x
-                                  ///< is the 'maxBandwidthVariation' percentage of B.
-                                  ///< It is valid only if contractType is CONTRACT_BANDWIDTH [default = 5.0].
     uint requiredCompletionTime; ///< The required completion time for the application (in seconds). It is
                                  ///< valid only if contractType is CONTRACT_COMPLETION_TIME [default = unused].
     uint64_t expectedTasksNumber; ///< The number of task expected for this computation. It is
@@ -253,7 +246,7 @@ public:
      */
     AdaptivityParameters(Communicator* const communicator = NULL):
       mammut(communicator){
-    	setDefault();
+        setDefault();
     }
 
     /**
@@ -264,45 +257,45 @@ public:
      */
     AdaptivityParameters(const std::string& xmlFileName, Communicator* const communicator = NULL):
       mammut(communicator){
-		setDefault();
-		rapidxml::xml_document<> xmlContent;
-		std::ifstream file(xmlFileName.c_str());
-		if(!file.is_open()){
-			throw std::runtime_error("Impossible to read xml file " + xmlFileName);
-		}
+        setDefault();
+        rapidxml::xml_document<> xmlContent;
+        std::ifstream file(xmlFileName.c_str());
+        if(!file.is_open()){
+                    throw std::runtime_error("Impossible to read xml file " + xmlFileName);
+        }
 
-		std::string fileContent;
-		file.seekg(0, std::ios::end);
-		fileContent.reserve(file.tellg());
-		file.seekg(0, std::ios::beg);
-		fileContent.assign((std::istreambuf_iterator<char>(file)),
-							std::istreambuf_iterator<char>());
-		char* fileContentChars = new char[fileContent.size() + 1];
-		std::copy(fileContent.begin(), fileContent.end(), fileContentChars);
-		fileContentChars[fileContent.size()] = '\0';
-		xmlContent.parse<0>(fileContentChars);
-		rapidxml::xml_node<> *root = xmlContent.first_node("adaptivityParameters");
-		rapidxml::xml_node<> *node = NULL;
+        std::string fileContent;
+        file.seekg(0, std::ios::end);
+        fileContent.reserve(file.tellg());
+        file.seekg(0, std::ios::beg);
+        fileContent.assign((std::istreambuf_iterator<char>(file)),
+                            std::istreambuf_iterator<char>());
+        char* fileContentChars = new char[fileContent.size() + 1];
+        std::copy(fileContent.begin(), fileContent.end(), fileContentChars);
+        fileContentChars[fileContent.size()] = '\0';
+        xmlContent.parse<0>(fileContentChars);
+        rapidxml::xml_node<> *root = xmlContent.first_node("adaptivityParameters");
+        rapidxml::xml_node<> *node = NULL;
 
-		node = root->first_node("contractType");
-		if(node){
-			contractType = (ContractType) utils::stringToInt(node->value());
-		}
-
-		node = root->first_node("strategyMapping");
-		if(node){
-			strategyMapping = (StrategyMapping) utils::stringToInt(node->value());
-		}
+        node = root->first_node("contractType");
+        if(node){
+          contractType = (ContractType) utils::stringToInt(node->value());
+        }
+        
+        node = root->first_node("strategyMapping");
+        if(node){
+          strategyMapping = (StrategyMapping) utils::stringToInt(node->value());
+        }
 
         node = root->first_node("strategyHyperthreading");
         if(node){
             strategyHyperthreading = (StrategyHyperthreading) utils::stringToInt(node->value());
         }
 
-		node = root->first_node("strategyFrequencies");
-		if(node){
-			strategyFrequencies = (StrategyFrequencies) utils::stringToInt(node->value());
-		}
+        node = root->first_node("strategyFrequencies");
+        if(node){
+          strategyFrequencies = (StrategyFrequencies) utils::stringToInt(node->value());
+        }
 
         node = root->first_node("strategyUnusedVirtualCores");
         if(node){
@@ -329,77 +322,72 @@ public:
             mappingCollector = (ServiceNodeMapping) utils::stringToInt(node->value());
         }
 
-		node = root->first_node("frequencyGovernor");
-		if(node){
-			frequencyGovernor = (cpufreq::Governor) utils::stringToInt(node->value());
-		}
+        node = root->first_node("frequencyGovernor");
+        if(node){
+            frequencyGovernor = (cpufreq::Governor) utils::stringToInt(node->value());
+        }
+        
+        node = root->first_node("turboBoost");
+        if(node){
+            turboBoost = utils::stringToInt(node->value());
+        }
 
-		node = root->first_node("turboBoost");
-		if(node){
-			turboBoost = utils::stringToInt(node->value());
-		}
+        node = root->first_node("frequencyLowerBound");
+        if(node){
+            frequencyLowerBound = utils::stringToInt(node->value());
+        }
 
-		node = root->first_node("frequencyLowerBound");
-		if(node){
-			frequencyLowerBound = utils::stringToInt(node->value());
-		}
+        node = root->first_node("frequencyUpperBound");
+        if(node){
+            frequencyUpperBound = utils::stringToInt(node->value());
+        }
 
-		node = root->first_node("frequencyUpperBound");
-		if(node){
-			frequencyUpperBound = utils::stringToInt(node->value());
-		}
+        node = root->first_node("fastReconfiguration");
+        if(node){
+            fastReconfiguration = utils::stringToInt(node->value());
+        }
 
-		node = root->first_node("fastReconfiguration");
-		if(node){
-			fastReconfiguration = utils::stringToInt(node->value());
-		}
+        node = root->first_node("numSamples");
+        if(node){
+            numSamples = utils::stringToInt(node->value());
+        }
 
-		node = root->first_node("numSamples");
-		if(node){
-			numSamples = utils::stringToInt(node->value());
-		}
+        node = root->first_node("samplingInterval");
+        if(node){
+            samplingInterval = utils::stringToInt(node->value());
+        }
 
-		node = root->first_node("samplingInterval");
-		if(node){
-			samplingInterval = utils::stringToInt(node->value());
-		}
+        node = root->first_node("underloadThresholdFarm");
+        if(node){
+            underloadThresholdFarm = utils::stringToDouble(node->value());
+        }
 
-		node = root->first_node("underloadThresholdFarm");
-		if(node){
-			underloadThresholdFarm = utils::stringToDouble(node->value());
-		}
+        node = root->first_node("overloadThresholdFarm");
+        if(node){
+            overloadThresholdFarm = utils::stringToDouble(node->value());
+        }
 
-		node = root->first_node("overloadThresholdFarm");
-		if(node){
-			overloadThresholdFarm = utils::stringToDouble(node->value());
-		}
+        node = root->first_node("underloadThresholdWorker");
+        if(node){
+            underloadThresholdWorker = utils::stringToDouble(node->value());
+        }
 
-		node = root->first_node("underloadThresholdWorker");
-		if(node){
-			underloadThresholdWorker = utils::stringToDouble(node->value());
-		}
+        node = root->first_node("overloadThresholdWorker");
+        if(node){
+            overloadThresholdWorker = utils::stringToDouble(node->value());
+        }
 
-		node = root->first_node("overloadThresholdWorker");
-		if(node){
-			overloadThresholdWorker = utils::stringToDouble(node->value());
-		}
+        node = root->first_node("migrateCollector");
+        if(node){
+            migrateCollector = utils::stringToInt(node->value());
+        }
 
-		node = root->first_node("migrateCollector");
-		if(node){
-			migrateCollector = utils::stringToInt(node->value());
-		}
+        node = root->first_node("requiredBandwidth");
+        if(node){
+            requiredBandwidth = utils::stringToDouble(node->value());
+        }
 
-		node = root->first_node("requiredBandwidth");
-		if(node){
-			requiredBandwidth = utils::stringToDouble(node->value());
-		}
-
-		node = root->first_node("maxBandwidthVariation");
-		if(node){
-			maxBandwidthVariation = utils::stringToDouble(node->value());
-		}
-
-		node = root->first_node("requiredCompletionTime");
+        node = root->first_node("requiredCompletionTime");
         if(node){
             requiredCompletionTime = utils::stringToInt(node->value());
         }
@@ -419,20 +407,20 @@ public:
             maxPredictionError = utils::stringToDouble(node->value());
         }
 
-		node = root->first_node("voltageTableFile");
-		if(node){
-			voltageTableFile = node->value();
-		}
+        node = root->first_node("voltageTableFile");
+        if(node){
+            voltageTableFile = node->value();
+        }
 
-		delete[] fileContentChars;
-	}
+        delete[] fileContentChars;
+    }
 
 
     /**
      * Destroyes these parameters.
      */
     ~AdaptivityParameters(){
-    	;
+        ;
     }
 
     /**
@@ -468,7 +456,6 @@ public:
                !mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
                 return VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS;
             }
-
         }else{
             if((mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE) || (mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE)){
                 return VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY;
@@ -546,7 +533,7 @@ public:
                 }
             }break;
             case CONTRACT_PERF_BANDWIDTH:{
-                if(requiredBandwidth < 0 || maxBandwidthVariation < 0 || maxBandwidthVariation > 100.0){
+                if(requiredBandwidth <= 0){
                     return VALIDATION_WRONG_CONTRACT_PARAMETERS;
                 }
             }break;
@@ -556,7 +543,7 @@ public:
                 }
             }break;
             case CONTRACT_POWER_BUDGET:{
-                if(!powerBudget || (strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES) ||
+                if(powerBudget <= 0 || (strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES) ||
                    strategyPrediction == STRATEGY_PREDICTION_SIMPLE){
                     return VALIDATION_WRONG_CONTRACT_PARAMETERS;
                 }
@@ -564,6 +551,10 @@ public:
             default:{
                 ;
             }break;
+        }
+
+        if(maxPredictionError < 0 || maxPredictionError > 100.0){
+            return VALIDATION_WRONG_CONTRACT_PARAMETERS;
         }
 
         /** Validate voltage table. **/
@@ -580,11 +571,6 @@ public:
                 !availableFrequencies.size())){
                 return VALIDATION_NO_FAST_RECONF;
             }
-        }
-
-        /** Validate linear regression. **/
-        if(strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR){
-            return VALIDATION_WRONG_REGRESSION_PARAMETERS;
         }
 
         /** Validate Hyperthreading strategies. **/

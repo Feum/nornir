@@ -25,13 +25,12 @@
     <contractType>2</contractType>
     <strategyFrequencies>3</strategyFrequencies>
     <voltageTableFile>voltage.txt</voltageTableFile> -->
-    
+    <samplingInterval>1000</samplingInterval>
+    <numSamples>4</numSamples>    
     <contractType>4</contractType>
     <voltageTableFile>voltage.txt</voltageTableFile>
-	<powerBudget>20</powerBudget>
-	<numRegressionPoints>4</numRegressionPoints>
-	<numStabilizationTasks>50</numStabilizationTasks>
-	<strategyFrequencies>0</strategyFrequencies>
-	<strategyMapping>2</strategyMapping>
-	<strategyPrediction>1</strategyPrediction> 
+    <powerBudget>50</powerBudget>
+    <strategyFrequencies>0</strategyFrequencies>
+    <strategyMapping>2</strategyMapping>
+    <strategyPrediction>1</strategyPrediction> 
 </adaptivityParameters>

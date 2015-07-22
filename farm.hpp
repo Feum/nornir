@@ -126,6 +126,8 @@ private:
     adp_ff_node* getAdaptiveEmitter() const;
 
     adp_ff_node* getAdaptiveCollector() const;
+
+    void waitInternal();
 public:
 
     /**
@@ -133,7 +135,7 @@ public:
      * For parameters documentation, see fastflow's farm documentation.
      */
     adp_ff_farm(std::vector<ff_node*>& w, ff_node* const emitter = NULL,
-    		    ff_node* const collector = NULL, bool inputCh = false);
+                    ff_node* const collector = NULL, bool inputCh = false);
 
     /**
      * Builds the adaptive farm.
@@ -310,8 +312,6 @@ private:
     Predictor* _secondaryPredictor; ///< The predictor of the secondary value.
     double _primaryPrediction; ///< The prediction done for the primary value for the chosen configuration.
     double _secondaryPrediction; ///< The prediction done for the secondary value for the chosen configuration.
-    double _primaryError; ///< The last error (percentage) in primary value predictor.
-    double _secondaryError; ///< The last error (percentage) in secondary value predictor.
 
     /**
      * If possible, finds a set of physical cores belonging to domains different from
@@ -517,7 +517,7 @@ private:
      * @param unusedVirtualCores The virtual cores.
      */
     void applyUnusedVirtualCoresStrategy(StrategyUnusedVirtualCores strategyUnused,
-    		                             const std::vector<topology::VirtualCore*>& unusedVirtualCores){
+                                         const std::vector<topology::VirtualCore*>& unusedVirtualCores){
         switch(strategyUnused){
             case STRATEGY_UNUSED_VC_OFF:{
                 for(size_t i = 0; i < unusedVirtualCores.size(); i++){
@@ -553,7 +553,6 @@ private:
         /**
          * OFF 'includes' LOWEST_FREQUENCY. i.e. If we shutdown all the virtual cores
          * on a domain, we can also lower its frequency to the minimum.
-         * TODO: Explain better
          */
         std::vector<topology::VirtualCore*> virtualCores;
         if(_p.strategyInactiveVirtualCores != STRATEGY_UNUSED_VC_NONE){
@@ -676,8 +675,14 @@ private:
         MonitoredSample sum = _monitoredSamples.sum();
         WorkerSample workersSum = sum.collapseWorkersSamples();
 
-        _averageServiceTime = workersSum.serviceTime / (double)(_monitoredSamples.size() * _currentConfiguration.numWorkers);
-        _averageBandwidth = workersSum.tasksCount / (sum.durationMilliSec / 1000.0);
+        //TODO scrivere meglio. Al momento per qualche motivo il service time non funziona
+        for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
+            _averageServiceTime += sum.workers.at(i).serviceTime / (double) _monitoredSamples.size();
+            _averageBandwidth += sum.workers.at(i).bandwidth / (double) _monitoredSamples.size();
+        }
+        _averageServiceTime /= (double) _currentConfiguration.numWorkers;
+
+        _averageBandwidth = (double) workersSum.tasksCount / (sum.durationMilliSec / 1000.0);
         _averageUtilization = workersSum.loadPercentage / (double)(_monitoredSamples.size() * _currentConfiguration.numWorkers);
         _averageWatts = sum.totalJoules / (sum.durationMilliSec / 1000.0);
     }
@@ -725,27 +730,48 @@ private:
     }
 
     /**
-     * Checks if a specific primary value violates the contract requested
-     * by the user.
-     * @param primaryValue The primary value.
+     * Checks if the contract is violated.
      * @return true if the contract has been violated, false otherwise.
      */
-    bool isContractViolated(double primaryValue) const{
+    bool isContractViolated() const{
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
-                return primaryValue < _p.underloadThresholdFarm ||
-                       primaryValue > _p.overloadThresholdFarm;
+                return _averageUtilization < _p.underloadThresholdFarm ||
+                       _averageUtilization > _p.overloadThresholdFarm;
             }break;
-            case CONTRACT_PERF_BANDWIDTH:{
-                double offset = (_p.requiredBandwidth * _p.maxBandwidthVariation) / 100.0;
-                return primaryValue < _p.requiredBandwidth ||
-                       primaryValue > _p.requiredBandwidth + offset;
-            }break;
+            case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
-                return primaryValue < _p.requiredBandwidth;
+                double tolerance = (_p.requiredBandwidth * _p.maxPredictionError) / 100.0;
+                return _averageBandwidth < _p.requiredBandwidth - tolerance;
             }break;
             case CONTRACT_POWER_BUDGET:{
-                return primaryValue > _p.powerBudget;
+                double tolerance = (_p.powerBudget * _p.maxPredictionError) / 100.0;
+                return _averageWatts.cores > _p.powerBudget + tolerance;
+            }break;
+            default:{
+                return false;
+            }break;
+        }
+        return false;
+    }
+
+    /**
+     * Checks if a specific primary value is feasible according to the specified
+     * contract.
+     * @return true if the solution is feasible, false otherwise.
+     */
+    bool isFeasiblePrimaryValue(double primaryValue) const{
+        switch(_p.contractType){
+            case CONTRACT_PERF_UTILIZATION:{
+                return primaryValue > _p.underloadThresholdFarm &&
+                        primaryValue < _p.overloadThresholdFarm;
+            }break;
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                return primaryValue > _p.requiredBandwidth;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                return primaryValue < _p.powerBudget;
             }break;
             default:{
                 return false;
@@ -881,7 +907,7 @@ private:
                     }
                 }
 
-                if(!isContractViolated(currentPrimaryPrediction)){
+                if(isFeasiblePrimaryValue(currentPrimaryPrediction)){
                     currentSecondaryPrediction = _secondaryPredictor->predict(examinedConfiguration);
                     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
                         currentSecondaryPrediction *= remainingTime;
@@ -976,8 +1002,11 @@ private:
             }
 
             /** Stops farm. **/
+            DEBUG("Asking the farm for NULL production");
             _emitter->produceNull();
+            DEBUG("Wait for freezing");
             _farm->wait_freezing();
+            DEBUG("Farm freezed");
             /**
              * When workers stops, they update their last sample.
              * Accordingly, we do not need to ask them but we can just
@@ -1023,7 +1052,9 @@ private:
 
 
             /** Start the farm again. **/
+            DEBUG("Asking the farm to start again");
             _farm->run_then_freeze(configuration.numWorkers);
+            DEBUG("Farm started");
             //TODO: Se la farm non è stata avviata con la run_then_freeze questo potrebbe essere un problema.
             if(_p.fastReconfiguration){
                 _cpufreq->rollback(rollbackPoints);
@@ -1038,6 +1069,9 @@ private:
         }
         /****************** P-state change terminated ******************/
         _currentConfiguration = configuration;
+
+        /****************** Ensure farm is running ******************/
+        while(!storeNewSample()){;}
 
         /****************** Clean state ******************/
         _lastStoredSampleMs = utils::getMillisecondsTime();
@@ -1201,9 +1235,7 @@ public:
         _availableVirtualCores(getAvailableVirtualCores()),
         _emitterVirtualCore(NULL),
         _collectorVirtualCore(NULL),
-        _monitoredSamples(_p.numSamples),
-        _primaryError(100.0),
-        _secondaryError(100.0){
+        _monitoredSamples(_p.numSamples){
         /** If voltage table file is specified, then load the table. **/
         if(_p.voltageTableFile.compare("")){
             cpufreq::loadVoltageTable(_voltageTable, _p.voltageTableFile);
@@ -1245,7 +1277,6 @@ public:
         mapAndSetFrequencies();
         _energy->resetCountersCpu();
 
-        double microsecsSleep = 0;
         _lastStoredSampleMs = utils::getMillisecondsTime();
         _p.observer->_startMonitoringMs = _lastStoredSampleMs;
 
@@ -1255,28 +1286,29 @@ public:
         }
 
         initPredictors();
-        std::vector<FarmConfiguration> calibrationPoints;
-        if(_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR){
-            calibrationPoints = _calibrator->getPoints();
-        }
 
-        FarmConfiguration nextConfiguration;
-        bool reconfigurationRequired = false;
-        bool forceReconfiguration = false;
-
+        double microsecsSleep = 0;
         if(_p.contractType == CONTRACT_NONE){
-            _monitor.wait();
+            //_monitor.wait();
+            _farm->waitInternal();
             storeNewSample();
             updateMonitoredValues();
             observe();
         }else{
+            /* Force the first calibration point. **/
+            if(_calibrator){
+                changeConfiguration(_calibrator->getNextConfiguration());
+            }
+
+            double startSample = utils::getMillisecondsTime();
             while(!mustStop()){
-                double overheadMs = utils::getMillisecondsTime() - _lastStoredSampleMs;
+                double overheadMs = utils::getMillisecondsTime() - startSample;
                 microsecsSleep = ((double)_p.samplingInterval - overheadMs)*(double)MAMMUT_MICROSECS_IN_MILLISEC;
                 if(microsecsSleep < 0){
                     microsecsSleep = 0;
                 }
                 usleep(microsecsSleep);
+                startSample = utils::getMillisecondsTime();
 
                 if(!storeNewSample()){
                     goto controlLoopEnd;
@@ -1294,39 +1326,24 @@ public:
                 updateMonitoredValues();
                 observe();
 
-                //TODO: Do something smarter
-                if(_monitoredSamples.size() == _p.numSamples - 1){
-                    if(!calibrationPoints.size()){
-                        _primaryError = std::abs((getPrimaryValue() - _primaryPrediction)/getPrimaryValue())*100.0;
-                        _secondaryError = std::abs((getSecondaryValue() - _secondaryPrediction)/getSecondaryValue())*100.0;
-                        DEBUG("Primary error: " << _primaryError << " Secondary error: " << _secondaryError);
-                    }
-                }
-
                 if(_monitoredSamples.size() >= _p.numSamples){
-                    if(!calibrationPoints.size()){
-                        if(isContractViolated(getPrimaryValue()) || forceReconfiguration ||
-                           _primaryError > _p.maxPredictionError || _primaryError > _p.maxPredictionError){
-                            reconfigurationRequired = true;
-                            nextConfiguration = getNewConfiguration();
-                        }
-                    }else{
-                        if(calibrationPoints.size()){
-                            nextConfiguration = calibrationPoints.back();
-                            calibrationPoints.pop_back();
-                            reconfigurationRequired = true;
-                        }
+                    bool reconfigurationRequired = false;
+                    FarmConfiguration nextConfiguration;
 
-                        if(!calibrationPoints.size()){
-                            /** Calibration finished. **/
-                            forceReconfiguration = true;
+                    if(_calibrator){
+                        nextConfiguration = _calibrator->getNextConfiguration();
+                        if(nextConfiguration != _currentConfiguration){
+                            reconfigurationRequired = true;
                         }
+                    }else if(isContractViolated()){
+                        nextConfiguration = getNewConfiguration();
+                        reconfigurationRequired = true;
                     }
-                }
 
-                if(reconfigurationRequired){
-                    changeConfiguration(nextConfiguration);
-                    reconfigurationRequired = false;
+                    if(reconfigurationRequired){
+                        changeConfiguration(nextConfiguration);
+                        startSample = utils::getMillisecondsTime();
+                    }
                 }
             }
         }
@@ -1480,6 +1497,12 @@ int adp_ff_farm<lb_t, gt_t>::wait(){
         delete _adaptivityManager;
     }
     return r;
+}
+
+
+template <typename lb_t, typename gt_t>
+void adp_ff_farm<lb_t, gt_t>::waitInternal(){
+    ff_farm<lb_t, gt_t>::wait();
 }
 
 }

@@ -52,12 +52,14 @@ using namespace mammut;
 typedef struct WorkerSample{
     double loadPercentage; ///< The percentage of time that the node spent on svc().
     double tasksCount; ///< The number of computed tasks.
+    double bandwidth; ///< Bandwidth (tasks per ticks).
     double serviceTime; ///< The average service time (in ticks).
-    WorkerSample():loadPercentage(0), tasksCount(0), serviceTime(0){;}
+    WorkerSample():loadPercentage(0), tasksCount(0), bandwidth(0), serviceTime(0){;}
 
     WorkerSample& operator+=(const WorkerSample& rhs){
         loadPercentage += rhs.loadPercentage;
         tasksCount += rhs.tasksCount;
+        bandwidth += rhs.bandwidth;
         serviceTime += rhs.serviceTime;
         return *this;
     }
@@ -142,6 +144,18 @@ private:
     }
 
     /**
+     * Check if the node is running.
+     * @return true if the node is running, false otherwise.
+     */
+    bool isRunning(){
+        bool r;
+        _threadRunningLock.lock();
+        r = _threadRunning;
+        _threadRunningLock.unlock();
+        return r;
+    }
+
+    /**
      * Ask the node for a sample of the statistics computed since the last
      * time this method has been called.
      * The result can be retrieved with getSampleResponse call.
@@ -158,19 +172,19 @@ private:
      * @return true if the node is running, false otherwise.
      */
      bool getSampleResponse(WorkerSample& sample){
-		int dummy;
-		int* dummyPtr = &dummy;
-		while(!_responseQ.pop((void**) &dummyPtr)){
-			_threadRunningLock.lock();
-			if(!_threadRunning){
-				_threadRunningLock.unlock();
-				return false;
-			}
-			_threadRunningLock.unlock();
-		}
-		sample = _sampleResponse;
-		return true;
-	}
+         int dummy;
+         int* dummyPtr = &dummy;
+         while(!_responseQ.pop((void**) &dummyPtr)){
+             _threadRunningLock.lock();
+             if(!_threadRunning){
+                 _threadRunningLock.unlock();
+                 return false;
+             }
+             _threadRunningLock.unlock();
+         }
+         sample = _sampleResponse;
+         return true;
+     }
 
     /**
      * Tell the node to produce a Null task as the next task.
@@ -184,9 +198,11 @@ private:
         int dummy;
         int* dummyPtr = &dummy;
         ticks now = getticks();
+        ticks totalTicks = now - _startTicks;
         _sampleResponse.loadPercentage = ((double) (_workTicks)
-                / (double) ((now - _startTicks))) * 100.0;
+                / (double) totalTicks) * 100.0;
         _sampleResponse.tasksCount = _tasksCount;
+        _sampleResponse.bandwidth = _tasksCount / (double) totalTicks;
         _sampleResponse.serviceTime = (double)_workTicks / (double)_tasksCount;
         _workTicks = 0;
         _startTicks = now;
@@ -204,16 +220,16 @@ public:
      * Builds an adaptive node.
      */
     adp_ff_node():
-    	  _tasksManager(NULL),
-    	  _thread(NULL),
-    	  _threadCreationPerformed(false),
-    	  _threadRunning(false),
-    	  _managementRequest(MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE),
-    	  _managementQ(1),
-    	  _responseQ(1){
+            _tasksManager(NULL),
+            _thread(NULL),
+            _threadCreationPerformed(false),
+            _threadRunning(false),
+            _managementRequest(MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE),
+            _managementQ(1),
+            _responseQ(1){
         resetCounters();
-    	_managementQ.init();
-    	_responseQ.init();
+        _managementQ.init();
+        _responseQ.init();
     }
 
     /**

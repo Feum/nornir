@@ -1,7 +1,7 @@
 CC                   = gcc 
-CXX                  = g++ 
+CXX                  = /home/desensi/bin/g++ 
 OPTIMIZE_FLAGS       = -O3 -finline-functions
-CXXFLAGS             = -DNO_CMAKE_CONFIG -Wall
+CXXFLAGS             = -DNO_CMAKE_CONFIG -Wall --std=c++11
 INCLUDES             = -I. -I./include $(INCS)
 TARGET               = cholesky blockCholesky
 
