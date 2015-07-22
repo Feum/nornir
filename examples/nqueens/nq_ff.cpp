@@ -526,9 +526,13 @@ public:
     }
 
     void * adp_svc(void *) {
-        ff_task_t* t = tasks.back();
-        tasks.pop_back();
-        return t;
+        if(!tasks.empty()){
+            ff_task_t* t = tasks.back();
+            tasks.pop_back();
+            return t;
+        }else{
+            return NULL;
+        }
     }
     
 private:

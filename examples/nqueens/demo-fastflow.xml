@@ -20,13 +20,17 @@
     <overloadThresholdWorker>90</overloadThresholdWorker>
     <migrateCollector>0</migrateCollector>
     <requiredBandwidth>0</requiredBandwidth>
-    <maxBandwidthVariation>0</maxBandwidthVariation>
     <voltageTableFile>voltage.txt</voltageTableFile>
     <contractType>2</contractType>
     <strategyFrequencies>3</strategyFrequencies>
     <voltageTableFile>voltage.txt</voltageTableFile> -->
-    <samplingInterval>1000</samplingInterval>
-    <numSamples>4</numSamples>    
-    <contractType>0</contractType>
-    <strategyFrequencies>1</strategyFrequencies>
+    <maxPredictionError>5</maxPredictionError>
+    <samplingInterval>1</samplingInterval>
+    <numSamples>20</numSamples>    
+    <contractType>4</contractType>
+    <voltageTableFile>voltage.txt</voltageTableFile>
+    <powerBudget>50</powerBudget>
+    <strategyFrequencies>0</strategyFrequencies>
+    <strategyMapping>2</strategyMapping>
+    <strategyPrediction>1</strategyPrediction> 
 </adaptivityParameters>

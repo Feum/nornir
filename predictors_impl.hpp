@@ -72,7 +72,8 @@ void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
     if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
         _frequency = configuration.frequency;
         ++_numPredictors;
-    }*/
+    }
+    */
 }
 
 RegressionDataServiceTime::RegressionDataServiceTime(const AdaptivityManagerFarm& manager):
@@ -103,7 +104,8 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
     /*
     if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
         matrix(rowId++, columnId) = _frequency;
-    }*/
+    }
+    */
 }
 
 void RegressionDataPower::init(const FarmConfiguration& configuration){
@@ -394,13 +396,19 @@ FarmConfiguration CalibratorSpread::getNextConfiguration(){
             }
         }break;
         case CALIBRATION_FINISHED:{
+            /*
             if(highError()){
                 fc = _seeds.at(0);
                 _nextSeed = 1;
                 _state = CALIBRATION_SEEDS;
                 DEBUG("========Moving to seeds");
-            }else if(_manager.isContractViolated()){
-                fc = _manager.getNewConfiguration();
+            }else*/ 
+            if(_manager.isContractViolated()){
+                //fc = _manager.getNewConfiguration();
+                fc = _seeds.at(0);                                                                                                                                             
+                _nextSeed = 1;                                                                                                                                                 
+                _state = CALIBRATION_SEEDS;                                                                                                                                    
+                DEBUG("========Moving to seeds");
             }else{
                 fc = _manager._currentConfiguration;
             }
