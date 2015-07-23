@@ -211,33 +211,23 @@ inline bool operator==(const FarmConfiguration& lhs, const FarmConfiguration& rh
 inline bool operator!=(const FarmConfiguration& lhs, const FarmConfiguration& rhs){return !operator==(lhs,rhs);}
 
 typedef struct MonitoredSample{
-    double durationMilliSec; ///< The duration of the sample (in milliseconds). Indeed, since some task may require longer time to
-                             ///< be processed, the worker may reply later to the monitoring request. Accordingly,
-                             ///< some sample may last longer than others. For this reason, we store explicitely each
-                             ///< length and we do not rely on _p.samplingInterval since the duration of a sample may
-                             ///< be longer than _p.samplingInterval.
-    std::vector<WorkerSample> workers; ///< The samples taken from the active workers (one per worker).
-    energy::JoulesCpu totalJoules; ///< Energy consumed by all the CPUs.
+    energy::JoulesCpu totalWatts; ///< Watts consumed by all the CPUs.
+    double bandwidth; ///< Bandwidth of the entire farm.
+    double utilization; ///< Utilization of the entire farm.
 
-    MonitoredSample():durationMilliSec(0){;}
-
-    WorkerSample collapseWorkersSamples() const{
-        WorkerSample ws;
-        for(size_t i = 0; i < workers.size(); i++){
-            ws += workers.at(i);
-        }
-        return ws;
-    }
+    MonitoredSample(){;}
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
-        durationMilliSec += rhs.durationMilliSec;
-        if(!workers.size()){
-            workers.resize(rhs.workers.size(), WorkerSample());
-        }
-        for(size_t i = 0; i < std::min(workers.size(), rhs.workers.size()); i++){
-            workers.at(i) = workers.at(i) + rhs.workers.at(i);
-        }
-        totalJoules += rhs.totalJoules;
+        totalWatts += rhs.totalWatts;
+        bandwidth += rhs.bandwidth;
+        utilization += bandwidth;
+        return *this;
+    }
+
+    MonitoredSample operator/=(double x){
+        totalWatts /= x;
+        bandwidth /= x;
+        utilization /= x;
         return *this;
     }
 }MonitoredSample;
@@ -245,6 +235,12 @@ typedef struct MonitoredSample{
 inline MonitoredSample operator+(MonitoredSample lhs, const MonitoredSample& rhs){
     lhs += rhs;
     return lhs;
+}
+
+inline MonitoredSample operator/(const MonitoredSample& lhs, double x){
+    MonitoredSample r = lhs;
+    r /= x;
+    return r;
 }
 
 /*!
@@ -298,7 +294,6 @@ private:
     std::vector<cpufreq::Frequency> _availableFrequencies; ///< The available frequencies on this machine.
     Window<MonitoredSample> _monitoredSamples; ///< Monitored samples;
     double _totalTasks; ///< The number of tasks processed since the last reconfiguration.
-    double _averageServiceTime; ///< The average service time (ticks) during the last time window.
     double _averageBandwidth; ///< The average tasks per second processed during last time window.
     double _averageUtilization; ///< The average utilization during last time window.
     energy::JoulesCpu _averageWatts; ///< Average Watts during last time window.
@@ -667,24 +662,10 @@ private:
      * Updates the monitored values.
      */
     void updateMonitoredValues(){
-        _averageServiceTime = 0;
-        _averageBandwidth = 0;
-        _averageUtilization = 0;
-        _averageWatts.zero();
-
-        MonitoredSample sum = _monitoredSamples.sum();
-        WorkerSample workersSum = sum.collapseWorkersSamples();
-
-        //TODO scrivere meglio. Al momento per qualche motivo il service time non funziona
-        for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
-            _averageServiceTime += sum.workers.at(i).serviceTime / (double) _monitoredSamples.size();
-            _averageBandwidth += sum.workers.at(i).bandwidth / (double) _monitoredSamples.size();
-        }
-        _averageServiceTime /= (double) _currentConfiguration.numWorkers;
-
-        _averageBandwidth = (double) workersSum.tasksCount / (sum.durationMilliSec / 1000.0);
-        _averageUtilization = workersSum.loadPercentage / (double)(_monitoredSamples.size() * _currentConfiguration.numWorkers);
-        _averageWatts = sum.totalJoules / (sum.durationMilliSec / 1000.0);
+        MonitoredSample avg = _monitoredSamples.average();
+        _averageBandwidth = avg.bandwidth;
+        _averageUtilization = avg.utilization;
+        _averageWatts = avg.totalWatts.cores;
     }
 
     /**
@@ -1106,18 +1087,21 @@ private:
 
     /**
      * Obtain workers samples.
-     * @param samples A vector of workers samples. It will be filled by this call.
+     * @param sample A worker sample. It will be filled by this call with the
+     *               global data of the farm.
      * @return True if all the workers are still running, false otherwise.
      */
-    bool getWorkersSamples(std::vector<WorkerSample>& samples){
-        samples.clear();
+    bool getWorkersSamples(WorkerSample& sample){
+        sample = WorkerSample();
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
-            WorkerSample ns;
-            if(!_activeWorkers.at(i)->getSampleResponse(ns)){
+            WorkerSample tmp;
+            if(!_activeWorkers.at(i)->getSampleResponse(tmp)){
                 return false;
             }
-            samples.push_back(ns);
+            sample += tmp;
         }
+        sample.loadPercentage /= _currentConfiguration.numWorkers;
+        //TODO: For service time we should pick the maximum. We could delete service time at all
         return true;
     }
 
@@ -1133,36 +1117,37 @@ private:
         }
 
         MonitoredSample sample;
-        if(!getWorkersSamples(sample.workers)){
+        WorkerSample ws;
+        energy::Joules joules;
+        if(!getWorkersSamples(ws)){
             return false;
         }
 
-        double tasksCount = 0;
-        for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
-            tasksCount += sample.workers.at(i).tasksCount;
-        }
-        _totalTasks += tasksCount;
+        _totalTasks += ws.tasksCount;
         if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-            if(_remainingTasks > tasksCount){
-                _remainingTasks -= tasksCount;
+            if(_remainingTasks > ws.tasksCount){
+                _remainingTasks -= ws.tasksCount;
             }else{
                 _remainingTasks = 0;
             }
         }
 
-        sample.totalJoules.zero();
         for(size_t i = 0; i < _usedCpus.size(); i++){
             energy::CounterCpu* currentCounter = _energy->getCounterCpu(_usedCpus.at(i));
-            sample.totalJoules += currentCounter->getJoules();
+            joules += currentCounter->getJoules();
         }
         for(size_t i = 0; i < _unusedCpus.size(); i++){
             energy::CounterCpu* currentCounter = _energy->getCounterCpu(_unusedCpus.at(i));
-            sample.totalJoules += currentCounter->getJoules();
+            joules += currentCounter->getJoules();
         }
 
         double now = utils::getMillisecondsTime();
-        sample.durationMilliSec = (now - _lastStoredSampleMs);
+        double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
         _lastStoredSampleMs = now;
+
+        sample.totalWatts = joules / durationSecs;
+        sample.utilization = ws.loadPercentage;
+        sample.bandwidth = (double) ws.tasksCount / durationSecs;
 
         _energy->resetCountersCpu();
         _monitoredSamples.add(sample);
