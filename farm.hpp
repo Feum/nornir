@@ -62,10 +62,13 @@
 #include <limits>
 
 #undef DEBUG
-#if 1
+
+#ifdef DEBUG_FARM
 #define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
+#define DEBUGB(x) do {x;} while(0)
 #else
 #define DEBUG(x)
+#define DEBUGB(x)
 #endif
 
 namespace adpff{
@@ -146,11 +149,11 @@ public:
      * For parameters documentation, see fastflow's farm documentation.
      */
     adp_ff_farm(bool inputCh = false,
-                          int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
-                          int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
-                          bool workerCleanup = false,
-                          int maxNumWorkers = DEF_MAX_NUM_WORKERS,
-                          bool fixedSize = false);
+                int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
+                int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
+                bool workerCleanup = false,
+                int maxNumWorkers = DEF_MAX_NUM_WORKERS,
+                bool fixedSize = false);
 
     /**
      * Builds the adaptive farm.
@@ -170,13 +173,14 @@ public:
      * @param adaptivityParameters Parameters that will be used by the farm
      *                             to take reconfiguration decisions.
      */
-    explicit adp_ff_farm(AdaptivityParameters adaptivityParameters,
-                         bool inputCh = false,
-                         int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
-                         int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
-                         bool workerCleanup = false,
-                         int maxNumWorkers = DEF_MAX_NUM_WORKERS,
-                         bool fixedSize = false);
+    explicit
+    adp_ff_farm(AdaptivityParameters adaptivityParameters,
+                bool inputCh = false,
+                int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
+                int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
+                bool workerCleanup = false,
+                int maxNumWorkers = DEF_MAX_NUM_WORKERS,
+                bool fixedSize = false);
 
     /**
      * Destroyes this adaptive farm.
@@ -211,7 +215,8 @@ typedef struct FarmConfiguration{
     uint numWorkers;
     cpufreq::Frequency frequency;
     FarmConfiguration():numWorkers(0), frequency(0){;}
-    FarmConfiguration(uint numWorkers, cpufreq::Frequency frequency = 0):numWorkers(numWorkers), frequency(frequency){;}
+    FarmConfiguration(uint numWorkers, cpufreq::Frequency frequency = 0):
+                     numWorkers(numWorkers), frequency(frequency){;}
 }FarmConfiguration;
 
 inline bool operator==(const FarmConfiguration& lhs,
@@ -247,28 +252,28 @@ typedef struct MonitoredSample{
     MonitoredSample& operator+=(const MonitoredSample& rhs){
         watts += rhs.watts;
         bandwidth += rhs.bandwidth;
-        utilization += bandwidth;
+        utilization += rhs.utilization;
         return *this;
     }
 
     MonitoredSample& operator-=(const MonitoredSample& rhs){
         watts -= rhs.watts;
         bandwidth -= rhs.bandwidth;
-        utilization -= bandwidth;
+        utilization -= rhs.utilization;
         return *this;
     }
 
     MonitoredSample& operator*=(const MonitoredSample& rhs){
         watts *= rhs.watts;
         bandwidth *= rhs.bandwidth;
-        utilization *= bandwidth;
+        utilization *= rhs.utilization;
         return *this;
     }
 
     MonitoredSample& operator/=(const MonitoredSample& rhs){
         watts /= rhs.watts;
         bandwidth /= rhs.bandwidth;
-        utilization /= bandwidth;
+        utilization /= rhs.utilization;
         return *this;
     }
 
@@ -298,21 +303,21 @@ inline MonitoredSample operator-(const MonitoredSample& lhs,
                                  const MonitoredSample& rhs){
     MonitoredSample r = lhs;
     r -= rhs;
-    return lhs;
+    return r;
 }
 
 inline MonitoredSample operator*(const MonitoredSample& lhs,
                                  const MonitoredSample& rhs){
     MonitoredSample r = lhs;
     r *= rhs;
-    return lhs;
+    return r;
 }
 
 inline MonitoredSample operator/(const MonitoredSample& lhs,
                                  const MonitoredSample& rhs){
     MonitoredSample r = lhs;
     r /= rhs;
-    return lhs;
+    return r;
 }
 
 inline MonitoredSample operator/(const MonitoredSample& lhs, double x){
@@ -329,28 +334,45 @@ inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
 
 std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
     os << "[";
-    os << "Watts: " << obj.watts;
-    os << "Bandwidth: " << obj.bandwidth;
-    os << "Utilization: " << obj.utilization;
+    os << "Watts: " << obj.watts << " ";
+    os << "Bandwidth: " << obj.bandwidth << " ";
+    os << "Utilization: " << obj.utilization << " ";
     os << "]";
+    return os;
+}
+
+std::ofstream& operator<<(std::ofstream& os, const MonitoredSample& obj){
+    os << obj.watts.cores << "\t";
+    os << obj.bandwidth << "\t";
+    os << obj.utilization << "\t";
     return os;
 }
 
 inline energy::JoulesCpu squareRoot(const energy::JoulesCpu& x){
     energy::JoulesCpu r;
-    r.cores = std::sqrt(x.cores);
-    r.cpu = std::sqrt(x.cpu);
-    r.graphic = std::sqrt(x.graphic);
-    r.dram = std::sqrt(x.dram);
+    r.cores = x.cores?std::sqrt(x.cores):0;
+    r.cpu = x.cpu?std::sqrt(x.cpu):0;
+    r.graphic = x.graphic?std::sqrt(x.graphic):0;
+    r.dram = x.dram?std::sqrt(x.dram):0;
     return r;
 }
 
 inline MonitoredSample squareRoot(const MonitoredSample& x){
     MonitoredSample r;
     r.watts = squareRoot(x.watts);
-    r.bandwidth = std::sqrt(x.bandwidth);
-    r.utilization = std::sqrt(x.utilization);
+    r.bandwidth = x.bandwidth?std::sqrt(x.bandwidth):0;
+    r.utilization = x.utilization?std::sqrt(x.utilization):0;
     return r;
+}
+
+
+inline void regularize(MonitoredSample& x){
+    if(x.watts.cpu < 0){x.watts.cpu = 0;}
+    if(x.watts.cores < 0){x.watts.cores = 0;}
+    if(x.watts.graphic < 0){x.watts.graphic = 0;}
+    if(x.watts.dram < 0){x.watts.dram = 0;}
+    if(x.bandwidth < 0){x.bandwidth = 0;}
+    if(x.utilization < 0){x.utilization = 0;}
 }
 
 /*!
@@ -417,6 +439,10 @@ private:
     Predictor* _secondaryPredictor; ///< The predictor of the secondary value.
     double _primaryPrediction; ///< The prediction done for the primary value for the chosen configuration.
     double _secondaryPrediction; ///< The prediction done for the secondary value for the chosen configuration.
+
+#ifdef DEBUG_FARM
+    std::ofstream samplesFile;
+#endif
 
     /**
      * If possible, finds a set of physical cores belonging to domains different from
@@ -550,13 +576,17 @@ private:
     }
 
     /**
-     * Generates mapping indexes. They are indexes to be used on _availableVirtualCores vector
-     * to get the corresponding virtual core where a specific node must be mapped.
+     * Generates mapping indexes. They are indexes to be used on
+     * _availableVirtualCores vector to get the corresponding virtual core
+     * where a specific node must be mapped.
      * @param emitterIndex The index of the emitter.
-     * @param firstWorkerIndex The index of the first worker (the others follow).
+     * @param firstWorkerIndex The index of the first worker
+     *                         (the others follow).
      * @param collectorIndex The index of the collector (if present).
      */
-    void getMappingIndexes(size_t& emitterIndex, size_t& firstWorkerIndex, size_t& collectorIndex){
+    void getMappingIndexes(size_t& emitterIndex,
+                           size_t& firstWorkerIndex,
+                           size_t& collectorIndex){
         size_t nextIndex = 0;
         if(_emitter && !_emitterVirtualCore){
             emitterIndex = nextIndex;
@@ -1161,9 +1191,6 @@ private:
         /****************** P-state change terminated ******************/
         _currentConfiguration = configuration;
 
-        /****************** Ensure farm is running ******************/
-        while(!storeNewSample()){;}
-
         /****************** Clean state ******************/
         _lastStoredSampleMs = utils::getMillisecondsTime();
         _monitoredSamples->reset();
@@ -1261,7 +1288,7 @@ private:
         _energy->resetCountersCpu();
         _monitoredSamples->add(sample);
 
-        DEBUG((*_monitoredSamples));
+        DEBUGB(samplesFile << *_monitoredSamples << "\n");
         return true;
     }
 
@@ -1338,13 +1365,17 @@ public:
 
         _monitoredSamples = NULL;
         switch(_p.strategyAverage){
-            case STRATEGY_AVERAGE_SIMPLE:{
-                _monitoredSamples = new MovingAverageSimple<MonitoredSample>(_p.numSamples);
-            }break;
-            case STRATEGY_AVERAGE_EXPONENTIAL:{
-                ;
-            }break;
+        case STRATEGY_AVERAGE_SIMPLE:{
+            _monitoredSamples = new MovingAverageSimple<MonitoredSample>
+                                    (_p.numSamples);
+        }break;
+        case STRATEGY_AVERAGE_EXPONENTIAL:{
+            _monitoredSamples = new MovingAverageExponential<MonitoredSample>
+                                    (_p.alphaExpAverage);
+        }break;
         }
+
+        DEBUGB(samplesFile.open("samples.dat"));
     }
 
     /**
@@ -1352,6 +1383,8 @@ public:
      */
     ~AdaptivityManagerFarm(){
         delete _monitoredSamples;
+
+        DEBUGB(samplesFile.close());
     }
 
     /**

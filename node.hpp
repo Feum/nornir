@@ -199,14 +199,16 @@ private:
         int* dummyPtr = &dummy;
         ticks now = getticks();
         ticks totalTicks = now - _startTicks;
-        _sampleResponse.loadPercentage = ((double) (_workTicks)
-                / (double) totalTicks) * 100.0;
+        _sampleResponse.loadPercentage = ((double) (_workTicks) /
+                                          (double) totalTicks) * 100.0;
         _sampleResponse.tasksCount = _tasksCount;
         _sampleResponse.bandwidth = _tasksCount / (double) totalTicks;
         _sampleResponse.serviceTime = (double)_workTicks / (double)_tasksCount;
+
+        _tasksCount = 0;
         _workTicks = 0;
         _startTicks = now;
-        _tasksCount = 0;
+
         _responseQ.push(dummyPtr);
     }
 

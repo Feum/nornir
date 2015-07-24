@@ -39,9 +39,18 @@ namespace adpff{
 
 /**
  * Represents a moving average technique.
- * Requirement: There must exists a method 'T squareRoot(const T&)'.
+ * Requirement: There must exists the following functions:
+ *   - 'T squareRoot(const T&)' to compute the square root.
+ *   - 'void regularize(T&)' to set the values < 0 to zero.
  */
 template <typename T> class MovingAverage{
+    template<typename V>
+    friend std::ostream& operator<<(std::ostream& os,
+                                    const MovingAverage<V>& obj);
+
+    template<typename V>
+    friend std::ofstream& operator<<(std::ofstream& os,
+                                     const MovingAverage<V>& obj);
 public:
     virtual ~MovingAverage(){;}
 
@@ -63,17 +72,14 @@ public:
 };
 
 template<typename T> class MovingAverageSimple: public MovingAverage<T>{
-    template<typename V>
-    friend std::ostream& operator<<(std::ostream& os,
-                                    const MovingAverageSimple<V>& obj);
 private:
     std::vector<T> _windowImpl;
-    size_t _span;
+    const size_t _span;
     size_t _nextIndex;
     size_t _storedValues;
     T _lastSample;
     T _oldAverage, _average;
-    T _tmpVariance;
+    T _oldTmpVariance, _tmpVariance;
     T _oldVariance, _variance;
     T _standardDeviation;
     T _coefficientVariation;
@@ -90,26 +96,30 @@ public:
             _oldAverage = _average = value;
         }else if(_storedValues < _span){
             ++_storedValues;
-            _average = _oldAverage + (value - _oldAverage)/_storedValues;
-            _tmpVariance = _tmpVariance + (value - _oldAverage)*
-                                          (value - _average);
-            _variance = _tmpVariance / _storedValues;
+            _average = _oldAverage + (value - _oldAverage) / _storedValues;
+            _tmpVariance = _oldTmpVariance + (value - _oldAverage)*
+                                             (value - _average);
+            _variance = _tmpVariance / (_storedValues - 1);
 
             _oldAverage = _average;
+            _oldTmpVariance = _tmpVariance;
             _oldVariance = _variance;
         }else{
             T removedValue = _windowImpl.at(_nextIndex);
             _average = _oldAverage + (value - _windowImpl.at(_nextIndex))/
-                                         _span;
+                                      _span;
             _variance = _oldVariance + (value - _average +
-                                           removedValue - _oldAverage)*
-                                          (value - removedValue)/(_span-1);
-
-            _windowImpl.at(_nextIndex) = value;
-            _nextIndex = (_nextIndex + 1) % _span;
+                                        removedValue - _oldAverage)*
+                                        (value - removedValue)/(_span - 1);
         }
+
+        regularize(_variance);
+
         _standardDeviation = squareRoot(_variance);
         _coefficientVariation = (_standardDeviation / _average) * 100.0;
+
+        _windowImpl.at(_nextIndex) = value;
+        _nextIndex = (_nextIndex + 1) % _span;
     }
 
     T getLastSample() const{
@@ -121,6 +131,76 @@ public:
         _windowImpl.resize(_span);
         _nextIndex = 0;
         _storedValues = 0;
+        _lastSample = T();
+        _oldAverage = T();
+        _average = T();
+        _oldTmpVariance = T();
+        _tmpVariance = T();
+        _oldVariance = T();
+        _variance = T();
+        _standardDeviation = T();
+        _coefficientVariation = T();
+    }
+
+    size_t size() const{
+        return _storedValues;
+    }
+
+    T average() const{
+        return _average;
+    }
+
+    T variance() const{
+        return _variance;
+    }
+
+    T standardDeviation() const{
+        return _standardDeviation;
+    }
+
+    T coefficientVariation() const{
+        return _coefficientVariation;
+    }
+};
+
+template<typename T> class MovingAverageExponential: public MovingAverage<T>{
+private:
+    double _alpha;
+    size_t _storedValues;
+    T _lastSample;
+    T _average;
+    T _variance;
+    T _standardDeviation;
+    T _coefficientVariation;
+public:
+    MovingAverageExponential(double alpha):_alpha(alpha),_storedValues(0){
+        if(_alpha < 0 || _alpha > 1.0){
+            throw std::runtime_error("Alpha must be between 0 and 1 "
+                                     "(included)");
+        }
+    }
+
+    void add(const T& value){
+        ++_storedValues;
+        _lastSample = value;
+        T diff = value - _average;
+        T incr = _alpha * diff;
+        _average += incr;
+        _variance = (1 - _alpha) * (_variance + diff * incr);
+        _standardDeviation = squareRoot(_variance);
+        _coefficientVariation = (_standardDeviation / _average) * 100.0;
+    }
+
+    T getLastSample() const{
+        return _lastSample;
+    }
+
+    void reset(){
+        _lastSample = T();
+        _average = T();
+        _variance = T();
+        _standardDeviation = T();
+        _coefficientVariation = T();
     }
 
     size_t size() const{
@@ -146,13 +226,23 @@ public:
 
 template<class T>
 std::ostream& operator<<(std::ostream& os, const MovingAverage<T>& obj){
-    os << "[";
-    os << "Last sample: " << obj.getLastSample();
-    os << "Average: " << obj.average();
-    os << "Variance: " << obj.variance();
-    os << "StdDev: " << obj.standardDeviation();
-    os << "CoeffVar: " << obj.coefficientVariation();
-    os << "]";
+    os << "==============================" << std::endl;
+    os << "Last sample: " << obj.getLastSample() << std::endl;
+    os << "Average: " << obj.average() << std::endl;
+    os << "CoeffVar: " << obj.coefficientVariation() << std::endl;
+    os << "Variance: " << obj.variance() << std::endl;
+    os << "StdDev: " << obj.standardDeviation() << std::endl;
+    os << "==============================" << std::endl;
+    return os;
+}
+
+template<class T>
+std::ofstream& operator<<(std::ofstream& os, const MovingAverage<T>& obj){
+    os << obj.getLastSample() << "\t";
+    os << obj.average() << "\t";
+    os << obj.coefficientVariation() << "\t";
+    os << obj.variance() << "\t";
+    os << obj.standardDeviation() << "\t";
     return os;
 }
 

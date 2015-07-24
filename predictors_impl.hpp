@@ -36,10 +36,12 @@
 #include "farm.hpp"
 
 #undef DEBUG
-#if 1
+#ifdef DEBUG_PREDICTORS
 #define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
+#define DEBUGB(x) do {x} while (0)
 #else
 #define DEBUG(x)
+#define DEBUGB(x)
 #endif
 
 

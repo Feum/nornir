@@ -178,6 +178,7 @@ private:
         fastReconfiguration = false;
         migrateCollector = false;
         numSamples = 10;
+        alphaExpAverage = 0.5;
         samplingInterval = 1000;
         underloadThresholdFarm = 80.0;
         overloadThresholdFarm = 90.0;
@@ -222,7 +223,8 @@ public:
     StrategyAverage strategyAverage; ///< Averaging strategy [default = STRATEGY_AVERAGE_SIMPLE].
     bool migrateCollector; ///< If true, when a reconfiguration occur, the collector is migrated to a
                            ///< different virtual core (if needed) [default = false].
-    uint32_t numSamples; ///< The number of samples used to take reconfiguration decisions [default = 10].
+    uint32_t numSamples; ///< The minimum number of samples used to take reconfiguration decisions [default = 10].
+    double alphaExpAverage; ///< The alpha to be used in exponential moving average [default = 0.5].
     uint32_t samplingInterval; ///< The length of the sampling interval (in milliseconds) for
                               ///< the data reading [default = 1000].
     double underloadThresholdFarm; ///< The underload threshold for the entire farm. It is valid only if
@@ -363,6 +365,11 @@ public:
         node = root->first_node("numSamples");
         if(node){
             numSamples = utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("alphaExpAverage");
+        if(node){
+            alphaExpAverage = utils::stringToDouble(node->value());
         }
 
         node = root->first_node("samplingInterval");
