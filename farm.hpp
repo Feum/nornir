@@ -62,6 +62,7 @@
 #include <limits>
 
 #undef DEBUG
+#undef DEBUGB
 
 #ifdef DEBUG_FARM
 #define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
@@ -1375,7 +1376,7 @@ public:
         }break;
         }
 
-        DEBUGB(samplesFile.open("samples.dat"));
+        DEBUGB(samplesFile.open("samples.csv"));
     }
 
     /**

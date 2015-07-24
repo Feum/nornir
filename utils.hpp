@@ -183,10 +183,15 @@ public:
     void add(const T& value){
         ++_storedValues;
         _lastSample = value;
-        T diff = value - _average;
-        T incr = _alpha * diff;
-        _average += incr;
-        _variance = (1 - _alpha) * (_variance + diff * incr);
+        if(_storedValues == 1){
+            _average = value;
+        }else{
+            T diff = value - _average;
+            T incr = diff * _alpha;
+            _average += incr;
+            _variance = (_variance + diff * incr) * (1 - _alpha);
+        }
+        regularize(_variance);
         _standardDeviation = squareRoot(_variance);
         _coefficientVariation = (_standardDeviation / _average) * 100.0;
     }
@@ -196,6 +201,7 @@ public:
     }
 
     void reset(){
+        _storedValues = 0;
         _lastSample = T();
         _average = T();
         _variance = T();
