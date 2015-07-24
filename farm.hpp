@@ -230,6 +230,14 @@ inline bool operator!=(const FarmConfiguration& lhs,
     return !operator==(lhs,rhs);
 }
 
+std::ostream& operator<<(std::ostream& os, const FarmConfiguration& obj){
+    os << "[";
+    os << obj.numWorkers << ", ";
+    os << obj.frequency;
+    os << "]";
+    return os;
+}
+
 typedef struct MonitoredSample{
     energy::JoulesCpu watts; ///< Watts consumed by all the CPUs.
     double bandwidth; ///< Bandwidth of the entire farm.
@@ -388,7 +396,7 @@ class AdaptivityManagerFarm: public utils::Thread{
     friend class PredictorLinearRegression;
     friend class RegressionDataServiceTime;
     friend class RegressionDataPower;
-    friend class CalibratorSpread;
+    friend class CalibratorLowDiscrepancy;
 private:
     utils::Monitor _monitor; ///< Used to let the manager stop safe.
     adp_ff_farm<>* _farm; ///< The managed farm.
@@ -779,20 +787,23 @@ private:
         updateUsedCpus();
         applyUnusedVirtualCoresStrategy();
 
-        _availableFrequencies.push_back(1.0); // Insert dummy constant frequency
+        // Insert dummy constant frequency
+        _availableFrequencies.push_back(1.0);
+
         if(_p.strategyFrequencies != STRATEGY_FREQUENCY_NO){
             if(_p.strategyFrequencies != STRATEGY_FREQUENCY_OS){
-                /** We suppose that all the domains have the same available frequencies. **/
+                // We suppose that all the domains have the same
+                // available frequencies.
                 _availableFrequencies = _cpufreq->getDomains().at(0)->getAvailableFrequencies();
 
-                /** Remove turbo boost frequency. **/
+                // Remove turbo boost frequency.
                 if(!_p.turboBoost){
                     if(utils::intToString(_availableFrequencies.back()).at(3) == '1'){
                         _availableFrequencies.pop_back();
                     }
                 }
 
-                /** Sets the current frequency to the highest possible. **/
+                // Sets the current frequency to the highest possible.
                 _currentConfiguration.frequency = _availableFrequencies.back();
             }
             updatePstate(_currentConfiguration.frequency);
@@ -863,11 +874,13 @@ private:
             }break;
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
-                double tolerance = (_p.requiredBandwidth * _p.maxPredictionError) / 100.0;
+                double tolerance = (_p.requiredBandwidth *
+                                    _p.maxPredictionError) / 100.0;
                 return _averageBandwidth < _p.requiredBandwidth - tolerance;
             }break;
             case CONTRACT_POWER_BUDGET:{
-                double tolerance = (_p.powerBudget * _p.maxPredictionError) / 100.0;
+                double tolerance = (_p.powerBudget *
+                                    _p.maxPredictionError) / 100.0;
                 return _averageWatts.cores > _p.powerBudget + tolerance;
             }break;
             default:{
@@ -878,8 +891,8 @@ private:
     }
 
     /**
-     * Checks if a specific primary value is feasible according to the specified
-     * contract.
+     * Checks if a specific primary value is feasible according to the
+     * specified contract.
      * @return true if the solution is feasible, false otherwise.
      */
     bool isFeasiblePrimaryValue(double primaryValue) const{
@@ -908,12 +921,14 @@ private:
      * @return The voltage at that configuration.
      */
     double getVoltage(const FarmConfiguration& configuration) const{
-        cpufreq::VoltageTableKey key(configuration.numWorkers, configuration.frequency);
+        cpufreq::VoltageTableKey key(configuration.numWorkers,
+                                     configuration.frequency);
         cpufreq::VoltageTableIterator it = _voltageTable.find(key);
         if(it != _voltageTable.end()){
             return it->second;
         }else{
-            throw std::runtime_error("Frequency and/or number of virtual cores not found in voltage table.");
+            throw std::runtime_error("Frequency and/or number of virtual cores "
+                                     "not found in voltage table.");
         }
     }
 
@@ -921,12 +936,14 @@ private:
      * Checks if x is a best suboptimal monitored value than y.
      * @param x The first monitored value.
      * @param y The second monitored value.
-     * @return True if x is a best suboptimal monitored value than y, false otherwise.
+     * @return True if x is a best suboptimal monitored value than y,
+     *         false otherwise.
      */
     bool isBestSuboptimalValue(double x, double y) const{
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
-                // Concerning utilization factors, if both are suboptimal, we prefer the closest to the lower bound.
+                // Concerning utilization factors, if both are suboptimal,
+                // we prefer the closest to the lower bound.
                 double distanceX, distanceY;
                 distanceX = _p.underloadThresholdFarm - x;
                 distanceY = _p.underloadThresholdFarm - y;
@@ -940,11 +957,13 @@ private:
             }break;
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
-                // Concerning bandwidths, if both are suboptimal, we prefer the higher one.
+                // Concerning bandwidths, if both are suboptimal,
+                // we prefer the higher one.
                 return x > y;
             }break;
             case CONTRACT_POWER_BUDGET:{
-                // Concerning power budgets, if both are suboptimal, we prefer the lowest one.
+                // Concerning power budgets, if both are suboptimal,
+                // we prefer the lowest one.
                 return x < y;
             }break;
             default:{
@@ -1323,7 +1342,7 @@ private:
             case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
                 _primaryPredictor = new PredictorLinearRegression(primary, *this);
                 _secondaryPredictor = new PredictorLinearRegression(secondary, *this);
-                _calibrator = new CalibratorSpread(*this);
+                _calibrator = new CalibratorLowDiscrepancy(*this);
             }break;
             default:{
                 ;

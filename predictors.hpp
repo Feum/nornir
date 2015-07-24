@@ -39,6 +39,8 @@
 #include <mlpack/core.hpp>
 #include <mlpack/methods/linear_regression/linear_regression.hpp>
 
+#include <gsl/gsl_qrng.h>
+
 using namespace mlpack::regression;
 
 namespace adpff{
@@ -243,28 +245,26 @@ public:
 };
 
 /**
- * It chooses the calibration points such to cover the maximum number
- * of possible configurations choices.
+ * It chooses the calibration points using low discrepancy
+ * sampling techniques.
  */
-class CalibratorSpread: public Calibrator{
+class CalibratorLowDiscrepancy: public Calibrator{
 private:
     AdaptivityManagerFarm& _manager;
     CalibrationState _state;
-    const std::vector<FarmConfiguration> _seeds;
-    size_t _nextSeed;
-
-    /**
-     * Gets the seeds points.
-     * @return The seedsPoints.
-     */
-    std::vector<FarmConfiguration> getSeeds();
+    gsl_qrng* _generator;
+    size_t _minNumPoints;
+    size_t _numGeneratedPoints;
 
     /**
      * Returns true if the error of the model is too high, false otherwise.
      */
     bool highError();
+
+    FarmConfiguration generateConfiguration() const;
 public:
-    CalibratorSpread(AdaptivityManagerFarm& manager);
+    CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager);
+    ~CalibratorLowDiscrepancy();
 
     FarmConfiguration getNextConfiguration();
 };

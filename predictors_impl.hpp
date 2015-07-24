@@ -310,51 +310,20 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
     return 0.0;
 }
 
-CalibratorSpread::CalibratorSpread(AdaptivityManagerFarm& manager):
-        _manager(manager), _state(CALIBRATION_SEEDS),
-        _seeds(getSeeds()), _nextSeed(0){;}
-
-std::vector<FarmConfiguration> CalibratorSpread::getSeeds(){
-    /*
-     * If I need X points, I split the interval into X - 1 parts and I took
-     * the intervals' bounds as points.
-     *
-     * E.g. X = 4:
-     *
-     * P1   P2   P3   P4
-     * |----|----|----|
-     *
-     */
-    size_t numWorkers = _manager._maxNumWorkers ;
-    std::vector<cpufreq::Frequency> frequencies = _manager._availableFrequencies;
-    size_t numFrequencies = frequencies.size();
-    size_t m = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
-                        _manager._secondaryPredictor->getMinimumPointsNeeded()) - 1;
-    if(!m){
-        throw std::runtime_error("getCalibrationPoints: we can't apply regression with only 1 point.");
-    }
-
-    std::vector<FarmConfiguration> points;
-
-    size_t nextWorkerId = 1;
-    size_t nextFrequencyIndex = 0;
-
-    for(size_t i = 0; i < m; i++){
-        points.push_back(FarmConfiguration(nextWorkerId, frequencies.at(nextFrequencyIndex)));
-
-        nextWorkerId += ((numWorkers*i+numWorkers)/m - (numWorkers*i)/m);
-        nextFrequencyIndex += ((numFrequencies*i+numFrequencies)/m - (numFrequencies*i)/m);
-    }
-
-    points.push_back(FarmConfiguration(numWorkers, frequencies.at(numFrequencies - 1)));
-    std::reverse(points.begin(), points.end());
-    for(size_t i = 0; i < points.size(); i++){
-        DEBUG("Calibration point: [" << points.at(i).numWorkers << ", " << points.at(i).frequency << "]");
-    }
-    return points;
+CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager):
+        _manager(manager), _state(CALIBRATION_SEEDS), _numGeneratedPoints(0){
+    // 2 is the number of dimension in farm configuration (at the moment just
+    // number of workers and frequency).
+    _generator = gsl_qrng_alloc(gsl_qrng_sobol, 2);
+    _minNumPoints = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
+                             _manager._secondaryPredictor->getMinimumPointsNeeded()) - 1;
 }
 
-bool CalibratorSpread::highError(){
+CalibratorLowDiscrepancy::~CalibratorLowDiscrepancy(){
+    gsl_qrng_free(_generator);
+}
+
+bool CalibratorLowDiscrepancy::highError(){
     double primaryError = std::abs((_manager.getPrimaryValue() - _manager._primaryPrediction)/_manager.getPrimaryValue())*100.0;
     double secondaryError = std::abs((_manager.getSecondaryValue() - _manager._secondaryPrediction)/_manager.getSecondaryValue())*100.0;
     DEBUG("Primary prediction: " << _manager._primaryPrediction << " Secondary prediction: " << _manager._secondaryPrediction);
@@ -363,15 +332,30 @@ bool CalibratorSpread::highError(){
            secondaryError > _manager._p.maxPredictionError;
 }
 
-FarmConfiguration CalibratorSpread::getNextConfiguration(){
+FarmConfiguration CalibratorLowDiscrepancy::generateConfiguration() const{
+    FarmConfiguration r;
+    double v[2];
+    gsl_qrng_get(_generator, v);
+    uint numWorkers = v[0]*(double)_manager._maxNumWorkers;
+    uint frequencyId = v[1]*(double)_manager._availableFrequencies.size();
+
+    if(!numWorkers){numWorkers = 1;}
+    if(frequencyId == _manager._availableFrequencies.size()){--frequencyId;}
+
+    r = FarmConfiguration(numWorkers,
+                          _manager._availableFrequencies.at(frequencyId));
+    return r;
+}
+
+FarmConfiguration CalibratorLowDiscrepancy::getNextConfiguration(){
     FarmConfiguration fc;
+
     switch(_state){
         case CALIBRATION_SEEDS:{
-            fc = _seeds.at(_nextSeed);
-            _nextSeed++;
-            if(_nextSeed == _seeds.size()){
+            fc = generateConfiguration();
+            if(++_numGeneratedPoints == _minNumPoints){
                 _state = CALIBRATION_TRY_PREDICT;
-                DEBUG("========Movign to predict");
+                DEBUG("========Moving to predict");
             }
         }break;
         case CALIBRATION_TRY_PREDICT:{
@@ -381,8 +365,7 @@ FarmConfiguration CalibratorSpread::getNextConfiguration(){
         }break;
         case CALIBRATION_EXTRA_POINT:{
             if(highError()){
-                fc = FarmConfiguration(((uint)(rand()*1000.0) % _manager._maxNumWorkers) + 1,
-                     _manager._availableFrequencies.at(((uint)(rand()*1000.0) % _manager._availableFrequencies.size())));
+                fc = generateConfiguration();
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("========High error");
                 DEBUG("========Moving to predict");
@@ -396,7 +379,7 @@ FarmConfiguration CalibratorSpread::getNextConfiguration(){
                 _state = CALIBRATION_FINISHED;
                 _manager._primaryPredictor->clear();
                 _manager._secondaryPredictor->clear();
-                DEBUG("========Movign to finished");
+                DEBUG("========Moving to finished");
             }
         }break;
         case CALIBRATION_FINISHED:{
@@ -409,8 +392,8 @@ FarmConfiguration CalibratorSpread::getNextConfiguration(){
             }else*/ 
             if(_manager.isContractViolated()){
                 //fc = _manager.getNewConfiguration();
-                fc = _seeds.at(0);                                                                                                                                             
-                _nextSeed = 1;                                                                                                                                                 
+                fc = generateConfiguration();
+                _numGeneratedPoints = 0;
                 _state = CALIBRATION_SEEDS;                                                                                                                                    
                 DEBUG("========Moving to seeds");
             }else{
