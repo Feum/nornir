@@ -27,7 +27,7 @@
 
 /*!
  * \file utils.hpp
- * \brief Implementation of vairous utilities.
+ * \brief Implementation of various utilities.
  **/
 
 #ifndef UTILS_HPP_
@@ -37,27 +37,73 @@
 
 namespace adpff{
 
-template<typename T> class Window{
+/**
+ * Represents a moving average technique.
+ * Requirement: There must exists a method 'T squareRoot(const T&)'.
+ */
+template <typename T> class MovingAverage{
+public:
+    virtual ~MovingAverage(){;}
+
+    virtual void add(const T& value) = 0;
+
+    virtual void reset() = 0;
+
+    virtual size_t size() = 0;
+
+    virtual T average() const = 0;
+
+    virtual T variance() const = 0;
+
+    virtual T standardDeviation() const = 0;
+};
+
+template<typename T> class MovingAverageSimple: public MovingAverage<T>{
+    template<typename V>
+    friend std::ostream& operator<<(std::ostream& os,
+                                    const MovingAverageSimple<V>& obj);
 private:
     std::vector<T> _windowImpl;
     size_t _span;
     size_t _nextIndex;
     size_t _storedValues;
+    T _lastSample;
+    T _oldAverage, _newAverage;
+    T _tmpVariance;
+    T _oldVariance, _newVariance;
+    T _standardDeviation;
 public:
-    Window(size_t span):_span(span), _nextIndex(0), _storedValues(0){
+    MovingAverageSimple(size_t span):_span(span), _nextIndex(0),
+                                     _storedValues(0){
         _windowImpl.resize(_span);
     }
 
     void add(const T& value){
-        _windowImpl.at(_nextIndex) = value;
-        _nextIndex = (_nextIndex + 1) % _span;
-        if(_storedValues < _span){
+        _lastSample = value;
+        if(_storedValues == 0){
             ++_storedValues;
-        }
-    }
+            _oldAverage = _newAverage = value;
+        }else if(_storedValues < _span){
+            ++_storedValues;
+            _newAverage = _oldAverage + (value - _oldAverage)/_storedValues;
+            _tmpVariance = _tmpVariance + (value - _oldAverage)*
+                                          (value - _newAverage);
+            _newVariance = _tmpVariance / _storedValues;
 
-    std::vector<T> toVector() const{
-        return _windowImpl;
+            _oldAverage = _newAverage;
+            _oldVariance = _newVariance;
+        }else{
+            T removedValue = _windowImpl.at(_nextIndex);
+            _newAverage = _oldAverage + (value - _windowImpl.at(_nextIndex))/
+                                         _span;
+            _newVariance = _oldVariance + (value - _newAverage +
+                                           removedValue - _oldAverage)*
+                                          (value - removedValue)/(_span-1);
+
+            _windowImpl.at(_nextIndex) = value;
+            _nextIndex = (_nextIndex + 1) % _span;
+        }
+        _standardDeviation = squareRoot(_newVariance);
     }
 
     void reset(){
@@ -67,47 +113,34 @@ public:
         _storedValues = 0;
     }
 
-    size_t size() const{
+    size_t size(){
         return _storedValues;
     }
 
-    T& operator[](size_t idx){
-        return _windowImpl[idx];
-    }
-
-    const T& operator[](size_t idx) const{
-        return _windowImpl[idx];
-    }
-
-    T& at(size_t idx){
-        return _windowImpl.at(idx);
-    }
-
-    const T& at(size_t idx) const{
-        return _windowImpl.at(idx);
-    }
-
-    T sum() const{
-        T r;
-
-        for(size_t i = 0; i < _storedValues; i++){
-            r += _windowImpl[i];
-        }
-
-        return r;
-    }
-
     T average() const{
-        T r;
-        if(!_storedValues){
-            return r;
-        }
+        return _newAverage;
+    }
 
-        r = sum();
-        return r / _storedValues;
+    T variance() const{
+        return _newVariance;
+    }
+
+    T standardDeviation() const{
+        return _standardDeviation;
     }
 
 };
+
+template<class T>
+std::ostream& operator<<(std::ostream& os, const MovingAverageSimple<T>& obj){
+    os << "[";
+    os << "Last sample: " << obj._lastSample;
+    os << "Average: " << obj.average();
+    os << "Variance: " << obj.variance();
+    os << "StdDev: " << obj.standardDeviation();
+    os << "]";
+    return os;
+}
 
 }
 

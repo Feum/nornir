@@ -29,16 +29,18 @@
  * \brief Implementation of an adaptive fastflow farm.
  *
  * To let an existing fastflow farm-based adaptive, follow these steps:
- *  1. Emitter, Workers and Collector of the farm must extend adpff::adp_ff_node
- *     instead of ff::ff_node
+ *  1. Emitter, Workers and Collector of the farm must extend
+ *     adpff::adp_ff_node instead of ff::ff_node
  *  2. Replace the following calls (if present) in the farm nodes:
  *          svc           -> adp_svc
  *          svc_init      -> adp_svc_init
  *          svc_end       -> adp_svc_end
- *  3. If the application wants to be aware of the changes in the number of workers, the nodes
- *     can implement the notifyWorkersChange virtual method.
- *  4. Substitute ff::ff_farm with adpff::adp_ff_farm. The maximum number of workers
- *     that can be activated correspond to the number of workers specified during farm creation.
+ *  3. If the application wants to be aware of the changes in the number
+ *     of workers, the nodes can implement the notifyWorkersChange virtual
+ *     method.
+ *  4. Substitute ff::ff_farm with adpff::adp_ff_farm. The maximum number of
+ *     workers that can be activated correspond to the number of workers
+ *     specified during farm creation.
  */
 
 #ifndef ADAPTIVE_FASTFLOW_FARM_HPP_
@@ -93,9 +95,11 @@ protected:
     energy::JoulesCpu _averageWatts;
     unsigned int _startMonitoringMs;
 public:
-    adp_ff_farm_observer():_numberOfWorkers(0), _currentFrequency(0), _emitterVirtualCore(NULL),
-                         _collectorVirtualCore(NULL), _averageBandwidth(0), _averageUtilization(0),
-                         _startMonitoringMs(0){;}
+    adp_ff_farm_observer():_numberOfWorkers(0), _currentFrequency(0),
+                           _emitterVirtualCore(NULL),
+                           _collectorVirtualCore(NULL),
+                           _averageBandwidth(0), _averageUtilization(0),
+                           _startMonitoringMs(0){;}
     virtual ~adp_ff_farm_observer(){;}
     virtual void observe(){;}
 };
@@ -135,7 +139,7 @@ public:
      * For parameters documentation, see fastflow's farm documentation.
      */
     adp_ff_farm(std::vector<ff_node*>& w, ff_node* const emitter = NULL,
-                    ff_node* const collector = NULL, bool inputCh = false);
+                ff_node* const collector = NULL, bool inputCh = false);
 
     /**
      * Builds the adaptive farm.
@@ -151,22 +155,28 @@ public:
     /**
      * Builds the adaptive farm.
      * For parameters documentation, see fastflow's farm documentation.
-     * @param adaptivityParameters Parameters that will be used by the farm to take reconfiguration decisions.
+     * @param adaptivityParameters Parameters that will be used by the farm
+     *                             to take reconfiguration decisions.
      */
-    adp_ff_farm(AdaptivityParameters adaptivityParameters, std::vector<ff_node*>& w,
-                 ff_node* const emitter = NULL, ff_node* const collector = NULL, bool inputCh = false);
+    adp_ff_farm(AdaptivityParameters adaptivityParameters,
+                std::vector<ff_node*>& w,
+                ff_node* const emitter = NULL,
+                ff_node* const collector = NULL,
+                bool inputCh = false);
 
     /**
      * Builds the adaptive farm.
      * For parameters documentation, see fastflow's farm documentation.
-     * @param adaptivityParameters Parameters that will be used by the farm to take reconfiguration decisions.
+     * @param adaptivityParameters Parameters that will be used by the farm
+     *                             to take reconfiguration decisions.
      */
-    explicit adp_ff_farm(AdaptivityParameters adaptivityParameters, bool inputCh = false,
-                          int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
-                          int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
-                          bool workerCleanup = false,
-                          int maxNumWorkers = DEF_MAX_NUM_WORKERS,
-                          bool fixedSize = false);
+    explicit adp_ff_farm(AdaptivityParameters adaptivityParameters,
+                         bool inputCh = false,
+                         int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
+                         int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
+                         bool workerCleanup = false,
+                         int maxNumWorkers = DEF_MAX_NUM_WORKERS,
+                         bool fixedSize = false);
 
     /**
      * Destroyes this adaptive farm.
@@ -204,42 +214,128 @@ typedef struct FarmConfiguration{
     FarmConfiguration(uint numWorkers, cpufreq::Frequency frequency = 0):numWorkers(numWorkers), frequency(frequency){;}
 }FarmConfiguration;
 
-inline bool operator==(const FarmConfiguration& lhs, const FarmConfiguration& rhs){
+inline bool operator==(const FarmConfiguration& lhs,
+                       const FarmConfiguration& rhs){
     return lhs.numWorkers == rhs.numWorkers &&
            lhs.frequency == rhs.frequency;
 }
-inline bool operator!=(const FarmConfiguration& lhs, const FarmConfiguration& rhs){return !operator==(lhs,rhs);}
+inline bool operator!=(const FarmConfiguration& lhs,
+                       const FarmConfiguration& rhs){
+    return !operator==(lhs,rhs);
+}
 
 typedef struct MonitoredSample{
-    energy::JoulesCpu totalWatts; ///< Watts consumed by all the CPUs.
+    energy::JoulesCpu watts; ///< Watts consumed by all the CPUs.
     double bandwidth; ///< Bandwidth of the entire farm.
     double utilization; ///< Utilization of the entire farm.
 
-    MonitoredSample(){;}
+    MonitoredSample():bandwidth(0), utilization(0){;}
+
+    void swap(MonitoredSample& x){
+        using std::swap;
+
+        swap(watts, x.watts);
+        swap(bandwidth, x.bandwidth);
+        swap(utilization, x.utilization);
+    }
+
+    MonitoredSample& operator=(MonitoredSample rhs){
+        swap(rhs);
+        return *this;
+    }
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
-        totalWatts += rhs.totalWatts;
+        watts += rhs.watts;
         bandwidth += rhs.bandwidth;
         utilization += bandwidth;
         return *this;
     }
 
+    MonitoredSample& operator-=(const MonitoredSample& rhs){
+        watts -= rhs.watts;
+        bandwidth -= rhs.bandwidth;
+        utilization -= bandwidth;
+        return *this;
+    }
+
+    MonitoredSample& operator*=(const MonitoredSample& rhs){
+        watts *= rhs.watts;
+        bandwidth *= rhs.bandwidth;
+        utilization *= bandwidth;
+        return *this;
+    }
+
     MonitoredSample operator/=(double x){
-        totalWatts /= x;
+        watts /= x;
         bandwidth /= x;
         utilization /= x;
         return *this;
     }
+
+    MonitoredSample operator*=(double x){
+        watts *= x;
+        bandwidth *= x;
+        utilization *= x;
+        return *this;
+    }
 }MonitoredSample;
 
-inline MonitoredSample operator+(MonitoredSample lhs, const MonitoredSample& rhs){
-    lhs += rhs;
+inline MonitoredSample operator+(const MonitoredSample& lhs,
+                                 const MonitoredSample& rhs){
+    MonitoredSample r = lhs;
+    r += rhs;
+    return r;
+}
+
+inline MonitoredSample operator-(const MonitoredSample& lhs,
+                                 const MonitoredSample& rhs){
+    MonitoredSample r = lhs;
+    r -= rhs;
+    return lhs;
+}
+
+inline MonitoredSample operator*(const MonitoredSample& lhs,
+                                 const MonitoredSample& rhs){
+    MonitoredSample r = lhs;
+    r *= rhs;
     return lhs;
 }
 
 inline MonitoredSample operator/(const MonitoredSample& lhs, double x){
     MonitoredSample r = lhs;
     r /= x;
+    return r;
+}
+
+inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
+    MonitoredSample r = lhs;
+    r *= x;
+    return r;
+}
+
+std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
+    os << "[";
+    os << "Watts: " << obj.watts;
+    os << "Bandwidth: " << obj.bandwidth;
+    os << "Utilization: " << obj.utilization;
+    os << "]";
+    return os;
+}
+
+inline energy::JoulesCpu squareRoot(const energy::JoulesCpu& x){
+    energy::JoulesCpu r;
+    r.cores = std::sqrt(x.cores);
+    r.cpu = std::sqrt(x.cpu);
+    r.graphic = std::sqrt(x.graphic);
+    r.dram = std::sqrt(x.dram);
+    return r;
+}
+
+inline MonitoredSample squareRoot(const MonitoredSample& x){
+    MonitoredSample r;
+    r.watts = squareRoot(x.watts);
+    r.bandwidth = std::sqrt(x.bandwidth);
+    r.utilization = std::sqrt(x.utilization);
     return r;
 }
 
@@ -292,7 +388,7 @@ private:
     std::vector<cpufreq::Domain*> _scalableDomains; ///< The domains on which frequency scaling is applied.
     cpufreq::VoltageTable _voltageTable; ///< The voltage table.
     std::vector<cpufreq::Frequency> _availableFrequencies; ///< The available frequencies on this machine.
-    Window<MonitoredSample> _monitoredSamples; ///< Monitored samples;
+    MovingAverage<MonitoredSample>* _monitoredSamples; ///< Monitored samples;
     double _totalTasks; ///< The number of tasks processed since the last reconfiguration.
     double _averageBandwidth; ///< The average tasks per second processed during last time window.
     double _averageUtilization; ///< The average utilization during last time window.
@@ -662,10 +758,10 @@ private:
      * Updates the monitored values.
      */
     void updateMonitoredValues(){
-        MonitoredSample avg = _monitoredSamples.average();
+        MonitoredSample avg = _monitoredSamples->average();
         _averageBandwidth = avg.bandwidth;
         _averageUtilization = avg.utilization;
-        _averageWatts = avg.totalWatts.cores;
+        _averageWatts = avg.watts;
     }
 
     /**
@@ -1056,7 +1152,7 @@ private:
 
         /****************** Clean state ******************/
         _lastStoredSampleMs = utils::getMillisecondsTime();
-        _monitoredSamples.reset();
+        _monitoredSamples->reset();
         _energy->resetCountersCpu();
         _totalTasks = 0;
     }
@@ -1118,7 +1214,7 @@ private:
 
         MonitoredSample sample;
         WorkerSample ws;
-        energy::Joules joules;
+        energy::JoulesCpu joules;
         if(!getWorkersSamples(ws)){
             return false;
         }
@@ -1145,12 +1241,14 @@ private:
         double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
         _lastStoredSampleMs = now;
 
-        sample.totalWatts = joules / durationSecs;
+        sample.watts = joules / durationSecs;
         sample.utilization = ws.loadPercentage;
         sample.bandwidth = (double) ws.tasksCount / durationSecs;
 
         _energy->resetCountersCpu();
-        _monitoredSamples.add(sample);
+        _monitoredSamples->add(sample);
+
+        DEBUG(_monitoredSamples);
         return true;
     }
 
@@ -1219,11 +1317,20 @@ public:
         _currentConfiguration(_activeWorkers.size(), 0),
         _availableVirtualCores(getAvailableVirtualCores()),
         _emitterVirtualCore(NULL),
-        _collectorVirtualCore(NULL),
-        _monitoredSamples(_p.numSamples){
+        _collectorVirtualCore(NULL){
         /** If voltage table file is specified, then load the table. **/
         if(_p.voltageTableFile.compare("")){
             cpufreq::loadVoltageTable(_voltageTable, _p.voltageTableFile);
+        }
+
+        _monitoredSamples = NULL;
+        switch(_p.strategyAverage){
+            case STRATEGY_AVERAGE_SIMPLE:{
+                _monitoredSamples = new MovingAverageSimple<MonitoredSample>(_p.numSamples);
+            }break;
+            case STRATEGY_AVERAGE_EXPONENTIAL:{
+                ;
+            }break;
         }
     }
 
@@ -1231,7 +1338,7 @@ public:
      * Destroyes this adaptivity manager.
      */
     ~AdaptivityManagerFarm(){
-        ;
+        delete _monitoredSamples;
     }
 
     /**
@@ -1311,7 +1418,7 @@ public:
                 updateMonitoredValues();
                 observe();
 
-                if(_monitoredSamples.size() >= _p.numSamples){
+                if(_monitoredSamples->size() >= _p.numSamples){
                     bool reconfigurationRequired = false;
                     FarmConfiguration nextConfiguration;
 

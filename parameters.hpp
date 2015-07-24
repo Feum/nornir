@@ -113,6 +113,12 @@ typedef enum{
                                      ///< strategyFrequencies != STRATEGY_FREQUENCY_NO).
 }ServiceNodeMapping;
 
+/// Possible ways to compute the averages of the values.
+typedef enum{
+    STRATEGY_AVERAGE_SIMPLE = 0, ///< Simple moving average
+    STRATEGY_AVERAGE_EXPONENTIAL ///< Exponential moving average
+}StrategyAverage;
+
 /// Possible parameters validation results.
 typedef enum{
     VALIDATION_OK = 0, ///< Parameters are ok.
@@ -164,6 +170,7 @@ private:
         strategyPrediction = STRATEGY_PREDICTION_SIMPLE;
         mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
         mappingCollector = SERVICE_NODE_MAPPING_ALONE;
+        strategyAverage = STRATEGY_AVERAGE_SIMPLE;
         frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
         turboBoost = false;
         frequencyLowerBound = 0;
@@ -212,6 +219,7 @@ public:
                                            ///< [default = STRATEGY_PREDICTION_SIMPLE].
     ServiceNodeMapping mappingEmitter; ///< Emitter mapping [default = SERVICE_NODE_MAPPING_ALONE].
     ServiceNodeMapping mappingCollector; ///< Collector mapping [default = SERVICE_NODE_MAPPING_ALONE].
+    StrategyAverage strategyAverage; ///< Averaging strategy [default = STRATEGY_AVERAGE_SIMPLE].
     bool migrateCollector; ///< If true, when a reconfiguration occur, the collector is migrated to a
                            ///< different virtual core (if needed) [default = false].
     uint32_t numSamples; ///< The number of samples used to take reconfiguration decisions [default = 10].
@@ -320,6 +328,11 @@ public:
         node = root->first_node("mappingCollector");
         if(node){
             mappingCollector = (ServiceNodeMapping) utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("strategyAverage");
+        if(node){
+            strategyAverage = (StrategyAverage) utils::stringToInt(node->value());
         }
 
         node = root->first_node("frequencyGovernor");
