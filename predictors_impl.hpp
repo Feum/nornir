@@ -350,10 +350,11 @@ FarmConfiguration CalibratorLowDiscrepancy::generateConfiguration() const{
 FarmConfiguration CalibratorLowDiscrepancy::getNextConfiguration(){
     FarmConfiguration fc;
 
+
     switch(_state){
         case CALIBRATION_SEEDS:{
             fc = generateConfiguration();
-            if(++_numGeneratedPoints == _minNumPoints){
+            if(++_numGeneratedPoints >= _minNumPoints){
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("========Moving to predict");
             }

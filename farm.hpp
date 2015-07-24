@@ -1116,8 +1116,15 @@ private:
     /**
      * Changes the current farm configuration.
      * @param configuration The new configuration.
+     * @param refine True if the data on the last configuration must be used
+     *               to refine the model.
      */
-    void changeConfiguration(FarmConfiguration configuration){
+    void changeConfiguration(FarmConfiguration configuration,
+                             bool refine = true){
+        if(configuration == _currentConfiguration){
+            return;
+        }
+
         if(!configuration.numWorkers){
             throw std::runtime_error("AdaptivityManagerFarm: fatal error, trying to activate zero "
                                      "workers.");
@@ -1127,7 +1134,7 @@ private:
         }
 
         /****************** Refine the model ******************/
-        if(configuration != _currentConfiguration){
+        if(refine){
             _primaryPredictor->refine();
             _secondaryPredictor->refine();
         }
@@ -1455,13 +1462,14 @@ public:
         }else{
             /* Force the first calibration point. **/
             if(_calibrator){
-                changeConfiguration(_calibrator->getNextConfiguration());
+                changeConfiguration(_calibrator->getNextConfiguration(), false);
             }
 
             double startSample = utils::getMillisecondsTime();
             while(!mustStop()){
                 double overheadMs = utils::getMillisecondsTime() - startSample;
-                microsecsSleep = ((double)_p.samplingInterval - overheadMs)*(double)MAMMUT_MICROSECS_IN_MILLISEC;
+                microsecsSleep = ((double)_p.samplingInterval - overheadMs)*
+                                  (double)MAMMUT_MICROSECS_IN_MILLISEC;
                 if(microsecsSleep < 0){
                     microsecsSleep = 0;
                 }
