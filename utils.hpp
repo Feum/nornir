@@ -47,15 +47,19 @@ public:
 
     virtual void add(const T& value) = 0;
 
+    virtual T getLastSample() const = 0;
+
     virtual void reset() = 0;
 
-    virtual size_t size() = 0;
+    virtual size_t size() const = 0;
 
     virtual T average() const = 0;
 
     virtual T variance() const = 0;
 
     virtual T standardDeviation() const = 0;
+
+    virtual T coefficientVariation() const = 0;
 };
 
 template<typename T> class MovingAverageSimple: public MovingAverage<T>{
@@ -68,10 +72,11 @@ private:
     size_t _nextIndex;
     size_t _storedValues;
     T _lastSample;
-    T _oldAverage, _newAverage;
+    T _oldAverage, _average;
     T _tmpVariance;
-    T _oldVariance, _newVariance;
+    T _oldVariance, _variance;
     T _standardDeviation;
+    T _coefficientVariation;
 public:
     MovingAverageSimple(size_t span):_span(span), _nextIndex(0),
                                      _storedValues(0){
@@ -82,28 +87,33 @@ public:
         _lastSample = value;
         if(_storedValues == 0){
             ++_storedValues;
-            _oldAverage = _newAverage = value;
+            _oldAverage = _average = value;
         }else if(_storedValues < _span){
             ++_storedValues;
-            _newAverage = _oldAverage + (value - _oldAverage)/_storedValues;
+            _average = _oldAverage + (value - _oldAverage)/_storedValues;
             _tmpVariance = _tmpVariance + (value - _oldAverage)*
-                                          (value - _newAverage);
-            _newVariance = _tmpVariance / _storedValues;
+                                          (value - _average);
+            _variance = _tmpVariance / _storedValues;
 
-            _oldAverage = _newAverage;
-            _oldVariance = _newVariance;
+            _oldAverage = _average;
+            _oldVariance = _variance;
         }else{
             T removedValue = _windowImpl.at(_nextIndex);
-            _newAverage = _oldAverage + (value - _windowImpl.at(_nextIndex))/
+            _average = _oldAverage + (value - _windowImpl.at(_nextIndex))/
                                          _span;
-            _newVariance = _oldVariance + (value - _newAverage +
+            _variance = _oldVariance + (value - _average +
                                            removedValue - _oldAverage)*
                                           (value - removedValue)/(_span-1);
 
             _windowImpl.at(_nextIndex) = value;
             _nextIndex = (_nextIndex + 1) % _span;
         }
-        _standardDeviation = squareRoot(_newVariance);
+        _standardDeviation = squareRoot(_variance);
+        _coefficientVariation = (_standardDeviation / _average) * 100.0;
+    }
+
+    T getLastSample() const{
+        return _lastSample;
     }
 
     void reset(){
@@ -113,31 +123,35 @@ public:
         _storedValues = 0;
     }
 
-    size_t size(){
+    size_t size() const{
         return _storedValues;
     }
 
     T average() const{
-        return _newAverage;
+        return _average;
     }
 
     T variance() const{
-        return _newVariance;
+        return _variance;
     }
 
     T standardDeviation() const{
         return _standardDeviation;
     }
 
+    T coefficientVariation() const{
+        return _coefficientVariation;
+    }
 };
 
 template<class T>
-std::ostream& operator<<(std::ostream& os, const MovingAverageSimple<T>& obj){
+std::ostream& operator<<(std::ostream& os, const MovingAverage<T>& obj){
     os << "[";
-    os << "Last sample: " << obj._lastSample;
+    os << "Last sample: " << obj.getLastSample();
     os << "Average: " << obj.average();
     os << "Variance: " << obj.variance();
     os << "StdDev: " << obj.standardDeviation();
+    os << "CoeffVar: " << obj.coefficientVariation();
     os << "]";
     return os;
 }

@@ -265,6 +265,13 @@ typedef struct MonitoredSample{
         return *this;
     }
 
+    MonitoredSample& operator/=(const MonitoredSample& rhs){
+        watts /= rhs.watts;
+        bandwidth /= rhs.bandwidth;
+        utilization /= bandwidth;
+        return *this;
+    }
+
     MonitoredSample operator/=(double x){
         watts /= x;
         bandwidth /= x;
@@ -298,6 +305,13 @@ inline MonitoredSample operator*(const MonitoredSample& lhs,
                                  const MonitoredSample& rhs){
     MonitoredSample r = lhs;
     r *= rhs;
+    return lhs;
+}
+
+inline MonitoredSample operator/(const MonitoredSample& lhs,
+                                 const MonitoredSample& rhs){
+    MonitoredSample r = lhs;
+    r /= rhs;
     return lhs;
 }
 
@@ -1197,7 +1211,6 @@ private:
             sample += tmp;
         }
         sample.loadPercentage /= _currentConfiguration.numWorkers;
-        //TODO: For service time we should pick the maximum. We could delete service time at all
         return true;
     }
 
@@ -1248,7 +1261,7 @@ private:
         _energy->resetCountersCpu();
         _monitoredSamples->add(sample);
 
-        DEBUG(_monitoredSamples);
+        DEBUG((*_monitoredSamples));
         return true;
     }
 
