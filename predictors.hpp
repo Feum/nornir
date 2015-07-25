@@ -253,6 +253,7 @@ private:
     AdaptivityManagerFarm& _manager;
     CalibrationState _state;
     gsl_qrng* _generator;
+    double* _normalizedPoint;
     size_t _minNumPoints;
     size_t _numGeneratedPoints;
 

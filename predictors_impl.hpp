@@ -49,9 +49,6 @@
 
 namespace adpff{
 
-
-/**************** PredictorLinearRegression ****************/
-
 void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
     _numPredictors = 0;
     double usedPhysicalCores = std::min(configuration.numWorkers, _manager._numPhysicalCores);
@@ -190,7 +187,8 @@ void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
     }
 }
 
-PredictorLinearRegression::PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm& manager):
+PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
+                                                     const AdaptivityManagerFarm& manager):
                                                     _type(type), _manager(manager){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
@@ -273,13 +271,14 @@ double PredictorLinearRegression::predict(const FarmConfiguration& configuration
     if(_type == PREDICTION_BANDWIDTH){
         result.at(0) = 1.0 / result.at(0);
     }
-    //    DEBUG("Prediction at configuration [" << configuration.numWorkers << ", " << configuration.frequency << "]: " << result.at(0));
+
     return result.at(0);
 }
     
 /**************** PredictorSimple ****************/
 
-PredictorSimple::PredictorSimple(PredictorType type, const AdaptivityManagerFarm& manager):
+PredictorSimple::PredictorSimple(PredictorType type,
+                                 const AdaptivityManagerFarm& manager):
     _type(type), _manager(manager){
     ;
 }
@@ -312,38 +311,50 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
 
 CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager):
         _manager(manager), _state(CALIBRATION_SEEDS), _numGeneratedPoints(0){
-    // 2 is the number of dimension in farm configuration (at the moment just
-    // number of workers and frequency).
-    _generator = gsl_qrng_alloc(gsl_qrng_sobol, 2);
+    uint d = _manager.getConfigurationDimension();
+    _generator = gsl_qrng_alloc(gsl_qrng_sobol, d);
+    _normalizedPoint = new double[d];
     _minNumPoints = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
-                             _manager._secondaryPredictor->getMinimumPointsNeeded()) - 1;
+                             _manager._secondaryPredictor->getMinimumPointsNeeded());
 }
 
 CalibratorLowDiscrepancy::~CalibratorLowDiscrepancy(){
     gsl_qrng_free(_generator);
+    delete[] _normalizedPoint;
 }
 
 bool CalibratorLowDiscrepancy::highError(){
-    double primaryError = std::abs((_manager.getPrimaryValue() - _manager._primaryPrediction)/_manager.getPrimaryValue())*100.0;
-    double secondaryError = std::abs((_manager.getSecondaryValue() - _manager._secondaryPrediction)/_manager.getSecondaryValue())*100.0;
-    DEBUG("Primary prediction: " << _manager._primaryPrediction << " Secondary prediction: " << _manager._secondaryPrediction);
-    DEBUG("Primary error: " << primaryError << " Secondary error: " << secondaryError);
+    double primaryValue = _manager.getPrimaryValue();
+    double secondaryValue = _manager.getSecondaryValue();
+    double primaryError = std::abs((primaryValue - _manager._primaryPrediction)/
+                                   primaryValue)*100.0;
+    double secondaryError = std::abs((secondaryValue - _manager._secondaryPrediction)/
+                                     secondaryValue)*100.0;
+    DEBUG("Primary prediction: " << _manager._primaryPrediction << " " <<
+          "Secondary prediction: " << _manager._secondaryPrediction);
+    DEBUG("Primary error: " << primaryError << " " <<
+          "Secondary error: " << secondaryError);
     return primaryError > _manager._p.maxPredictionError ||
            secondaryError > _manager._p.maxPredictionError;
 }
 
 FarmConfiguration CalibratorLowDiscrepancy::generateConfiguration() const{
     FarmConfiguration r;
-    double v[2];
-    gsl_qrng_get(_generator, v);
-    uint numWorkers = v[0]*(double)_manager._maxNumWorkers;
-    uint frequencyId = v[1]*(double)_manager._availableFrequencies.size();
+    size_t nextPointId = 0;
+    gsl_qrng_get(_generator, _normalizedPoint);
 
-    if(!numWorkers){numWorkers = 1;}
-    if(frequencyId == _manager._availableFrequencies.size()){--frequencyId;}
+    if(_manager.reconfigureWorkers()){
+        r.numWorkers = _normalizedPoint[nextPointId++]*
+                       (double)_manager._maxNumWorkers;
+        if(!r.numWorkers){r.numWorkers = 1;}
+    }
 
-    r = FarmConfiguration(numWorkers,
-                          _manager._availableFrequencies.at(frequencyId));
+    if(_manager.reconfigureFrequency()){
+        size_t frequencyId = _normalizedPoint[nextPointId++]*
+                             (double)_manager._availableFrequencies.size();
+        if(frequencyId == _manager._availableFrequencies.size()){--frequencyId;}
+        r.frequency = _manager._availableFrequencies.at(frequencyId);
+    }
     return r;
 }
 
@@ -392,9 +403,9 @@ FarmConfiguration CalibratorLowDiscrepancy::getNextConfiguration(){
                 DEBUG("========Moving to seeds");
             }else*/ 
             if(_manager.isContractViolated()){
-                //fc = _manager.getNewConfiguration();
+                gsl_qrng_init(_generator);
                 fc = generateConfiguration();
-                _numGeneratedPoints = 0;
+                _numGeneratedPoints = 1;
                 _state = CALIBRATION_SEEDS;                                                                                                                                    
                 DEBUG("========Moving to seeds");
             }else{

@@ -398,7 +398,7 @@ class AdaptivityManagerFarm: public utils::Thread{
     friend class RegressionDataPower;
     friend class CalibratorLowDiscrepancy;
 private:
-    utils::Monitor _monitor; ///< Used to let the manager stop safe.
+    utils::Monitor _monitor; ///< Used to let the manager stop safely.
     adp_ff_farm<>* _farm; ///< The managed farm.
     AdaptivityParameters _p; ///< The parameters used to take management decisions.
     cpufreq::CpuFreq* _cpufreq; ///< The cpufreq module.
@@ -452,6 +452,37 @@ private:
 #ifdef DEBUG_FARM
     std::ofstream samplesFile;
 #endif
+
+    /**
+     * Returns true if the number of workers must be reconfigured.
+     * @return true if the number of workers must be reconfigured,
+     *         false otherwise
+     */
+    bool reconfigureWorkers() const{
+        return true;
+    }
+
+    /**
+     * Returns true if the frequencies must be reconfigured.
+     * @return true if the frequencies must be reconfigured,
+     *         false otherwise
+     */
+    bool reconfigureFrequency() const{
+        return _p.strategyFrequencies == STRATEGY_FREQUENCY_YES ||
+               _p.strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES;
+    }
+
+    /**
+     * Returns the number of dimensions of a configuration,
+     * i.e. the number of different decisions that can
+     * be taken at runtime.
+     */
+    uint getConfigurationDimension() const{
+        uint numDimensions = 0;
+        if(reconfigureWorkers()){++numDimensions;}
+        if(reconfigureFrequency()){++numDimensions;}
+        return numDimensions;
+    }
 
     /**
      * If possible, finds a set of physical cores belonging to domains different from
@@ -748,18 +779,24 @@ private:
      */
     void updatePstate(cpufreq::Frequency frequency){
         updateScalableDomains();
+        cpufreq::Domain* currentDomain;
         for(size_t i = 0; i < _scalableDomains.size(); i++){
-            if(!_scalableDomains.at(i)->setGovernor(_p.frequencyGovernor)){
-                throw std::runtime_error("AdaptivityManagerFarm: Impossible to set the specified governor.");
+            currentDomain = _scalableDomains.at(i);
+            if(!currentDomain->setGovernor(_p.frequencyGovernor)){
+                throw std::runtime_error("AdaptivityManagerFarm: Impossible to "
+                                         "set the specified governor.");
             }
             if(_p.frequencyGovernor != cpufreq::GOVERNOR_USERSPACE){
-                if(!_scalableDomains.at(i)->setGovernorBounds(_p.frequencyLowerBound,
-                                                              _p.frequencyUpperBound)){
-                    throw std::runtime_error("AdaptivityManagerFarm: Impossible to set the specified governor's bounds.");
+                if(!currentDomain->setGovernorBounds(_p.frequencyLowerBound,
+                                                     _p.frequencyUpperBound)){
+                    throw std::runtime_error("AdaptivityManagerFarm: Impossible "
+                                             "to set the specified governor's "
+                                             "bounds.");
                 }
             }else if(_p.strategyFrequencies != STRATEGY_FREQUENCY_OS){
-                if(!_scalableDomains.at(i)->setFrequencyUserspace(frequency)){
-                    throw std::runtime_error("AdaptivityManagerFarm: Impossible to set the specified frequency.");
+                if(!currentDomain->setFrequencyUserspace(frequency)){
+                    throw std::runtime_error("AdaptivityManagerFarm: Impossible "
+                                             "to set the specified frequency.");
                 }
             }
         }
@@ -1053,14 +1090,17 @@ private:
                     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
                         currentSecondaryPrediction *= remainingTime;
                     }
-                    if(isBestSecondaryValue(currentSecondaryPrediction, bestSecondaryValue)){
+                    if(isBestSecondaryValue(currentSecondaryPrediction,
+                                            bestSecondaryValue)){
                         bestSecondaryValue = currentSecondaryPrediction;
                         r = examinedConfiguration;
                         feasibleSolutionFound = true;
                         primaryPrediction = currentPrimaryPrediction;
                         secondaryPrediction = currentSecondaryPrediction;
                     }
-                }else if(!feasibleSolutionFound && isBestSuboptimalValue(currentPrimaryPrediction, bestSuboptimalValue)){
+                }else if(!feasibleSolutionFound &&
+                         isBestSuboptimalValue(currentPrimaryPrediction,
+                                               bestSuboptimalValue)){
                     bestSuboptimalValue = currentPrimaryPrediction;
                     bestSuboptimalConfiguration = examinedConfiguration;
                     primaryPredictionSub = currentPrimaryPrediction;
