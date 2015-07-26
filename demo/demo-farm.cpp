@@ -38,64 +38,6 @@
 
 using namespace ff;
 
-class Obs: public adpff::adp_ff_farm_observer{
-private:
-    std::ofstream _statsFile;
-    std::ofstream _energyFile;
-public:
-    Obs(){
-        _statsFile.open("stats.txt");
-        if(!_statsFile.is_open()){
-            throw std::runtime_error("Obs: Impossible to open stats file.");
-        }
-        _statsFile << "# Time [[EmitterVc][WorkersVc][CollectorVc]] NumWorkers,Frequency CurrentBandwidth CurrentUtilization" << std::endl;
-
-        _energyFile.open("energy.txt");
-        if(!_energyFile.is_open()){
-            throw std::runtime_error("Obs: Impossible to open energy file.");
-        }
-        _energyFile << "# UsedVCCpuEnergy UsedVCCoresEnergy UsedVCGraphicEnergy UsedVCDRAMEnergy " << std::endl;
-    }
-
-    ~Obs(){
-        _statsFile.close();
-        _energyFile.close();
-    }
-
-    void observe(){
-        /****************** Stats ******************/
-        _statsFile << time(NULL) << " ";
-        _statsFile << "[";
-        if(_emitterVirtualCore){
-            _statsFile << "[" << _emitterVirtualCore->getVirtualCoreId() << "]";
-        }
-
-        _statsFile << "[";
-        for(size_t i = 0; i < _workersVirtualCore.size(); i++){
-            _statsFile << _workersVirtualCore.at(i)->getVirtualCoreId() << ",";
-        }
-        _statsFile << "]";
-
-        if(_collectorVirtualCore){
-            _statsFile << "[" << _collectorVirtualCore->getVirtualCoreId() << "]";
-        }
-        _statsFile << "] ";
-
-        _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
-        _statsFile << _averageBandwidth << " ";
-        _statsFile << _averageUtilization << " ";
-
-        _statsFile << std::endl;
-
-        /****************** Energy ******************/
-        _energyFile << _averageWatts.cpu << " "
-                    << _averageWatts.cores << " "
-                    << _averageWatts.graphic << " "
-                    << _averageWatts.dram;
-        _energyFile << std::endl;
-    }
-};
-
 // generic worker
 class Worker: public adpff::adp_ff_node{
 public:
@@ -167,7 +109,7 @@ int main(int argc, char * argv[]) {
         return -1;
     }
     
-    Obs obs;
+    adpff::Observer obs;
     adpff::AdaptivityParameters ap("demo-farm.xml");
     ap.observer = &obs;
     adpff::adp_ff_farm<> farm(ap); // farm object

@@ -76,8 +76,11 @@ inline WorkerSample operator+(WorkerSample lhs, const WorkerSample& rhs){
  * \brief Possible requests that a manager can make.
  */
 typedef enum{
-    MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE = 0, ///< Get the current sample and reset it.
-    MANAGEMENT_REQUEST_PRODUCE_NULL ///< Produce a NULL value on output stream.
+    // Get the current sample and reset it.
+    MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE = 0,
+
+    // Produce a NULL value on output stream.
+    MANAGEMENT_REQUEST_PRODUCE_NULL
 }ManagementRequest;
 
 /*!private
@@ -105,11 +108,14 @@ private:
     ticks _startTicks;
     ManagementRequest _managementRequest;
     WorkerSample _sampleResponse;
-    ff::SWSR_Ptr_Buffer _managementQ; ///< Queue used by the manager to notify that a request
-                                      ///< is present on _managementRequest.
-    ff::SWSR_Ptr_Buffer _responseQ; ///< Queue used by the node to notify that a response is
-                                    ///< present on _sampleResponse.
 
+    // Queue used by the manager to notify that a request is present on
+    // _managementRequest.
+    ff::SWSR_Ptr_Buffer _managementQ;
+
+    // Queue used by the node to notify that a response is  present on
+    // _sampleResponse.
+    ff::SWSR_Ptr_Buffer _responseQ;
 
     /**
      * Waits for the thread to be created.
@@ -162,26 +168,24 @@ private:
      */
     void askForSample(){
         _managementRequest = MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE;
-        _managementQ.push(&_managementRequest); // The value pushed in the queue will not be read, it could be anything.
+        // The value pushed in the queue will not be read,
+        // it could be anything except NULL.
+        _managementQ.push(&_managementRequest);
     }
 
     /**
      * The result of askForSample call.
-     * @param sample The statistics computed since the last time 'askForSample' has
-     * been called.
+     * @param sample The statistics computed since the last
+     *               time 'askForSample' has been called.
      * @return true if the node is running, false otherwise.
      */
      bool getSampleResponse(WorkerSample& sample){
-         int dummy;
-         int* dummyPtr = &dummy;
-         while(!_responseQ.pop((void**) &dummyPtr)){
-             _threadRunningLock.lock();
-             if(!_threadRunning){
-                 _threadRunningLock.unlock();
+         while(_responseQ.empty()){
+             if(!isRunning()){
                  return false;
              }
-             _threadRunningLock.unlock();
          }
+         _responseQ.inc();
          sample = _sampleResponse;
          return true;
      }
@@ -191,7 +195,9 @@ private:
      */
     void produceNull(){
         _managementRequest = MANAGEMENT_REQUEST_PRODUCE_NULL;
-        _managementQ.push(&_managementRequest); // The value pushed in the queue will not be read, it could be anything.
+        // The value pushed in the queue will not be read, it could be
+        // anything except NULL.
+        _managementQ.push(&_managementRequest);
     }
 
     void storeSample(){
@@ -274,11 +280,12 @@ public:
         _threadRunning = true;
         _threadRunningLock.unlock();
         if(!_threadCreationPerformed){
-            /** Operations performed only the first time the thread is running. **/
+            // Operations performed only the first time the thread is running.
             if(_tasksManager){
                 _thread = _tasksManager->getThreadHandler();
             }else{
-                throw std::runtime_error("AdaptiveNode: Tasks manager not initialized.");
+                throw std::runtime_error("AdaptiveNode: Tasks manager "
+                                         "not initialized.");
             }
             _threadCreated.notifyAll();
             _threadCreationPerformed = true;
@@ -294,9 +301,8 @@ public:
      * @return The output task.
      */
     void* svc(void* task) CX11_KEYWORD(final){
-        int dummy;
-        int* dummyPtr = &dummy;
-        if(_managementQ.pop((void**)&dummyPtr)){
+        if(!_managementQ.empty()){
+            _managementQ.inc();
             switch(_managementRequest){
                 case MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE:{
                     storeSample();

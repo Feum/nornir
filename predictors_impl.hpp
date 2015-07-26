@@ -161,10 +161,12 @@ void RegressionDataPower::init(const FarmConfiguration& configuration){
 }
 
 RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm& manager):
-        _manager(manager), _dynamicPowerModel(0), _voltagePerUsedSockets(0),
-        _voltagePerUnusedSockets(0), _additionalContextes(0), _numPredictors(0){;}
+        _manager(manager), _dynamicPowerModel(0),
+        _voltagePerUsedSockets(0), _voltagePerUnusedSockets(0),
+        _additionalContextes(0), _numPredictors(0){;}
 
-RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm& manager, const FarmConfiguration& configuration):
+RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm& manager,
+                                         const FarmConfiguration& configuration):
             _manager(manager){
     init(configuration);
 }
