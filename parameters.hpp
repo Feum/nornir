@@ -113,11 +113,25 @@ typedef enum{
                                      ///< strategyFrequencies != STRATEGY_FREQUENCY_NO).
 }ServiceNodeMapping;
 
-/// Possible ways to compute the averages of the values.
+/// Possible ways to smooth the values.
 typedef enum{
-    STRATEGY_AVERAGE_SIMPLE = 0, ///< Simple moving average
-    STRATEGY_AVERAGE_EXPONENTIAL ///< Exponential moving average
-}StrategyAverage;
+    STRATEGY_SMOOTHING_MOVING_AVERAGE = 0, ///< Simple moving average
+    STRATEGY_SMOOTHING_EXPONENTIAL ///< Exponential moving average
+}StrategySmoothing;
+
+/// Possible ways to select the calibration points.
+typedef enum{
+    // Random choice of the points.
+    STRATEGY_CALIBRATION_RANDOM = 0,
+    // Bratley, Fox, Niederreiter, ACM Trans. Model. Comp. Sim. 2, 195 (1992)
+    STRATEGY_CALIBRATION_NIEDERREITER,
+    // Antonov, Saleev, USSR Comput. Maths. Math. Phys. 19, 252 (1980)
+    STRATEGY_CALIBRATION_SOBOL,
+    // J.H. Halton, Numerische Mathematik 2, 84-90 (1960) and B. Vandewoestyne
+    // R. Cools Computational and Applied Mathematics 189, 1&2, 341-361 (2006)
+    STRATEGY_CALIBRATION_HALTON,
+    STRATEGY_CALIBRATION_HALTON_REVERSE,
+}StrategyCalibration;
 
 /// Possible parameters validation results.
 typedef enum{
@@ -168,9 +182,10 @@ private:
         strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyPrediction = STRATEGY_PREDICTION_SIMPLE;
+        strategySmoothing = STRATEGY_SMOOTHING_MOVING_AVERAGE;
+        strategyCalibration = STRATEGY_CALIBRATION_SOBOL;
         mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
         mappingCollector = SERVICE_NODE_MAPPING_ALONE;
-        strategyAverage = STRATEGY_AVERAGE_SIMPLE;
         frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
         turboBoost = false;
         frequencyLowerBound = 0;
@@ -193,14 +208,41 @@ private:
         observer = NULL;
     }
 public:
-    mammut::Mammut mammut; ///< The mammut modules handler.
-    ContractType contractType; ///< The contract type that must be respected by the application
-                               ///< [default = CONTRACT_NONE].
-    StrategyMapping strategyMapping; ///< The mapping strategy [default = STRATEGY_MAPPING_LINEAR].
-    StrategyHyperthreading strategyHyperthreading; ///< The hyperthreading strategy [default = STRATEGY_HT_NO].
-    StrategyFrequencies strategyFrequencies; ///< The frequency strategy. It can be different from
-                                             ///< STRATEGY_FREQUENCY_NO only if strategyMapping is
-                                             ///< different from STRATEGY_MAPPING_NO [default = STRATEGY_FREQUENCY_NO].
+    // The mammut modules handler.
+    mammut::Mammut mammut;
+
+    // The contract type that must be respected by the application
+    // [default = CONTRACT_NONE].
+    ContractType contractType;
+
+    //  The mapping strategy [default = STRATEGY_MAPPING_LINEAR].
+    StrategyMapping strategyMapping;
+
+    // The hyperthreading strategy [default = STRATEGY_HT_NO].
+    StrategyHyperthreading strategyHyperthreading;
+
+    // The frequency strategy. It can be different from STRATEGY_FREQUENCY_NO
+    // only if strategyMapping is different from STRATEGY_MAPPING_NO
+    // [default = STRATEGY_FREQUENCY_NO].
+    StrategyFrequencies strategyFrequencies;
+
+    // Strategy for virtual cores that are never used [default = STRATEGY_UNUSED_VC_NONE].
+    StrategyUnusedVirtualCores strategyUnusedVirtualCores;
+
+    // Strategy for virtual cores that become inactive after a workers
+    // reconfiguration [default = STRATEGY_UNUSED_VC_NONE].
+    StrategyUnusedVirtualCores strategyInactiveVirtualCores;
+
+    // Strategy to be used to predict power and performance values
+    // [default = STRATEGY_PREDICTION_SIMPLE].
+    StrategyPrediction strategyPrediction;
+
+    // Smoothing strategy [default = STRATEGY_SMOOTHING_SIMPLE_AVERAGE].
+    StrategySmoothing strategySmoothing;
+
+    // Calibration strategy [default = STRATEGY_CALIBRATION_SOBOL].
+    StrategyCalibration strategyCalibration;
+
     cpufreq::Governor frequencyGovernor; ///< The frequency governor (only used when
                                          ///< strategyFrequencies is STRATEGY_FREQUENCY_OS) [default = GOVERNOR_USERSPACE].
     bool turboBoost; ///< Flag to enable/disable cores turbo boosting [default = false].
@@ -211,16 +253,8 @@ public:
     bool fastReconfiguration; ///< If true, before changing the number of workers the frequency will be set to
                               ///< maximum to reduce the latency of the reconfiguration. The frequency will be
                               ///< be set again to the correct value after the farm is restarted [default = false].
-    StrategyUnusedVirtualCores strategyUnusedVirtualCores; ///< Strategy for virtual cores that are never used
-                                                           ///< [default = STRATEGY_UNUSED_VC_NONE].
-    StrategyUnusedVirtualCores strategyInactiveVirtualCores; ///< Strategy for virtual cores that become inactive
-                                                             ///< after a workers reconfiguration
-                                                             ///< [default = STRATEGY_UNUSED_VC_NONE].
-    StrategyPrediction strategyPrediction; ///< Strategy to be used to predict power and performance values
-                                           ///< [default = STRATEGY_PREDICTION_SIMPLE].
     ServiceNodeMapping mappingEmitter; ///< Emitter mapping [default = SERVICE_NODE_MAPPING_ALONE].
     ServiceNodeMapping mappingCollector; ///< Collector mapping [default = SERVICE_NODE_MAPPING_ALONE].
-    StrategyAverage strategyAverage; ///< Averaging strategy [default = STRATEGY_AVERAGE_SIMPLE].
     bool migrateCollector; ///< If true, when a reconfiguration occur, the collector is migrated to a
                            ///< different virtual core (if needed) [default = false].
     uint32_t numSamples; ///< The minimum number of samples used to take reconfiguration decisions [default = 10].
@@ -322,6 +356,16 @@ public:
             strategyPrediction = (StrategyPrediction) utils::stringToInt(node->value());
         }
 
+        node = root->first_node("strategySmoothing");
+        if(node){
+            strategySmoothing = (StrategySmoothing) utils::stringToInt(node->value());
+        }
+
+        node = root->first_node("strategyCalibration");
+        if(node){
+            strategyCalibration = (StrategyCalibration) utils::stringToInt(node->value());
+        }
+
         node = root->first_node("mappingEmitter");
         if(node){
             mappingEmitter = (ServiceNodeMapping) utils::stringToInt(node->value());
@@ -330,11 +374,6 @@ public:
         node = root->first_node("mappingCollector");
         if(node){
             mappingCollector = (ServiceNodeMapping) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("strategyAverage");
-        if(node){
-            strategyAverage = (StrategyAverage) utils::stringToInt(node->value());
         }
 
         node = root->first_node("frequencyGovernor");

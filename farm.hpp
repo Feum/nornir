@@ -1359,6 +1359,15 @@ private:
         return true;
     }
 
+
+    void initCalibrators(){
+        if(_p.strategyCalibration == STRATEGY_CALIBRATION_RANDOM){
+            ;
+        }else{
+            _calibrator = new CalibratorLowDiscrepancy(*this);
+        }
+    }
+
     /**
      * Initializes the predictors
      */
@@ -1389,7 +1398,7 @@ private:
             case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
                 _primaryPredictor = new PredictorLinearRegression(primary, *this);
                 _secondaryPredictor = new PredictorLinearRegression(secondary, *this);
-                _calibrator = new CalibratorLowDiscrepancy(*this);
+                initCalibrators();
             }break;
             default:{
                 ;
@@ -1431,12 +1440,12 @@ public:
         }
 
         _monitoredSamples = NULL;
-        switch(_p.strategyAverage){
-        case STRATEGY_AVERAGE_SIMPLE:{
+        switch(_p.strategySmoothing){
+        case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
             _monitoredSamples = new MovingAverageSimple<MonitoredSample>
                                     (_p.numSamples);
         }break;
-        case STRATEGY_AVERAGE_EXPONENTIAL:{
+        case STRATEGY_SMOOTHING_EXPONENTIAL:{
             _monitoredSamples = new MovingAverageExponential<MonitoredSample>
                                     (_p.alphaExpAverage);
         }break;

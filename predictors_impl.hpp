@@ -312,7 +312,27 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
 CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager):
         _manager(manager), _state(CALIBRATION_SEEDS), _numGeneratedPoints(0){
     uint d = _manager.getConfigurationDimension();
-    _generator = gsl_qrng_alloc(gsl_qrng_sobol, d);
+    gsl_qrng_type* generatorType;
+    switch(_manager._p.strategyCalibration){
+        case STRATEGY_CALIBRATION_NIEDERREITER:{
+            generatorType = gsl_qrng_niederreiter_2;
+        }break;
+        case STRATEGY_CALIBRATION_SOBOL:{
+            generatorType = gsl_qrng_sobol;
+        }break;
+        case STRATEGY_CALIBRATION_HALTON:{
+            generatorType = gsl_qrng_halton;
+        }break;
+        case STRATEGY_CALIBRATION_HALTON_REVERSE:{
+            generatorType = gsl_qrng_reversehalton;
+        }break;
+        default:{
+            throw std::runtime_error("CalibratorLowDiscrepancy: Unknown "
+                                     "generator type: " +
+                                     _manager._p.strategyCalibration);
+        }break;
+    }
+    _generator = gsl_qrng_alloc(generatorType, d);
     _normalizedPoint = new double[d];
     _minNumPoints = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
                              _manager._secondaryPredictor->getMinimumPointsNeeded());

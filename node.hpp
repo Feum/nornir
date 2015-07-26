@@ -105,11 +105,14 @@ private:
     ticks _startTicks;
     ManagementRequest _managementRequest;
     WorkerSample _sampleResponse;
-    ff::SWSR_Ptr_Buffer _managementQ; ///< Queue used by the manager to notify that a request
-                                      ///< is present on _managementRequest.
-    ff::SWSR_Ptr_Buffer _responseQ; ///< Queue used by the node to notify that a response is
-                                    ///< present on _sampleResponse.
 
+    // Queue used by the manager to notify that a request is present
+    // on _managementRequest.
+    ff::SWSR_Ptr_Buffer _managementQ;
+
+    // Queue used by the node to notify that a response is present
+    // on _sampleResponse.
+    ff::SWSR_Ptr_Buffer _responseQ;
 
     /**
      * Waits for the thread to be created.
