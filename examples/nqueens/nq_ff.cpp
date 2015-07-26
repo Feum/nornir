@@ -115,65 +115,6 @@
 
 using namespace adpff;
 
-class Obs: public adpff::adp_ff_farm_observer{
-private:
-    std::ofstream _statsFile;
-    std::ofstream _energyFile;
-    mammut::energy::JoulesCpu _totalUsedJoules, _totalUnusedJoules;
-public:
-    Obs(){
-        _statsFile.open("stats.txt");
-        if(!_statsFile.is_open()){
-            throw std::runtime_error("Obs: Impossible to open stats file.");
-        }
-        _statsFile << "# [[EmitterVc][WorkersVc][CollectorVc]] NumWorkers,Frequency CurrentBandwidth CurrentUtilization" << std::endl;
-
-        _energyFile.open("energy.txt");
-        if(!_energyFile.is_open()){
-            throw std::runtime_error("Obs: Impossible to open energy file.");
-        }
-        _energyFile << "# UsedVCCpuWattsy UsedVCCoresWatts UsedVCGraphicWatts UsedVCDRAMWatts" << std::endl;
-    }
-
-    ~Obs(){
-        double duration = (mammut::utils::getMillisecondsTime() - _startMonitoringMs) / 1000.0;
-        _energyFile << _totalUsedJoules.cpu/duration << " " << _totalUsedJoules.cores/duration << " " << _totalUsedJoules.graphic/duration << " " << _totalUsedJoules.dram/duration << std::endl;
-        _statsFile.close();
-        _energyFile.close();
-    }
-
-    void observe(){
-        /****************** Stats ******************/
-        _statsFile << time(NULL);
-        _statsFile << " [";
-        if(_emitterVirtualCore){
-            _statsFile << "[" << _emitterVirtualCore->getVirtualCoreId() << "]";
-        }
-
-        _statsFile << "[";
-        for(size_t i = 0; i < _workersVirtualCore.size(); i++){
-            _statsFile << _workersVirtualCore.at(i)->getVirtualCoreId() << ",";
-        }
-        _statsFile << "]";
-
-        if(_collectorVirtualCore){
-            _statsFile << "[" << _collectorVirtualCore->getVirtualCoreId() << "]";
-        }
-        _statsFile << "] ";
-
-        _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
-        _statsFile << _averageBandwidth << " ";
-        _statsFile << _averageUtilization << " ";
-        _statsFile << std::endl;
-        /****************** Energy ******************/
-
-        _energyFile << _averageWatts.cpu << " " << _averageWatts.cores << " " << _averageWatts.graphic << " " << _averageWatts.dram << " ";
-        _energyFile << std::endl;
-        _totalUsedJoules += _averageWatts;
-    }
-};
-
-
 /* 
    Notes on MAX_BOARDSIZE:
 
@@ -585,7 +526,7 @@ int main(int argc, char** argv) {
     // init allocator
     ffalloc.init();
 
-    Obs obs;
+    adpff::Observer obs;
     adpff::AdaptivityParameters ap("demo-fastflow.xml");
     ap.observer = &obs;
     adpff::adp_ff_farm<> farm(ap, false, 8192, 8192, false, DEF_MAX_NUM_WORKERS, true);

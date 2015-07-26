@@ -37,7 +37,7 @@
 
 namespace adpff{
 
-class adp_ff_farm_observer;
+class Observer;
 
 using namespace mammut;
 
@@ -280,7 +280,7 @@ public:
     double maxPredictionError; ///< Maximum error percentage allowed for prediction [default = 10.0].
     std::string voltageTableFile; ///< The file containing the voltage table. It is mandatory when
                                   ///< strategyFrequencies is STRATEGY_FREQUENCY_YES or when contract is [default = unused].
-    adp_ff_farm_observer* observer; ///< The observer object. It will be called every samplingInterval milliseconds
+    Observer* observer; ///< The observer object. It will be called every samplingInterval milliseconds
                                    ///< to monitor the adaptivity behaviour [default = NULL].
 
     /**

@@ -86,26 +86,76 @@ using namespace mammut;
  * It can be extended by a user defined class to customize action to take
  * for each observed statistic.
  */
-class adp_ff_farm_observer{
+class Observer{
     friend class AdaptivityManagerFarm;
-protected:
-    size_t _numberOfWorkers;
-    cpufreq::Frequency _currentFrequency;
-    topology::VirtualCore* _emitterVirtualCore;
-    std::vector<topology::VirtualCore*> _workersVirtualCore;
-    topology::VirtualCore* _collectorVirtualCore;
-    double _averageBandwidth;
-    double _averageUtilization;
-    energy::JoulesCpu _averageWatts;
+private:
+    std::ofstream _file;
     unsigned int _startMonitoringMs;
 public:
-    adp_ff_farm_observer():_numberOfWorkers(0), _currentFrequency(0),
-                           _emitterVirtualCore(NULL),
-                           _collectorVirtualCore(NULL),
-                           _averageBandwidth(0), _averageUtilization(0),
-                           _startMonitoringMs(0){;}
-    virtual ~adp_ff_farm_observer(){;}
-    virtual void observe(){;}
+    Observer(std::string fileName = "stats.txt"):
+            _startMonitoringMs(0){
+        _file.open(fileName.c_str());
+        if(!_file.is_open()){
+            throw std::runtime_error("Observer: Impossible to open file.");
+        }
+        _file << "TimestampMillisecs" << "\t";
+        _file << "[[EmitterVc][WorkersVc][CollectorVc]]" << "\t";
+        _file << "Workers" << "\t";
+        _file << "Frequency" << "\t";
+        _file << "AvgBandwidth" << "\t";
+        _file << "CoeffVarBandwidth" << "\t";
+        _file << "AvgUtilization" << "\t";
+        _file << "AvgWattsCpu" << "\t";
+        _file << "AvgWattsCores" << "\t";
+        _file << "AvgWattsGraphic" << "\t";
+        _file << "AvgWattsDram" << "\t";
+        _file << std::endl;
+    }
+
+    virtual ~Observer(){
+        _file.close();
+    }
+
+    virtual void observe(unsigned int timeStamp,
+                         size_t workers,
+                         cpufreq::Frequency frequency,
+                         const topology::VirtualCore* emitterVirtualCore,
+                         const std::vector<topology::VirtualCore*>& workersVirtualCore,
+                         const topology::VirtualCore* collectorVirtualCore,
+                         double averageBandwidth,
+                         double coeffVarBandwidth,
+                         double averageUtilization,
+                         energy::JoulesCpu averageWatts){
+        _file << timeStamp - _startMonitoringMs << "\t";
+        _file << "[";
+        if(emitterVirtualCore){
+            _file << "[" << emitterVirtualCore->getVirtualCoreId() << "]";
+        }
+
+        _file << "[";
+        for(size_t i = 0; i < workersVirtualCore.size(); i++){
+            _file << workersVirtualCore.at(i)->getVirtualCoreId() << ",";
+        }
+        _file << "]";
+
+        if(collectorVirtualCore){
+            _file << "[" << collectorVirtualCore->getVirtualCoreId() << "]";
+        }
+        _file << "]" << "\t";
+
+        _file << workers << "\t";
+        _file << frequency << "\t";
+        _file << averageBandwidth << "\t";
+        _file << coeffVarBandwidth << "\t";
+        _file << averageUtilization << "\t";
+
+        _file << averageWatts.cpu << "\t";
+        _file << averageWatts.cores << "\t";
+        _file << averageWatts.graphic << "\t";
+        _file << averageWatts.dram << "\t";
+
+        _file << std::endl;
+    }
 };
 
 /*!
@@ -1265,18 +1315,21 @@ private:
         _totalTasks = 0;
     }
 
-    /** Send data to observer. **/
+    /**
+     * Send data to observer.
+     **/
     void observe(){
         if(_p.observer){
-            _p.observer->_numberOfWorkers = _currentConfiguration.numWorkers;
-            _p.observer->_currentFrequency = _currentConfiguration.frequency;
-            _p.observer->_emitterVirtualCore = _emitterVirtualCore;
-            _p.observer->_workersVirtualCore = _activeWorkersVirtualCores;
-            _p.observer->_collectorVirtualCore = _collectorVirtualCore;
-            _p.observer->_averageBandwidth = _averageBandwidth;
-            _p.observer->_averageUtilization = _averageUtilization;
-            _p.observer->_averageWatts = _averageWatts;
-            _p.observer->observe();
+            _p.observer->observe(_lastStoredSampleMs,
+                                 _currentConfiguration.numWorkers,
+                                 _currentConfiguration.frequency,
+                                 _emitterVirtualCore,
+                                 _activeWorkersVirtualCores,
+                                 _collectorVirtualCore,
+                                 _averageBandwidth,
+                                 _monitoredSamples->coefficientVariation().bandwidth,
+                                 _averageUtilization,
+                                 _averageWatts);
         }
     }
 
