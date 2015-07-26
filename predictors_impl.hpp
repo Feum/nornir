@@ -314,7 +314,7 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
 CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager):
         _manager(manager), _state(CALIBRATION_SEEDS), _numGeneratedPoints(0){
     uint d = _manager.getConfigurationDimension();
-    gsl_qrng_type* generatorType;
+    const gsl_qrng_type* generatorType;
     switch(_manager._p.strategyCalibration){
         case STRATEGY_CALIBRATION_NIEDERREITER:{
             generatorType = gsl_qrng_niederreiter_2;
@@ -383,37 +383,42 @@ FarmConfiguration CalibratorLowDiscrepancy::generateConfiguration() const{
 FarmConfiguration CalibratorLowDiscrepancy::getNextConfiguration(){
     FarmConfiguration fc;
 
+    if(_state != CALIBRATION_FINISHED){
+        ++_numGeneratedPoints;
+    }
 
     switch(_state){
         case CALIBRATION_SEEDS:{
             fc = generateConfiguration();
-            if(++_numGeneratedPoints >= _minNumPoints){
+            if(_numGeneratedPoints >= _minNumPoints){
                 _state = CALIBRATION_TRY_PREDICT;
-                DEBUG("========Moving to predict");
+                DEBUG("[Calibrator]: Moving to predict");
             }
         }break;
         case CALIBRATION_TRY_PREDICT:{
             fc = _manager.getNewConfiguration();
             _state = CALIBRATION_EXTRA_POINT;
-            DEBUG("========Moving to extra");
+            DEBUG("[Calibrator]: Moving to extra");
         }break;
         case CALIBRATION_EXTRA_POINT:{
             if(highError()){
                 fc = generateConfiguration();
                 _state = CALIBRATION_TRY_PREDICT;
-                DEBUG("========High error");
-                DEBUG("========Moving to predict");
+                DEBUG("[Calibrator]: High error");
+                DEBUG("[Calibrator]: Moving to predict");
             }else if(_manager.isContractViolated()){
-              DEBUG("========Contract violated");
+              DEBUG("[Calibrator]: Contract violated");
               fc = _manager.getNewConfiguration();
               _state = CALIBRATION_TRY_PREDICT;
-              DEBUG("========Moving to predict");
+              DEBUG("[Calibrator]: Moving to predict");
             }else{
                 fc = _manager.getNewConfiguration();
                 _state = CALIBRATION_FINISHED;
                 _manager._primaryPredictor->clear();
                 _manager._secondaryPredictor->clear();
-                DEBUG("========Moving to finished");
+                DEBUG("[Calibrator]: Moving to finished");
+                DEBUG("[Calibrator]: Finished in " << _numGeneratedPoints - 1 <<
+                      " steps with configuration " << fc);
             }
         }break;
         case CALIBRATION_FINISHED:{
@@ -429,7 +434,7 @@ FarmConfiguration CalibratorLowDiscrepancy::getNextConfiguration(){
                 fc = generateConfiguration();
                 _numGeneratedPoints = 1;
                 _state = CALIBRATION_SEEDS;                                                                                                                                    
-                DEBUG("========Moving to seeds");
+                DEBUG("[Calibrator]: Moving to seeds");
             }else{
                 fc = _manager._currentConfiguration;
             }

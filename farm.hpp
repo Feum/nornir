@@ -102,13 +102,14 @@ public:
         _file << "[[EmitterVc][WorkersVc][CollectorVc]]" << "\t";
         _file << "Workers" << "\t";
         _file << "Frequency" << "\t";
-        _file << "AvgBandwidth" << "\t";
+        _file << "CurrentBandwidth" << "\t";
+        _file << "SmoothedBandwidth" << "\t";
         _file << "CoeffVarBandwidth" << "\t";
-        _file << "AvgUtilization" << "\t";
-        _file << "AvgWattsCpu" << "\t";
-        _file << "AvgWattsCores" << "\t";
-        _file << "AvgWattsGraphic" << "\t";
-        _file << "AvgWattsDram" << "\t";
+        _file << "SmoothedUtilization" << "\t";
+        _file << "SmoothedWattsCpu" << "\t";
+        _file << "SmoothedWattsCores" << "\t";
+        _file << "SmoothedWattsGraphic" << "\t";
+        _file << "SmoothedWattsDram" << "\t";
         _file << std::endl;
     }
 
@@ -122,10 +123,11 @@ public:
                          const topology::VirtualCore* emitterVirtualCore,
                          const std::vector<topology::VirtualCore*>& workersVirtualCore,
                          const topology::VirtualCore* collectorVirtualCore,
-                         double averageBandwidth,
+                         double currentBandwidth,
+                         double smoothedBandwidth,
                          double coeffVarBandwidth,
-                         double averageUtilization,
-                         energy::JoulesCpu averageWatts){
+                         double smoothedUtilization,
+                         energy::JoulesCpu smoothedWatts){
         _file << timeStamp - _startMonitoringMs << "\t";
         _file << "[";
         if(emitterVirtualCore){
@@ -145,14 +147,15 @@ public:
 
         _file << workers << "\t";
         _file << frequency << "\t";
-        _file << averageBandwidth << "\t";
+        _file << currentBandwidth << "\t";
+        _file << smoothedBandwidth << "\t";
         _file << coeffVarBandwidth << "\t";
-        _file << averageUtilization << "\t";
+        _file << smoothedUtilization << "\t";
 
-        _file << averageWatts.cpu << "\t";
-        _file << averageWatts.cores << "\t";
-        _file << averageWatts.graphic << "\t";
-        _file << averageWatts.dram << "\t";
+        _file << smoothedWatts.cpu << "\t";
+        _file << smoothedWatts.cores << "\t";
+        _file << smoothedWatts.graphic << "\t";
+        _file << smoothedWatts.dram << "\t";
 
         _file << std::endl;
     }
@@ -1326,6 +1329,7 @@ private:
                                  _emitterVirtualCore,
                                  _activeWorkersVirtualCores,
                                  _collectorVirtualCore,
+                                 _monitoredSamples->getLastSample().bandwidth,
                                  _averageBandwidth,
                                  _monitoredSamples->coefficientVariation().bandwidth,
                                  _averageUtilization,
