@@ -301,6 +301,12 @@ public:
      * @return The output task.
      */
     void* svc(void* task) CX11_KEYWORD(final){
+        ticks start = getticks();
+        void* t = adp_svc(task);
+        ++_tasksCount;
+        _workTicks += getticks() - start;
+        ff_send_out(t);
+
         if(!_managementQ.empty()){
             _managementQ.inc();
             switch(_managementRequest){
@@ -312,11 +318,7 @@ public:
                 }
             }
         }
-        ticks start = getticks();
-        void* t = adp_svc(task);
-        ++_tasksCount;
-        _workTicks += getticks() - start;
-        return t;
+        return GO_ON;
     }
 
     /**

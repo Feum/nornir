@@ -34,6 +34,8 @@
 
 #include "utils.hpp"
 
+#include <map>
+
 #include <ff/farm.hpp>
 
 #include <mlpack/core.hpp>
@@ -52,7 +54,16 @@ class FarmConfiguration;
  * Represents a sample to be used in the regression.
  */
 class RegressionData{
+protected:
+    const AdaptivityManagerFarm& _manager;
 public:
+    RegressionData(const AdaptivityManagerFarm& manager):_manager(manager){;}
+
+    /**
+     * Initializes the regression data with the current configuration.
+     */
+    void init();
+
     /**
      * Initializes the regression data.
      * @param configuration The configuration to insert as data.
@@ -79,7 +90,6 @@ public:
  */
 class RegressionDataServiceTime: public RegressionData{
 private:
-    const AdaptivityManagerFarm& _manager;
     double _physicalCores;
     double _invScalFactorPhysical;
     double _workers;
@@ -92,7 +102,8 @@ public:
 
     RegressionDataServiceTime(const AdaptivityManagerFarm& manager);
 
-    RegressionDataServiceTime(const AdaptivityManagerFarm& manager, const FarmConfiguration& configuration);
+    RegressionDataServiceTime(const AdaptivityManagerFarm& manager,
+                              const FarmConfiguration& configuration);
 
     uint getNumPredictors() const;
 
@@ -105,7 +116,6 @@ public:
  */
 class RegressionDataPower: public RegressionData{
 private:
-    const AdaptivityManagerFarm& _manager;
     double _dynamicPowerModel;
     double _voltagePerUsedSockets;
     double _voltagePerUnusedSockets;
@@ -117,7 +127,8 @@ public:
 
     RegressionDataPower(const AdaptivityManagerFarm& manager);
 
-    RegressionDataPower(const AdaptivityManagerFarm& manager, const FarmConfiguration& configuration);
+    RegressionDataPower(const AdaptivityManagerFarm& manager,
+                        const FarmConfiguration& configuration);
 
     uint getNumPredictors() const;
 
@@ -155,8 +166,8 @@ public:
     virtual void clear(){;}
 
     /**
-     * If possible, refines the model with the information obtained on the current
-     * configuration.
+     * If possible, refines the model with the information
+     * obtained on the current configuration.
      */
     virtual void refine(){;}
 
@@ -173,6 +184,12 @@ public:
     virtual double predict(const FarmConfiguration& configuration) = 0;
 };
 
+
+typedef struct{
+    RegressionData* data;
+    double response;
+}Observation;
+
 /*
  * Represents a linear regression predictor.
  */
@@ -181,11 +198,18 @@ private:
     PredictorType _type;
     const AdaptivityManagerFarm& _manager;
     LinearRegression _lr;
-    std::vector<RegressionData*> _data;
-    std::vector<double> _responses; ///< The responses to be used in the regression.
-    RegressionData* _predictionInput; ///< Input to be used for predicting a value.
+
+    typedef std::map<FarmConfiguration, Observation> Observations;
+    Observations _observations;
+    typedef Observations::iterator obs_it;
+
+    // Input to be used for predicting a value.
+    RegressionData* _predictionInput;
+
+    double getCurrentResponse() const;
 public:
-    PredictorLinearRegression(PredictorType type, const AdaptivityManagerFarm& manager);
+    PredictorLinearRegression(PredictorType type,
+                              const AdaptivityManagerFarm& manager);
 
     ~PredictorLinearRegression();
 
@@ -243,7 +267,7 @@ private:
     CalibrationState _state;
     std::vector<uint> _calibrationsLengths;
     size_t _minNumPoints;
-    size_t _numGeneratedPoints;
+    size_t _numCalibrationPoints;
 
     bool highError() const;
 protected:

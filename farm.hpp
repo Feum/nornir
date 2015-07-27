@@ -282,20 +282,11 @@ public:
 typedef struct FarmConfiguration{
     uint numWorkers;
     cpufreq::Frequency frequency;
+
     FarmConfiguration():numWorkers(0), frequency(0){;}
     FarmConfiguration(uint numWorkers, cpufreq::Frequency frequency = 0):
                      numWorkers(numWorkers), frequency(frequency){;}
 }FarmConfiguration;
-
-inline bool operator==(const FarmConfiguration& lhs,
-                       const FarmConfiguration& rhs){
-    return lhs.numWorkers == rhs.numWorkers &&
-           lhs.frequency == rhs.frequency;
-}
-inline bool operator!=(const FarmConfiguration& lhs,
-                       const FarmConfiguration& rhs){
-    return !operator==(lhs,rhs);
-}
 
 std::ostream& operator<<(std::ostream& os, const FarmConfiguration& obj){
     os << "[";
@@ -303,6 +294,47 @@ std::ostream& operator<<(std::ostream& os, const FarmConfiguration& obj){
     os << obj.frequency;
     os << "]";
     return os;
+}
+
+inline bool operator==(const FarmConfiguration& lhs,
+                       const FarmConfiguration& rhs){
+    return lhs.numWorkers == rhs.numWorkers &&
+           lhs.frequency == rhs.frequency;
+}
+
+inline bool operator!=(const FarmConfiguration& lhs,
+                       const FarmConfiguration& rhs){
+    return !operator==(lhs,rhs);
+}
+
+inline bool operator<(const FarmConfiguration& lhs,
+                      const FarmConfiguration& rhs){
+    if(lhs.numWorkers < rhs.numWorkers){
+        return true;
+    }
+    if(lhs.numWorkers > rhs.numWorkers){
+        return false;
+    }
+
+    if(lhs.frequency < rhs.frequency){
+        return true;
+    }
+    return false;
+}
+
+inline bool operator>(const FarmConfiguration& lhs,
+                      const FarmConfiguration& rhs){
+    return operator< (rhs,lhs);
+}
+
+inline bool operator<=(const FarmConfiguration& lhs,
+                       const FarmConfiguration& rhs){
+    return !operator> (lhs,rhs);
+}
+
+inline bool operator>=(const FarmConfiguration& lhs,
+                       const FarmConfiguration& rhs){
+    return !operator< (lhs,rhs);
 }
 
 typedef struct MonitoredSample{
@@ -461,6 +493,7 @@ inline void regularize(MonitoredSample& x){
 class AdaptivityManagerFarm: public utils::Thread{
     friend class PredictorSimple;
     friend class PredictorLinearRegression;
+    friend class RegressionData;
     friend class RegressionDataServiceTime;
     friend class RegressionDataPower;
     friend class Calibrator;
@@ -1538,9 +1571,11 @@ public:
             delete _secondaryPredictor;
         }
         if(_calibrator){
+            if(_p.observer){
+                _p.observer->calibrationStats(_calibrator->getCalibrationsLengths());
+            }
             delete _calibrator;
         }
-
         DEBUGB(samplesFile.close());
     }
 
@@ -1573,7 +1608,9 @@ public:
         _energy->resetCountersCpu();
 
         _lastStoredSampleMs = utils::getMillisecondsTime();
-        _p.observer->_startMonitoringMs = _lastStoredSampleMs;
+        if(_p.observer){
+            _p.observer->_startMonitoringMs = _lastStoredSampleMs;
+        }
 
         if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
             _remainingTasks = _p.expectedTasksNumber;

@@ -49,6 +49,8 @@
 
 namespace adpff{
 
+void RegressionData::init(){init(_manager._currentConfiguration);}
+
 void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
     _numPredictors = 0;
     double usedPhysicalCores = std::min(configuration.numWorkers, _manager._numPhysicalCores);
@@ -78,14 +80,16 @@ void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
 }
 
 RegressionDataServiceTime::RegressionDataServiceTime(const AdaptivityManagerFarm& manager):
-                                                   _manager(manager),
-                                                   _physicalCores(0), _invScalFactorPhysical(0),
-                                                   _workers(0), _invScalFactorWorkers(0),
-                                                   _frequency(0),
-                                                   _numPredictors(0){;}
+        RegressionData(manager),
+        _physicalCores(0), _invScalFactorPhysical(0),
+        _workers(0), _invScalFactorWorkers(0),
+        _frequency(0), _numPredictors(0){
+    init(manager._currentConfiguration);
+}
 
-RegressionDataServiceTime::RegressionDataServiceTime(const AdaptivityManagerFarm& manager, const FarmConfiguration& configuration):
-            _manager(manager){
+RegressionDataServiceTime::RegressionDataServiceTime(const AdaptivityManagerFarm& manager,
+                                                     const FarmConfiguration& configuration):
+        RegressionData(manager){
     init(configuration);
 }
 
@@ -161,13 +165,15 @@ void RegressionDataPower::init(const FarmConfiguration& configuration){
 }
 
 RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm& manager):
-        _manager(manager), _dynamicPowerModel(0),
+        RegressionData(manager), _dynamicPowerModel(0),
         _voltagePerUsedSockets(0), _voltagePerUnusedSockets(0),
-        _additionalContextes(0), _numPredictors(0){;}
+        _additionalContextes(0), _numPredictors(0){
+    init(_manager._currentConfiguration);
+}
 
 RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm& manager,
                                          const FarmConfiguration& configuration):
-            _manager(manager){
+        RegressionData(manager){
     init(configuration);
 }
 
@@ -208,11 +214,12 @@ PredictorLinearRegression::~PredictorLinearRegression(){
 }
 
 void PredictorLinearRegression::clear(){
-    for(size_t i = 0; i < _data.size(); i++){
-        delete _data.at(i);
+    for(obs_it iterator = _observations.begin();
+               iterator != _observations.end();
+               iterator++){
+        delete iterator->second.data;
     }
-    _data.clear();
-    _responses.clear();
+    _observations.clear();
 }
 
 uint PredictorLinearRegression::getMinimumPointsNeeded(){
@@ -221,39 +228,66 @@ uint PredictorLinearRegression::getMinimumPointsNeeded(){
     return std::max<uint>(_predictionInput->getNumPredictors(), 2);
 }
 
-void PredictorLinearRegression::refine(){
-    RegressionData* rd = NULL;
-    double response = 0;
-
+double PredictorLinearRegression::getCurrentResponse() const{
+    double r = 0.0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            rd = new RegressionDataServiceTime(_manager, _manager._currentConfiguration);
-            response = 1.0 / _manager._averageBandwidth;
+            r = 1.0 / _manager._averageBandwidth;
         }break;
         case PREDICTION_POWER:{
-            rd = new RegressionDataPower(_manager, _manager._currentConfiguration);
-            response = _manager._averageWatts.cores;
+            r = _manager._averageWatts.cores;
         }break;
     }
+    return r;
+}
 
-    _data.push_back(rd);
-    _responses.push_back(response);
-    DEBUG("Refining with configuration [" << _manager._currentConfiguration.numWorkers << ", "
-                                          << _manager._currentConfiguration.frequency << "]: "
-                                          << response);
+void PredictorLinearRegression::refine(){
+    const FarmConfiguration& currentConf = _manager._currentConfiguration;
+    obs_it lb = _observations.lower_bound(currentConf);
+
+    if(lb != _observations.end() &&
+       !(_observations.key_comp()(currentConf, lb->first))){
+        // Key already exists
+        DEBUG("Replacing " << currentConf);
+        lb->second.data->init();
+        lb->second.response = getCurrentResponse();
+    }else{
+        // The key does not exist in the map
+        Observation o;
+        switch(_type){
+            case PREDICTION_BANDWIDTH:{
+                o.data = new RegressionDataServiceTime(_manager);
+            }break;
+            case PREDICTION_POWER:{
+                o.data = new RegressionDataPower(_manager);
+            }break;
+        }
+        o.response = getCurrentResponse();
+        _observations.insert(lb, Observations::value_type(currentConf, o));
+    }
+
+    DEBUG("Refining with configuration " << currentConf << ": "
+                                         << getCurrentResponse());
 }
 
 void PredictorLinearRegression::prepareForPredictions(){
-    if(!_data.size()){
-        return;
+    if(!_observations.size()){
+        throw std::runtime_error("prepareForPredictions: No points are "
+                                 "present");
     }
 
     // One observation per column.
-    arma::mat dataMl(_data[0]->getNumPredictors(), _data.size());
-    arma::vec responsesMl(_data.size());
-    for(size_t i = 0; i < _data.size(); i++){
-        _data.at(i)->toArmaRow(i, dataMl);
-        responsesMl(i) = _responses.at(i);
+    arma::mat dataMl(_observations.begin()->second.data->getNumPredictors(),
+                     _observations.size());
+    arma::vec responsesMl(_observations.size());
+
+    size_t i = 0;
+    for(obs_it iterator = _observations.begin();
+               iterator != _observations.end();
+               iterator++){
+        iterator->second.data->toArmaRow(i, dataMl);
+        responsesMl(i) = iterator->second.response;
+        ++i;
     }
 
     _lr = LinearRegression(dataMl, responsesMl);
@@ -312,12 +346,12 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
 }
 
 Calibrator::Calibrator(AdaptivityManagerFarm& manager):
-        _manager(manager), _state(CALIBRATION_SEEDS), _numGeneratedPoints(0){
+        _manager(manager), _state(CALIBRATION_SEEDS), _numCalibrationPoints(0){
     _minNumPoints = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
                              _manager._secondaryPredictor->getMinimumPointsNeeded());
 }
 
-bool Calibrator::highError(){
+bool Calibrator::highError() const{
     double primaryValue = _manager.getPrimaryValue();
     double secondaryValue = _manager.getSecondaryValue();
     double primaryError = std::abs((primaryValue - _manager._primaryPrediction)/
@@ -335,14 +369,10 @@ bool Calibrator::highError(){
 FarmConfiguration Calibrator::getNextConfiguration(){
     FarmConfiguration fc;
 
-    if(_state != CALIBRATION_FINISHED){
-        ++_numGeneratedPoints;
-    }
-
     switch(_state){
         case CALIBRATION_SEEDS:{
             fc = generateConfiguration();
-            if(_numGeneratedPoints >= _minNumPoints){
+            if(_numCalibrationPoints > _minNumPoints){
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: Moving to predict");
             }
@@ -359,17 +389,20 @@ FarmConfiguration Calibrator::getNextConfiguration(){
                 DEBUG("[Calibrator]: High error");
                 DEBUG("[Calibrator]: Moving to predict");
             }else if(_manager.isContractViolated()){
-              DEBUG("[Calibrator]: Contract violated");
-              fc = _manager.getNewConfiguration();
-              _state = CALIBRATION_TRY_PREDICT;
-              DEBUG("[Calibrator]: Moving to predict");
+                DEBUG("[Calibrator]: Contract violated");
+                fc = _manager.getNewConfiguration();
+                _state = CALIBRATION_TRY_PREDICT;
+                DEBUG("[Calibrator]: Moving to predict");
             }else{
                 fc = _manager.getNewConfiguration();
                 _state = CALIBRATION_FINISHED;
                 _manager._primaryPredictor->clear();
                 _manager._secondaryPredictor->clear();
+                // We do -1 because we counted the current point and now we
+                // discovered it isn't a calibration point.
+                _calibrationsLengths.push_back(_numCalibrationPoints - 1);
                 DEBUG("[Calibrator]: Moving to finished");
-                DEBUG("[Calibrator]: Finished in " << _numGeneratedPoints - 1 <<
+                DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints - 1 <<
                       " steps with configuration " << fc);
             }
         }break;
@@ -384,8 +417,7 @@ FarmConfiguration Calibrator::getNextConfiguration(){
             if(_manager.isContractViolated()){
                 reset();
                 fc = generateConfiguration();
-                _calibrationsLengths.push_back(_numGeneratedPoints);
-                _numGeneratedPoints = 1;
+                _numCalibrationPoints = 1;
                 _state = CALIBRATION_SEEDS;
                 DEBUG("[Calibrator]: Moving to seeds");
             }else{
@@ -393,6 +425,11 @@ FarmConfiguration Calibrator::getNextConfiguration(){
             }
         }break;
     }
+
+    if(_state != CALIBRATION_FINISHED){
+        ++_numCalibrationPoints;
+    }
+
     return fc;
 }
 
