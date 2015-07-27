@@ -238,10 +238,25 @@ typedef enum{
  * Used to obtain calibration points.
  */
 class Calibrator{
+private:
+    AdaptivityManagerFarm& _manager;
+    CalibrationState _state;
+    std::vector<uint> _calibrationsLengths;
+    size_t _minNumPoints;
+    size_t _numGeneratedPoints;
+
+    bool highError() const;
+protected:
+    virtual FarmConfiguration generateConfiguration() const = 0;
+    virtual void reset(){;}
 public:
+    Calibrator(AdaptivityManagerFarm& manager);
+
     virtual ~Calibrator(){;}
 
-    virtual FarmConfiguration getNextConfiguration() = 0;
+    virtual FarmConfiguration getNextConfiguration();
+
+    std::vector<uint> getCalibrationsLengths() const;
 };
 
 /**
@@ -251,23 +266,14 @@ public:
 class CalibratorLowDiscrepancy: public Calibrator{
 private:
     AdaptivityManagerFarm& _manager;
-    CalibrationState _state;
     gsl_qrng* _generator;
     double* _normalizedPoint;
-    size_t _minNumPoints;
-    size_t _numGeneratedPoints;
-
-    /**
-     * Returns true if the error of the model is too high, false otherwise.
-     */
-    bool highError();
-
+protected:
     FarmConfiguration generateConfiguration() const;
+    void reset();
 public:
     CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager);
     ~CalibratorLowDiscrepancy();
-
-    FarmConfiguration getNextConfiguration();
 };
 
 }

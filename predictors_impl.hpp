@@ -311,41 +311,13 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
     return 0.0;
 }
 
-CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager):
+Calibrator::Calibrator(AdaptivityManagerFarm& manager):
         _manager(manager), _state(CALIBRATION_SEEDS), _numGeneratedPoints(0){
-    uint d = _manager.getConfigurationDimension();
-    const gsl_qrng_type* generatorType;
-    switch(_manager._p.strategyCalibration){
-        case STRATEGY_CALIBRATION_NIEDERREITER:{
-            generatorType = gsl_qrng_niederreiter_2;
-        }break;
-        case STRATEGY_CALIBRATION_SOBOL:{
-            generatorType = gsl_qrng_sobol;
-        }break;
-        case STRATEGY_CALIBRATION_HALTON:{
-            generatorType = gsl_qrng_halton;
-        }break;
-        case STRATEGY_CALIBRATION_HALTON_REVERSE:{
-            generatorType = gsl_qrng_reversehalton;
-        }break;
-        default:{
-            throw std::runtime_error("CalibratorLowDiscrepancy: Unknown "
-                                     "generator type: " +
-                                     _manager._p.strategyCalibration);
-        }break;
-    }
-    _generator = gsl_qrng_alloc(generatorType, d);
-    _normalizedPoint = new double[d];
     _minNumPoints = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
                              _manager._secondaryPredictor->getMinimumPointsNeeded());
 }
 
-CalibratorLowDiscrepancy::~CalibratorLowDiscrepancy(){
-    gsl_qrng_free(_generator);
-    delete[] _normalizedPoint;
-}
-
-bool CalibratorLowDiscrepancy::highError(){
+bool Calibrator::highError(){
     double primaryValue = _manager.getPrimaryValue();
     double secondaryValue = _manager.getSecondaryValue();
     double primaryError = std::abs((primaryValue - _manager._primaryPrediction)/
@@ -360,27 +332,7 @@ bool CalibratorLowDiscrepancy::highError(){
            secondaryError > _manager._p.maxPredictionError;
 }
 
-FarmConfiguration CalibratorLowDiscrepancy::generateConfiguration() const{
-    FarmConfiguration r;
-    size_t nextPointId = 0;
-    gsl_qrng_get(_generator, _normalizedPoint);
-
-    if(_manager.reconfigureWorkers()){
-        r.numWorkers = _normalizedPoint[nextPointId++]*
-                       (double)_manager._maxNumWorkers;
-        if(!r.numWorkers){r.numWorkers = 1;}
-    }
-
-    if(_manager.reconfigureFrequency()){
-        size_t frequencyId = _normalizedPoint[nextPointId++]*
-                             (double)_manager._availableFrequencies.size();
-        if(frequencyId == _manager._availableFrequencies.size()){--frequencyId;}
-        r.frequency = _manager._availableFrequencies.at(frequencyId);
-    }
-    return r;
-}
-
-FarmConfiguration CalibratorLowDiscrepancy::getNextConfiguration(){
+FarmConfiguration Calibrator::getNextConfiguration(){
     FarmConfiguration fc;
 
     if(_state != CALIBRATION_FINISHED){
@@ -428,12 +380,13 @@ FarmConfiguration CalibratorLowDiscrepancy::getNextConfiguration(){
                 _nextSeed = 1;
                 _state = CALIBRATION_SEEDS;
                 DEBUG("========Moving to seeds");
-            }else*/ 
+            }else*/
             if(_manager.isContractViolated()){
-                gsl_qrng_init(_generator);
+                reset();
                 fc = generateConfiguration();
+                _calibrationsLengths.push_back(_numGeneratedPoints);
                 _numGeneratedPoints = 1;
-                _state = CALIBRATION_SEEDS;                                                                                                                                    
+                _state = CALIBRATION_SEEDS;
                 DEBUG("[Calibrator]: Moving to seeds");
             }else{
                 fc = _manager._currentConfiguration;
@@ -441,6 +394,66 @@ FarmConfiguration CalibratorLowDiscrepancy::getNextConfiguration(){
         }break;
     }
     return fc;
+}
+
+std::vector<uint> Calibrator::getCalibrationsLengths() const{
+    return _calibrationsLengths;
+}
+
+CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager):
+        Calibrator(manager), _manager(manager){
+    uint d = _manager.getConfigurationDimension();
+    const gsl_qrng_type* generatorType;
+    switch(_manager._p.strategyCalibration){
+        case STRATEGY_CALIBRATION_NIEDERREITER:{
+            generatorType = gsl_qrng_niederreiter_2;
+        }break;
+        case STRATEGY_CALIBRATION_SOBOL:{
+            generatorType = gsl_qrng_sobol;
+        }break;
+        case STRATEGY_CALIBRATION_HALTON:{
+            generatorType = gsl_qrng_halton;
+        }break;
+        case STRATEGY_CALIBRATION_HALTON_REVERSE:{
+            generatorType = gsl_qrng_reversehalton;
+        }break;
+        default:{
+            throw std::runtime_error("CalibratorLowDiscrepancy: Unknown "
+                                     "generator type: " +
+                                     _manager._p.strategyCalibration);
+        }break;
+    }
+    _generator = gsl_qrng_alloc(generatorType, d);
+    _normalizedPoint = new double[d];
+}
+
+CalibratorLowDiscrepancy::~CalibratorLowDiscrepancy(){
+    gsl_qrng_free(_generator);
+    delete[] _normalizedPoint;
+}
+
+FarmConfiguration CalibratorLowDiscrepancy::generateConfiguration() const{
+    FarmConfiguration r;
+    size_t nextPointId = 0;
+    gsl_qrng_get(_generator, _normalizedPoint);
+
+    if(_manager.reconfigureWorkers()){
+        r.numWorkers = _normalizedPoint[nextPointId++]*
+                       (double)_manager._maxNumWorkers;
+        if(!r.numWorkers){r.numWorkers = 1;}
+    }
+
+    if(_manager.reconfigureFrequency()){
+        size_t frequencyId = _normalizedPoint[nextPointId++]*
+                             (double)_manager._availableFrequencies.size();
+        if(frequencyId == _manager._availableFrequencies.size()){--frequencyId;}
+        r.frequency = _manager._availableFrequencies.at(frequencyId);
+    }
+    return r;
+}
+
+void CalibratorLowDiscrepancy::reset(){
+    gsl_qrng_init(_generator);
 }
 
 }

@@ -89,32 +89,39 @@ using namespace mammut;
 class Observer{
     friend class AdaptivityManagerFarm;
 private:
-    std::ofstream _file;
+    std::ofstream _statsFile;
+    std::ofstream _calibrationFile;
     unsigned int _startMonitoringMs;
 public:
-    Observer(std::string fileName = "stats.txt"):
+    Observer(std::string statsFile = "stats.csv",
+             std::string calibrationFile = "calibration.csv"):
             _startMonitoringMs(0){
-        _file.open(fileName.c_str());
-        if(!_file.is_open()){
+        _statsFile.open(statsFile.c_str());
+        _calibrationFile.open(calibrationFile.c_str());
+        if(!_statsFile.is_open()){
             throw std::runtime_error("Observer: Impossible to open file.");
         }
-        _file << "TimestampMillisecs" << "\t";
-        _file << "[[EmitterVc][WorkersVc][CollectorVc]]" << "\t";
-        _file << "Workers" << "\t";
-        _file << "Frequency" << "\t";
-        _file << "CurrentBandwidth" << "\t";
-        _file << "SmoothedBandwidth" << "\t";
-        _file << "CoeffVarBandwidth" << "\t";
-        _file << "SmoothedUtilization" << "\t";
-        _file << "SmoothedWattsCpu" << "\t";
-        _file << "SmoothedWattsCores" << "\t";
-        _file << "SmoothedWattsGraphic" << "\t";
-        _file << "SmoothedWattsDram" << "\t";
-        _file << std::endl;
+        _statsFile << "TimestampMillisecs" << "\t";
+        _statsFile << "[[EmitterVc][WorkersVc][CollectorVc]]" << "\t";
+        _statsFile << "Workers" << "\t";
+        _statsFile << "Frequency" << "\t";
+        _statsFile << "CurrentBandwidth" << "\t";
+        _statsFile << "SmoothedBandwidth" << "\t";
+        _statsFile << "CoeffVarBandwidth" << "\t";
+        _statsFile << "SmoothedUtilization" << "\t";
+        _statsFile << "SmoothedWattsCpu" << "\t";
+        _statsFile << "SmoothedWattsCores" << "\t";
+        _statsFile << "SmoothedWattsGraphic" << "\t";
+        _statsFile << "SmoothedWattsDram" << "\t";
+        _statsFile << std::endl;
+
+        _calibrationFile << "NumCalibrationSteps";
+        _calibrationFile << std::endl;
     }
 
     virtual ~Observer(){
-        _file.close();
+        _statsFile.close();
+        _calibrationFile.close();
     }
 
     virtual void observe(unsigned int timeStamp,
@@ -128,36 +135,43 @@ public:
                          double coeffVarBandwidth,
                          double smoothedUtilization,
                          energy::JoulesCpu smoothedWatts){
-        _file << timeStamp - _startMonitoringMs << "\t";
-        _file << "[";
+        _statsFile << timeStamp - _startMonitoringMs << "\t";
+        _statsFile << "[";
         if(emitterVirtualCore){
-            _file << "[" << emitterVirtualCore->getVirtualCoreId() << "]";
+            _statsFile << "[" << emitterVirtualCore->getVirtualCoreId() << "]";
         }
 
-        _file << "[";
+        _statsFile << "[";
         for(size_t i = 0; i < workersVirtualCore.size(); i++){
-            _file << workersVirtualCore.at(i)->getVirtualCoreId() << ",";
+            _statsFile << workersVirtualCore.at(i)->getVirtualCoreId() << ",";
         }
-        _file << "]";
+        _statsFile << "]";
 
         if(collectorVirtualCore){
-            _file << "[" << collectorVirtualCore->getVirtualCoreId() << "]";
+            _statsFile << "[" << collectorVirtualCore->getVirtualCoreId() << "]";
         }
-        _file << "]" << "\t";
+        _statsFile << "]" << "\t";
 
-        _file << workers << "\t";
-        _file << frequency << "\t";
-        _file << currentBandwidth << "\t";
-        _file << smoothedBandwidth << "\t";
-        _file << coeffVarBandwidth << "\t";
-        _file << smoothedUtilization << "\t";
+        _statsFile << workers << "\t";
+        _statsFile << frequency << "\t";
+        _statsFile << currentBandwidth << "\t";
+        _statsFile << smoothedBandwidth << "\t";
+        _statsFile << coeffVarBandwidth << "\t";
+        _statsFile << smoothedUtilization << "\t";
 
-        _file << smoothedWatts.cpu << "\t";
-        _file << smoothedWatts.cores << "\t";
-        _file << smoothedWatts.graphic << "\t";
-        _file << smoothedWatts.dram << "\t";
+        _statsFile << smoothedWatts.cpu << "\t";
+        _statsFile << smoothedWatts.cores << "\t";
+        _statsFile << smoothedWatts.graphic << "\t";
+        _statsFile << smoothedWatts.dram << "\t";
 
-        _file << std::endl;
+        _statsFile << std::endl;
+    }
+
+    virtual void calibrationStats(const std::vector<uint>& calibrationLenghts){
+        for(size_t i = 0; i < calibrationLenghts.size(); i++){
+            _calibrationFile << calibrationLenghts.at(i);
+            _calibrationFile << std::endl;
+        }
     }
 };
 
@@ -449,6 +463,7 @@ class AdaptivityManagerFarm: public utils::Thread{
     friend class PredictorLinearRegression;
     friend class RegressionDataServiceTime;
     friend class RegressionDataPower;
+    friend class Calibrator;
     friend class CalibratorLowDiscrepancy;
 private:
     utils::Monitor _monitor; ///< Used to let the manager stop safely.
@@ -1516,6 +1531,15 @@ public:
      */
     ~AdaptivityManagerFarm(){
         delete _monitoredSamples;
+        if(_primaryPredictor){
+            delete _primaryPredictor;
+        }
+        if(_secondaryPredictor){
+            delete _secondaryPredictor;
+        }
+        if(_calibrator){
+            delete _calibrator;
+        }
 
         DEBUGB(samplesFile.close());
     }
