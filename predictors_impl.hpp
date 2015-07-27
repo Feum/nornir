@@ -408,7 +408,7 @@ FarmConfiguration Calibrator::getNextConfiguration(){
                 uint now = utils::getMillisecondsTime();
                 // We do -1 because we counted the current point and now we
                 // discovered it isn't a calibration point.
-                cs.length = _numCalibrationPoints - 1;
+                cs.numSteps = _numCalibrationPoints - 1;
                 cs.duration += (now - _calibrationStartMs);
                 _calibrationStartMs = now;
                 _calibrationStats.push_back(cs);

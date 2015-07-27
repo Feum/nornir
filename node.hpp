@@ -50,11 +50,19 @@ using namespace mammut;
  * This struct represents a sample of values taken from an adaptive node.
  */
 typedef struct WorkerSample{
-    double loadPercentage; ///< The percentage of time that the node spent on svc().
-    double tasksCount; ///< The number of computed tasks.
-    double bandwidth; ///< Bandwidth (tasks per ticks).
-    double serviceTime; ///< The average service time (in ticks).
-    WorkerSample():loadPercentage(0), tasksCount(0), bandwidth(0), serviceTime(0){;}
+    // The percentage of time that the node spent on svc().
+    double loadPercentage;
+
+    // The number of computed tasks.
+    double tasksCount;
+
+    // Bandwidth (tasks per ticks).
+    double bandwidth;
+
+    // The average service time (in ticks).
+    double serviceTime;
+    WorkerSample():loadPercentage(0), tasksCount(0),
+                   bandwidth(0), serviceTime(0){;}
 
     WorkerSample& operator+=(const WorkerSample& rhs){
         loadPercentage += rhs.loadPercentage;
@@ -301,12 +309,6 @@ public:
      * @return The output task.
      */
     void* svc(void* task) CX11_KEYWORD(final){
-        ticks start = getticks();
-        void* t = adp_svc(task);
-        ++_tasksCount;
-        _workTicks += getticks() - start;
-        assert(ff_send_out(t));
-
         if(!_managementQ.empty()){
             _managementQ.inc();
             switch(_managementRequest){
@@ -318,7 +320,13 @@ public:
                 }
             }
         }
-        return GO_ON;
+
+        ticks start = getticks();
+        void* t = adp_svc(task);
+        ++_tasksCount;
+        _workTicks += getticks() - start;
+
+        return t;
     }
 
     /**
@@ -345,7 +353,8 @@ public:
      * @param oldNumWorkers The old number of workers.
      * @param newNumWorkers The new number of workers.
      */
-    virtual void notifyWorkersChange(size_t oldNumWorkers, size_t newNumWorkers){;}
+    virtual void notifyWorkersChange(size_t oldNumWorkers,
+                                     size_t newNumWorkers){;}
 };
 
 }
