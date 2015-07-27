@@ -258,6 +258,11 @@ typedef enum{
     CALIBRATION_FINISHED
 }CalibrationState;
 
+typedef struct{
+    uint numSteps;
+    uint duration;
+}CalibrationStats;
+
 /**
  * Used to obtain calibration points.
  */
@@ -265,9 +270,10 @@ class Calibrator{
 private:
     AdaptivityManagerFarm& _manager;
     CalibrationState _state;
-    std::vector<uint> _calibrationsLengths;
+    std::vector<CalibrationStats> _calibrationStats;
     size_t _minNumPoints;
     size_t _numCalibrationPoints;
+    uint _calibrationStartMs;
 
     bool highError() const;
 protected:
@@ -278,9 +284,15 @@ public:
 
     virtual ~Calibrator(){;}
 
+    /**
+     * Override this member function to have custom
+     * ways to create calibration points.
+     *
+     * @return The next calibration point to be used.
+     */
     virtual FarmConfiguration getNextConfiguration();
 
-    std::vector<uint> getCalibrationsLengths() const;
+    std::vector<CalibrationStats> getCalibrationsStats() const;
 };
 
 /**

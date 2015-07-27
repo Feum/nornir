@@ -346,7 +346,8 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
 }
 
 Calibrator::Calibrator(AdaptivityManagerFarm& manager):
-        _manager(manager), _state(CALIBRATION_SEEDS), _numCalibrationPoints(0){
+        _manager(manager), _state(CALIBRATION_SEEDS),
+        _numCalibrationPoints(0), _calibrationStartMs(0){
     _minNumPoints = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
                              _manager._secondaryPredictor->getMinimumPointsNeeded());
 }
@@ -369,10 +370,14 @@ bool Calibrator::highError() const{
 FarmConfiguration Calibrator::getNextConfiguration(){
     FarmConfiguration fc;
 
+    if(_numCalibrationPoints == 0){
+        _calibrationStartMs = utils::getMillisecondsTime();
+    }
+
     switch(_state){
         case CALIBRATION_SEEDS:{
             fc = generateConfiguration();
-            if(_numCalibrationPoints > _minNumPoints){
+            if(_numCalibrationPoints + 1 >= _minNumPoints){
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: Moving to predict");
             }
@@ -398,9 +403,15 @@ FarmConfiguration Calibrator::getNextConfiguration(){
                 _state = CALIBRATION_FINISHED;
                 _manager._primaryPredictor->clear();
                 _manager._secondaryPredictor->clear();
+
+                CalibrationStats cs;
+                uint now = utils::getMillisecondsTime();
                 // We do -1 because we counted the current point and now we
                 // discovered it isn't a calibration point.
-                _calibrationsLengths.push_back(_numCalibrationPoints - 1);
+                cs.length = _numCalibrationPoints - 1;
+                cs.duration += (now - _calibrationStartMs);
+                _calibrationStartMs = now;
+                _calibrationStats.push_back(cs);
                 DEBUG("[Calibrator]: Moving to finished");
                 DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints - 1 <<
                       " steps with configuration " << fc);
@@ -433,8 +444,8 @@ FarmConfiguration Calibrator::getNextConfiguration(){
     return fc;
 }
 
-std::vector<uint> Calibrator::getCalibrationsLengths() const{
-    return _calibrationsLengths;
+std::vector<CalibrationStats> Calibrator::getCalibrationsStats() const{
+    return _calibrationStats;
 }
 
 CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager):

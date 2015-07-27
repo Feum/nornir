@@ -305,7 +305,7 @@ public:
         void* t = adp_svc(task);
         ++_tasksCount;
         _workTicks += getticks() - start;
-        ff_send_out(t);
+        assert(ff_send_out(t));
 
         if(!_managementQ.empty()){
             _managementQ.inc();
@@ -334,13 +334,14 @@ public:
     }
 
     /**
-     * This method can be implemented by the nodes to be aware of a change in the number
-     * of workers.
-     * When the farm is stopped and before running it again with the new number of workers,
-     * this method is called. It is called on the emitter (if present), on the collector (if
-     * present) and on all the workers of the new configuration.
-     * In this way, if needed action may be taken to prepare for the new configuration (e.g.
-     * shared state modification, etc..).
+     * This method can be implemented by the nodes to be aware of a change
+     * in the number of workers.
+     * When the farm is stopped and before running it again with the new
+     * number of workers, this method is called. It is called on the emitter
+     * (if present), on the collector (if present) and on all the workers of
+     * the new configuration.
+     * In this way, if needed action may be taken to prepare for the new
+     * configuration (e.g. shared state modification, etc..).
      * @param oldNumWorkers The old number of workers.
      * @param newNumWorkers The new number of workers.
      */

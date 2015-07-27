@@ -115,7 +115,9 @@ public:
         _statsFile << "SmoothedWattsDram" << "\t";
         _statsFile << std::endl;
 
-        _calibrationFile << "NumCalibrationSteps";
+        _calibrationFile << "NumSteps" << "\t";
+        _calibrationFile << "Duration" << "\t";
+        _calibrationFile << "Time%" << "\t";
         _calibrationFile << std::endl;
     }
 
@@ -167,9 +169,17 @@ public:
         _statsFile << std::endl;
     }
 
-    virtual void calibrationStats(const std::vector<uint>& calibrationLenghts){
-        for(size_t i = 0; i < calibrationLenghts.size(); i++){
-            _calibrationFile << calibrationLenghts.at(i);
+    virtual void calibrationStats(const std::vector<CalibrationStats>&
+                                  calibrationStats,
+                                  uint totalDurationMs){
+        double timePerc = 0.0;
+        for(size_t i = 0; i < calibrationStats.size(); i++){
+            timePerc = (calibrationStats.at(i).duration /
+                        totalDurationMs) * 100.0;
+
+            _calibrationFile << calibrationStats.at(i).numSteps << "\t";
+            _calibrationFile << calibrationStats.at(i).duration << "\t";
+            _calibrationFile << timePerc << "\t";
             _calibrationFile << std::endl;
         }
     }
@@ -502,6 +512,7 @@ private:
     utils::Monitor _monitor; ///< Used to let the manager stop safely.
     adp_ff_farm<>* _farm; ///< The managed farm.
     AdaptivityParameters _p; ///< The parameters used to take management decisions.
+    uint _startTimeMs; ///< Starting time of the manager.
     cpufreq::CpuFreq* _cpufreq; ///< The cpufreq module.
     energy::Energy* _energy; ///< The energy module.
     task::TasksManager* _task; ///< The task module.
@@ -1521,6 +1532,7 @@ public:
     AdaptivityManagerFarm(adp_ff_farm<>* farm, AdaptivityParameters adaptivityParameters):
         _farm(farm),
         _p(adaptivityParameters),
+        _startTimeMs(0),
         _cpufreq(_p.mammut.getInstanceCpuFreq()),
         _energy(_p.mammut.getInstanceEnergy()),
         _task(_p.mammut.getInstanceTask()),
@@ -1571,9 +1583,6 @@ public:
             delete _secondaryPredictor;
         }
         if(_calibrator){
-            if(_p.observer){
-                _p.observer->calibrationStats(_calibrator->getCalibrationsLengths());
-            }
             delete _calibrator;
         }
         DEBUGB(samplesFile.close());
@@ -1596,6 +1605,8 @@ public:
             _collector->waitThreadCreation();
         }
 
+        _startTimeMs = utils::getMillisecondsTime();
+
         if(_cpufreq->isBoostingSupported()){
             if(_p.turboBoost){
                 _cpufreq->enableBoosting();
@@ -1607,7 +1618,7 @@ public:
         mapAndSetFrequencies();
         _energy->resetCountersCpu();
 
-        _lastStoredSampleMs = utils::getMillisecondsTime();
+        _lastStoredSampleMs = _startTimeMs;
         if(_p.observer){
             _p.observer->_startMonitoringMs = _lastStoredSampleMs;
         }
@@ -1681,7 +1692,12 @@ public:
             }
         }
     controlLoopEnd:
-        ;
+
+        if(_calibrator && _p.observer){
+            _p.observer->calibrationStats(_calibrator->getCalibrationsStats(),
+                                          utils::getMillisecondsTime() -
+                                          _startTimeMs);
+        }
     }
 
     /**
