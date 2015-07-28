@@ -174,8 +174,8 @@ public:
                                   uint totalDurationMs){
         double timePerc = 0.0;
         for(size_t i = 0; i < calibrationStats.size(); i++){
-            timePerc = (calibrationStats.at(i).duration /
-                        totalDurationMs) * 100.0;
+            timePerc = ((double)calibrationStats.at(i).duration /
+                        (double)totalDurationMs) * 100.0;
 
             _calibrationFile << calibrationStats.at(i).numSteps << "\t";
             _calibrationFile << calibrationStats.at(i).duration << "\t";
