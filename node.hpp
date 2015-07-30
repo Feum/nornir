@@ -36,6 +36,7 @@
 #include <fstream>
 #include <streambuf>
 #include <string>
+#include <time.h>
 
 namespace adpff{
 
@@ -56,19 +57,15 @@ typedef struct WorkerSample{
     // The number of computed tasks.
     double tasksCount;
 
-    // Bandwidth (tasks per ticks).
-    double bandwidth;
-
     // The average service time (in ticks).
-    double serviceTime;
+    double latency;
     WorkerSample():loadPercentage(0), tasksCount(0),
-                   bandwidth(0), serviceTime(0){;}
+                   latency(0){;}
 
     WorkerSample& operator+=(const WorkerSample& rhs){
         loadPercentage += rhs.loadPercentage;
         tasksCount += rhs.tasksCount;
-        bandwidth += rhs.bandwidth;
-        serviceTime += rhs.serviceTime;
+        latency += rhs.latency;
         return *this;
     }
 }NodeSample;
@@ -181,16 +178,47 @@ private:
         _managementQ.push(&_managementRequest);
     }
 
+    // Sleeps for a given amount of nanoseconds
+    static inline void nsleep(long ns) {
+#if defined(__linux__)
+        struct timespec req = {0, ns};
+        nanosleep(&req, NULL);
+#else
+        throw std::runtime_error("Nanosleep not supported on this OS.");
+#endif
+    }
+
     /**
      * The result of askForSample call.
      * @param sample The statistics computed since the last
      *               time 'askForSample' has been called.
+     * @param strategyPolling Strategy to apply if the queue is empty.
+     * @param avgLatency Current average latency of the workers (in ns).
      * @return true if the node is running, false otherwise.
      */
-     bool getSampleResponse(WorkerSample& sample){
+     bool getSampleResponse(WorkerSample& sample,
+                            StrategyPolling strategyPolling,
+                            double avgLatency){
          while(_responseQ.empty()){
              if(!isRunning()){
                  return false;
+             }
+             switch(strategyPolling){
+             //TODO: Poiche' non ci sono svantaggi a vedere il risultato un
+             //      po' in ritardo, probabilmente la soluzione migliore e'
+             //      quella che consuma meno energia/CPU
+                 case STRATEGY_POLLING_SPINNING:{
+                     continue;
+                 }break;
+                 case STRATEGY_POLLING_PAUSE:{
+                     PAUSE();
+                 }break;
+                 case STRATEGY_POLLING_SLEEP_SMALL:{
+                     nsleep(0);
+                 }break;
+                 case STRATEGY_POLLING_SLEEP_LATENCY:{
+                     nsleep(avgLatency);
+                 }break;
              }
          }
          _responseQ.inc();
@@ -216,8 +244,8 @@ private:
         _sampleResponse.loadPercentage = ((double) (_workTicks) /
                                           (double) totalTicks) * 100.0;
         _sampleResponse.tasksCount = _tasksCount;
-        _sampleResponse.bandwidth = _tasksCount / (double) totalTicks;
-        _sampleResponse.serviceTime = (double)_workTicks / (double)_tasksCount;
+        _sampleResponse.latency = (double)_workTicks /
+                                  (double)_tasksCount;
 
         _tasksCount = 0;
         _workTicks = 0;

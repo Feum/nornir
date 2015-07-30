@@ -29,6 +29,8 @@
 #ifndef ADAPTIVE_FASTFLOW_PARAMETERS_HPP_
 #define ADAPTIVE_FASTFLOW_PARAMETERS_HPP_
 
+#include "enumutils.hpp"
+
 #include "external/rapidXml/rapidxml.hpp"
 
 #include <fstream>
@@ -38,7 +40,6 @@
 namespace adpff{
 
 class Observer;
-
 using namespace mammut;
 
 /// Possible contracts requested by the user.
@@ -55,6 +56,15 @@ typedef enum{
                           ///< with best performance is chosen.
 }ContractType;
 
+template<> char const* enumStrings<ContractType>::data[] = {
+        "NONE",
+        "PERF_UTILIZATION",
+        "PERF_BANDWIDTH",
+        "PERF_COMPLETION_TIME",
+        "POWER_BUDGET"
+};
+
+
 /// Possible reconfiguration strategies.
 typedef enum{
     STRATEGY_FREQUENCY_YES = 0, ///< Reconfigures frequencies and number of workers. If contractType is
@@ -70,6 +80,13 @@ typedef enum{
 
 }StrategyFrequencies;
 
+template<> char const* enumStrings<StrategyFrequencies>::data[] = {
+    "YES",
+    "NO",
+    "OS",
+    "MIN_CORES"
+};
+
 /// Possible mapping strategies.
 typedef enum{
     STRATEGY_MAPPING_NO = 0, ///< Mapping decisions will be performed by the operating system.
@@ -79,12 +96,25 @@ typedef enum{
                                      ///< Particularly useful when threads have large working sets.
 }StrategyMapping;
 
+template<> char const* enumStrings<StrategyMapping>::data[] = {
+    "NO",
+    "AUTO",
+    "LINEAR",
+    "CACHE_EFFICIENT"
+};
+
 /// Possible hyperthreading strategies.
 typedef enum{
     STRATEGY_HT_NO = 0, ///< Hyperthreading is not used.
     STRATEGY_HT_YES_SOONER, ///< Hyperthreading is used since the beginning.
     STRATEGY_HT_YES_LATER ///< Hyperthreading is used only when we used all the physical cores.
 }StrategyHyperthreading;
+
+template<> char const* enumStrings<StrategyHyperthreading>::data[] = {
+    "NO",
+    "YES_SOONER",
+    "YES_LATER"
+};
 
 /// Possible strategies to apply for unused virtual cores. For unused virtual cores we mean
 /// those never used or those used only on some conditions.
@@ -98,11 +128,23 @@ typedef enum{
                            ///< operating system and it will not schedule anything on them.
 }StrategyUnusedVirtualCores;
 
+template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
+    "NONE",
+    "AUTO",
+    "LOWEST_FREQUENCY",
+    "OFF"
+};
+
 /// Possible strategies to use to predict power and performance values.
 typedef enum{
     STRATEGY_PREDICTION_SIMPLE = 0,       ///< Applies a simple analytical model.
     STRATEGY_PREDICTION_REGRESSION_LINEAR ///< Applies multivariate linear regression.
 }StrategyPrediction;
+
+template<> char const* enumStrings<StrategyPrediction>::data[] = {
+    "SIMPLE",
+    "REGRESSION_LINEAR"
+};
 
 /// Possible mappings for a service node (emitter or collector).
 typedef enum{
@@ -113,11 +155,22 @@ typedef enum{
                                      ///< strategyFrequencies != STRATEGY_FREQUENCY_NO).
 }ServiceNodeMapping;
 
+template<> char const* enumStrings<ServiceNodeMapping>::data[] = {
+    "ALONE",
+    "COLLAPSED",
+    "PERFORMANCE"
+};
+
 /// Possible ways to smooth the values.
 typedef enum{
     STRATEGY_SMOOTHING_MOVING_AVERAGE = 0, ///< Simple moving average
     STRATEGY_SMOOTHING_EXPONENTIAL ///< Exponential moving average
 }StrategySmoothing;
+
+template<> char const* enumStrings<StrategySmoothing>::data[] = {
+    "MOVING_AVERAGE",
+    "EXPONENTIAL"
+};
 
 /// Possible ways to select the calibration points.
 typedef enum{
@@ -133,6 +186,40 @@ typedef enum{
     STRATEGY_CALIBRATION_HALTON_REVERSE,
 }StrategyCalibration;
 
+template<> char const* enumStrings<StrategyCalibration>::data[] = {
+    "RANDOM",
+    "NIEDERREITER",
+    "SOBOL",
+    "HALTON",
+    "HALTON_REVERSE"
+};
+
+/// Possible ways to act when the manager finds no response on a queue
+/// from a farm node.
+typedef enum{
+    // Spins.
+    STRATEGY_POLLING_SPINNING = 0,
+
+    // Suspend the execution on the processor for a short period of time.
+    // However, the OS will see the thread as doing useful work and probably
+    // will not get descheduled.
+    STRATEGY_POLLING_PAUSE,
+
+    // Sleeps for 0 nanoseconds. The OS may deschedule the thread.
+    STRATEGY_POLLING_SLEEP_SMALL,
+
+    // Sleeps for a period of time equal to the node average latency. The
+    // OS may deschedule the thread.
+    STRATEGY_POLLING_SLEEP_LATENCY
+}StrategyPolling;
+
+template<> char const* enumStrings<StrategyPolling>::data[] = {
+    "SPINNING",
+    "PAUSE",
+    "SLEEP_SMALL",
+    "SLEEP_LATENCY"
+};
+
 /// Possible parameters validation results.
 typedef enum{
     VALIDATION_OK = 0, ///< Parameters are ok.
@@ -145,7 +232,7 @@ typedef enum{
     VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY, ///< sensitiveEmitter or sensitiveCollector specified but frequency
                                               ///< strategy is STRATEGY_FREQUENCY_NO.
     VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS, ///< sensitiveEmitter or sensitiveCollector specified but highest
-                                               ///< frequency can't be set..
+                                               ///< frequency can't be set.
     VALIDATION_INVALID_FREQUENCY_BOUNDS, ///< The bounds are invalid or the frequency strategy is not STRATEGY_FREQUENCY_OS.
     VALIDATION_UNUSED_VC_NO_OFF, ///< Strategy for unused virtual cores requires turning off the virtual cores but they
                                  ///< can't be turned off.
@@ -156,6 +243,124 @@ typedef enum{
                                     ///< has not been specified or it does not exist.
     VALIDATION_NO_FAST_RECONF, ///< Fast reconfiguration not available.
 }AdaptivityParametersValidation;
+
+
+class XmlContent{
+private:
+    char* _fileContentChars;
+    rapidxml::xml_node<>* _root;
+public:
+    XmlContent(const std::string& fileName,
+               const std::string& rootName){
+        rapidxml::xml_document<> xmlContent;
+        std::ifstream file(fileName.c_str());
+        if(!file.is_open()){
+            throw std::runtime_error("Impossible to read xml file " + fileName);
+        }
+
+        std::string fileContent;
+        file.seekg(0, std::ios::end);
+        fileContent.reserve(file.tellg());
+        file.seekg(0, std::ios::beg);
+        fileContent.assign((std::istreambuf_iterator<char>(file)),
+                            std::istreambuf_iterator<char>());
+        _fileContentChars = new char[fileContent.size() + 1];
+        std::copy(fileContent.begin(), fileContent.end(), _fileContentChars);
+        _fileContentChars[fileContent.size()] = '\0';
+        xmlContent.parse<0>(_fileContentChars);
+        _root = xmlContent.first_node(rootName.c_str());
+    }
+
+    ~XmlContent(){
+        delete[] _fileContentChars;
+    }
+
+    void setBoolValue(const char* valueName, bool& value){
+        rapidxml::xml_node<> *node = NULL;
+        node = _root->first_node(valueName);
+        if(node){
+            value = std::string(node->value()).compare("true")?false:true;
+        }
+    }
+
+    void setIntValue(const char* valueName, int& value){
+        rapidxml::xml_node<> *node = NULL;
+        node = _root->first_node(valueName);
+        if(node){
+            value = utils::stringToInt(node->value());
+        }
+    }
+
+    void setUintValue(const char* valueName, uint& value){
+        rapidxml::xml_node<> *node = NULL;
+        node = _root->first_node(valueName);
+        if(node){
+            value = utils::stringToUint(node->value());
+        }
+    }
+
+    void setUlongValue(const char* valueName, ulong& value){
+        rapidxml::xml_node<> *node = NULL;
+        node = _root->first_node(valueName);
+        if(node){
+            value = utils::stringToUlong(node->value());
+        }
+    }
+
+    void setDoubleValue(const char* valueName, double& value){
+        rapidxml::xml_node<> *node = NULL;
+        node = _root->first_node(valueName);
+        if(node){
+            value = utils::stringToDouble(node->value());
+        }
+    }
+
+    void setStringValue(const char* valueName, std::string& value){
+        rapidxml::xml_node<> *node = NULL;
+        node = _root->first_node(valueName);
+        if(node){
+            value = node->value();
+        }
+    }
+
+    template<typename T>
+    void setEnumValue(const char* valueName, T& value){
+        rapidxml::xml_node<> *node = NULL;
+        node = _root->first_node(valueName);
+        if(node){
+            std::stringstream line(node->value());
+            line >> enumFromString(value);
+        }
+    }
+};
+
+#define SETVALUE(XML, TYPE, NAME) XML.set##TYPE##Value(#NAME, NAME)
+
+/*!
+ * \class ArchData
+ * \brief This class contains data specific to the architecture,
+ *        obtained by microbenchmarks.
+ *
+ * This class contains data specific to the architecture,
+ * obtained by microbenchmarks.
+ */
+typedef struct ArchData{
+    // Number of ticks for a nanosecond.
+    double ticksPerNs;
+
+    // The file containing the voltage table. It is mandatory when
+    // strategyFrequencies is STRATEGY_FREQUENCY_YES.
+    std::string voltageTableFile;
+
+    ArchData():ticksPerNs(0),
+               voltageTableFile(""){;}
+
+    void loadXml(const std::string& archFileName){
+        XmlContent xc(archFileName, "archData");
+        SETVALUE(xc, Double, ticksPerNs);
+        SETVALUE(xc, String, voltageTableFile);
+    }
+}ArchData;
 
 /*!
  * \class AdaptivityParameters
@@ -184,6 +389,7 @@ private:
         strategyPrediction = STRATEGY_PREDICTION_SIMPLE;
         strategySmoothing = STRATEGY_SMOOTHING_MOVING_AVERAGE;
         strategyCalibration = STRATEGY_CALIBRATION_SOBOL;
+        strategyPolling = STRATEGY_POLLING_PAUSE;
         mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
         mappingCollector = SERVICE_NODE_MAPPING_ALONE;
         frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
@@ -194,7 +400,7 @@ private:
         migrateCollector = false;
         numSamples = 10;
         alphaExpAverage = 0.5;
-        samplingInterval = 1000;
+        samplingInterval = 1000.0;
         underloadThresholdFarm = 80.0;
         overloadThresholdFarm = 90.0;
         underloadThresholdWorker = 80.0;
@@ -204,12 +410,50 @@ private:
         expectedTasksNumber = 0;
         powerBudget = 0;
         maxPredictionError = 10.0;
-        voltageTableFile = "";
         observer = NULL;
     }
+
+    void loadXml(const std::string& paramFileName){
+        XmlContent xc(paramFileName, "adaptivityParameters");
+
+        SETVALUE(xc, Enum, contractType);
+        SETVALUE(xc, Enum, strategyMapping);
+        SETVALUE(xc, Enum, strategyHyperthreading);
+        SETVALUE(xc, Enum, strategyFrequencies);
+        SETVALUE(xc, Enum, strategyUnusedVirtualCores);
+        SETVALUE(xc, Enum, strategyInactiveVirtualCores);
+        SETVALUE(xc, Enum, strategyPrediction);
+        SETVALUE(xc, Enum, strategySmoothing);
+        SETVALUE(xc, Enum, strategyCalibration);
+        SETVALUE(xc, Enum, strategyPolling);
+        SETVALUE(xc, Enum, mappingEmitter);
+        SETVALUE(xc, Enum, mappingCollector);
+        SETVALUE(xc, Enum, frequencyGovernor);
+        SETVALUE(xc, Bool, turboBoost);
+        SETVALUE(xc, Uint, frequencyLowerBound);
+        SETVALUE(xc, Uint, frequencyUpperBound);
+        SETVALUE(xc, Bool, fastReconfiguration);
+        SETVALUE(xc, Uint, numSamples);
+        SETVALUE(xc, Double, alphaExpAverage);
+        SETVALUE(xc, Uint, samplingInterval);
+        SETVALUE(xc, Double, underloadThresholdFarm);
+        SETVALUE(xc, Double, overloadThresholdFarm);
+        SETVALUE(xc, Double, underloadThresholdWorker);
+        SETVALUE(xc, Double, overloadThresholdWorker);
+        SETVALUE(xc, Bool, migrateCollector);
+        SETVALUE(xc, Double, requiredBandwidth);
+        SETVALUE(xc, Uint, requiredCompletionTime);
+        SETVALUE(xc, Ulong, expectedTasksNumber);
+        SETVALUE(xc, Double, powerBudget);
+        SETVALUE(xc, Double, maxPredictionError);
+    }
+
 public:
     // The mammut modules handler.
     mammut::Mammut mammut;
+
+    // Architecture's specific data.
+    ArchData archData;
 
     // The contract type that must be respected by the application
     // [default = CONTRACT_NONE].
@@ -226,7 +470,8 @@ public:
     // [default = STRATEGY_FREQUENCY_NO].
     StrategyFrequencies strategyFrequencies;
 
-    // Strategy for virtual cores that are never used [default = STRATEGY_UNUSED_VC_NONE].
+    // Strategy for virtual cores that are never used
+    // [default = STRATEGY_UNUSED_VC_NONE].
     StrategyUnusedVirtualCores strategyUnusedVirtualCores;
 
     // Strategy for virtual cores that become inactive after a workers
@@ -243,24 +488,52 @@ public:
     // Calibration strategy [default = STRATEGY_CALIBRATION_SOBOL].
     StrategyCalibration strategyCalibration;
 
-    cpufreq::Governor frequencyGovernor; ///< The frequency governor (only used when
-                                         ///< strategyFrequencies is STRATEGY_FREQUENCY_OS) [default = GOVERNOR_USERSPACE].
-    bool turboBoost; ///< Flag to enable/disable cores turbo boosting [default = false].
-    cpufreq::Frequency frequencyLowerBound; ///< The frequency lower bound (only if strategyFrequency is
-                                            ///< STRATEGY_FREQUENCY_OS) [default = unused].
-    cpufreq::Frequency frequencyUpperBound; ///< The frequency upper bound (only if strategyFrequency is
-                                            ///< STRATEGY_FREQUENCY_OS) [default = unused].
-    bool fastReconfiguration; ///< If true, before changing the number of workers the frequency will be set to
-                              ///< maximum to reduce the latency of the reconfiguration. The frequency will be
-                              ///< be set again to the correct value after the farm is restarted [default = false].
-    ServiceNodeMapping mappingEmitter; ///< Emitter mapping [default = SERVICE_NODE_MAPPING_ALONE].
-    ServiceNodeMapping mappingCollector; ///< Collector mapping [default = SERVICE_NODE_MAPPING_ALONE].
-    bool migrateCollector; ///< If true, when a reconfiguration occur, the collector is migrated to a
-                           ///< different virtual core (if needed) [default = false].
-    uint32_t numSamples; ///< The minimum number of samples used to take reconfiguration decisions [default = 10].
-    double alphaExpAverage; ///< The alpha to be used in exponential moving average [default = 0.5].
-    uint32_t samplingInterval; ///< The length of the sampling interval (in milliseconds) for
-                              ///< the data reading [default = 1000].
+    // Polling strategy [default = STRATEGY_POLLING_PAUSE].
+    StrategyPolling strategyPolling;
+
+    // The frequency governor (only used when strategyFrequencies is
+    // STRATEGY_FREQUENCY_OS) [default = GOVERNOR_USERSPACE].
+    cpufreq::Governor frequencyGovernor;
+
+    // Flag to enable/disable cores turbo boosting [default = false].
+    bool turboBoost;
+
+    // The frequency lower bound (only if strategyFrequency is
+    // STRATEGY_FREQUENCY_OS) [default = unused].
+    cpufreq::Frequency frequencyLowerBound;
+
+    // The frequency upper bound (only if strategyFrequency is
+    // STRATEGY_FREQUENCY_OS) [default = unused].
+    cpufreq::Frequency frequencyUpperBound;
+
+    // If true, before changing the number of workers the frequency will be
+    // set to maximum to reduce the latency of the reconfiguration. The
+    // frequency will be be set again to the correct value after the farm
+    // is restarted [default = false].
+    bool fastReconfiguration;
+
+    // Emitter mapping [default = SERVICE_NODE_MAPPING_ALONE].
+    ServiceNodeMapping mappingEmitter;
+
+    // Collector mapping [default = SERVICE_NODE_MAPPING_ALONE].
+    ServiceNodeMapping mappingCollector;
+
+    // If true, when a reconfiguration occur, the collector is migrated to a
+    // different virtual core (if needed) [default = false].
+    bool migrateCollector;
+
+    // The minimum number of samples used to take reconfiguration
+    // decisions [default = 10].
+    uint32_t numSamples;
+
+    // The alpha to be used in exponential moving average [default = 0.5].
+    double alphaExpAverage;
+
+    // The length of the sampling interval (in milliseconds) for the data
+    // reading. If 0, it will be automatically computed such to have a low
+    // overhead [default = 0].
+    uint32_t samplingInterval;
+
     double underloadThresholdFarm; ///< The underload threshold for the entire farm. It is valid only if
                                    ///< contractType is CONTRACT_UTILIZATION [default = 80.0].
     double overloadThresholdFarm; ///< The overload threshold for the entire farm. It is valid only if
@@ -273,205 +546,40 @@ public:
                               ///< It is valid only if contractType is CONTRACT_BANDWIDTH [default = unused].
     uint requiredCompletionTime; ///< The required completion time for the application (in seconds). It is
                                  ///< valid only if contractType is CONTRACT_COMPLETION_TIME [default = unused].
-    uint64_t expectedTasksNumber; ///< The number of task expected for this computation. It is
-                                  ///< valid only if contractType is CONTRACT_COMPLETION_TIME [default = unused].
+    ulong expectedTasksNumber; ///< The number of task expected for this computation. It is
+                               ///< valid only if contractType is CONTRACT_COMPLETION_TIME [default = unused].
     double powerBudget;           ///< The maximum cores power to be used. It is
                                   ///< valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
     double maxPredictionError; ///< Maximum error percentage allowed for prediction [default = 10.0].
-    std::string voltageTableFile; ///< The file containing the voltage table. It is mandatory when
-                                  ///< strategyFrequencies is STRATEGY_FREQUENCY_YES or when contract is [default = unused].
     Observer* observer; ///< The observer object. It will be called every samplingInterval milliseconds
                                    ///< to monitor the adaptivity behaviour [default = NULL].
 
     /**
      * Creates the adaptivity parameters.
-     * @param communicator The communicator used to instantiate the other modules.
-     *        If NULL, the modules will be created as local modules.
+     * @param communicator The communicator used to instantiate the other
+     *        modules. If NULL, the modules will be created as local modules.
      */
     AdaptivityParameters(Communicator* const communicator = NULL):
-      mammut(communicator){
+          mammut(communicator){
         setDefault();
     }
 
     /**
      * Creates the adaptivity parameters.
-     * @param xmlFileName The name containing the adaptivity parameters.
-     * @param communicator The communicator used to instantiate the other modules.
-     *        If NULL, the modules will be created as local modules.
+     * @param paramFileName The name of the XML file containing the adaptivity
+     *        parameters.
+     * @param archFileName The name of the XML file containing the
+     *        architectural data.
+     * @param communicator The communicator used to instantiate the other
+     *        modules. If NULL, the modules will be created as local modules.
      */
-    AdaptivityParameters(const std::string& xmlFileName, Communicator* const communicator = NULL):
-      mammut(communicator){
+    AdaptivityParameters(const std::string& paramFileName,
+                         const std::string& archFileName,
+                         Communicator* const communicator = NULL):
+          mammut(communicator){
         setDefault();
-        rapidxml::xml_document<> xmlContent;
-        std::ifstream file(xmlFileName.c_str());
-        if(!file.is_open()){
-                    throw std::runtime_error("Impossible to read xml file " + xmlFileName);
-        }
-
-        std::string fileContent;
-        file.seekg(0, std::ios::end);
-        fileContent.reserve(file.tellg());
-        file.seekg(0, std::ios::beg);
-        fileContent.assign((std::istreambuf_iterator<char>(file)),
-                            std::istreambuf_iterator<char>());
-        char* fileContentChars = new char[fileContent.size() + 1];
-        std::copy(fileContent.begin(), fileContent.end(), fileContentChars);
-        fileContentChars[fileContent.size()] = '\0';
-        xmlContent.parse<0>(fileContentChars);
-        rapidxml::xml_node<> *root = xmlContent.first_node("adaptivityParameters");
-        rapidxml::xml_node<> *node = NULL;
-
-        node = root->first_node("contractType");
-        if(node){
-          contractType = (ContractType) utils::stringToInt(node->value());
-        }
-        
-        node = root->first_node("strategyMapping");
-        if(node){
-          strategyMapping = (StrategyMapping) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("strategyHyperthreading");
-        if(node){
-            strategyHyperthreading = (StrategyHyperthreading) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("strategyFrequencies");
-        if(node){
-          strategyFrequencies = (StrategyFrequencies) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("strategyUnusedVirtualCores");
-        if(node){
-            strategyUnusedVirtualCores = (StrategyUnusedVirtualCores) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("strategyInactiveVirtualCores");
-        if(node){
-            strategyInactiveVirtualCores = (StrategyUnusedVirtualCores) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("strategyPrediction");
-        if(node){
-            strategyPrediction = (StrategyPrediction) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("strategySmoothing");
-        if(node){
-            strategySmoothing = (StrategySmoothing) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("strategyCalibration");
-        if(node){
-            strategyCalibration = (StrategyCalibration) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("mappingEmitter");
-        if(node){
-            mappingEmitter = (ServiceNodeMapping) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("mappingCollector");
-        if(node){
-            mappingCollector = (ServiceNodeMapping) utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("frequencyGovernor");
-        if(node){
-            frequencyGovernor = (cpufreq::Governor) utils::stringToInt(node->value());
-        }
-        
-        node = root->first_node("turboBoost");
-        if(node){
-            turboBoost = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("frequencyLowerBound");
-        if(node){
-            frequencyLowerBound = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("frequencyUpperBound");
-        if(node){
-            frequencyUpperBound = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("fastReconfiguration");
-        if(node){
-            fastReconfiguration = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("numSamples");
-        if(node){
-            numSamples = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("alphaExpAverage");
-        if(node){
-            alphaExpAverage = utils::stringToDouble(node->value());
-        }
-
-        node = root->first_node("samplingInterval");
-        if(node){
-            samplingInterval = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("underloadThresholdFarm");
-        if(node){
-            underloadThresholdFarm = utils::stringToDouble(node->value());
-        }
-
-        node = root->first_node("overloadThresholdFarm");
-        if(node){
-            overloadThresholdFarm = utils::stringToDouble(node->value());
-        }
-
-        node = root->first_node("underloadThresholdWorker");
-        if(node){
-            underloadThresholdWorker = utils::stringToDouble(node->value());
-        }
-
-        node = root->first_node("overloadThresholdWorker");
-        if(node){
-            overloadThresholdWorker = utils::stringToDouble(node->value());
-        }
-
-        node = root->first_node("migrateCollector");
-        if(node){
-            migrateCollector = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("requiredBandwidth");
-        if(node){
-            requiredBandwidth = utils::stringToDouble(node->value());
-        }
-
-        node = root->first_node("requiredCompletionTime");
-        if(node){
-            requiredCompletionTime = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("expectedTasksNumber");
-        if(node){
-            expectedTasksNumber = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("powerBudget");
-        if(node){
-            powerBudget = utils::stringToInt(node->value());
-        }
-
-        node = root->first_node("maxPredictionError");
-        if(node){
-            maxPredictionError = utils::stringToDouble(node->value());
-        }
-
-        node = root->first_node("voltageTableFile");
-        if(node){
-            voltageTableFile = node->value();
-        }
-
-        delete[] fileContentChars;
+        loadXml(paramFileName);
+        archData.loadXml(archFileName);
     }
 
 
@@ -618,7 +726,8 @@ public:
 
         /** Validate voltage table. **/
         if(strategyFrequencies == STRATEGY_FREQUENCY_YES){
-            if(voltageTableFile.empty() || !utils::existsFile(voltageTableFile)){
+            if(archData.voltageTableFile.empty() ||
+               !utils::existsFile(archData.voltageTableFile)){
                 return VALIDATION_VOLTAGE_FILE_NEEDED;
             }
         }

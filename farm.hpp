@@ -351,8 +351,9 @@ typedef struct MonitoredSample{
     energy::JoulesCpu watts; ///< Watts consumed by all the CPUs.
     double bandwidth; ///< Bandwidth of the entire farm.
     double utilization; ///< Utilization of the entire farm.
+    double latency; ///< Average latency of a worker (ticks).
 
-    MonitoredSample():bandwidth(0), utilization(0){;}
+    MonitoredSample():bandwidth(0), utilization(0), latency(0){;}
 
     void swap(MonitoredSample& x){
         using std::swap;
@@ -360,6 +361,7 @@ typedef struct MonitoredSample{
         swap(watts, x.watts);
         swap(bandwidth, x.bandwidth);
         swap(utilization, x.utilization);
+        swap(latency, x.latency);
     }
 
     MonitoredSample& operator=(MonitoredSample rhs){
@@ -371,6 +373,7 @@ typedef struct MonitoredSample{
         watts += rhs.watts;
         bandwidth += rhs.bandwidth;
         utilization += rhs.utilization;
+        latency += rhs.latency;
         return *this;
     }
 
@@ -378,6 +381,7 @@ typedef struct MonitoredSample{
         watts -= rhs.watts;
         bandwidth -= rhs.bandwidth;
         utilization -= rhs.utilization;
+        latency -= rhs.latency;
         return *this;
     }
 
@@ -385,6 +389,7 @@ typedef struct MonitoredSample{
         watts *= rhs.watts;
         bandwidth *= rhs.bandwidth;
         utilization *= rhs.utilization;
+        latency *= rhs.latency;
         return *this;
     }
 
@@ -392,6 +397,7 @@ typedef struct MonitoredSample{
         watts /= rhs.watts;
         bandwidth /= rhs.bandwidth;
         utilization /= rhs.utilization;
+        latency /= rhs.latency;
         return *this;
     }
 
@@ -399,6 +405,7 @@ typedef struct MonitoredSample{
         watts /= x;
         bandwidth /= x;
         utilization /= x;
+        latency /= x;
         return *this;
     }
 
@@ -406,6 +413,7 @@ typedef struct MonitoredSample{
         watts *= x;
         bandwidth *= x;
         utilization *= x;
+        latency *= x;
         return *this;
     }
 }MonitoredSample;
@@ -455,6 +463,7 @@ std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
     os << "Watts: " << obj.watts << " ";
     os << "Bandwidth: " << obj.bandwidth << " ";
     os << "Utilization: " << obj.utilization << " ";
+    os << "Latency: " << obj.latency << " ";
     os << "]";
     return os;
 }
@@ -463,6 +472,7 @@ std::ofstream& operator<<(std::ofstream& os, const MonitoredSample& obj){
     os << obj.watts.cores << "\t";
     os << obj.bandwidth << "\t";
     os << obj.utilization << "\t";
+    os << obj.latency << "\t";
     return os;
 }
 
@@ -480,6 +490,7 @@ inline MonitoredSample squareRoot(const MonitoredSample& x){
     r.watts = squareRoot(x.watts);
     r.bandwidth = x.bandwidth?std::sqrt(x.bandwidth):0;
     r.utilization = x.utilization?std::sqrt(x.utilization):0;
+    r.latency = x.latency?std::sqrt(x.latency):0;
     return r;
 }
 
@@ -491,6 +502,7 @@ inline void regularize(MonitoredSample& x){
     if(x.watts.dram < 0){x.watts.dram = 0;}
     if(x.bandwidth < 0){x.bandwidth = 0;}
     if(x.utilization < 0){x.utilization = 0;}
+    if(x.latency < 0){x.latency = 0;}
 }
 
 /*!
@@ -1412,15 +1424,20 @@ private:
      * @return True if all the workers are still running, false otherwise.
      */
     bool getWorkersSamples(WorkerSample& sample){
+        adp_ff_node* w;
         sample = WorkerSample();
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             WorkerSample tmp;
-            if(!_activeWorkers.at(i)->getSampleResponse(tmp)){
+            w = _activeWorkers.at(i);
+            if(!w->getSampleResponse(tmp,
+                                     _p.strategyPolling,
+                                     _monitoredSamples->average().latency)){
                 return false;
             }
             sample += tmp;
         }
         sample.loadPercentage /= _currentConfiguration.numWorkers;
+        sample.latency /= _currentConfiguration.numWorkers;
         return true;
     }
 
@@ -1466,7 +1483,14 @@ private:
 
         sample.watts = joules / durationSecs;
         sample.utilization = ws.loadPercentage;
+        // ATTENTION: Bandwidth is not the number of task since the
+        //            last observation but the number of expected
+        //            tasks that will be processed in 1 second.
+        //            For this reason, if we sum all the bandwidths in
+        //            the result observation file, we may have an higher
+        //            number than the number of tasks.
         sample.bandwidth = (double) ws.tasksCount / durationSecs;
+        sample.latency = ws.latency * _p.archData.ticksPerNs;
 
         _energy->resetCountersCpu();
         _monitoredSamples->add(sample);
@@ -1552,8 +1576,8 @@ public:
         _emitterVirtualCore(NULL),
         _collectorVirtualCore(NULL){
         /** If voltage table file is specified, then load the table. **/
-        if(_p.voltageTableFile.compare("")){
-            cpufreq::loadVoltageTable(_voltageTable, _p.voltageTableFile);
+        if(_p.archData.voltageTableFile.compare("")){
+            cpufreq::loadVoltageTable(_voltageTable, _p.archData.voltageTableFile);
         }
 
         _monitoredSamples = NULL;
