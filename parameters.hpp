@@ -31,6 +31,7 @@
 
 #include "external/rapidXml/rapidxml.hpp"
 
+#include <cmath>
 #include <fstream>
 #include <mammut/utils.hpp>
 #include <mammut/mammut.hpp>
@@ -57,11 +58,11 @@ typedef enum{
 }ContractType;
 
 template<> char const* enumStrings<ContractType>::data[] = {
-        "NONE",
-        "PERF_UTILIZATION",
-        "PERF_BANDWIDTH",
-        "PERF_COMPLETION_TIME",
-        "POWER_BUDGET"
+    "NONE",
+    "PERF_UTILIZATION",
+    "PERF_BANDWIDTH",
+    "PERF_COMPLETION_TIME",
+    "POWER_BUDGET"
 };
 
 
@@ -355,16 +356,21 @@ typedef struct ArchData{
     // Number of ticks for a nanosecond.
     double ticksPerNs;
 
+    // Number of ticks spent by a worker to reply to a monitoring request.
+    double monitoringCost;
+
     // The file containing the voltage table. It is mandatory when
     // strategyFrequencies is STRATEGY_FREQUENCY_YES.
     std::string voltageTableFile;
 
     ArchData():ticksPerNs(0),
+               monitoringCost(0),
                voltageTableFile(""){;}
 
     void loadXml(const std::string& archFileName){
         XmlContent xc(archFileName, "archData");
         SETVALUE(xc, Double, ticksPerNs);
+        SETVALUE(xc, Double, monitoringCost);
         SETVALUE(xc, String, voltageTableFile);
     }
 }ArchData;
@@ -407,7 +413,7 @@ private:
         migrateCollector = false;
         numSamples = 10;
         alphaExpAverage = 0.5;
-        samplingInterval = 1000.0;
+        samplingInterval = 0;
         underloadThresholdFarm = 80.0;
         overloadThresholdFarm = 90.0;
         underloadThresholdWorker = 80.0;
@@ -417,6 +423,7 @@ private:
         expectedTasksNumber = 0;
         powerBudget = 0;
         maxPredictionError = 10.0;
+        maxMonitoringOverhead = 1.0;
         observer = NULL;
     }
 
@@ -460,6 +467,15 @@ private:
         SETVALUE(xc, Ulong, expectedTasksNumber);
         SETVALUE(xc, Double, powerBudget);
         SETVALUE(xc, Double, maxPredictionError);
+        SETVALUE(xc, Double, maxMonitoringOverhead);
+
+        if(!samplingInterval){
+            double msMonitoringCost = (archData.monitoringCost*
+                                       archData.ticksPerNs*
+                                       0.000001);
+            samplingInterval = std::ceil(msMonitoringCost*
+                                        (100.0 - maxMonitoringOverhead));
+        }
     }
 
 public:
@@ -548,25 +564,51 @@ public:
     // overhead [default = 0].
     uint32_t samplingInterval;
 
-    double underloadThresholdFarm; ///< The underload threshold for the entire farm. It is valid only if
-                                   ///< contractType is CONTRACT_UTILIZATION [default = 80.0].
-    double overloadThresholdFarm; ///< The overload threshold for the entire farm. It is valid only if
-                                  ///< contractType is CONTRACT_UTILIZATION [default = 90.0].
-    double underloadThresholdWorker; ///< The underload threshold for a single worker. It is valid only if
-                                     ///< contractType is CONTRACT_UTILIZATION [default = 80.0].
-    double overloadThresholdWorker; ///< The overload threshold for a single worker. It is valid only if
-                                    ///< contractType is CONTRACT_UTILIZATION [default = 90.0].
-    double requiredBandwidth; ///< The bandwidth required for the application (expressed as tasks/sec).
-                              ///< It is valid only if contractType is CONTRACT_BANDWIDTH [default = unused].
-    uint requiredCompletionTime; ///< The required completion time for the application (in seconds). It is
-                                 ///< valid only if contractType is CONTRACT_COMPLETION_TIME [default = unused].
-    ulong expectedTasksNumber; ///< The number of task expected for this computation. It is
-                               ///< valid only if contractType is CONTRACT_COMPLETION_TIME [default = unused].
-    double powerBudget;           ///< The maximum cores power to be used. It is
-                                  ///< valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
-    double maxPredictionError; ///< Maximum error percentage allowed for prediction [default = 10.0].
-    Observer* observer; ///< The observer object. It will be called every samplingInterval milliseconds
-                                   ///< to monitor the adaptivity behaviour [default = NULL].
+    // The underload threshold for the entire farm. It is valid only if
+    // contractType is CONTRACT_UTILIZATION [default = 80.0].
+    double underloadThresholdFarm;
+
+    // The overload threshold for the entire farm. It is valid only if
+    // contractType is CONTRACT_UTILIZATION [default = 90.0].
+    double overloadThresholdFarm;
+
+    // The underload threshold for a single worker. It is valid only if
+    // contractType is CONTRACT_UTILIZATION [default = 80.0].
+    double underloadThresholdWorker;
+
+    // The overload threshold for a single worker. It is valid only if
+    // contractType is CONTRACT_UTILIZATION [default = 90.0].
+    double overloadThresholdWorker;
+
+    // The bandwidth required for the application (expressed as tasks/sec).
+    // It is valid only if contractType is CONTRACT_BANDWIDTH
+    // [default = unused].
+    double requiredBandwidth;
+
+    // The required completion time for the application (in seconds). It is
+    // valid only if contractType is CONTRACT_COMPLETION_TIME
+    // [default = unused].
+    uint requiredCompletionTime;
+
+    // The number of task expected for this computation. It is
+    // valid only if contractType is CONTRACT_COMPLETION_TIME
+    // [default = unused].
+    ulong expectedTasksNumber;
+
+    // The maximum cores power to be used. It is
+    // valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
+    double powerBudget;
+
+    // Maximum error percentage allowed for prediction [default = 10.0].
+    double maxPredictionError;
+
+    // The maximum percentage of monitoring overhead, in the range (0, 100).
+    // [default = 1.0].
+    double maxMonitoringOverhead;
+
+    // The observer object. It will be called every samplingInterval
+    // milliseconds to monitor the adaptivity behaviour [default = NULL].
+    Observer* observer;
 
     /**
      * Creates the adaptivity parameters.
@@ -592,8 +634,8 @@ public:
                          Communicator* const communicator = NULL):
           mammut(communicator){
         setDefault();
-        loadXml(paramFileName);
         archData.loadXml(archFileName);
+        loadXml(paramFileName);
     }
 
 
