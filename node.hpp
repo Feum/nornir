@@ -181,7 +181,10 @@ private:
     // Sleeps for a given amount of nanoseconds
     static inline void nsleep(long ns) {
 #if defined(__linux__)
-        struct timespec req = {0, ns};
+        struct timespec req={0};
+        time_t sec = ns/1000000000L;
+        req.tv_sec = sec;
+        req.tv_nsec = ns - sec*1000000000L;
         nanosleep(&req, NULL);
 #else
         throw std::runtime_error("Nanosleep not supported on this OS.");
@@ -244,8 +247,12 @@ private:
         _sampleResponse.loadPercentage = ((double) (_workTicks) /
                                           (double) totalTicks) * 100.0;
         _sampleResponse.tasksCount = _tasksCount;
-        _sampleResponse.latency = (double)_workTicks /
-                                  (double)_tasksCount;
+        if(_tasksCount){
+            _sampleResponse.latency = (double)_workTicks /
+                                      (double)_tasksCount;
+        }else{
+            _sampleResponse.latency = 0.0;
+        }
 
         _tasksCount = 0;
         _workTicks = 0;

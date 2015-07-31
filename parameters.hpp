@@ -400,9 +400,9 @@ private:
         strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyPrediction = STRATEGY_PREDICTION_SIMPLE;
-        strategySmoothing = STRATEGY_SMOOTHING_MOVING_AVERAGE;
+        strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
         strategyCalibration = STRATEGY_CALIBRATION_SOBOL;
-        strategyPolling = STRATEGY_POLLING_PAUSE;
+        strategyPolling = STRATEGY_POLLING_SLEEP_LATENCY;
         mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
         mappingCollector = SERVICE_NODE_MAPPING_ALONE;
         frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
@@ -512,13 +512,13 @@ public:
     // [default = STRATEGY_PREDICTION_SIMPLE].
     StrategyPrediction strategyPrediction;
 
-    // Smoothing strategy [default = STRATEGY_SMOOTHING_SIMPLE_AVERAGE].
+    // Smoothing strategy [default = STRATEGY_SMOOTHING_EXPONENTIAL].
     StrategySmoothing strategySmoothing;
 
     // Calibration strategy [default = STRATEGY_CALIBRATION_SOBOL].
     StrategyCalibration strategyCalibration;
 
-    // Polling strategy [default = STRATEGY_POLLING_PAUSE].
+    // Polling strategy [default = STRATEGY_POLLING_SLEEP_LATENCY].
     StrategyPolling strategyPolling;
 
     // The frequency governor (only used when strategyFrequencies is

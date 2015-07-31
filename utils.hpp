@@ -106,7 +106,7 @@ public:
             _oldVariance = _variance;
         }else{
             T removedValue = _windowImpl.at(_nextIndex);
-            _average = _oldAverage + (value - _windowImpl.at(_nextIndex))/
+            _average = _oldAverage + (value - removedValue)/
                                       _span;
             _variance = _oldVariance + (value - _average +
                                         removedValue - _oldAverage)*
