@@ -470,7 +470,17 @@ private:
         SETVALUE(xc, Double, maxMonitoringOverhead);
 
         if(!samplingInterval){
-            double msMonitoringCost = (archData.monitoringCost*
+            //TODO Se questo sampling interval è molto minore della latenza
+            // media di un task potrei settare il sampling interval alla
+            // latenza media di un task.
+            // In generale, lo svantaggio di averci un sampling interval troppo
+            // corto è che stresso di piu' la cpu, quindi consumo di piu', quindi
+            // c'è meno budget per l'applicazione vera e propria
+            // Potrei mettere un sampling interval tale da far stare la
+            // Cpu per il 90% del tempo in C6
+            // In fase di calibrazione è il caso che il sampling interval sia molto
+            // basso, in fase steady probabilemtne si potrebbe aumentare un po'
+            double msMonitoringCost = (archData.monitoringCost/
                                        archData.ticksPerNs*
                                        0.000001);
             samplingInterval = std::ceil(msMonitoringCost*

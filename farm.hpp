@@ -1490,7 +1490,7 @@ private:
         //            the result observation file, we may have an higher
         //            number than the number of tasks.
         sample.bandwidth = (double) ws.tasksCount / durationSecs;
-        sample.latency = ws.latency * _p.archData.ticksPerNs;
+        sample.latency = ws.latency / _p.archData.ticksPerNs;
 
         _energy->resetCountersCpu();
         _monitoredSamples->add(sample);

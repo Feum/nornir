@@ -3,7 +3,7 @@ CXXFLAGS             = -Wall -g -pedantic -fpermissive
 OPTIMIZE_FLAGS       = -O3 -finline-functions 
 INCS                 = 
 LDFLAGS              = 
-LDLIBS               = -pthread
+LDLIBS               = -pthread -lrt
 TARGET               = ticksPerNs
 
 .PHONY: clean cleanall
