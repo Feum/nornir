@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <adaptivityParameters>
     <maxPredictionError>5</maxPredictionError>
-<!-- <samplingInterval>1</samplingInterval> -->
+    <samplingInterval>0</samplingInterval>
     <numSamples>6</numSamples>    
     <contractType>POWER_BUDGET</contractType>
     <powerBudget>50</powerBudget>
     <strategyFrequencies>YES</strategyFrequencies>
-    <strategyMapping>LINEAR</strategyMapping>
     <strategyPrediction>REGRESSION_LINEAR</strategyPrediction> 
 </adaptivityParameters>

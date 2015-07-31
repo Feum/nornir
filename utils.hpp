@@ -100,10 +100,6 @@ public:
             _tmpVariance = _oldTmpVariance + (value - _oldAverage)*
                                              (value - _average);
             _variance = _tmpVariance / (_storedValues - 1);
-
-            _oldAverage = _average;
-            _oldTmpVariance = _tmpVariance;
-            _oldVariance = _variance;
         }else{
             T removedValue = _windowImpl.at(_nextIndex);
             _average = _oldAverage + (value - removedValue)/
@@ -112,6 +108,10 @@ public:
                                         removedValue - _oldAverage)*
                                         (value - removedValue)/(_span - 1);
         }
+
+        _oldAverage = _average;
+        _oldTmpVariance = _tmpVariance;
+        _oldVariance = _variance;
 
         regularize(_variance);
 
