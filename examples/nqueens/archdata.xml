@@ -2,4 +2,5 @@
 <archData>
 	<voltageTableFile>voltage.txt</voltageTableFile>
 	<ticksPerNs>2.4</ticksPerNs>
+        <monitoringCost>420</monitoringCost>
 </archData>
