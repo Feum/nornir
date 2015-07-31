@@ -29,13 +29,13 @@
 #ifndef ADAPTIVE_FASTFLOW_PARAMETERS_HPP_
 #define ADAPTIVE_FASTFLOW_PARAMETERS_HPP_
 
-#include "enumutils.hpp"
-
 #include "external/rapidXml/rapidxml.hpp"
 
 #include <fstream>
 #include <mammut/utils.hpp>
 #include <mammut/mammut.hpp>
+
+using mammut::utils::enumStrings;
 
 namespace adpff{
 
@@ -315,12 +315,19 @@ public:
         }
     }
 
-    void setStringValue(const char* valueName, std::string& value){
+    bool getStringValue(const char* valueName, std::string& value){
         rapidxml::xml_node<> *node = NULL;
         node = _root->first_node(valueName);
         if(node){
             value = node->value();
+            return true;
+        }else{
+            return false;
         }
+    }
+
+    void setStringValue(const char* valueName, std::string& value){
+        getStringValue(valueName, value);
     }
 
     template<typename T>
@@ -329,7 +336,7 @@ public:
         node = _root->first_node(valueName);
         if(node){
             std::stringstream line(node->value());
-            line >> enumFromString(value);
+            line >> mammut::utils::enumFromStringInternal(value);
         }
     }
 };
@@ -428,7 +435,14 @@ private:
         SETVALUE(xc, Enum, strategyPolling);
         SETVALUE(xc, Enum, mappingEmitter);
         SETVALUE(xc, Enum, mappingCollector);
-        SETVALUE(xc, Enum, frequencyGovernor);
+
+        std::string g;
+        if(xc.getStringValue("frequencyGovernor", g)){
+            std::transform(g.begin(), g.end(), g.begin(), ::tolower);
+            mammut::cpufreq::CpuFreq* cf = mammut.getInstanceCpuFreq();
+            frequencyGovernor = cf->getGovernorFromGovernorName(g);
+        }
+
         SETVALUE(xc, Bool, turboBoost);
         SETVALUE(xc, Uint, frequencyLowerBound);
         SETVALUE(xc, Uint, frequencyUpperBound);

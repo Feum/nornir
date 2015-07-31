@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adaptivityParameters>
+    <samplingInterval>1000</samplingInterval>
+    <numSamples>4</numSamples>    
+    <contractType>POWER_BUDGET</contractType>
+    <powerBudget>50</powerBudget>
+    <strategyFrequencies>YES</strategyFrequencies>
+    <strategyMapping>LINEAR</strategyMapping>
+    <strategyPrediction>REGRESSION_LINEAR</strategyPrediction> 
+</adaptivityParameters>
