@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <adaptivityParameters>
-    <samplingInterval>1000</samplingInterval>
-    <numSamples>4</numSamples>    
+    <maxPredictionError>5</maxPredictionError>
+    <samplingInterval>1</samplingInterval>
+    <numSamples>6</numSamples>    
     <contractType>POWER_BUDGET</contractType>
     <powerBudget>50</powerBudget>
     <strategyFrequencies>YES</strategyFrequencies>

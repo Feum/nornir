@@ -2192,7 +2192,7 @@ int main(int argc, char* argv[])
 	
 	/* ----- define FastFlow farm ----- */
 	adpff::Observer obs;
- 	adpff::AdaptivityParameters ap("demo-fastflow.xml");
+ 	adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
 	ap.observer = &obs;
 	adpff::adp_ff_farm<> farm(ap, false, 0, numCPU*20); 
 	farm.set_scheduling_ondemand(); // set on-demand scheduling policy

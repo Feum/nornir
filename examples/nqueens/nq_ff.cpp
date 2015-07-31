@@ -527,7 +527,7 @@ int main(int argc, char** argv) {
     ffalloc.init();
 
     adpff::Observer obs;
-    adpff::AdaptivityParameters ap("demo-fastflow.xml");
+    adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     adpff::adp_ff_farm<> farm(ap, false, 8192, 8192, false, DEF_MAX_NUM_WORKERS, true);
     Emitter E(boardsize, depth);

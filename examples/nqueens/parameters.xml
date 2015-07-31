@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <adaptivityParameters>
+    <maxPredictionError>5</maxPredictionError>
     <samplingInterval>1000</samplingInterval>
     <numSamples>4</numSamples>    
     <contractType>POWER_BUDGET</contractType>
