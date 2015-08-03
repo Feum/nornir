@@ -1001,11 +1001,12 @@ private:
      * @return The maximum primary prediction error.
      */
     double getMaxPredictionErrorPrimary() const{
+        double r = _p.maxPrimaryPredictionError;
         if(_p.strategyPredictionErrorPrimary ==
            STRATEGY_PREDICTION_ERROR_COEFFVAR){
-            return std::max(_p.maxPrimaryPredictionError,
-                            getPrimaryValue(_samples->coefficientVariation()));
+            r = std::max(r, getPrimaryValue(_samples->coefficientVariation()));
         }
+        return r;
     }
 
     /**
@@ -1013,11 +1014,12 @@ private:
      * @return The maximum secondary prediction error.
      */
     double getMaxPredictionErrorSecondary() const{
+        double r = _p.maxSecondaryPredictionError;
         if(_p.strategyPredictionErrorSecondary ==
            STRATEGY_PREDICTION_ERROR_COEFFVAR){
-            return std::max(_p.maxSecondaryPredictionError,
-                            getSecondaryValue(_samples->coefficientVariation()));
+            r = std::max(r, getSecondaryValue(_samples->coefficientVariation()));
         }
+        return r;
     }
 
     /**
@@ -1089,53 +1091,38 @@ private:
      * @return true if the contract has been violated, false otherwise.
      */
     bool isContractViolated() const{
-        /*
-        double primaryValue = getPrimaryValue();
+        double tolerance = 0;
+        double maxError = getMaxPredictionErrorPrimary();
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
-                return primaryValue < _p.underloadThresholdFarm ||
-                       primaryValue > _p.overloadThresholdFarm;
+                tolerance = ((_p.overloadThresholdFarm - _p.underloadThresholdFarm)*
+                            maxError) / 100.0;
             }break;
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
-                double tolerance = (_p.requiredBandwidth *
-                                    _getMaxPredictionErrorPrimary()) / 100.0;
-                return primaryValue < _p.requiredBandwidth - tolerance;
+                tolerance = (_p.requiredBandwidth * maxError) / 100.0;
             }break;
             case CONTRACT_POWER_BUDGET:{
-                double tolerance = (_p.powerBudget *
-                                    getMaxPredictionErrorPrimary()) / 100.0;
-                return primaryValue > _p.powerBudget + tolerance;
+                tolerance = (_p.powerBudget * maxError) / 100.0;
             }break;
             default:{
                 return false;
             }break;
         }
-        return false;
-        */
-        return !isFeasiblePrimaryValue(getPrimaryValue());
+        return !isFeasiblePrimaryValue(getPrimaryValue(), tolerance);
     }
 
-    /**
-     * Checks if a specific primary value is feasible according to the
-     * specified contract.
-     * @return true if the solution is feasible, false otherwise.
-     */
-    bool isFeasiblePrimaryValue(double primaryValue) const{
+    bool isFeasiblePrimaryValue(double primaryValue, double tolerance = 0) const{
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
-                return primaryValue > _p.underloadThresholdFarm &&
-                       primaryValue < _p.overloadThresholdFarm;
+                return primaryValue > _p.underloadThresholdFarm - tolerance &&
+                       primaryValue < _p.overloadThresholdFarm + tolerance;
             }break;
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
-                double tolerance = (_p.requiredBandwidth *
-                                    getMaxPredictionErrorPrimary()) / 100.0;
                 return primaryValue > _p.requiredBandwidth - tolerance;
             }break;
             case CONTRACT_POWER_BUDGET:{
-                double tolerance = (_p.powerBudget *
-                                    getMaxPredictionErrorPrimary()) / 100.0;
                 return primaryValue < _p.powerBudget + tolerance;
             }break;
             default:{
@@ -1144,28 +1131,6 @@ private:
         }
         return false;
     }
-    //TODO: Tolerance also here?
-    /*
-    bool isFeasiblePrimaryValue(double primaryValue) const{
-        switch(_p.contractType){
-            case CONTRACT_PERF_UTILIZATION:{
-                return primaryValue > _p.underloadThresholdFarm &&
-                       primaryValue < _p.overloadThresholdFarm;
-            }break;
-            case CONTRACT_PERF_BANDWIDTH:
-            case CONTRACT_PERF_COMPLETION_TIME:{
-                return primaryValue > _p.requiredBandwidth;
-            }break;
-            case CONTRACT_POWER_BUDGET:{
-                return primaryValue < _p.powerBudget;
-            }break;
-            default:{
-                return false;
-            }break;
-        }
-        return false;
-    }
-    */
 
     /**
      * Returns the voltage at a specific configuration.
