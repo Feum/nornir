@@ -96,6 +96,12 @@ private:
     double _totalWatts;
     double _totalBw;
     unsigned long _numSamples;
+
+    double calibrationDurationToPerc(const CalibrationStats& cs,
+                                     uint durationMs){
+        return ((double)cs.duration /
+                (double)durationMs) * 100.0;
+    }
 public:
     Observer(std::string statsFile = "stats.csv",
              std::string calibrationFile = "calibration.csv",
@@ -193,24 +199,30 @@ public:
 
     virtual void calibrationStats(const std::vector<CalibrationStats>&
                                   calibrationStats,
-                                  uint totalDurationMs){
-        double timePerc = 0.0;
-        double totalTimePerc = 0.0;
-        for(size_t i = 0; i < calibrationStats.size(); i++){
-            timePerc = ((double)calibrationStats.at(i).duration /
-                        (double)totalDurationMs) * 100.0;
-            totalTimePerc += timePerc;
+                                  uint durationMs){
 
-            _calibrationFile << calibrationStats.at(i).numSteps << "\t";
-            _calibrationFile << calibrationStats.at(i).duration << "\t";
-            _calibrationFile << timePerc << "\t";
+        for(size_t i = 0; i < calibrationStats.size(); i++){
+            const CalibrationStats& cs = calibrationStats.at(i);
+            _calibrationFile << cs.numSteps << "\t";
+            _calibrationFile << cs.duration << "\t";
+            _calibrationFile << calibrationDurationToPerc(cs, durationMs) << "\t";
             _calibrationFile << std::endl;
+        }
+    }
+
+    virtual void summaryStats(const std::vector<CalibrationStats>&
+                              calibrationStats,
+                              uint durationMs){
+        double totalCalibrationPerc = 0.0;
+        for(size_t i = 0; i < calibrationStats.size(); i++){
+            const CalibrationStats& cs = calibrationStats.at(i);
+            totalCalibrationPerc += calibrationDurationToPerc(cs, durationMs);
         }
 
         _summaryFile << _totalWatts / (double) _numSamples << "\t";
         _summaryFile << _totalBw / (double) _numSamples << "\t";
-        _summaryFile << (double) totalDurationMs / 1000.0 << "\t";
-        _summaryFile << totalTimePerc << "\t";
+        _summaryFile << (double) durationMs / 1000.0 << "\t";
+        _summaryFile << totalCalibrationPerc << "\t";
         _summaryFile << std::endl;
     }
 };
