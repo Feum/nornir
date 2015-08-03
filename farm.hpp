@@ -91,14 +91,25 @@ class Observer{
 private:
     std::ofstream _statsFile;
     std::ofstream _calibrationFile;
+    std::ofstream _summaryFile;
     unsigned int _startMonitoringMs;
+    double _totalWatts;
+    double _totalBw;
+    unsigned long _numSamples;
 public:
     Observer(std::string statsFile = "stats.csv",
-             std::string calibrationFile = "calibration.csv"):
-            _startMonitoringMs(0){
+             std::string calibrationFile = "calibration.csv",
+             std::string summaryFile = "summary.csv"):
+            _startMonitoringMs(0),
+            _totalWatts(0),
+            _totalBw(0),
+            _numSamples(0){
         _statsFile.open(statsFile.c_str());
         _calibrationFile.open(calibrationFile.c_str());
-        if(!_statsFile.is_open()){
+        _summaryFile.open(summaryFile.c_str());
+        if(!_statsFile.is_open() ||
+           !_calibrationFile.is_open() ||
+           !_summaryFile.is_open()){
             throw std::runtime_error("Observer: Impossible to open file.");
         }
         _statsFile << "TimestampMillisecs" << "\t";
@@ -119,11 +130,17 @@ public:
         _calibrationFile << "Duration" << "\t";
         _calibrationFile << "Time%" << "\t";
         _calibrationFile << std::endl;
+
+        _summaryFile << "Watts" << "\t";
+        _summaryFile << "Bandwidth" << "\t";
+        _summaryFile << "CompletionTime" << "\t";
+        _summaryFile << std::endl;
     }
 
     virtual ~Observer(){
         _statsFile.close();
         _calibrationFile.close();
+        _summaryFile.close();
     }
 
     virtual void observe(unsigned int timeStamp,
@@ -167,6 +184,10 @@ public:
         _statsFile << smoothedWatts.dram << "\t";
 
         _statsFile << std::endl;
+
+        _totalWatts += smoothedWatts.cores;
+        _totalBw += currentBandwidth;
+        _numSamples++;
     }
 
     virtual void calibrationStats(const std::vector<CalibrationStats>&
@@ -182,6 +203,13 @@ public:
             _calibrationFile << timePerc << "\t";
             _calibrationFile << std::endl;
         }
+    }
+
+    virtual void summaryStats(uint totalDurationMs){
+        _summaryFile << _totalWatts / (double) _numSamples << "\t";
+        _summaryFile << _totalBw / (double) _numSamples << "\t";
+        _summaryFile << (double) totalDurationMs / 1000.0 << "\t";
+        _summaryFile << std::endl;
     }
 };
 
@@ -1720,10 +1748,13 @@ public:
         }
     controlLoopEnd:
 
-        if(_calibrator && _p.observer){
-            _p.observer->calibrationStats(_calibrator->getCalibrationsStats(),
-                                          utils::getMillisecondsTime() -
-                                          _startTimeMs);
+        uint duration = utils::getMillisecondsTime() - _startTimeMs;
+        if(_p.observer){
+            _p.observer->summaryStats(duration);
+            if(_calibrator){
+                _p.observer->calibrationStats(_calibrator->getCalibrationsStats(),
+                                              duration);
+            }
         }
     }
 
