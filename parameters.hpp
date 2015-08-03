@@ -152,7 +152,8 @@ typedef enum{
     // Constant prediction error, set by the user.
     STRATEGY_PREDICTION_ERROR_CONSTANT = 0,
 
-    // Prediction error set equal to coefficient of variation.
+    // Prediction error set equal to the maximum between
+    // coefficient of variation and maximum specified error.
     STRATEGY_PREDICTION_ERROR_COEFFVAR
 }StrategyPredictionError;
 

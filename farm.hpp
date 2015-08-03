@@ -997,6 +997,30 @@ private:
     }
 
     /**
+     * Returns the maximum primary prediction error.
+     * @return The maximum primary prediction error.
+     */
+    double getMaxPredictionErrorPrimary() const{
+        if(_p.strategyPredictionErrorPrimary ==
+           STRATEGY_PREDICTION_ERROR_COEFFVAR){
+            return std::max(_p.maxPrimaryPredictionError,
+                            getPrimaryValue(_samples->coefficientVariation()));
+        }
+    }
+
+    /**
+     * Returns the maximum secondary prediction error.
+     * @return The maximum secondary prediction error.
+     */
+    double getMaxPredictionErrorSecondary() const{
+        if(_p.strategyPredictionErrorSecondary ==
+           STRATEGY_PREDICTION_ERROR_COEFFVAR){
+            return std::max(_p.maxSecondaryPredictionError,
+                            getSecondaryValue(_samples->coefficientVariation()));
+        }
+    }
+
+    /**
      * Returns the primary value of a sample according to
      * the required contract.
      * @param sample The sample.
@@ -1075,12 +1099,12 @@ private:
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
                 double tolerance = (_p.requiredBandwidth *
-                                    _p.maxPrimaryPredictionError) / 100.0;
+                                    _getMaxPredictionErrorPrimary()) / 100.0;
                 return primaryValue < _p.requiredBandwidth - tolerance;
             }break;
             case CONTRACT_POWER_BUDGET:{
                 double tolerance = (_p.powerBudget *
-                                    _p.maxPrimaryPredictionError) / 100.0;
+                                    getMaxPredictionErrorPrimary()) / 100.0;
                 return primaryValue > _p.powerBudget + tolerance;
             }break;
             default:{
@@ -1106,12 +1130,12 @@ private:
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
                 double tolerance = (_p.requiredBandwidth *
-                                    _p.maxPrimaryPredictionError) / 100.0;
+                                    getMaxPredictionErrorPrimary()) / 100.0;
                 return primaryValue > _p.requiredBandwidth - tolerance;
             }break;
             case CONTRACT_POWER_BUDGET:{
                 double tolerance = (_p.powerBudget *
-                                    _p.maxPrimaryPredictionError) / 100.0;
+                                    getMaxPredictionErrorPrimary()) / 100.0;
                 return primaryValue < _p.powerBudget + tolerance;
             }break;
             default:{
@@ -1510,7 +1534,6 @@ private:
         return true;
     }
 
-
     /**
      * Store a new sample.
      * @param askWorkers If false, the request to the worker is not sent.
@@ -1563,18 +1586,6 @@ private:
 
         _energy->resetCountersCpu();
         _samples->add(sample);
-
-        if(_p.strategyPredictionErrorPrimary ==
-           STRATEGY_PREDICTION_ERROR_COEFFVAR){
-           _p.maxPrimaryPredictionError =
-                   getPrimaryValue(_samples->coefficientVariation());
-        }
-
-        if(_p.strategyPredictionErrorSecondary ==
-           STRATEGY_PREDICTION_ERROR_COEFFVAR){
-           _p.maxSecondaryPredictionError =
-                   getSecondaryValue(_samples->coefficientVariation());
-        }
 
         DEBUGB(samplesFile << *_samples << "\n");
         return true;
