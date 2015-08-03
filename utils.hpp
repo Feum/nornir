@@ -35,6 +35,8 @@
 
 #include <vector>
 
+#define NSECS_IN_SECS 1000000000.0
+
 namespace adpff{
 
 /**

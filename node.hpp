@@ -59,13 +59,22 @@ typedef struct WorkerSample{
 
     // The average service time (in ticks).
     double latency;
+
+    // The bandwidth of the node.
+    double bandwidthTotal;
+
+    // The bandwidth of the node considered as isolated.
+    double bandwidthIsolation;
+
     WorkerSample():loadPercentage(0), tasksCount(0),
-                   latency(0){;}
+                   latency(0), bandwidthTotal(0), bandwidthIsolation(0){;}
 
     WorkerSample& operator+=(const WorkerSample& rhs){
         loadPercentage += rhs.loadPercentage;
         tasksCount += rhs.tasksCount;
         latency += rhs.latency;
+        bandwidthTotal += rhs.bandwidthTotal;
+        bandwidthIsolation += rhs.bandwidthIsolation;
         return *this;
     }
 }NodeSample;
@@ -113,6 +122,7 @@ private:
     ticks _startTicks;
     ManagementRequest _managementRequest;
     WorkerSample _sampleResponse;
+    double _ticksPerNs;
 
     // Queue used by the manager to notify that a request is present
     // on _managementRequest.
@@ -121,6 +131,15 @@ private:
     // Queue used by the node to notify that a response is present
     // on _sampleResponse.
     ff::SWSR_Ptr_Buffer _responseQ;
+
+
+    void setTicksPerNs(double ticksPerNs){
+        _ticksPerNs = ticksPerNs;
+    }
+
+    double ticksToSeconds(double ticks){
+        return (ticks/_ticksPerNs)/NSECS_IN_SECS;
+    }
 
     /**
      * Waits for the thread to be created.
@@ -182,9 +201,9 @@ private:
     static inline void nsleep(long ns) {
 #if defined(__linux__)
         struct timespec req={0};
-        time_t sec = ns/1000000000L;
+        time_t sec = ns/NSECS_IN_SECS;
         req.tv_sec = sec;
-        req.tv_nsec = ns - sec*1000000000L;
+        req.tv_nsec = ns - sec*NSECS_IN_SECS;
         nanosleep(&req, NULL);
 #else
         throw std::runtime_error("Nanosleep not supported on this OS.");
@@ -248,11 +267,15 @@ private:
                                           (double) totalTicks) * 100.0;
         _sampleResponse.tasksCount = _tasksCount;
         if(_tasksCount){
-            _sampleResponse.latency = (double)_workTicks /
-                                      (double)_tasksCount;
+            _sampleResponse.latency = ((double)_workTicks / (double)_tasksCount) /
+                                      _ticksPerNs;
         }else{
             _sampleResponse.latency = 0.0;
         }
+        _sampleResponse.bandwidthTotal = (double) _tasksCount /
+                                         ticksToSeconds(totalTicks);
+        _sampleResponse.bandwidthIsolation = (double) _tasksCount /
+                                             ticksToSeconds(_workTicks);
 
         _tasksCount = 0;
         _workTicks = 0;

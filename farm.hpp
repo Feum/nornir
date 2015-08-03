@@ -351,7 +351,7 @@ typedef struct MonitoredSample{
     energy::JoulesCpu watts; ///< Watts consumed by all the CPUs.
     double bandwidth; ///< Bandwidth of the entire farm.
     double utilization; ///< Utilization of the entire farm.
-    double latency; ///< Average latency of a worker (ticks).
+    double latency; ///< Average latency of a worker (nanoseconds).
 
     MonitoredSample():bandwidth(0), utilization(0), latency(0){;}
 
@@ -1489,8 +1489,8 @@ private:
         //            For this reason, if we sum all the bandwidths in
         //            the result observation file, we may have an higher
         //            number than the number of tasks.
-        sample.bandwidth = (double) ws.tasksCount / durationSecs;
-        sample.latency = ws.latency / _p.archData.ticksPerNs;
+        sample.bandwidth = ws.bandwidthTotal;
+        sample.latency = ws.latency;
 
         _energy->resetCountersCpu();
         _monitoredSamples->add(sample);
@@ -1621,12 +1621,15 @@ public:
          */
         for(size_t i = 0; i < _activeWorkers.size(); i++){
             _activeWorkers.at(i)->waitThreadCreation();
+            _activeWorkers.at(i)->setTicksPerNs(_p.archData.ticksPerNs);
         }
         if(_emitter){
             _emitter->waitThreadCreation();
+            _emitter->setTicksPerNs(_p.archData.ticksPerNs);
         }
         if(_collector){
             _collector->waitThreadCreation();
+            _collector->setTicksPerNs(_p.archData.ticksPerNs);
         }
 
         _startTimeMs = utils::getMillisecondsTime();
