@@ -585,11 +585,8 @@ private:
     std::vector<cpufreq::Domain*> _scalableDomains; ///< The domains on which frequency scaling is applied.
     cpufreq::VoltageTable _voltageTable; ///< The voltage table.
     std::vector<cpufreq::Frequency> _availableFrequencies; ///< The available frequencies on this machine.
-    MovingAverage<MonitoredSample>* _monitoredSamples; ///< Monitored samples;
+    Smoother<MonitoredSample>* _samples; ///< Monitored samples;
     double _totalTasks; ///< The number of tasks processed since the last reconfiguration.
-    double _averageBandwidth; ///< The average tasks per second processed during last time window.
-    double _averageUtilization; ///< The average utilization during last time window.
-    energy::JoulesCpu _averageWatts; ///< Average Watts during last time window.
     uint64_t _remainingTasks; ///< When contract is CONTRACT_COMPLETION_TIME, represent the number of tasks that
                              ///< still needs to be processed by the application.
     time_t _deadline; ///< When contract is CONTRACT_COMPLETION_TIME, represent the deadline of the application.
@@ -1000,13 +997,51 @@ private:
     }
 
     /**
-     * Updates the monitored values.
+     * Returns the primary value of a sample according to
+     * the required contract.
+     * @param sample The sample.
+     * @return The primary value of a sample according to
+     * the required contract.
      */
-    void updateMonitoredValues(){
-        MonitoredSample avg = _monitoredSamples->average();
-        _averageBandwidth = avg.bandwidth;
-        _averageUtilization = avg.utilization;
-        _averageWatts = avg.watts;
+    double getPrimaryValue(const MonitoredSample& sample) const{
+        switch(_p.contractType){
+            case CONTRACT_PERF_UTILIZATION:{
+                return sample.utilization;
+            }break;
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                return sample.bandwidth;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                return sample.watts.cores;
+            }break;
+            default:{
+                return 0;
+            }break;
+        }
+    }
+
+    /**
+     * Returns the secondary value of a sample according to
+     * the required contract.
+     * @param sample The sample.
+     * @return The secondary value of a sample according to
+     * the required contract.
+     */
+    double getSecondaryValue(const MonitoredSample& sample) const{
+        switch(_p.contractType){
+            case CONTRACT_PERF_UTILIZATION:
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                return sample.watts.cores;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                return sample.bandwidth;
+            }break;
+            default:{
+                return 0;
+            }break;
+        }
     }
 
     /**
@@ -1014,21 +1049,7 @@ private:
      * @return The primary value according to the required contract.
      */
     double getPrimaryValue() const{
-        switch(_p.contractType){
-            case CONTRACT_PERF_UTILIZATION:{
-                return _averageUtilization;
-            }break;
-            case CONTRACT_PERF_BANDWIDTH:
-            case CONTRACT_PERF_COMPLETION_TIME:{
-                return _averageBandwidth;
-            }break;
-            case CONTRACT_POWER_BUDGET:{
-                return _averageWatts.cores;
-            }break;
-            default:{
-                return 0;
-            }break;
-        }
+        return getPrimaryValue(_samples->average());
     }
 
     /**
@@ -1036,19 +1057,7 @@ private:
      * @return The secondary value according to the required contract.
      */
     double getSecondaryValue() const{
-        switch(_p.contractType){
-            case CONTRACT_PERF_UTILIZATION:
-            case CONTRACT_PERF_BANDWIDTH:
-            case CONTRACT_PERF_COMPLETION_TIME:{
-                return _averageWatts.cores;
-            }break;
-            case CONTRACT_POWER_BUDGET:{
-                return _averageBandwidth;
-            }break;
-            default:{
-                return 0;
-            }break;
-        }
+        return getSecondaryValue(_samples->average());
     }
 
     /**
@@ -1056,27 +1065,31 @@ private:
      * @return true if the contract has been violated, false otherwise.
      */
     bool isContractViolated() const{
+        /*
+        double primaryValue = getPrimaryValue();
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
-                return _averageUtilization < _p.underloadThresholdFarm ||
-                       _averageUtilization > _p.overloadThresholdFarm;
+                return primaryValue < _p.underloadThresholdFarm ||
+                       primaryValue > _p.overloadThresholdFarm;
             }break;
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
                 double tolerance = (_p.requiredBandwidth *
-                                    _p.maxPredictionError) / 100.0;
-                return _averageBandwidth < _p.requiredBandwidth - tolerance;
+                                    _p.maxPrimaryPredictionError) / 100.0;
+                return primaryValue < _p.requiredBandwidth - tolerance;
             }break;
             case CONTRACT_POWER_BUDGET:{
                 double tolerance = (_p.powerBudget *
-                                    _p.maxPredictionError) / 100.0;
-                return _averageWatts.cores > _p.powerBudget + tolerance;
+                                    _p.maxPrimaryPredictionError) / 100.0;
+                return primaryValue > _p.powerBudget + tolerance;
             }break;
             default:{
                 return false;
             }break;
         }
         return false;
+        */
+        return !isFeasiblePrimaryValue(getPrimaryValue());
     }
 
     /**
@@ -1088,7 +1101,32 @@ private:
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
                 return primaryValue > _p.underloadThresholdFarm &&
-                        primaryValue < _p.overloadThresholdFarm;
+                       primaryValue < _p.overloadThresholdFarm;
+            }break;
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                double tolerance = (_p.requiredBandwidth *
+                                    _p.maxPrimaryPredictionError) / 100.0;
+                return primaryValue > _p.requiredBandwidth - tolerance;
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                double tolerance = (_p.powerBudget *
+                                    _p.maxPrimaryPredictionError) / 100.0;
+                return primaryValue < _p.powerBudget + tolerance;
+            }break;
+            default:{
+                return false;
+            }break;
+        }
+        return false;
+    }
+    //TODO: Tolerance also here?
+    /*
+    bool isFeasiblePrimaryValue(double primaryValue) const{
+        switch(_p.contractType){
+            case CONTRACT_PERF_UTILIZATION:{
+                return primaryValue > _p.underloadThresholdFarm &&
+                       primaryValue < _p.overloadThresholdFarm;
             }break;
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
@@ -1103,6 +1141,7 @@ private:
         }
         return false;
     }
+    */
 
     /**
      * Returns the voltage at a specific configuration.
@@ -1230,7 +1269,9 @@ private:
                         remainingTime = (double) _remainingTasks / currentPrimaryPrediction;
                     }break;
                     case CONTRACT_PERF_UTILIZATION:{
-                        currentPrimaryPrediction = (_averageBandwidth / currentPrimaryPrediction) * _averageUtilization;
+                        currentPrimaryPrediction = (_samples->average().bandwidth /
+                                                    currentPrimaryPrediction) *
+                                                   _samples->average().utilization;
                     }break;
                     default:{
                         ;
@@ -1412,7 +1453,7 @@ private:
 
         /****************** Clean state ******************/
         _lastStoredSampleMs = utils::getMillisecondsTime();
-        _monitoredSamples->reset();
+        _samples->reset();
         _energy->resetCountersCpu();
         _totalTasks = 0;
     }
@@ -1428,11 +1469,11 @@ private:
                                  _emitterVirtualCore,
                                  _activeWorkersVirtualCores,
                                  _collectorVirtualCore,
-                                 _monitoredSamples->getLastSample().bandwidth,
-                                 _averageBandwidth,
-                                 _monitoredSamples->coefficientVariation().bandwidth,
-                                 _averageUtilization,
-                                 _averageWatts);
+                                 _samples->getLastSample().bandwidth,
+                                 _samples->average().bandwidth,
+                                 _samples->coefficientVariation().bandwidth,
+                                 _samples->average().utilization,
+                                 _samples->average().watts);
         }
     }
 
@@ -1459,7 +1500,7 @@ private:
             w = _activeWorkers.at(i);
             if(!w->getSampleResponse(tmp,
                                      _p.strategyPolling,
-                                     _monitoredSamples->average().latency)){
+                                     _samples->average().latency)){
                 return false;
             }
             sample += tmp;
@@ -1521,9 +1562,21 @@ private:
         sample.latency = ws.latency;
 
         _energy->resetCountersCpu();
-        _monitoredSamples->add(sample);
+        _samples->add(sample);
 
-        DEBUGB(samplesFile << *_monitoredSamples << "\n");
+        if(_p.strategyPredictionErrorPrimary ==
+           STRATEGY_PREDICTION_ERROR_COEFFVAR){
+           _p.maxPrimaryPredictionError =
+                   getPrimaryValue(_samples->coefficientVariation());
+        }
+
+        if(_p.strategyPredictionErrorSecondary ==
+           STRATEGY_PREDICTION_ERROR_COEFFVAR){
+           _p.maxSecondaryPredictionError =
+                   getSecondaryValue(_samples->coefficientVariation());
+        }
+
+        DEBUGB(samplesFile << *_samples << "\n");
         return true;
     }
 
@@ -1608,14 +1661,14 @@ public:
             cpufreq::loadVoltageTable(_voltageTable, _p.archData.voltageTableFile);
         }
 
-        _monitoredSamples = NULL;
+        _samples = NULL;
         switch(_p.strategySmoothing){
         case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
-            _monitoredSamples = new MovingAverageSimple<MonitoredSample>
+            _samples = new MovingAverageSimple<MonitoredSample>
                                     (_p.numSamples);
         }break;
         case STRATEGY_SMOOTHING_EXPONENTIAL:{
-            _monitoredSamples = new MovingAverageExponential<MonitoredSample>
+            _samples = new MovingAverageExponential<MonitoredSample>
                                     (_p.alphaExpAverage);
         }break;
         }
@@ -1627,7 +1680,7 @@ public:
      * Destroyes this adaptivity manager.
      */
     ~AdaptivityManagerFarm(){
-        delete _monitoredSamples;
+        delete _samples;
         if(_primaryPredictor){
             delete _primaryPredictor;
         }
@@ -1690,7 +1743,6 @@ public:
             //_monitor.wait();
             _farm->waitInternal();
             storeNewSample();
-            updateMonitoredValues();
             observe();
         }else{
             /* Force the first calibration point. **/
@@ -1722,10 +1774,9 @@ public:
                     }
                 }
 
-                updateMonitoredValues();
                 observe();
 
-                if(_monitoredSamples->size() >= _p.numSamples){
+                if(_samples->size() >= _p.numSamples){
                     bool reconfigurationRequired = false;
                     FarmConfiguration nextConfiguration;
 

@@ -232,10 +232,10 @@ double PredictorLinearRegression::getCurrentResponse() const{
     double r = 0.0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            r = 1.0 / _manager._averageBandwidth;
+            r = 1.0 / _manager._samples->average().bandwidth;
         }break;
         case PREDICTION_POWER:{
-            r = _manager._averageWatts.cores;
+            r = _manager._samples->average().watts.cores;
         }break;
     }
     return r;
@@ -336,7 +336,8 @@ void PredictorSimple::prepareForPredictions(){
 double PredictorSimple::predict(const FarmConfiguration& configuration){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            return _manager._averageBandwidth * getScalingFactor(configuration);
+            return _manager._samples->average().bandwidth *
+                   getScalingFactor(configuration);
         }break;
         case PREDICTION_POWER:{
             return getPowerPrediction(configuration);
@@ -363,8 +364,8 @@ bool Calibrator::highError() const{
           "Secondary prediction: " << _manager._secondaryPrediction);
     DEBUG("Primary error: " << primaryError << " " <<
           "Secondary error: " << secondaryError);
-    return primaryError > _manager._p.maxPredictionError ||
-           secondaryError > _manager._p.maxPredictionError;
+    return primaryError > _manager._p.maxPrimaryPredictionError ||
+           secondaryError > _manager._p.maxSecondaryPredictionError;
 }
 
 FarmConfiguration Calibrator::getNextConfiguration(){

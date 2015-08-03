@@ -147,6 +147,20 @@ template<> char const* enumStrings<StrategyPrediction>::data[] = {
     "REGRESSION_LINEAR"
 };
 
+/// Possible ways to detect if the model has an high error.
+typedef enum{
+    // Constant prediction error, set by the user.
+    STRATEGY_PREDICTION_ERROR_CONSTANT = 0,
+
+    // Prediction error set equal to coefficient of variation.
+    STRATEGY_PREDICTION_ERROR_COEFFVAR
+}StrategyPredictionError;
+
+template<> char const* enumStrings<StrategyPredictionError>::data[] = {
+    "CONSTANT",
+    "COEFFVAR"
+};
+
 /// Possible mappings for a service node (emitter or collector).
 typedef enum{
     SERVICE_NODE_MAPPING_ALONE = 0, ///< The service node is mapped on a physical core where no workers are mapped.
@@ -400,6 +414,8 @@ private:
         strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyPrediction = STRATEGY_PREDICTION_SIMPLE;
+        strategyPredictionErrorPrimary = STRATEGY_PREDICTION_ERROR_CONSTANT;
+        strategyPredictionErrorSecondary = STRATEGY_PREDICTION_ERROR_CONSTANT;
         strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
         strategyCalibration = STRATEGY_CALIBRATION_SOBOL;
         strategyPolling = STRATEGY_POLLING_SLEEP_LATENCY;
@@ -422,7 +438,8 @@ private:
         requiredCompletionTime = 0;
         expectedTasksNumber = 0;
         powerBudget = 0;
-        maxPredictionError = 10.0;
+        maxPrimaryPredictionError = 5.0;
+        maxSecondaryPredictionError = 5.0;
         maxMonitoringOverhead = 1.0;
         observer = NULL;
     }
@@ -437,6 +454,8 @@ private:
         SETVALUE(xc, Enum, strategyUnusedVirtualCores);
         SETVALUE(xc, Enum, strategyInactiveVirtualCores);
         SETVALUE(xc, Enum, strategyPrediction);
+        SETVALUE(xc, Enum, strategyPredictionErrorPrimary);
+        SETVALUE(xc, Enum, strategyPredictionErrorSecondary);
         SETVALUE(xc, Enum, strategySmoothing);
         SETVALUE(xc, Enum, strategyCalibration);
         SETVALUE(xc, Enum, strategyPolling);
@@ -466,7 +485,8 @@ private:
         SETVALUE(xc, Uint, requiredCompletionTime);
         SETVALUE(xc, Ulong, expectedTasksNumber);
         SETVALUE(xc, Double, powerBudget);
-        SETVALUE(xc, Double, maxPredictionError);
+        SETVALUE(xc, Double, maxPrimaryPredictionError);
+        SETVALUE(xc, Double, maxSecondaryPredictionError);
         SETVALUE(xc, Double, maxMonitoringOverhead);
 
         if(!samplingInterval){
@@ -514,6 +534,14 @@ public:
     // Strategy to be used to predict power and performance values
     // [default = STRATEGY_PREDICTION_SIMPLE].
     StrategyPrediction strategyPrediction;
+
+    // Strategy to be used for toleration of prediction
+    // errors on primary value [default = STRATEGY_PREDICTION_ERROR_CONSTANT].
+    StrategyPredictionError strategyPredictionErrorPrimary;
+
+    // Strategy to be used for toleration of prediction
+    // errors on secondary value [default = STRATEGY_PREDICTION_ERROR_CONSTANT].
+    StrategyPredictionError strategyPredictionErrorSecondary;
 
     // Smoothing strategy [default = STRATEGY_SMOOTHING_EXPONENTIAL].
     StrategySmoothing strategySmoothing;
@@ -602,8 +630,15 @@ public:
     // valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
     double powerBudget;
 
-    // Maximum error percentage allowed for prediction [default = 10.0].
-    double maxPredictionError;
+    // Maximum error percentage allowed for prediction of primary
+    // value. If 0, then it will be set equal to the coefficient
+    // of variation of the primary value [default = 5.0].
+    double maxPrimaryPredictionError;
+
+    // Maximum error percentage allowed for prediction of secondary
+    // value. If 0, then it will be set equal to the coefficient
+    // of variation of the secondary value [default = 5.0].
+    double maxSecondaryPredictionError;
 
     // The maximum percentage of monitoring overhead, in the range (0, 100).
     // [default = 1.0].
@@ -661,7 +696,8 @@ public:
             availableFrequencies = frequencyDomains.at(0)->getAvailableFrequencies();
         }
 
-        if(strategyFrequencies != STRATEGY_FREQUENCY_NO && strategyMapping == STRATEGY_MAPPING_NO){
+        if(strategyFrequencies != STRATEGY_FREQUENCY_NO &&
+           strategyMapping == STRATEGY_MAPPING_NO){
             return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
         }
 
@@ -781,7 +817,8 @@ public:
             }break;
         }
 
-        if(maxPredictionError < 0 || maxPredictionError > 100.0){
+        if(maxPrimaryPredictionError < 0 || maxPrimaryPredictionError > 100.0 ||
+           maxSecondaryPredictionError < 0 || maxSecondaryPredictionError > 100.0){
             return VALIDATION_WRONG_CONTRACT_PARAMETERS;
         }
 

@@ -45,16 +45,16 @@ namespace adpff{
  *   - 'T squareRoot(const T&)' to compute the square root.
  *   - 'void regularize(T&)' to set the values < 0 to zero.
  */
-template <typename T> class MovingAverage{
+template <typename T> class Smoother{
     template<typename V>
     friend std::ostream& operator<<(std::ostream& os,
-                                    const MovingAverage<V>& obj);
+                                    const Smoother<V>& obj);
 
     template<typename V>
     friend std::ofstream& operator<<(std::ofstream& os,
-                                     const MovingAverage<V>& obj);
+                                     const Smoother<V>& obj);
 public:
-    virtual ~MovingAverage(){;}
+    virtual ~Smoother(){;}
 
     virtual void add(const T& value) = 0;
 
@@ -73,7 +73,7 @@ public:
     virtual T coefficientVariation() const = 0;
 };
 
-template<typename T> class MovingAverageSimple: public MovingAverage<T>{
+template<typename T> class MovingAverageSimple: public Smoother<T>{
 private:
     std::vector<T> _windowImpl;
     const size_t _span;
@@ -165,7 +165,7 @@ public:
     }
 };
 
-template<typename T> class MovingAverageExponential: public MovingAverage<T>{
+template<typename T> class MovingAverageExponential: public Smoother<T>{
 private:
     double _alpha;
     size_t _storedValues;
@@ -233,7 +233,7 @@ public:
 };
 
 template<class T>
-std::ostream& operator<<(std::ostream& os, const MovingAverage<T>& obj){
+std::ostream& operator<<(std::ostream& os, const Smoother<T>& obj){
     os << "==============================" << std::endl;
     os << "Last sample: " << obj.getLastSample() << std::endl;
     os << "Average: " << obj.average() << std::endl;
@@ -245,7 +245,7 @@ std::ostream& operator<<(std::ostream& os, const MovingAverage<T>& obj){
 }
 
 template<class T>
-std::ofstream& operator<<(std::ofstream& os, const MovingAverage<T>& obj){
+std::ofstream& operator<<(std::ofstream& os, const Smoother<T>& obj){
     os << obj.getLastSample() << "\t";
     os << obj.average() << "\t";
     os << obj.coefficientVariation() << "\t";
