@@ -1655,11 +1655,11 @@ public:
         switch(_p.strategySmoothing){
         case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
             _samples = new MovingAverageSimple<MonitoredSample>
-                                    (_p.numSamples);
+                                    (_p.smoothingFactor);
         }break;
         case STRATEGY_SMOOTHING_EXPONENTIAL:{
             _samples = new MovingAverageExponential<MonitoredSample>
-                                    (_p.alphaExpAverage);
+                                    (_p.smoothingFactor);
         }break;
         }
 
@@ -1723,7 +1723,8 @@ public:
 
         if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
             _remainingTasks = _p.expectedTasksNumber;
-            _deadline = time(NULL) + _p.requiredCompletionTime;
+            _deadline = utils::getMillisecondsTime()/1000.0 +
+                        _p.requiredCompletionTime;
         }
 
         initPredictors();
@@ -1756,7 +1757,7 @@ public:
                 }
 
                 if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-                    time_t now = time(NULL);
+                    uint now = utils::getMillisecondsTime()/1000.0;
                     if(now >= _deadline){
                         _p.requiredBandwidth = std::numeric_limits<double>::max();
                     }else{
