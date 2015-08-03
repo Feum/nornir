@@ -406,12 +406,10 @@ FarmConfiguration Calibrator::getNextConfiguration(){
                 _manager._secondaryPredictor->clear();
 
                 CalibrationStats cs;
-                uint now = utils::getMillisecondsTime();
                 // We do -1 because we counted the current point and now we
                 // discovered it isn't a calibration point.
                 cs.numSteps = _numCalibrationPoints - 1;
-                cs.duration = (now - _calibrationStartMs);
-                _calibrationStartMs = now;
+                cs.duration = (utils::getMillisecondsTime() - _calibrationStartMs);
                 _calibrationStats.push_back(cs);
                 DEBUG("[Calibrator]: Moving to finished");
                 DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints - 1 <<
@@ -431,6 +429,7 @@ FarmConfiguration Calibrator::getNextConfiguration(){
                 fc = generateConfiguration();
                 _numCalibrationPoints = 1;
                 _state = CALIBRATION_SEEDS;
+                _calibrationStartMs = utils::getMillisecondsTime();
                 DEBUG("[Calibrator]: Moving to seeds");
             }else{
                 fc = _manager._currentConfiguration;

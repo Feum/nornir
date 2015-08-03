@@ -134,6 +134,7 @@ public:
         _summaryFile << "Watts" << "\t";
         _summaryFile << "Bandwidth" << "\t";
         _summaryFile << "CompletionTime" << "\t";
+        _summaryFile << "Calibration%" << "\t";
         _summaryFile << std::endl;
     }
 
@@ -194,21 +195,22 @@ public:
                                   calibrationStats,
                                   uint totalDurationMs){
         double timePerc = 0.0;
+        double totalTimePerc = 0.0;
         for(size_t i = 0; i < calibrationStats.size(); i++){
             timePerc = ((double)calibrationStats.at(i).duration /
                         (double)totalDurationMs) * 100.0;
+            totalTimePerc += timePerc;
 
             _calibrationFile << calibrationStats.at(i).numSteps << "\t";
             _calibrationFile << calibrationStats.at(i).duration << "\t";
             _calibrationFile << timePerc << "\t";
             _calibrationFile << std::endl;
         }
-    }
 
-    virtual void summaryStats(uint totalDurationMs){
         _summaryFile << _totalWatts / (double) _numSamples << "\t";
         _summaryFile << _totalBw / (double) _numSamples << "\t";
         _summaryFile << (double) totalDurationMs / 1000.0 << "\t";
+        _summaryFile << totalTimePerc << "\t";
         _summaryFile << std::endl;
     }
 };
