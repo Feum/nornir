@@ -1791,11 +1791,12 @@ public:
 
         uint duration = utils::getMillisecondsTime() - _startTimeMs;
         if(_p.observer){
-            _p.observer->summaryStats(duration);
+            std::vector<CalibrationStats> cs;
             if(_calibrator){
-                _p.observer->calibrationStats(_calibrator->getCalibrationsStats(),
-                                              duration);
+                cs = _calibrator->getCalibrationsStats();
+                _p.observer->calibrationStats(cs, duration);
             }
+            _p.observer->summaryStats(cs, duration);
         }
     }
 
