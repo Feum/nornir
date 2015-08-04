@@ -179,13 +179,31 @@ template<> char const* enumStrings<ServiceNodeMapping>::data[] = {
 
 /// Possible ways to smooth the values.
 typedef enum{
-    STRATEGY_SMOOTHING_MOVING_AVERAGE = 0, ///< Simple moving average
-    STRATEGY_SMOOTHING_EXPONENTIAL ///< Exponential moving average
+    // Simple moving average
+    STRATEGY_SMOOTHING_MOVING_AVERAGE = 0,
+
+    // Exponential moving average
+    STRATEGY_SMOOTHING_EXPONENTIAL
 }StrategySmoothing;
 
 template<> char const* enumStrings<StrategySmoothing>::data[] = {
     "MOVING_AVERAGE",
     "EXPONENTIAL"
+};
+
+/// Possible ways to change the smoothing factor at runtime.
+typedef enum{
+    // Constant smoothing factor
+    STRATEGY_SMOOTHING_FACTOR_CONST = 0,
+
+    // Changes the smoothing factor according to the variation
+    // of the data.
+    STRATEGY_SMOOTHING_FACTOR_DYNAMIC
+}StrategySmoothingFactor;
+
+template<> char const* enumStrings<StrategySmoothingFactor>::data[] = {
+    "CONST",
+    "DYNAMIC"
 };
 
 /// Possible ways to select the calibration points.
@@ -428,8 +446,7 @@ private:
         frequencyUpperBound = 0;
         fastReconfiguration = false;
         migrateCollector = false;
-        numSamples = 10;
-        alphaExpAverage = 0.5;
+        smoothingFactor = 0;
         samplingInterval = 0;
         underloadThresholdFarm = 80.0;
         overloadThresholdFarm = 90.0;
@@ -443,6 +460,17 @@ private:
         maxSecondaryPredictionError = 5.0;
         maxMonitoringOverhead = 1.0;
         observer = NULL;
+    }
+
+    void setDefaultDepending(){
+        switch(strategySmoothing){
+            case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
+                smoothingFactor = 10;
+            }break;
+            case STRATEGY_SMOOTHING_EXPONENTIAL:{
+                smoothingFactor = 0.5;
+            }break;
+        }
     }
 
     void loadXml(const std::string& paramFileName){
@@ -474,8 +502,7 @@ private:
         SETVALUE(xc, Uint, frequencyLowerBound);
         SETVALUE(xc, Uint, frequencyUpperBound);
         SETVALUE(xc, Bool, fastReconfiguration);
-        SETVALUE(xc, Uint, numSamples);
-        SETVALUE(xc, Double, alphaExpAverage);
+        SETVALUE(xc, Double, smoothingFactor);
         SETVALUE(xc, Uint, samplingInterval);
         SETVALUE(xc, Double, underloadThresholdFarm);
         SETVALUE(xc, Double, overloadThresholdFarm);
@@ -584,12 +611,9 @@ public:
     // different virtual core (if needed) [default = false].
     bool migrateCollector;
 
-    // The minimum number of samples used to take reconfiguration
-    // decisions [default = 10].
-    uint32_t numSamples;
-
-    // The alpha to be used in exponential moving average [default = 0.5].
-    double alphaExpAverage;
+    // The smoothing factor. It's meaning changes according to the smoothing
+    // strategy adopted. [default = 10 for moving average, 0.5 for exponential].
+    double smoothingFactor;
 
     // The length of the sampling interval (in milliseconds) for the data
     // reading. If 0, it will be automatically computed such to have a low
@@ -690,6 +714,7 @@ public:
      * @return The validation result.
      */
     AdaptivityParametersValidation validate(){
+        setDefaultDepending();
         std::vector<cpufreq::Domain*> frequencyDomains = mammut.getInstanceCpuFreq()->getDomains();
         std::vector<topology::VirtualCore*> virtualCores = mammut.getInstanceTopology()->getVirtualCores();
         std::vector<cpufreq::Frequency> availableFrequencies;

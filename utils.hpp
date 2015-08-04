@@ -56,6 +56,10 @@ template <typename T> class Smoother{
 public:
     virtual ~Smoother(){;}
 
+    virtual double getSmoothingFactor() const = 0;
+
+    virtual void setSmoothingFactor(double s) = 0;
+
     virtual void add(const T& value) = 0;
 
     virtual T getLastSample() const = 0;
@@ -88,6 +92,16 @@ private:
 public:
     MovingAverageSimple(size_t span):_span(span), _nextIndex(0),
                                      _storedValues(0){
+        _windowImpl.resize(_span);
+    }
+
+    double getSmoothingFactor() const{
+        return _span;
+    }
+
+    void setSmoothingFactor(double s){
+        reset();
+        _span = s;
         _windowImpl.resize(_span);
     }
 
@@ -180,6 +194,14 @@ public:
             throw std::runtime_error("Alpha must be between 0 and 1 "
                                      "(included)");
         }
+    }
+
+    double getSmoothingFactor() const{
+        return _alpha;
+    }
+
+    void setSmoothingFactor(double s){
+        _alpha = s;
     }
 
     void add(const T& value){
