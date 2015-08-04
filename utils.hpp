@@ -80,7 +80,7 @@ public:
 template<typename T> class MovingAverageSimple: public Smoother<T>{
 private:
     std::vector<T> _windowImpl;
-    const size_t _span;
+    size_t _span;
     size_t _nextIndex;
     size_t _storedValues;
     T _lastSample;

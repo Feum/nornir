@@ -45,16 +45,25 @@ using namespace mammut;
 
 /// Possible contracts requested by the user.
 typedef enum{
-    CONTRACT_NONE = 0, ///< No contract required.
-    CONTRACT_PERF_UTILIZATION, ///< A specific utilization (expressed by two bounds [X, Y]) is requested.
-                               ///< Under this constraint, the configuration with minimum power consumption
-                               ///< is chosen.
-    CONTRACT_PERF_BANDWIDTH, ///< A specific minimum bandwidth is requested. Under this constraint, the
-                             ///< configuration with minimum power consumption is chosen.
-    CONTRACT_PERF_COMPLETION_TIME, ///< A specific maximum completion time is requested. Under this constraint, the
-                                   ///< configuration with minimum energy consumption is chosen.
-    CONTRACT_POWER_BUDGET ///< A specific maximum cores power is requested. Under this constraint, the configuration
-                          ///< with best performance is chosen.
+    // No contract required.
+    CONTRACT_NONE = 0,
+
+    // A specific utilization (expressed by two bounds [X, Y]) is requested.
+    // Under this constraint, the configuration with minimum power consumption
+    // is chosen.
+    CONTRACT_PERF_UTILIZATION,
+
+    // A specific minimum bandwidth is requested. Under this constraint, the
+    // configuration with minimum power consumption is chosen.
+    CONTRACT_PERF_BANDWIDTH,
+
+    // A specific maximum completion time is requested. Under this constraint,
+    // the configuration with minimum energy consumption is chosen.
+    CONTRACT_PERF_COMPLETION_TIME,
+
+    // A specific maximum cores power is requested. Under this constraint, the
+    // configuration with best performance is chosen.
+    CONTRACT_POWER_BUDGET
 }ContractType;
 
 template<> char const* enumStrings<ContractType>::data[] = {
@@ -68,17 +77,26 @@ template<> char const* enumStrings<ContractType>::data[] = {
 
 /// Possible reconfiguration strategies.
 typedef enum{
-    STRATEGY_FREQUENCY_YES = 0, ///< Reconfigures frequencies and number of workers. If contractType is
-                                ///< of type CONTRACT_PERF_*, it tries to minimize the consumed power.
-                                ///< If contractType is of type CONTRACT_POWER_*, it tries to maximize
-                                ///< the performances.
-    STRATEGY_FREQUENCY_NO, ///< Does not reconfigure frequencies.
-    STRATEGY_FREQUENCY_OS, ///< Reconfigures the number of workers. The frequencies are managed by OS governor.
-                           ///< The governor must be specified with 'setFrequengyGovernor' call.
-    STRATEGY_FREQUENCY_MIN_CORES, ///< Reconfigures frequencies and number of workers. Tries always to
-                                  ///< minimize the number of virtual cores used. Only valid if contract
-                                  ///< type is CONTRACT_PERF_*.
+    // Chooses YES or NO according to the possibility of the system.
+    STRATEGY_FREQUENCY_AUTO = 0,
 
+    // Reconfigures frequencies and number of workers. If contractType is
+    // of type CONTRACT_PERF_*, it tries to minimize the consumed power.
+    // If contractType is of type CONTRACT_POWER_*, it tries to maximize
+    // the performances.
+    STRATEGY_FREQUENCY_YES,
+
+    // Does not reconfigure frequencies.
+    STRATEGY_FREQUENCY_NO,
+
+    // The frequencies are managed by OS governor.
+    // The governor must be set in 'frequencyGovernor' parameter.
+    STRATEGY_FREQUENCY_OS,
+
+    // Reconfigures frequencies and number of workers. Tries always to
+    // minimize the number of virtual cores used. Only valid if contract
+    // type is CONTRACT_PERF_*.
+    STRATEGY_FREQUENCY_MIN_CORES,
 }StrategyFrequencies;
 
 template<> char const* enumStrings<StrategyFrequencies>::data[] = {
@@ -90,11 +108,18 @@ template<> char const* enumStrings<StrategyFrequencies>::data[] = {
 
 /// Possible mapping strategies.
 typedef enum{
-    STRATEGY_MAPPING_NO = 0, ///< Mapping decisions will be performed by the operating system.
-    STRATEGY_MAPPING_AUTO, ///< Mapping strategy will be automatically chosen at runtime.
-    STRATEGY_MAPPING_LINEAR, ///< Tries to keep the threads as close as possible.
-    STRATEGY_MAPPING_CACHE_EFFICIENT ///< Tries to make good use of the shared caches.
-                                     ///< Particularly useful when threads have large working sets.
+    // Mapping decisions will be performed by the operating system.
+    STRATEGY_MAPPING_NO = 0,
+
+    // Mapping strategy will be automatically chosen at runtime.
+    STRATEGY_MAPPING_AUTO,
+
+    // Tries to keep the threads as close as possible.
+    STRATEGY_MAPPING_LINEAR,
+
+    // Tries to make good use of the shared caches.
+    // Particularly useful when threads have large working sets.
+    STRATEGY_MAPPING_CACHE_EFFICIENT
 }StrategyMapping;
 
 template<> char const* enumStrings<StrategyMapping>::data[] = {
@@ -106,9 +131,14 @@ template<> char const* enumStrings<StrategyMapping>::data[] = {
 
 /// Possible hyperthreading strategies.
 typedef enum{
-    STRATEGY_HT_NO = 0, ///< Hyperthreading is not used.
-    STRATEGY_HT_YES_SOONER, ///< Hyperthreading is used since the beginning.
-    STRATEGY_HT_YES_LATER ///< Hyperthreading is used only when we used all the physical cores.
+    // Hyperthreading is not used.
+    STRATEGY_HT_NO = 0,
+
+    // Hyperthreading is used since the beginning.
+    STRATEGY_HT_YES_SOONER,
+
+    // Hyperthreading is used only when we used all the physical cores.
+    STRATEGY_HT_YES_LATER
 }StrategyHyperthreading;
 
 template<> char const* enumStrings<StrategyHyperthreading>::data[] = {
@@ -117,16 +147,23 @@ template<> char const* enumStrings<StrategyHyperthreading>::data[] = {
     "YES_LATER"
 };
 
-/// Possible strategies to apply for unused virtual cores. For unused virtual cores we mean
-/// those never used or those used only on some conditions.
+/// Possible strategies to apply for unused virtual cores. For unused virtual
+/// cores we mean those never used or those used only on some conditions.
 typedef enum{
-    STRATEGY_UNUSED_VC_NONE = 0, ///< Nothing is done on unused virtual cores.
-    STRATEGY_UNUSED_VC_AUTO, ///< Automatically choose one of the other strategies.
-    STRATEGY_UNUSED_VC_LOWEST_FREQUENCY, ///< Set the virtual cores to the lowest frequency (only
-                                         ///< possible if all the other virtual cores on the same
-                                         ///< domain are unused).
-    STRATEGY_UNUSED_VC_OFF ///< Turn off the virtual cores. They will not be anymore seen by the
-                           ///< operating system and it will not schedule anything on them.
+    // Nothing is done on unused virtual cores.
+    STRATEGY_UNUSED_VC_NONE = 0,
+
+    // Automatically choose one of the other strategies.
+    STRATEGY_UNUSED_VC_AUTO,
+
+    // Set the virtual cores to the lowest frequency (only
+    // possible if all the other virtual cores on the same
+    // domain are unused).
+    STRATEGY_UNUSED_VC_LOWEST_FREQUENCY,
+
+    // Turn off the virtual cores. They will not be anymore seen by the
+    // operating system and it will not schedule anything on them.
+    STRATEGY_UNUSED_VC_OFF
 }StrategyUnusedVirtualCores;
 
 template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
@@ -138,8 +175,11 @@ template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
 
 /// Possible strategies to use to predict power and performance values.
 typedef enum{
-    STRATEGY_PREDICTION_SIMPLE = 0,       ///< Applies a simple analytical model.
-    STRATEGY_PREDICTION_REGRESSION_LINEAR ///< Applies multivariate linear regression.
+    // Applies multivariate linear regression.
+    STRATEGY_PREDICTION_REGRESSION_LINEAR = 0,
+
+    // Applies a simple analytical model.
+    STRATEGY_PREDICTION_SIMPLE
 }StrategyPrediction;
 
 template<> char const* enumStrings<StrategyPrediction>::data[] = {
@@ -164,11 +204,17 @@ template<> char const* enumStrings<StrategyPredictionError>::data[] = {
 
 /// Possible mappings for a service node (emitter or collector).
 typedef enum{
-    SERVICE_NODE_MAPPING_ALONE = 0, ///< The service node is mapped on a physical core where no workers are mapped.
-    SERVICE_NODE_MAPPING_COLLAPSED, ///< The service node is mapped on a physical core together with a worker.
-    SERVICE_NODE_MAPPING_PERFORMANCE ///< The service node is mapped on an independent voltage domain and is kept
-                                     ///< running at maximum performances (only available when
-                                     ///< strategyFrequencies != STRATEGY_FREQUENCY_NO).
+    // The service node is mapped on a physical core where no workers
+    // are mapped.
+    SERVICE_NODE_MAPPING_ALONE = 0,
+
+    // The service node is mapped on a physical core together with a worker.
+    SERVICE_NODE_MAPPING_COLLAPSED,
+
+    // The service node is mapped on an independent voltage domain and
+    // is kept running at maximum performances (only available when
+    // strategyFrequencies != STRATEGY_FREQUENCY_NO).
+    SERVICE_NODE_MAPPING_PERFORMANCE
 }ServiceNodeMapping;
 
 template<> char const* enumStrings<ServiceNodeMapping>::data[] = {
@@ -254,28 +300,71 @@ template<> char const* enumStrings<StrategyPolling>::data[] = {
     "SLEEP_LATENCY"
 };
 
+// How to decide if we have to consider new configurations
+typedef enum{
+    // Number of samples.
+    STRATEGY_PERSISTENCE_SAMPLES = 0,
+
+    // Number of tasks.
+    STRATEGY_PERSISTENCE_TASKS,
+
+    // Coefficient of variation.
+    STRATEGY_PERSISTENCE_VARIATION
+}StrategyPersistence;
+
+template<> char const* enumStrings<StrategyPersistence>::data[] = {
+    "SAMPLES",
+    "TASKS",
+    "VARIATION"
+};
+
 /// Possible parameters validation results.
 typedef enum{
-    VALIDATION_OK = 0, ///< Parameters are ok.
-    VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING, ///< strategyFrequencies can be different from STRATEGY_FREQUENCY_NO
-                                                    ///< only if strategyMapping is different from STRATEGY_MAPPING_NO.
-    VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED, ///< The specified frequency strategy is not supported
-                                               ///< on this machine.
-    VALIDATION_GOVERNOR_UNSUPPORTED, ///< Specified governor not supported on this machine.
-    VALIDATION_STRATEGY_MAPPING_UNSUPPORTED, ///< Specified mapping strategy not supported on this machine.
-    VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY, ///< sensitiveEmitter or sensitiveCollector specified but frequency
-                                              ///< strategy is STRATEGY_FREQUENCY_NO.
-    VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS, ///< sensitiveEmitter or sensitiveCollector specified but highest
-                                               ///< frequency can't be set.
-    VALIDATION_INVALID_FREQUENCY_BOUNDS, ///< The bounds are invalid or the frequency strategy is not STRATEGY_FREQUENCY_OS.
-    VALIDATION_UNUSED_VC_NO_OFF, ///< Strategy for unused virtual cores requires turning off the virtual cores but they
-                                 ///< can't be turned off.
-    VALIDATION_UNUSED_VC_NO_FREQUENCIES, ///< Strategy for unused virtual cores requires lowering the frequency but
-                                         ///< frequency scaling not available.
-    VALIDATION_WRONG_CONTRACT_PARAMETERS, ///< Specified parameters are not valid for the specified contract.
-    VALIDATION_VOLTAGE_FILE_NEEDED, ///< strategyFrequencies is STRATEGY_FREQUENCY_POWER_CONSERVATIVE but the voltage file
-                                    ///< has not been specified or it does not exist.
-    VALIDATION_NO_FAST_RECONF, ///< Fast reconfiguration not available.
+    // Parameters are ok.
+    VALIDATION_OK = 0,
+
+    // strategyFrequencies can be different from STRATEGY_FREQUENCY_NO
+    // only if strategyMapping is different from STRATEGY_MAPPING_NO.
+    VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING,
+
+    // The specified frequency strategy is not supported on this machine.
+    VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED,
+
+    // Specified governor not supported on this machine.
+    VALIDATION_GOVERNOR_UNSUPPORTED,
+
+    // Specified mapping strategy not supported on this machine.
+    VALIDATION_STRATEGY_MAPPING_UNSUPPORTED,
+
+    // sensitiveEmitter or sensitiveCollector specified but frequency
+    // strategy is STRATEGY_FREQUENCY_NO.
+    VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY,
+
+    // sensitiveEmitter or sensitiveCollector specified but highest
+    // frequency can't be set.
+    VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS,
+
+    // The bounds are invalid or the frequency strategy is not
+    // STRATEGY_FREQUENCY_OS.
+    VALIDATION_INVALID_FREQUENCY_BOUNDS,
+
+    // Strategy for unused virtual cores requires turning off the virtual
+    // cores but they can't be turned off.
+    VALIDATION_UNUSED_VC_NO_OFF,
+
+    // Strategy for unused virtual cores requires lowering the frequency but
+    // frequency scaling not available.
+    VALIDATION_UNUSED_VC_NO_FREQUENCIES,
+
+    // Specified parameters are not valid for the specified contract.
+    VALIDATION_WRONG_CONTRACT_PARAMETERS,
+
+    // strategyFrequencies is STRATEGY_FREQUENCY_POWER_CONSERVATIVE but
+    // the voltage file has not been specified or it does not exist.
+    VALIDATION_VOLTAGE_FILE_NEEDED,
+
+    // Fast reconfiguration not available.
+    VALIDATION_NO_FAST_RECONF,
 }AdaptivityParametersValidation;
 
 
@@ -429,15 +518,16 @@ private:
         contractType = CONTRACT_NONE;
         strategyMapping = STRATEGY_MAPPING_LINEAR;
         strategyHyperthreading = STRATEGY_HT_NO;
-        strategyFrequencies = STRATEGY_FREQUENCY_NO;
+        strategyFrequencies = STRATEGY_FREQUENCY_AUTO;
         strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
-        strategyPrediction = STRATEGY_PREDICTION_SIMPLE;
+        strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
         strategyPredictionErrorPrimary = STRATEGY_PREDICTION_ERROR_CONSTANT;
         strategyPredictionErrorSecondary = STRATEGY_PREDICTION_ERROR_CONSTANT;
         strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
         strategyCalibration = STRATEGY_CALIBRATION_SOBOL;
         strategyPolling = STRATEGY_POLLING_SLEEP_LATENCY;
+        strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
         mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
         mappingCollector = SERVICE_NODE_MAPPING_ALONE;
         frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
@@ -462,7 +552,30 @@ private:
         observer = NULL;
     }
 
-    void setDefaultDepending(){
+    /**
+     * Sets the default values for parameters that depends
+     * from others.
+     */
+    void setDefaultPost(){
+        if(!samplingInterval){
+            //TODO Se questo sampling interval è molto minore della latenza
+            // media di un task potrei settare il sampling interval alla
+            // latenza media di un task.
+            double msMonitoringCost = (archData.monitoringCost/
+                                       archData.ticksPerNs*
+                                       0.000001);
+            samplingInterval = std::ceil(msMonitoringCost*
+                                        (100.0 - maxMonitoringOverhead));
+        }
+
+        if(strategyFrequencies == STRATEGY_FREQUENCY_AUTO){
+            if(isGovernorAvailable(mammut::cpufreq::GOVERNOR_USERSPACE)){
+                strategyFrequencies = STRATEGY_FREQUENCY_YES;
+            }else{
+                strategyFrequencies = STRATEGY_FREQUENCY_NO;
+            }
+        }
+
         switch(strategySmoothing){
             case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
                 smoothingFactor = 10;
@@ -471,6 +584,22 @@ private:
                 smoothingFactor = 0.5;
             }break;
         }
+
+        switch(strategyPersistence){
+            case STRATEGY_PERSISTENCE_SAMPLES:{
+                persistenceValue = 10;
+            }break;
+            case STRATEGY_PERSISTENCE_TASKS:{
+                persistenceValue = 1000;
+            }break;
+            case STRATEGY_PERSISTENCE_VARIATION:{
+                persistenceValue = 5;
+            }break;
+        }
+    }
+
+    bool isGovernorAvailable(mammut::cpufreq::Governor g){
+        return mammut.getInstanceCpuFreq()->isGovernorAvailable(g);
     }
 
     void loadXml(const std::string& paramFileName){
@@ -488,6 +617,7 @@ private:
         SETVALUE(xc, Enum, strategySmoothing);
         SETVALUE(xc, Enum, strategyCalibration);
         SETVALUE(xc, Enum, strategyPolling);
+        SETVALUE(xc, Enum, strategyPersistence);
         SETVALUE(xc, Enum, mappingEmitter);
         SETVALUE(xc, Enum, mappingCollector);
 
@@ -503,6 +633,7 @@ private:
         SETVALUE(xc, Uint, frequencyUpperBound);
         SETVALUE(xc, Bool, fastReconfiguration);
         SETVALUE(xc, Double, smoothingFactor);
+        SETVALUE(xc, Double, persistenceValue);
         SETVALUE(xc, Uint, samplingInterval);
         SETVALUE(xc, Double, underloadThresholdFarm);
         SETVALUE(xc, Double, overloadThresholdFarm);
@@ -516,17 +647,6 @@ private:
         SETVALUE(xc, Double, maxPrimaryPredictionError);
         SETVALUE(xc, Double, maxSecondaryPredictionError);
         SETVALUE(xc, Double, maxMonitoringOverhead);
-
-        if(!samplingInterval){
-            //TODO Se questo sampling interval è molto minore della latenza
-            // media di un task potrei settare il sampling interval alla
-            // latenza media di un task.
-            double msMonitoringCost = (archData.monitoringCost/
-                                       archData.ticksPerNs*
-                                       0.000001);
-            samplingInterval = std::ceil(msMonitoringCost*
-                                        (100.0 - maxMonitoringOverhead));
-        }
     }
 
 public:
@@ -548,7 +668,7 @@ public:
 
     // The frequency strategy. It can be different from STRATEGY_FREQUENCY_NO
     // only if strategyMapping is different from STRATEGY_MAPPING_NO
-    // [default = STRATEGY_FREQUENCY_NO].
+    // [default = STRATEGY_FREQUENCY_AUTO].
     StrategyFrequencies strategyFrequencies;
 
     // Strategy for virtual cores that are never used
@@ -560,7 +680,7 @@ public:
     StrategyUnusedVirtualCores strategyInactiveVirtualCores;
 
     // Strategy to be used to predict power and performance values
-    // [default = STRATEGY_PREDICTION_SIMPLE].
+    // [default = STRATEGY_PREDICTION_REGRESSION_LINEAR].
     StrategyPrediction strategyPrediction;
 
     // Strategy to be used for toleration of prediction
@@ -579,6 +699,9 @@ public:
 
     // Polling strategy [default = STRATEGY_POLLING_SLEEP_LATENCY].
     StrategyPolling strategyPolling;
+
+    // Persistence strategy [default = STRATEGY_PERSISTENCE_SAMPLES].
+    StrategyPersistence strategyPersistence;
 
     // The frequency governor (only used when strategyFrequencies is
     // STRATEGY_FREQUENCY_OS) [default = GOVERNOR_USERSPACE].
@@ -614,6 +737,11 @@ public:
     // The smoothing factor. It's meaning changes according to the smoothing
     // strategy adopted. [default = 10 for moving average, 0.5 for exponential].
     double smoothingFactor;
+
+    // The persistence value. It's meaning changes according to the persistence
+    // strategy adopted. [default = 10 for samples, 1000 for tasks, 5 for
+    // variation].
+    double persistenceValue;
 
     // The length of the sampling interval (in milliseconds) for the data
     // reading. If 0, it will be automatically computed such to have a low
@@ -714,12 +842,16 @@ public:
      * @return The validation result.
      */
     AdaptivityParametersValidation validate(){
-        setDefaultDepending();
-        std::vector<cpufreq::Domain*> frequencyDomains = mammut.getInstanceCpuFreq()->getDomains();
-        std::vector<topology::VirtualCore*> virtualCores = mammut.getInstanceTopology()->getVirtualCores();
+        setDefaultPost();
+
+        std::vector<cpufreq::Domain*> fDomains;
+        std::vector<topology::VirtualCore*> virtualCores;
         std::vector<cpufreq::Frequency> availableFrequencies;
-        if(frequencyDomains.size()){
-            availableFrequencies = frequencyDomains.at(0)->getAvailableFrequencies();
+
+        fDomains = mammut.getInstanceCpuFreq()->getDomains();
+        virtualCores = mammut.getInstanceTopology()->getVirtualCores();
+        if(fDomains.size()){
+            availableFrequencies = fDomains.front()->getAvailableFrequencies();
         }
 
         if(strategyFrequencies != STRATEGY_FREQUENCY_NO &&
@@ -729,20 +861,20 @@ public:
 
         /** Validate frequency strategies. **/
         if(strategyFrequencies != STRATEGY_FREQUENCY_NO){
-            if(!frequencyDomains.size()){
+            if(!availableFrequencies.size()){
                 return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
             }
 
             if(strategyFrequencies != STRATEGY_FREQUENCY_OS){
                 frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
-                if(!mammut.getInstanceCpuFreq()->isGovernorAvailable(frequencyGovernor)){
+                if(!isGovernorAvailable(frequencyGovernor)){
                     return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
                 }
             }
             if(((mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE) ||
                 (mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE)) &&
-               !mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
-               !mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
+               !isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
+               !isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
                 return VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS;
             }
         }else{
@@ -753,7 +885,7 @@ public:
         }
 
         /** Validate governor availability. **/
-        if(!mammut.getInstanceCpuFreq()->isGovernorAvailable(frequencyGovernor)){
+        if(!isGovernorAvailable(frequencyGovernor)){
             return VALIDATION_GOVERNOR_UNSUPPORTED;
         }
 
@@ -770,7 +902,8 @@ public:
                 }
 
                 if(frequencyLowerBound){
-                    if(!utils::contains(availableFrequencies, frequencyLowerBound)){
+                    if(!utils::contains(availableFrequencies,
+                                        frequencyLowerBound)){
                         return VALIDATION_INVALID_FREQUENCY_BOUNDS;
                     }
                 }else{
@@ -778,7 +911,8 @@ public:
                 }
 
                 if(frequencyUpperBound){
-                    if(!utils::contains(availableFrequencies, frequencyUpperBound)){
+                    if(!utils::contains(availableFrequencies,
+                                        frequencyUpperBound)){
                         return VALIDATION_INVALID_FREQUENCY_BOUNDS;
                     }
                 }else{
@@ -803,8 +937,8 @@ public:
                 }
             }break;
             case STRATEGY_UNUSED_VC_LOWEST_FREQUENCY:{
-                if(!mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_POWERSAVE) &&
-                   !mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
+                if(!isGovernorAvailable(cpufreq::GOVERNOR_POWERSAVE) &&
+                   !isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
                     return VALIDATION_UNUSED_VC_NO_FREQUENCIES;
                 }
             }break;
@@ -815,10 +949,12 @@ public:
         /** Validate contract parameters. **/
         switch(contractType){
             case CONTRACT_PERF_UTILIZATION:{
-                if((underloadThresholdFarm > overloadThresholdFarm) ||
-                   (underloadThresholdWorker > overloadThresholdWorker) ||
-                   underloadThresholdFarm < 0 || overloadThresholdFarm > 100 ||
-                   underloadThresholdWorker < 0 || overloadThresholdWorker > 100){
+                if(underloadThresholdFarm > overloadThresholdFarm     ||
+                   underloadThresholdWorker > overloadThresholdWorker ||
+                   underloadThresholdFarm < 0                         ||
+                   overloadThresholdFarm > 100                        ||
+                   underloadThresholdWorker < 0                       ||
+                   overloadThresholdWorker > 100){
                     return VALIDATION_WRONG_CONTRACT_PARAMETERS;
                 }
             }break;
@@ -833,7 +969,8 @@ public:
                 }
             }break;
             case CONTRACT_POWER_BUDGET:{
-                if(powerBudget <= 0 || (strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES) ||
+                if(powerBudget <= 0 ||
+                   strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES ||
                    strategyPrediction == STRATEGY_PREDICTION_SIMPLE){
                     return VALIDATION_WRONG_CONTRACT_PARAMETERS;
                 }
@@ -843,8 +980,10 @@ public:
             }break;
         }
 
-        if(maxPrimaryPredictionError < 0 || maxPrimaryPredictionError > 100.0 ||
-           maxSecondaryPredictionError < 0 || maxSecondaryPredictionError > 100.0){
+        if(maxPrimaryPredictionError < 0      ||
+           maxPrimaryPredictionError > 100.0  ||
+           maxSecondaryPredictionError < 0    ||
+           maxSecondaryPredictionError > 100.0){
             return VALIDATION_WRONG_CONTRACT_PARAMETERS;
         }
 
@@ -858,8 +997,8 @@ public:
 
         /** Validate fast reconfiguration. **/
         if(fastReconfiguration){
-            if(!mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
-               (!mammut.getInstanceCpuFreq()->isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE) ||
+            if(!isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
+               (!isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE) ||
                 !availableFrequencies.size())){
                 return VALIDATION_NO_FAST_RECONF;
             }

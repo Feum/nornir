@@ -1570,8 +1570,36 @@ private:
         return true;
     }
 
+    /**
+     * Returns true if the manager doesn't have still to check for a new
+     * configuration.
+     * @return True if the manager doesn't have still to check for a new
+     * configuration.
+     */
+    bool persist() const{
+        bool r = false;
+        switch(_p.strategyPersistence){
+            case STRATEGY_PERSISTENCE_SAMPLES:{
+                r = _samples->size() < _p.persistenceValue;
+            }break;
+            case STRATEGY_PERSISTENCE_TASKS:{
+                r = _totalTasks < _p.persistenceValue;
+            }break;
+            case STRATEGY_PERSISTENCE_VARIATION:{
+                const MonitoredSample& variation =
+                        _samples->coefficientVariation();
+                r = getPrimaryValue(variation) < _p.persistenceValue &&
+                    getSecondaryValue(variation) < _p.persistenceValue;
+            }break;
+        }
+        return r;
+    }
 
-    void initCalibrators(){
+
+    /**
+     * Initializes the calibrator.
+     */
+    void initCalibrator(){
         if(_p.strategyCalibration == STRATEGY_CALIBRATION_RANDOM){
             ;
         }else{
@@ -1609,7 +1637,7 @@ private:
             case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
                 _primaryPredictor = new PredictorLinearRegression(primary, *this);
                 _secondaryPredictor = new PredictorLinearRegression(secondary, *this);
-                initCalibrators();
+                initCalibrator();
             }break;
             default:{
                 ;
@@ -1767,7 +1795,7 @@ public:
 
                 observe();
 
-                if(_samples->size() >= _p.numSamples){
+                if(!persist()){
                     bool reconfigurationRequired = false;
                     FarmConfiguration nextConfiguration;
 
