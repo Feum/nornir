@@ -110,7 +110,8 @@ int main(int argc, char * argv[]) {
     }
     
     adpff::Observer obs;
-    adpff::AdaptivityParameters ap("demo-farm.xml");
+    adpff::AdaptivityParameters ap("parameters.xml",
+                                   "archdata.xml");
     ap.observer = &obs;
     adpff::adp_ff_farm<> farm(ap); // farm object
     

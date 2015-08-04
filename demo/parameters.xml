@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adaptivityParameters>
+    <samplingInterval>1000</samplingInterval>
+    <contractType>POWER_BUDGET</contractType>
+	<powerBudget>30</powerBudget> 
+</adaptivityParameters>
