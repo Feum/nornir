@@ -506,9 +506,6 @@ typedef struct ArchData{
 class AdaptivityParameters{
 
 private:
-    template<typename lb_t, typename gt_t>
-    friend class adp_ff_farm;
-
     friend class AdaptivityManagerFarm;
 
     /**

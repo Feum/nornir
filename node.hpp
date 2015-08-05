@@ -38,6 +38,17 @@
 #include <string>
 #include <time.h>
 
+#undef DEBUG
+#undef DEBUGB
+
+#ifdef DEBUG_NODE
+#define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
+#define DEBUGB(x) do {x;} while(0)
+#else
+#define DEBUG(x)
+#define DEBUGB(x)
+#endif
+
 namespace adpff{
 
 using namespace ff;
@@ -63,18 +74,14 @@ typedef struct WorkerSample{
     // The bandwidth of the node.
     double bandwidthTotal;
 
-    // The bandwidth of the node considered as isolated.
-    double bandwidthIsolation;
-
     WorkerSample():loadPercentage(0), tasksCount(0),
-                   latency(0), bandwidthTotal(0), bandwidthIsolation(0){;}
+                   latency(0), bandwidthTotal(0){;}
 
     WorkerSample& operator+=(const WorkerSample& rhs){
         loadPercentage += rhs.loadPercentage;
         tasksCount += rhs.tasksCount;
         latency += rhs.latency;
         bandwidthTotal += rhs.bandwidthTotal;
-        bandwidthIsolation += rhs.bandwidthIsolation;
         return *this;
     }
 }NodeSample;
@@ -86,15 +93,27 @@ inline WorkerSample operator+(WorkerSample lhs, const WorkerSample& rhs){
 
 /*!
  * \internal
- * \class ManagementRequest
- * \brief Possible requests that a manager can make.
+ * \class ManagementRequestType
+ * \brief Possible request types that a manager can make.
  */
 typedef enum{
     // Get the current sample and reset it.
-    MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE = 0,
+    MGMT_REQ_GET_AND_RESET_SAMPLE = 0,
 
-    // Produce a NULL value on output stream.
-    MANAGEMENT_REQUEST_PRODUCE_NULL
+    // Freezes the farm.
+    MGMT_REQ_FREEZE,
+
+    // Thaws the farm.
+    MGMT_REQ_THAW
+}ManagementRequestType;
+
+/**
+ * A management request.
+ */
+typedef struct{
+    ManagementRequestType type;
+    void* mark;
+    size_t numWorkers;
 }ManagementRequest;
 
 /*!private
@@ -103,26 +122,17 @@ typedef enum{
  *
  * This class wraps a ff_node to let it reconfigurable.
  */
-class adp_ff_node: public ff_node{
+class adpff_node: public ff_node{
 private:
-    template<typename lb_t, typename gt_t>
-    friend class adp_ff_farm;
-
     friend class AdaptivityManagerFarm;
 
     Mammut _mammut;
     task::TasksManager* _tasksManager;
     task::ThreadHandler* _thread;
-    bool _threadCreationPerformed;
-    utils::Monitor _threadCreated;
-    bool _threadRunning;
-    utils::LockPthreadMutex _threadRunningLock;
-    uint64_t _tasksCount;
-    ticks _workTicks;
-    ticks _startTicks;
     ManagementRequest _managementRequest;
     WorkerSample _sampleResponse;
     double _ticksPerNs;
+    ticks _startTicks;
 
     // Queue used by the manager to notify that a request is present
     // on _managementRequest.
@@ -132,20 +142,8 @@ private:
     // on _sampleResponse.
     ff::SWSR_Ptr_Buffer _responseQ;
 
-
-    void setTicksPerNs(double ticksPerNs){
-        _ticksPerNs = ticksPerNs;
-    }
-
     double ticksToSeconds(double ticks){
         return (ticks/_ticksPerNs)/NSECS_IN_SECS;
-    }
-
-    /**
-     * Waits for the thread to be created.
-     */
-    void waitThreadCreation(){
-        _threadCreated.wait();
     }
 
     /**
@@ -156,6 +154,7 @@ private:
      *         It doesn't need to be released.
      */
     task::ThreadHandler* getThreadHandler() const{
+        //TODO Evitare e passare invece il tid.
         if(_thread){
             return _thread;
         }else{
@@ -164,37 +163,15 @@ private:
     }
 
     /**
-     * Initializes the mammut modules needed by the node.
-     * @param communicator A communicator. If NULL, the modules
-     *        will be initialized locally.
+     * Initializes the node.
+     * @param mammut A Mammut handle.
+     * @param ticksPerNs The number of ticks in a nanosecond.
      */
-    void initMammutModules(Mammut& mammut){
+    void init(Mammut& mammut,
+              double ticksPerNs){
         _mammut = mammut;
         _tasksManager = _mammut.getInstanceTask();
-    }
-
-    /**
-     * Check if the node is running.
-     * @return true if the node is running, false otherwise.
-     */
-    bool isRunning(){
-        bool r;
-        _threadRunningLock.lock();
-        r = _threadRunning;
-        _threadRunningLock.unlock();
-        return r;
-    }
-
-    /**
-     * Ask the node for a sample of the statistics computed since the last
-     * time this method has been called.
-     * The result can be retrieved with getSampleResponse call.
-     */
-    void askForSample(){
-        _managementRequest = MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE;
-        // The value pushed in the queue will not be read,
-        // it could be anything except NULL.
-        _managementQ.push(&_managementRequest);
+        _ticksPerNs = ticksPerNs;
     }
 
     // Sleeps for a given amount of nanoseconds
@@ -218,44 +195,75 @@ private:
      * @param avgLatency Current average latency of the workers (in ns).
      * @return true if the node is running, false otherwise.
      */
-     bool getSampleResponse(WorkerSample& sample,
-                            StrategyPolling strategyPolling,
-                            double avgLatency){
-         while(_responseQ.empty()){
-             if(!isRunning()){
-                 return false;
-             }
-             switch(strategyPolling){
-             //TODO: Poiche' non ci sono svantaggi a vedere il risultato un
-             //      po' in ritardo, probabilmente la soluzione migliore e'
-             //      quella che consuma meno energia/CPU
-                 case STRATEGY_POLLING_SPINNING:{
-                     continue;
-                 }break;
-                 case STRATEGY_POLLING_PAUSE:{
-                     PAUSE();
-                 }break;
-                 case STRATEGY_POLLING_SLEEP_SMALL:{
-                     nsleep(0);
-                 }break;
-                 case STRATEGY_POLLING_SLEEP_LATENCY:{
-                     nsleep(avgLatency);
-                 }break;
-             }
-         }
-         _responseQ.inc();
-         sample = _sampleResponse;
-         return true;
-     }
+    bool getSampleResponse(WorkerSample& sample,
+                           StrategyPolling strategyPolling,
+                           double avgLatency){
+        while(_responseQ.empty()){
+            if(ff_node::isfrozen()){
+                return false;
+            }
+            switch(strategyPolling){
+                case STRATEGY_POLLING_SPINNING:{
+                    continue;
+                }break;
+                case STRATEGY_POLLING_PAUSE:{
+                    PAUSE();
+                }break;
+                case STRATEGY_POLLING_SLEEP_SMALL:{
+                    nsleep(0);
+                }break;
+                case STRATEGY_POLLING_SLEEP_LATENCY:{
+                    nsleep(avgLatency);
+                }break;
+            }
+        }
+        _responseQ.inc();
+        sample = _sampleResponse;
+        return true;
+    }
 
     /**
-     * Tell the node to produce a Null task as the next task.
+    * Ask the node for a sample of the statistics computed since the last
+    * time this method has been called.
+    * The result can be retrieved with getSampleResponse call.
+    */
+    void askForSample(){
+        _managementRequest.type = MGMT_REQ_GET_AND_RESET_SAMPLE;
+        // The value pushed in the queue will not be read,
+        // it could be anything except NULL.
+        _managementQ.push(&_managementRequest);
+    }
+
+    /**
+     * Tells the node to freeze the farm.
      */
-    void produceNull(){
-        _managementRequest = MANAGEMENT_REQUEST_PRODUCE_NULL;
+    void freezeAll(void* mark){
+        _managementRequest.type = MGMT_REQ_FREEZE;
+        _managementRequest.mark = mark;
         // The value pushed in the queue will not be read, it could be
         // anything except NULL.
         _managementQ.push(&_managementRequest);
+    }
+
+    /**
+     * Thaws the farm.
+     */
+    void thawAll(size_t numWorkers){
+        _managementRequest.type = MGMT_REQ_THAW;
+        _managementRequest.numWorkers = numWorkers;
+        // The value pushed in the queue will not be read, it could be
+        // anything except NULL.
+        _managementQ.push(&_managementRequest);
+    }
+
+    /**
+     * Called on the node before starting them.
+     * It must be called when the node is frozen.
+     */
+    void prepareToRun(){
+        taskcnt = 0;
+        tickstot = 0;
+        _startTicks = getticks();
     }
 
     void storeSample(){
@@ -263,45 +271,65 @@ private:
         int* dummyPtr = &dummy;
         ticks now = getticks();
         ticks totalTicks = now - _startTicks;
-        _sampleResponse.loadPercentage = ((double) (_workTicks) /
+        _sampleResponse.loadPercentage = ((double) (tickstot) /
                                           (double) totalTicks) * 100.0;
-        _sampleResponse.tasksCount = _tasksCount;
-        if(_tasksCount){
-            _sampleResponse.latency = ((double)_workTicks / (double)_tasksCount) /
+        _sampleResponse.tasksCount = taskcnt;
+        if(taskcnt){
+            _sampleResponse.latency = ((double)tickstot / (double)taskcnt) /
                                       _ticksPerNs;
         }else{
             _sampleResponse.latency = 0.0;
         }
-        _sampleResponse.bandwidthTotal = (double) _tasksCount /
+        _sampleResponse.bandwidthTotal = (double) taskcnt /
                                          ticksToSeconds(totalTicks);
-        _sampleResponse.bandwidthIsolation = (double) _tasksCount /
-                                             ticksToSeconds(_workTicks);
 
-        _tasksCount = 0;
-        _workTicks = 0;
+        taskcnt = 0;
+        tickstot = 0;
         _startTicks = now;
 
         _responseQ.push(dummyPtr);
     }
 
-    void resetCounters(){
-        _tasksCount = 0;
-        _workTicks = 0;
-        _startTicks = getticks();
+    void callbackIn(void *p) CX11_KEYWORD(final){
+        if(!_thread && _tasksManager){
+            _thread = _tasksManager->getThreadHandler();
+        }else{
+            throw std::runtime_error("AdaptiveNode: Tasks manager "
+                                                "not initialized.");
+        }
+
+        if(!_managementQ.empty()){
+            _managementQ.inc();
+            switch(_managementRequest.type){
+                case MGMT_REQ_GET_AND_RESET_SAMPLE:{
+                    storeSample();
+                }break;
+                case MGMT_REQ_FREEZE:{
+                    ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
+                    lb->broadcast_task(_managementRequest.mark);
+
+                    /** Waits for restart request from manager. **/
+                    while(_managementQ.empty()){;}
+                    _managementQ.inc();
+                    DEBUGB(assert(_managementRequest.type == MGMT_REQ_THAW));
+                    lb->thaw(true, _managementRequest.numWorkers);
+                }break;
+                default:{
+                    throw std::runtime_error("Unexpected mgmt request.");
+                }break;
+            }
+        }
     }
 public:
     /**
      * Builds an adaptive node.
      */
-    adp_ff_node():
+    adpff_node():
             _tasksManager(NULL),
             _thread(NULL),
-            _threadCreationPerformed(false),
-            _threadRunning(false),
-            _managementRequest(MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE),
             _managementQ(1),
             _responseQ(1){
-        resetCounters();
+        prepareToRun();
         _managementQ.init();
         _responseQ.init();
     }
@@ -309,94 +337,10 @@ public:
     /**
      * Destroyes this adaptive node.
      */
-    ~adp_ff_node(){
+    ~adpff_node(){
         if(_thread){
             _tasksManager->releaseThreadHandler(_thread);
         }
-    }
-
-    /**
-     * The class that extends AdaptiveNode, must replace
-     * (if present) the declaration of svc_init with
-     * adp_svc_init.
-     * @return 0 for success, != 0 otherwise.
-     */
-    virtual int adp_svc_init(){return 0;}
-
-    /**
-     * The class that extends AdaptiveNode, must replace
-     * the declaration of svc with adp_svc.
-     */
-    virtual void* adp_svc(void* task) = 0;
-
-    /**
-     * The class that extends AdaptiveNode, must replace
-     * (if present) the declaration of svc_end with
-     * adp_svc_end.
-     */
-    virtual void adp_svc_end(){;}
-
-    /**
-     * \internal
-     * Wraps the user svc_init with adaptivity logics.
-     * @return 0 for success, != 0 otherwise.
-     */
-    int svc_init() CX11_KEYWORD(final){
-        _threadRunningLock.lock();
-        _threadRunning = true;
-        _threadRunningLock.unlock();
-        if(!_threadCreationPerformed){
-            // Operations performed only the first time the thread is running.
-            if(_tasksManager){
-                _thread = _tasksManager->getThreadHandler();
-            }else{
-                throw std::runtime_error("AdaptiveNode: Tasks manager "
-                                         "not initialized.");
-            }
-            _threadCreated.notifyAll();
-            _threadCreationPerformed = true;
-        }
-        resetCounters();
-        return adp_svc_init();
-    }
-
-    /**
-     * \internal
-     * Wraps the user svc with adaptivity logics.
-     * @param task The input task.
-     * @return The output task.
-     */
-    void* svc(void* task) CX11_KEYWORD(final){
-        if(!_managementQ.empty()){
-            _managementQ.inc();
-            switch(_managementRequest){
-                case MANAGEMENT_REQUEST_GET_AND_RESET_SAMPLE:{
-                    storeSample();
-                }break;
-                case MANAGEMENT_REQUEST_PRODUCE_NULL:{
-                    return NULL;
-                }
-            }
-        }
-
-        ticks start = getticks();
-        void* t = adp_svc(task);
-        ++_tasksCount;
-        _workTicks += getticks() - start;
-
-        return t;
-    }
-
-    /**
-     * \internal
-     * Wraps the user svc_end with adaptivity logics.
-     */
-    void svc_end() CX11_KEYWORD(final){
-        storeSample();
-        adp_svc_end();
-        _threadRunningLock.lock();
-        _threadRunning = false;
-        _threadRunningLock.unlock();
     }
 
     /**

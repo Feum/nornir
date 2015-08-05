@@ -46,6 +46,8 @@
 #ifndef ADAPTIVE_FASTFLOW_FARM_HPP_
 #define ADAPTIVE_FASTFLOW_FARM_HPP_
 
+#define TRACE_FASTFLOW
+#define FF_TASK_CALLBACK
 
 #include "parameters.hpp"
 #include "predictors.hpp"
@@ -225,103 +227,6 @@ public:
         _summaryFile << totalCalibrationPerc << "\t";
         _summaryFile << std::endl;
     }
-};
-
-/*!
- * \class adp_ff_farm
- * \brief This class wraps a farm to let it reconfigurable.
- *
- * This class wraps a farm to let it reconfigurable.
- */
-template<typename lb_t=ff_loadbalancer, typename gt_t=ff_gatherer>
-class adp_ff_farm: public ff_farm<lb_t, gt_t>{
-    friend class AdaptivityManagerFarm;
-private:
-    std::vector<adp_ff_node*> _adaptiveWorkers;
-    adp_ff_node* _adaptiveEmitter;
-    adp_ff_node* _adaptiveCollector;
-    bool _firstRun;
-    AdaptivityParameters _adaptivityParameters;
-    AdaptivityManagerFarm* _adaptivityManager;
-
-    void construct();
-
-    void construct(AdaptivityParameters adaptivityParameters);
-
-    std::vector<adp_ff_node*> getAdaptiveWorkers() const;
-
-    adp_ff_node* getAdaptiveEmitter() const;
-
-    adp_ff_node* getAdaptiveCollector() const;
-
-    void waitInternal();
-public:
-
-    /**
-     * Builds the adaptive farm.
-     * For parameters documentation, see fastflow's farm documentation.
-     */
-    adp_ff_farm(std::vector<ff_node*>& w, ff_node* const emitter = NULL,
-                ff_node* const collector = NULL, bool inputCh = false);
-
-    /**
-     * Builds the adaptive farm.
-     * For parameters documentation, see fastflow's farm documentation.
-     */
-    adp_ff_farm(bool inputCh = false,
-                int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
-                int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
-                bool workerCleanup = false,
-                int maxNumWorkers = DEF_MAX_NUM_WORKERS,
-                bool fixedSize = false);
-
-    /**
-     * Builds the adaptive farm.
-     * For parameters documentation, see fastflow's farm documentation.
-     * @param adaptivityParameters Parameters that will be used by the farm
-     *                             to take reconfiguration decisions.
-     */
-    adp_ff_farm(AdaptivityParameters adaptivityParameters,
-                std::vector<ff_node*>& w,
-                ff_node* const emitter = NULL,
-                ff_node* const collector = NULL,
-                bool inputCh = false);
-
-    /**
-     * Builds the adaptive farm.
-     * For parameters documentation, see fastflow's farm documentation.
-     * @param adaptivityParameters Parameters that will be used by the farm
-     *                             to take reconfiguration decisions.
-     */
-    explicit
-    adp_ff_farm(AdaptivityParameters adaptivityParameters,
-                bool inputCh = false,
-                int inBufferEntries = ff_farm<lb_t, gt_t>::DEF_IN_BUFF_ENTRIES,
-                int outBufferEntries = ff_farm<lb_t, gt_t>::DEF_OUT_BUFF_ENTRIES,
-                bool workerCleanup = false,
-                int maxNumWorkers = DEF_MAX_NUM_WORKERS,
-                bool fixedSize = false);
-
-    /**
-     * Destroyes this adaptive farm.
-     */
-    ~adp_ff_farm();
-
-    void setAdaptivityParameters(AdaptivityParameters adaptivityParameters);
-
-    void firstRunBefore();
-
-    void firstRunAfter();
-
-    /**
-     * Runs this farm.
-     */
-    int run(bool skip_init=false);
-
-    /**
-     * Waits this farm for completion.
-     */
-    int wait();
 };
 
 /*!
@@ -563,8 +468,7 @@ class AdaptivityManagerFarm: public utils::Thread{
     friend class Calibrator;
     friend class CalibratorLowDiscrepancy;
 private:
-    utils::Monitor _monitor; ///< Used to let the manager stop safely.
-    adp_ff_farm<>* _farm; ///< The managed farm.
+    ff_farm<>* _farm; ///< The managed farm.
     AdaptivityParameters _p; ///< The parameters used to take management decisions.
     uint _startTimeMs; ///< Starting time of the manager.
     cpufreq::CpuFreq* _cpufreq; ///< The cpufreq module.
@@ -575,10 +479,10 @@ private:
     uint _numPhysicalCores; ///< Number of physical cores.
     uint _numPhysicalCoresPerCpu; ///< Number of physical cores per CPU.
     uint _numVirtualCoresPerPhysicalCore; ///< Number of virtual cores per physical core.
-    adp_ff_node* _emitter; ///< The emitter (if present).
-    adp_ff_node* _collector; ///< The collector (if present).
-    std::vector<adp_ff_node*> _activeWorkers; ///< The currently running workers.
-    std::vector<adp_ff_node*> _inactiveWorkers; ///< Workers that can run but are not currently running.
+    adpff_node* _emitter; ///< The emitter (if present).
+    adpff_node* _collector; ///< The collector (if present).
+    std::vector<adpff_node*> _activeWorkers; ///< The currently running workers.
+    std::vector<adpff_node*> _inactiveWorkers; ///< Workers that can run but are not currently running.
     size_t _maxNumWorkers; ///< The maximum number of workers that can be activated by the manager.
     bool _emitterSensitivitySatisfied; ///< If true, the user requested sensitivity for emitter and the
                                        ///< request has been satisfied.
@@ -1350,6 +1254,37 @@ private:
     }
 
     /**
+     * Changes the active and inactive nodes according to the new configuration.
+     * @param configuration The new configuration.
+     */
+    void changeActiveNodes(FarmConfiguration& configuration){
+        if(_currentConfiguration.numWorkers > configuration.numWorkers){
+            /** Move workers from active to inactive. **/
+            uint workersNumDiff = _currentConfiguration.numWorkers - configuration.numWorkers;
+            utils::moveEndToFront(_activeWorkers, _inactiveWorkers, workersNumDiff);
+            utils::moveEndToFront(_activeWorkersVirtualCores, _inactiveWorkersVirtualCores, workersNumDiff);
+        }else{
+            /** Move workers from inactive to active. **/
+            /**
+             * We need to map them again because if virtual cores were shutdown, the
+             * threads that were running on them have been moved on different virtual
+             * cores. Accordingly, when started again they would not be run on the
+             * correct virtual cores.
+             */
+            uint workersNumDiff = configuration.numWorkers - _currentConfiguration.numWorkers;
+            for(size_t i = 0; i < workersNumDiff; i++){
+                topology::VirtualCore* vc = _inactiveWorkersVirtualCores.at(i);
+                if(!vc->isHotPlugged()){
+                    vc->hotPlug();
+                }
+                _inactiveWorkers.at(i)->getThreadHandler()->move(vc);
+            }
+            utils::moveFrontToEnd(_inactiveWorkers, _activeWorkers, workersNumDiff);
+            utils::moveFrontToEnd(_inactiveWorkersVirtualCores, _activeWorkersVirtualCores, workersNumDiff);
+        }
+    }
+
+    /**
      * Changes the current farm configuration.
      * @param configuration The new configuration.
      * @param refine True if the data on the last configuration must be used
@@ -1385,59 +1320,54 @@ private:
                 }
             }
 
-            /** Stops farm. **/
-            DEBUG("Asking the farm for NULL production");
-            _emitter->produceNull();
+            /** Freezes farm. **/
+            DEBUG("Asking the farm to freeze");
+            _emitter->freezeAll((void*)(_collector?FF_EOSW:FF_GO_OUT));
             DEBUG("Wait for freezing");
-            _farm->wait_freezing();
-            DEBUG("Farm freezed");
-            /**
-             * When workers stops, they update their last sample.
-             * Accordingly, we do not need to ask them but we can just
-             * retrieve the samples.
-             */
-            storeNewSample(false);
-
-            if(_currentConfiguration.numWorkers > configuration.numWorkers){
-                /** Move workers from active to inactive. **/
-                uint workersNumDiff = _currentConfiguration.numWorkers - configuration.numWorkers;
-                utils::moveEndToFront(_activeWorkers, _inactiveWorkers, workersNumDiff);
-                utils::moveEndToFront(_activeWorkersVirtualCores, _inactiveWorkersVirtualCores, workersNumDiff);
-            }else{
-                /** Move workers from inactive to active. **/
-                /**
-                 * We need to map them again because if virtual cores were shutdown, the
-                 * threads that were running on them have been moved on different virtual
-                 * cores. Accordingly, when started again they would not be run on the
-                 * correct virtual cores.
-                 */
-                uint workersNumDiff = configuration.numWorkers - _currentConfiguration.numWorkers;
-                for(size_t i = 0; i < workersNumDiff; i++){
-                    topology::VirtualCore* vc = _inactiveWorkersVirtualCores.at(i);
-                    if(!vc->isHotPlugged()){
-                        vc->hotPlug();
-                    }
-                    _inactiveWorkers.at(i)->getThreadHandler()->move(vc);
-                }
-                utils::moveFrontToEnd(_inactiveWorkers, _activeWorkers, workersNumDiff);
-                utils::moveFrontToEnd(_inactiveWorkersVirtualCores, _activeWorkersVirtualCores, workersNumDiff);
+            for(size_t i = 0; i < _activeWorkers.size(); i++){
+                _activeWorkers.at(i)->wait_freezing();
             }
+            if(_collector){
+                _collector->wait_freezing();
+            }
+            DEBUG("Farm freezed");
 
+            changeActiveNodes(configuration);
             updateUsedCpus();
 
             /** Notify the nodes that a reconfiguration is happening. **/
-            _emitter->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
-            for(uint i = 0; i < configuration.numWorkers; i++){
-                _activeWorkers.at(i)->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
+            if(_emitter){
+                _emitter->notifyWorkersChange(_currentConfiguration.numWorkers,
+                                              configuration.numWorkers);
+            }
+            for(size_t i = 0; i < configuration.numWorkers; i++){
+                adpff_node* w = _activeWorkers.at(i);
+                w->notifyWorkersChange(_currentConfiguration.numWorkers,
+                                       configuration.numWorkers);
             }
             if(_collector){
-                _collector->notifyWorkersChange(_currentConfiguration.numWorkers, configuration.numWorkers);
+                _collector->notifyWorkersChange(_currentConfiguration.numWorkers,
+                                                configuration.numWorkers);
+            }
+
+            /** Prepare all the nodes for the new run. **/
+            if(_emitter){
+                _emitter->prepareToRun();
+            }
+            for(size_t i = 0; i < configuration.numWorkers; i++){
+                _activeWorkers.at(i)->prepareToRun();
+            }
+            if(_collector){
+                _collector->prepareToRun();
             }
 
 
             /** Start the farm again. **/
             DEBUG("Asking the farm to start again");
-            _farm->run_then_freeze(configuration.numWorkers);
+            _emitter->thawAll(configuration.numWorkers);
+            if(_collector){
+                _collector->thaw(true, configuration.numWorkers);
+            }
             DEBUG("Farm started");
             //TODO: Se la farm non è stata avviata con la run_then_freeze questo potrebbe essere un problema.
             if(_p.fastReconfiguration){
@@ -1496,7 +1426,7 @@ private:
      * @return True if all the workers are still running, false otherwise.
      */
     bool getWorkersSamples(WorkerSample& sample){
-        adp_ff_node* w;
+        adpff_node* w;
         sample = WorkerSample();
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             WorkerSample tmp;
@@ -1518,10 +1448,8 @@ private:
      * @param askWorkers If false, the request to the worker is not sent.
      * @return false if the farm is not running anymore, true otherwise.
      **/
-    bool storeNewSample(bool askWorkers = true){
-        if(askWorkers){
-            askForWorkersSamples();
-        }
+    bool storeNewSample(){
+        askForWorkersSamples();
 
         MonitoredSample sample;
         WorkerSample ws;
@@ -1648,35 +1576,30 @@ private:
 public:
     /**
      * Creates a farm adaptivity manager.
-     * ATTENTION: Needs to be created when the farm is ready (i.e. in run* methods).
      * @param farm The farm to be managed.
      * @param adaptivityParameters The parameters to be used for adaptivity decisions.
      */
-    AdaptivityManagerFarm(adp_ff_farm<>* farm, AdaptivityParameters adaptivityParameters):
-        _farm(farm),
-        _p(adaptivityParameters),
-        _startTimeMs(0),
-        _cpufreq(_p.mammut.getInstanceCpuFreq()),
-        _energy(_p.mammut.getInstanceEnergy()),
-        _task(_p.mammut.getInstanceTask()),
-        _topology(_p.mammut.getInstanceTopology()),
-        _numCpus(_topology->getCpus().size()),
-        _numPhysicalCores(_topology->getPhysicalCores().size()),
-        _numPhysicalCoresPerCpu(_topology->getCpu(0)->getPhysicalCores().size()),
-        _numVirtualCoresPerPhysicalCore(_topology->getPhysicalCore(0)->getVirtualCores().size()),
-        _emitter(_farm->getAdaptiveEmitter()),
-        _collector(_farm->getAdaptiveCollector()),
-        _activeWorkers(_farm->getAdaptiveWorkers()),
-        _maxNumWorkers(_activeWorkers.size()),
-        _emitterSensitivitySatisfied(false),
-        _collectorSensitivitySatisfied(false),
-        _currentConfiguration(_activeWorkers.size(), 0),
-        _availableVirtualCores(getAvailableVirtualCores()),
-        _emitterVirtualCore(NULL),
-        _collectorVirtualCore(NULL){
+    AdaptivityManagerFarm(ff_farm<>* farm, AdaptivityParameters adaptivityParameters):
+            _farm(farm),
+            _p(adaptivityParameters),
+            _startTimeMs(0),
+            _cpufreq(_p.mammut.getInstanceCpuFreq()),
+            _energy(_p.mammut.getInstanceEnergy()),
+            _task(_p.mammut.getInstanceTask()),
+            _topology(_p.mammut.getInstanceTopology()),
+            _numCpus(_topology->getCpus().size()),
+            _numPhysicalCores(_topology->getPhysicalCores().size()),
+            _numPhysicalCoresPerCpu(_topology->getCpu(0)->getPhysicalCores().size()),
+            _numVirtualCoresPerPhysicalCore(_topology->getPhysicalCore(0)->getVirtualCores().size()),
+            _emitterSensitivitySatisfied(false),
+            _collectorSensitivitySatisfied(false),
+            _availableVirtualCores(getAvailableVirtualCores()),
+            _emitterVirtualCore(NULL),
+            _collectorVirtualCore(NULL){
         /** If voltage table file is specified, then load the table. **/
         if(_p.archData.voltageTableFile.compare("")){
-            cpufreq::loadVoltageTable(_voltageTable, _p.archData.voltageTableFile);
+            cpufreq::loadVoltageTable(_voltageTable,
+                                      _p.archData.voltageTableFile);
         }
 
         _samples = NULL;
@@ -1715,20 +1638,27 @@ public:
      * Function executed by this thread.
      */
     void run(){
-        /**
-         * Wait for all the nodes to be running.
-         */
+        _emitter = static_cast<adpff_node*>(_farm->getEmitter());
+        _collector = static_cast<adpff_node*>(_farm->getCollector());
+        std::vector<ff_node*> w = _farm->getWorkers();
+        for(size_t i = 0; i < w.size(); i++){
+            _activeWorkers.push_back(static_cast<adpff_node*>(w.at(i)));
+        }
+        _maxNumWorkers = _activeWorkers.size();
+        _currentConfiguration = FarmConfiguration(_maxNumWorkers, 0);
+
+        _farm->run_then_freeze(_maxNumWorkers);
+
+        //TODO: Is already running when exits from that call?
+
         for(size_t i = 0; i < _activeWorkers.size(); i++){
-            _activeWorkers.at(i)->waitThreadCreation();
-            _activeWorkers.at(i)->setTicksPerNs(_p.archData.ticksPerNs);
+            _activeWorkers.at(i)->init(_p.mammut, _p.archData.ticksPerNs);
         }
         if(_emitter){
-            _emitter->waitThreadCreation();
-            _emitter->setTicksPerNs(_p.archData.ticksPerNs);
+            _emitter->init(_p.mammut, _p.archData.ticksPerNs);
         }
         if(_collector){
-            _collector->waitThreadCreation();
-            _collector->setTicksPerNs(_p.archData.ticksPerNs);
+            _collector->init(_p.mammut, _p.archData.ticksPerNs);
         }
 
         _startTimeMs = utils::getMillisecondsTime();
@@ -1759,8 +1689,7 @@ public:
 
         double microsecsSleep = 0;
         if(_p.contractType == CONTRACT_NONE){
-            //_monitor.wait();
-            _farm->waitInternal();
+            _farm->wait();
             storeNewSample();
             observe();
         }else{
@@ -1770,7 +1699,7 @@ public:
             }
 
             double startSample = utils::getMillisecondsTime();
-            while(!mustStop()){
+            while(true){
                 double overheadMs = utils::getMillisecondsTime() - startSample;
                 microsecsSleep = ((double)_p.samplingInterval - overheadMs)*
                                   (double)MAMMUT_MICROSECS_IN_MILLISEC;
@@ -1828,160 +1757,7 @@ public:
             _p.observer->summaryStats(cs, duration);
         }
     }
-
-    /**
-     * Stops this manager.
-     */
-    void stop(){
-        _monitor.notifyOne();
-    }
-
-    /**
-     * Return true if the manager must stop, false otherwise.
-     * @retur true if the manager must stop, false otherwise.
-     */
-    bool mustStop(){
-        return _monitor.predicate();
-    }
 };
-
-template <typename lb_t, typename gt_t>
-void adp_ff_farm<lb_t, gt_t>::construct(){
-    _adaptiveEmitter = NULL;
-    _adaptiveCollector = NULL;
-    _firstRun = true;
-    _adaptivityManager = NULL;
-}
-
-template <typename lb_t, typename gt_t>
-void adp_ff_farm<lb_t, gt_t>::construct(AdaptivityParameters adaptivityParameters){
-    construct();
-    setAdaptivityParameters(adaptivityParameters);
-}
-
-template <typename lb_t, typename gt_t>
-std::vector<adp_ff_node*> adp_ff_farm<lb_t, gt_t>::getAdaptiveWorkers() const{
-    return _adaptiveWorkers;
-}
-
-template <typename lb_t, typename gt_t>
-adp_ff_node* adp_ff_farm<lb_t, gt_t>::getAdaptiveEmitter() const{
-    return _adaptiveEmitter;
-}
-
-template <typename lb_t, typename gt_t>
-adp_ff_node* adp_ff_farm<lb_t, gt_t>::getAdaptiveCollector() const{
-    return _adaptiveCollector;
-}
-
-template <typename lb_t, typename gt_t>
-adp_ff_farm<lb_t, gt_t>::adp_ff_farm(std::vector<ff_node*>& w, ff_node* const emitter,
-                                     ff_node* const collector, bool inputCh):
-    ff_farm<lb_t, gt_t>::ff_farm(w, emitter, collector, inputCh){
-    construct();
-}
-
-template <typename lb_t, typename gt_t>
-adp_ff_farm<lb_t, gt_t>::adp_ff_farm(bool inputCh,
-                      int inBufferEntries,
-                      int outBufferEntries,
-                      bool workerCleanup,
-                      int maxNumWorkers,
-                      bool fixedSize):
-    ff_farm<lb_t, gt_t>::ff_farm(inputCh, inBufferEntries, outBufferEntries, workerCleanup, maxNumWorkers, fixedSize){
-    construct();
-}
-
-template <typename lb_t, typename gt_t>
-adp_ff_farm<lb_t, gt_t>::adp_ff_farm(AdaptivityParameters adaptivityParameters, std::vector<ff_node*>& w,
-             ff_node* const emitter, ff_node* const collector, bool inputCh):
-    ff_farm<lb_t, gt_t>::ff_farm(w, emitter, collector, inputCh){
-    construct(adaptivityParameters);
-}
-
-template <typename lb_t, typename gt_t>
-adp_ff_farm<lb_t, gt_t>::adp_ff_farm(AdaptivityParameters adaptivityParameters, bool inputCh,
-                      int inBufferEntries,
-                      int outBufferEntries,
-                      bool workerCleanup,
-                      int maxNumWorkers,
-                      bool fixedSize):
-    ff_farm<lb_t, gt_t>::ff_farm(inputCh, inBufferEntries, outBufferEntries, workerCleanup, maxNumWorkers, fixedSize){
-    construct(adaptivityParameters);
-}
-
-template <typename lb_t, typename gt_t>
-adp_ff_farm<lb_t, gt_t>::~adp_ff_farm(){
-    ;
-}
-
-template <typename lb_t, typename gt_t>
-void adp_ff_farm<lb_t, gt_t>::setAdaptivityParameters(AdaptivityParameters adaptivityParameters){
-    _adaptivityParameters = adaptivityParameters;
-    uint validationRes = _adaptivityParameters.validate();
-    if(validationRes != VALIDATION_OK){
-        throw std::runtime_error("AdaptiveFarm: invalid AdaptivityParameters: " + utils::intToString(validationRes));
-    }
-}
-
-template <typename lb_t, typename gt_t>
-void adp_ff_farm<lb_t, gt_t>::firstRunBefore(){
-    if(_firstRun){
-        svector<ff_node*> workers = ff_farm<lb_t, gt_t>::getWorkers();
-        for(size_t i = 0; i < workers.size(); i++){
-            _adaptiveWorkers.push_back(static_cast<adp_ff_node*>(workers[i]));
-            _adaptiveWorkers.at(i)->initMammutModules(_adaptivityParameters.mammut);
-        }
-
-        _adaptiveEmitter = static_cast<adp_ff_node*>(ff_farm<lb_t, gt_t>::getEmitter());
-        if(_adaptiveEmitter){
-            _adaptiveEmitter->initMammutModules(_adaptivityParameters.mammut);
-        }
-
-        _adaptiveCollector = static_cast<adp_ff_node*>(ff_farm<lb_t, gt_t>::getCollector());
-        if(_adaptiveCollector){
-            _adaptiveCollector->initMammutModules(_adaptivityParameters.mammut);
-        }
-    }
-}
-
-template <typename lb_t, typename gt_t>
-void adp_ff_farm<lb_t, gt_t>::firstRunAfter(){
-    if(_firstRun){
-        _firstRun = false;
-        _adaptivityManager = new AdaptivityManagerFarm(this, _adaptivityParameters);
-        _adaptivityManager->start();
-    }
-}
-
-template <typename lb_t, typename gt_t>
-int adp_ff_farm<lb_t, gt_t>::run(bool skip_init){
-    firstRunBefore();
-    int r = ff_farm<lb_t, gt_t>::run(skip_init);
-    if(r){
-        return r;
-    }
-    firstRunAfter();
-    return r;
-}
-
-template <typename lb_t, typename gt_t>
-int adp_ff_farm<lb_t, gt_t>::wait(){
-    int r = 0;
-    //int r = ff_farm<lb_t, gt_t>::wait();
-    if(_adaptivityManager){
-        //_adaptivityManager->stop();
-        _adaptivityManager->join();
-        delete _adaptivityManager;
-    }
-    return r;
-}
-
-
-template <typename lb_t, typename gt_t>
-void adp_ff_farm<lb_t, gt_t>::waitInternal(){
-    ff_farm<lb_t, gt_t>::wait();
-}
 
 }
 

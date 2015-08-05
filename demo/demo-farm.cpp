@@ -39,14 +39,14 @@
 using namespace ff;
 
 // generic worker
-class Worker: public adpff::adp_ff_node{
+class Worker: public adpff::adpff_node{
 public:
-    int adp_svc_init(){
+    int svc_init(){
         std::cout << "Worker svc_init called" << std::endl;
         return 0;
     }
 
-    void * adp_svc(void * task) {
+    void * svc(void * task) {
         int * t = (int *)task;
         sleep(1);
         std::cout << "Worker " << ff_node::get_my_id()
@@ -60,9 +60,9 @@ public:
 };
 
 // the gatherer filter
-class Collector: public adpff::adp_ff_node {
+class Collector: public adpff::adpff_node {
 public:
-    void * adp_svc(void * task) {
+    void * svc(void * task) {
         int * t = (int *)task;
         if (*t == -1) return NULL;
         return task;
@@ -70,11 +70,11 @@ public:
 };
 
 // the load-balancer filter
-class Emitter: public adpff::adp_ff_node {
+class Emitter: public adpff::adpff_node {
 public:
     Emitter(int max_task):ntask(max_task) {};
 
-    void * adp_svc(void *) {
+    void * svc(void *) {
         sleep(1);
         int * task = new int(ntask);
         --ntask;
@@ -109,11 +109,7 @@ int main(int argc, char * argv[]) {
         return -1;
     }
     
-    adpff::Observer obs;
-    adpff::AdaptivityParameters ap("parameters.xml",
-                                   "archdata.xml");
-    ap.observer = &obs;
-    adpff::adp_ff_farm<> farm(ap); // farm object
+    ff::ff_farm<> farm; // farm object
     
     Emitter E(streamlen);
     farm.add_emitter(&E);
@@ -125,12 +121,21 @@ int main(int argc, char * argv[]) {
     Collector C;
     farm.add_collector(&C);
     
-    if (farm.run_then_freeze()<0) {
-    //if (farm.run_and_wait_end()<0) {
+    adpff::Observer obs;
+    adpff::AdaptivityParameters ap("parameters.xml",
+                                   "archdata.xml");
+    ap.observer = &obs;
+    adpff::AdaptivityManagerFarm amf(&farm, ap);
+    amf.start();
+    amf.join();
+
+    /*
+    if (farm.run_and_wait_end()<0) {
         error("running farm\n");
         return -1;
     }
-    farm.wait();
+    */
+
     std::cout << "Farm end" << std::endl;
     std::cerr << "DONE, time= " << farm.ffTime() << " (ms)\n";
     farm.ffStats(std::cerr);

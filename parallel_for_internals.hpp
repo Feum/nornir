@@ -439,7 +439,7 @@ static inline void workerlosetime_in(const bool aggressive) {
 
 
 // parallel for/reduce task scheduler
-class forall_Scheduler: public adp_ff_node {
+class forall_Scheduler: public adpff_node {
 protected:
     std::vector<bool>      eossent;
     std::vector<dataPair>  data;
@@ -779,7 +779,7 @@ protected:
 
 // parallel for/reduce  worker node
 template<typename Tres>
-class forallreduce_W: public adp_ff_node {
+class forallreduce_W: public adpff_node {
 public:
     typedef Tres Tres_t;
     typedef std::function<void(const long,const long, const int, Tres&)> F_t;
