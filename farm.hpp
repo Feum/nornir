@@ -730,7 +730,7 @@ private:
             if(!_emitterVirtualCore->isHotPlugged()){
                 _emitterVirtualCore->hotPlug();
             }
-            _emitter->getThreadHandler()->move(_emitterVirtualCore);
+            _emitter->move(_emitterVirtualCore);
         }
 
         for(size_t i = 0; i < _activeWorkers.size(); i++){
@@ -739,7 +739,7 @@ private:
             if(!vc->isHotPlugged()){
                 vc->hotPlug();
             }
-            _activeWorkers.at(i)->getThreadHandler()->move(vc);
+            _activeWorkers.at(i)->move(vc);
         }
 
         if(_collector){
@@ -749,7 +749,7 @@ private:
             if(!_collectorVirtualCore->isHotPlugged()){
                 _collectorVirtualCore->hotPlug();
             }
-            _collector->getThreadHandler()->move(_collectorVirtualCore);
+            _collector->move(_collectorVirtualCore);
         }
     }
 
@@ -1277,7 +1277,7 @@ private:
                 if(!vc->isHotPlugged()){
                     vc->hotPlug();
                 }
-                _inactiveWorkers.at(i)->getThreadHandler()->move(vc);
+                _inactiveWorkers.at(i)->move(vc);
             }
             utils::moveFrontToEnd(_inactiveWorkers, _activeWorkers, workersNumDiff);
             utils::moveFrontToEnd(_inactiveWorkersVirtualCores, _activeWorkersVirtualCores, workersNumDiff);

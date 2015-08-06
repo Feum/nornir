@@ -126,7 +126,6 @@ class adpff_node: public ff_node{
 private:
     friend class AdaptivityManagerFarm;
 
-    Mammut _mammut;
     task::TasksManager* _tasksManager;
     task::ThreadHandler* _thread;
     ManagementRequest _managementRequest;
@@ -147,31 +146,29 @@ private:
     }
 
     /**
-     * Returns the thread handler associated to this node.
-     * If it is called before running the node, an exception
-     * is thrown.
-     * @return The thread handler associated to this node.
-     *         It doesn't need to be released.
-     */
-    task::ThreadHandler* getThreadHandler() const{
-        //TODO Evitare e passare invece il tid.
-        if(_thread){
-            return _thread;
-        }else{
-            throw std::runtime_error("AdaptiveNode: Thread not initialized.");
-        }
-    }
-
-    /**
-     * Initializes the node.
+     * Initializes the node. It must be called
+     * when the node is already running.
      * @param mammut A Mammut handle.
      * @param ticksPerNs The number of ticks in a nanosecond.
      */
     void init(Mammut& mammut,
               double ticksPerNs){
-        _mammut = mammut;
-        _tasksManager = _mammut.getInstanceTask();
+        size_t tid = getOSThreadId();
+        if(!tid){
+            throw std::runtime_error("Node init() called before "
+                                     "thread creation.");
+        }
+        _tasksManager = mammut.getInstanceTask();
+        _thread = _tasksManager->getThreadHandler(getpid(), tid);
         _ticksPerNs = ticksPerNs;
+    }
+
+    /**
+     * Moves this node on a specific virtual core.
+     * @param vc The virtual core where this nodes must be moved.
+     */
+    void move(mammut::topology::VirtualCore* vc){
+        _thread->move(vc);
     }
 
     // Sleeps for a given amount of nanoseconds
@@ -291,13 +288,6 @@ private:
     }
 
     void callbackIn(void *p) CX11_KEYWORD(final){
-        if(!_thread && _tasksManager){
-            _thread = _tasksManager->getThreadHandler();
-        }else{
-            throw std::runtime_error("AdaptiveNode: Tasks manager "
-                                                "not initialized.");
-        }
-
         if(!_managementQ.empty()){
             _managementQ.inc();
             switch(_managementRequest.type){
@@ -319,6 +309,13 @@ private:
                 }break;
             }
         }
+    }
+
+    bool ff_send_out(void * task,
+                     unsigned long retry=((unsigned long)-1),
+                     unsigned long ticks=(TICKS2WAIT)) CX11_KEYWORD(final){
+        callbackIn(task);
+        return ff_node::ff_send_out(task, retry, ticks);
     }
 public:
     /**
