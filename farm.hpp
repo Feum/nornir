@@ -1640,9 +1640,9 @@ public:
     void run(){
         _emitter = static_cast<adpff_node*>(_farm->getEmitter());
         _collector = static_cast<adpff_node*>(_farm->getCollector());
-        std::vector<ff_node*> w = _farm->getWorkers();
+        svector<ff_node*> w = _farm->getWorkers();
         for(size_t i = 0; i < w.size(); i++){
-            _activeWorkers.push_back(static_cast<adpff_node*>(w.at(i)));
+            _activeWorkers.push_back(static_cast<adpff_node*>(w[i]));
         }
         _maxNumWorkers = _activeWorkers.size();
         _currentConfiguration = FarmConfiguration(_maxNumWorkers, 0);

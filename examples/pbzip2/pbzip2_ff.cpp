@@ -364,7 +364,7 @@ char *memstr(char *searchBuf, int searchBufSize, char *searchString, int searchS
  * FastFlow's collector filter.
  */
 
-class FileWriter: public adpff::adp_ff_node {
+class FileWriter: public adpff::adpff_node {
 public:
         FileWriter():
 		OutFilename(NULL),currBlock(0),hOutfile(1),// default to stdout
@@ -378,7 +378,7 @@ public:
 	}
 
 	// called just once at very beginning
-        int adp_svc_init() {
+        int svc_init() {
 	  static int alreadycalled = 0;
 		if (OutputStdOut == 0 && !alreadycalled)
 		{
@@ -394,7 +394,7 @@ public:
 		return 0;
 	}
 	
-	void * adp_svc(void * t) {      
+	void * svc(void * t) {      
 		ff_task_t * task = (ff_task_t*)t;
 		int ret;
 		int percentComplete = 0;
@@ -474,7 +474,7 @@ public:
 		return NULL; // not reached
 	}
 	
-	void adp_svc_end() {
+	void svc_end() {
 #if 0
 		if (OutputStdOut == 0)
 			close(hOutfile);
@@ -918,7 +918,7 @@ ssize_t bufread(int hf, char *buf, size_t bsize)
  * FastFlow's emitter filter.
  */
 
-class Producer: public adpff::adp_ff_node{
+class Producer: public adpff::adpff_node{
 private:
   char *FileData;
   OFF_T inSize;
@@ -1286,7 +1286,7 @@ public:
 	}
 	
 	
-	void * adp_svc(void * notused) {
+	void * svc(void * notused) {
 	  if (comp_decomp==0) {
 			errLevel = producer(hInfile,blockSize);
 			if(errLevel == 1){
@@ -1326,7 +1326,7 @@ private:
  * FastFlow's worker filter.
  */
 
-class Consumer: public adpff::adp_ff_node{
+class Consumer: public adpff::adpff_node{
 public:
 	Consumer():comp_decomp(0) {}
 
@@ -1452,7 +1452,7 @@ public:
 
 
 	
-	void * adp_svc(void * task) {
+	void * svc(void * task) {
 		if (comp_decomp==0) 
 		{
 			if (consumer((ff_task_t*)task)<0) return NULL;
@@ -2194,7 +2194,7 @@ int main(int argc, char* argv[])
 	adpff::Observer obs;
  	adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
 	ap.observer = &obs;
-	adpff::adp_ff_farm<> farm(ap, false, 0, numCPU*20); 
+        ff::ff_farm<> farm(false, 0, numCPU*20); 
 	farm.set_scheduling_ondemand(); // set on-demand scheduling policy
 	std::vector<ff::ff_node *> w;
 	Producer * P = new Producer;
