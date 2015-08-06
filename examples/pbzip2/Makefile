@@ -4,7 +4,7 @@ SHELL = /bin/sh
 FF_HOME = /home/desensi/include/
 
 # Compiler to use
-CC = /home/desensi/bin/g++
+CC = g++
 CFLAGS = -DNO_CMAKE_CONFIG -O2 -finline-functions --std=c++11
 
 # Comment out CFLAGS line below for compatability mode for 32bit file sizes
