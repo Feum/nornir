@@ -33,7 +33,7 @@
 #define PREDICTORS_IMPL_HPP_
 
 #include "predictors.hpp"
-#include "farm.hpp"
+#include "manager.hpp"
 
 #undef DEBUG
 #undef DEBUGB
@@ -48,6 +48,9 @@
 
 
 namespace adpff{
+
+using namespace mammut::cpufreq;
+using namespace mammut::utils;
 
 void RegressionData::init(){init(_manager._currentConfiguration);}
 
@@ -79,7 +82,7 @@ void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
     */
 }
 
-RegressionDataServiceTime::RegressionDataServiceTime(const AdaptivityManagerFarm& manager):
+RegressionDataServiceTime::RegressionDataServiceTime(const ManagerFarm& manager):
         RegressionData(manager),
         _physicalCores(0), _invScalFactorPhysical(0),
         _workers(0), _invScalFactorWorkers(0),
@@ -87,7 +90,7 @@ RegressionDataServiceTime::RegressionDataServiceTime(const AdaptivityManagerFarm
     init(manager._currentConfiguration);
 }
 
-RegressionDataServiceTime::RegressionDataServiceTime(const AdaptivityManagerFarm& manager,
+RegressionDataServiceTime::RegressionDataServiceTime(const ManagerFarm& manager,
                                                      const FarmConfiguration& configuration):
         RegressionData(manager){
     init(configuration);
@@ -164,14 +167,14 @@ void RegressionDataPower::init(const FarmConfiguration& configuration){
     }
 }
 
-RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm& manager):
+RegressionDataPower::RegressionDataPower(const ManagerFarm& manager):
         RegressionData(manager), _dynamicPowerModel(0),
         _voltagePerUsedSockets(0), _voltagePerUnusedSockets(0),
         _additionalContextes(0), _numPredictors(0){
     init(_manager._currentConfiguration);
 }
 
-RegressionDataPower::RegressionDataPower(const AdaptivityManagerFarm& manager,
+RegressionDataPower::RegressionDataPower(const ManagerFarm& manager,
                                          const FarmConfiguration& configuration):
         RegressionData(manager){
     init(configuration);
@@ -196,7 +199,7 @@ void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
 }
 
 PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
-                                                     const AdaptivityManagerFarm& manager):
+                                                     const ManagerFarm& manager):
                                                     _type(type), _manager(manager){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
@@ -314,7 +317,7 @@ double PredictorLinearRegression::predict(const FarmConfiguration& configuration
 /**************** PredictorSimple ****************/
 
 PredictorSimple::PredictorSimple(PredictorType type,
-                                 const AdaptivityManagerFarm& manager):
+                                 const ManagerFarm& manager):
     _type(type), _manager(manager){
     ;
 }
@@ -325,7 +328,7 @@ double PredictorSimple::getScalingFactor(const FarmConfiguration& configuration)
 }
 
 double PredictorSimple::getPowerPrediction(const FarmConfiguration& configuration){
-    cpufreq::Voltage v = _manager.getVoltage(configuration);
+    Voltage v = _manager.getVoltage(configuration);
     return configuration.numWorkers*configuration.frequency*v*v;
 }
 
@@ -346,7 +349,7 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
     return 0.0;
 }
 
-Calibrator::Calibrator(AdaptivityManagerFarm& manager):
+Calibrator::Calibrator(ManagerFarm& manager):
         _manager(manager), _state(CALIBRATION_SEEDS),
         _numCalibrationPoints(0), _calibrationStartMs(0){
     _minNumPoints = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
@@ -372,7 +375,7 @@ FarmConfiguration Calibrator::getNextConfiguration(){
     FarmConfiguration fc;
 
     if(_numCalibrationPoints == 0){
-        _calibrationStartMs = utils::getMillisecondsTime();
+        _calibrationStartMs = getMillisecondsTime();
     }
 
     switch(_state){
@@ -409,7 +412,7 @@ FarmConfiguration Calibrator::getNextConfiguration(){
                 // We do -1 because we counted the current point and now we
                 // discovered it isn't a calibration point.
                 cs.numSteps = _numCalibrationPoints - 1;
-                cs.duration = (utils::getMillisecondsTime() - _calibrationStartMs);
+                cs.duration = (getMillisecondsTime() - _calibrationStartMs);
                 _calibrationStats.push_back(cs);
                 DEBUG("[Calibrator]: Moving to finished");
                 DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints - 1 <<
@@ -429,7 +432,7 @@ FarmConfiguration Calibrator::getNextConfiguration(){
                 fc = generateConfiguration();
                 _numCalibrationPoints = 1;
                 _state = CALIBRATION_SEEDS;
-                _calibrationStartMs = utils::getMillisecondsTime();
+                _calibrationStartMs = getMillisecondsTime();
                 DEBUG("[Calibrator]: Moving to seeds");
             }else{
                 fc = _manager._currentConfiguration;
@@ -448,7 +451,7 @@ std::vector<CalibrationStats> Calibrator::getCalibrationsStats() const{
     return _calibrationStats;
 }
 
-CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager):
+CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(ManagerFarm& manager):
         Calibrator(manager), _manager(manager){
     uint d = _manager.getConfigurationDimension();
     const gsl_qrng_type* generatorType;

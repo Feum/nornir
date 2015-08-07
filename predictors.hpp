@@ -47,7 +47,7 @@ using namespace mlpack::regression;
 
 namespace adpff{
 
-class AdaptivityManagerFarm;
+class ManagerFarm;
 class FarmConfiguration;
 
 /**
@@ -55,9 +55,9 @@ class FarmConfiguration;
  */
 class RegressionData{
 protected:
-    const AdaptivityManagerFarm& _manager;
+    const ManagerFarm& _manager;
 public:
-    RegressionData(const AdaptivityManagerFarm& manager):_manager(manager){;}
+    RegressionData(const ManagerFarm& manager):_manager(manager){;}
 
     /**
      * Initializes the regression data with the current configuration.
@@ -100,9 +100,9 @@ private:
 public:
     void init(const FarmConfiguration& configuration);
 
-    RegressionDataServiceTime(const AdaptivityManagerFarm& manager);
+    RegressionDataServiceTime(const ManagerFarm& manager);
 
-    RegressionDataServiceTime(const AdaptivityManagerFarm& manager,
+    RegressionDataServiceTime(const ManagerFarm& manager,
                               const FarmConfiguration& configuration);
 
     uint getNumPredictors() const;
@@ -125,9 +125,9 @@ private:
 public:
     void init(const FarmConfiguration& configuration);
 
-    RegressionDataPower(const AdaptivityManagerFarm& manager);
+    RegressionDataPower(const ManagerFarm& manager);
 
-    RegressionDataPower(const AdaptivityManagerFarm& manager,
+    RegressionDataPower(const ManagerFarm& manager,
                         const FarmConfiguration& configuration);
 
     uint getNumPredictors() const;
@@ -196,7 +196,7 @@ typedef struct{
 class PredictorLinearRegression: public Predictor{
 private:
     PredictorType _type;
-    const AdaptivityManagerFarm& _manager;
+    const ManagerFarm& _manager;
     LinearRegression _lr;
 
     typedef std::map<FarmConfiguration, Observation> Observations;
@@ -209,7 +209,7 @@ private:
     double getCurrentResponse() const;
 public:
     PredictorLinearRegression(PredictorType type,
-                              const AdaptivityManagerFarm& manager);
+                              const ManagerFarm& manager);
 
     ~PredictorLinearRegression();
 
@@ -234,13 +234,13 @@ public:
 class PredictorSimple: public Predictor{
 private:
     PredictorType _type;
-    const AdaptivityManagerFarm& _manager;
+    const ManagerFarm& _manager;
 
     double getScalingFactor(const FarmConfiguration& configuration);
 
     double getPowerPrediction(const FarmConfiguration& configuration);
 public:
-    PredictorSimple(PredictorType type, const AdaptivityManagerFarm& manager);
+    PredictorSimple(PredictorType type, const ManagerFarm& manager);
 
     void prepareForPredictions();
 
@@ -268,7 +268,7 @@ typedef struct{
  */
 class Calibrator{
 private:
-    AdaptivityManagerFarm& _manager;
+    ManagerFarm& _manager;
     CalibrationState _state;
     std::vector<CalibrationStats> _calibrationStats;
     size_t _minNumPoints;
@@ -280,7 +280,7 @@ protected:
     virtual FarmConfiguration generateConfiguration() const = 0;
     virtual void reset(){;}
 public:
-    Calibrator(AdaptivityManagerFarm& manager);
+    Calibrator(ManagerFarm& manager);
 
     virtual ~Calibrator(){;}
 
@@ -301,14 +301,14 @@ public:
  */
 class CalibratorLowDiscrepancy: public Calibrator{
 private:
-    AdaptivityManagerFarm& _manager;
+    ManagerFarm& _manager;
     gsl_qrng* _generator;
     double* _normalizedPoint;
 protected:
     FarmConfiguration generateConfiguration() const;
     void reset();
 public:
-    CalibratorLowDiscrepancy(AdaptivityManagerFarm& manager);
+    CalibratorLowDiscrepancy(ManagerFarm& manager);
     ~CalibratorLowDiscrepancy();
 };
 

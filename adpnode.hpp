@@ -1,5 +1,5 @@
 /*
- * node.hpp
+ * adpnode.hpp
  *
  * Created on: 23/03/2015
  *
@@ -42,7 +42,7 @@
 #undef DEBUGB
 
 #ifdef DEBUG_NODE
-#define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
+#define DEBUG(x) do { cerr << x << endl; } while (0)
 #define DEBUGB(x) do {x;} while(0)
 #else
 #define DEBUG(x)
@@ -51,8 +51,13 @@
 
 namespace adpff{
 
+using namespace std;
+
 using namespace ff;
-using namespace mammut;
+using namespace mammut::cpufreq;
+using namespace mammut::energy;
+using namespace mammut::task;
+using namespace mammut::topology;
 
 /*!
  * \internal
@@ -124,10 +129,10 @@ typedef struct{
  */
 class adpff_node: public ff_node{
 private:
-    friend class AdaptivityManagerFarm;
+    friend class ManagerFarm;
 
-    task::TasksManager* _tasksManager;
-    task::ThreadHandler* _thread;
+    TasksManager* _tasksManager;
+    ThreadHandler* _thread;
     ManagementRequest _managementRequest;
     WorkerSample _sampleResponse;
     double _ticksPerNs;
@@ -155,7 +160,7 @@ private:
               double ticksPerNs){
         size_t tid = getOSThreadId();
         if(!tid){
-            throw std::runtime_error("Node init() called before "
+            throw runtime_error("Node init() called before "
                                      "thread creation.");
         }
         _tasksManager = mammut.getInstanceTask();
@@ -167,7 +172,7 @@ private:
      * Moves this node on a specific virtual core.
      * @param vc The virtual core where this nodes must be moved.
      */
-    void move(mammut::topology::VirtualCore* vc){
+    void move(VirtualCore* vc){
         _thread->move(vc);
     }
 
@@ -180,7 +185,7 @@ private:
         req.tv_nsec = ns - sec*NSECS_IN_SECS;
         nanosleep(&req, NULL);
 #else
-        throw std::runtime_error("Nanosleep not supported on this OS.");
+        throw runtime_error("Nanosleep not supported on this OS.");
 #endif
     }
 
@@ -305,7 +310,7 @@ private:
                     lb->thaw(true, _managementRequest.numWorkers);
                 }break;
                 default:{
-                    throw std::runtime_error("Unexpected mgmt request.");
+                    throw runtime_error("Unexpected mgmt request.");
                 }break;
             }
         }

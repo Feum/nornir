@@ -36,12 +36,17 @@
 #include <mammut/utils.hpp>
 #include <mammut/mammut.hpp>
 
-using mammut::utils::enumStrings;
-
 namespace adpff{
 
 class Observer;
-using namespace mammut;
+
+using namespace std;
+using namespace mammut::cpufreq;
+using namespace mammut::topology;
+using namespace mammut::utils;
+using mammut::Communicator;
+using mammut::Mammut;
+using mammut::utils::enumStrings;
 
 /// Possible contracts requested by the user.
 typedef enum{
@@ -333,9 +338,6 @@ typedef enum{
     // Specified governor not supported on this machine.
     VALIDATION_GOVERNOR_UNSUPPORTED,
 
-    // Specified mapping strategy not supported on this machine.
-    VALIDATION_STRATEGY_MAPPING_UNSUPPORTED,
-
     // sensitiveEmitter or sensitiveCollector specified but frequency
     // strategy is STRATEGY_FREQUENCY_NO.
     VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY,
@@ -373,22 +375,22 @@ private:
     char* _fileContentChars;
     rapidxml::xml_node<>* _root;
 public:
-    XmlContent(const std::string& fileName,
-               const std::string& rootName){
+    XmlContent(const string& fileName,
+               const string& rootName){
         rapidxml::xml_document<> xmlContent;
-        std::ifstream file(fileName.c_str());
+        ifstream file(fileName.c_str());
         if(!file.is_open()){
-            throw std::runtime_error("Impossible to read xml file " + fileName);
+            throw runtime_error("Impossible to read xml file " + fileName);
         }
 
-        std::string fileContent;
-        file.seekg(0, std::ios::end);
+        string fileContent;
+        file.seekg(0, ios::end);
         fileContent.reserve(file.tellg());
-        file.seekg(0, std::ios::beg);
-        fileContent.assign((std::istreambuf_iterator<char>(file)),
-                            std::istreambuf_iterator<char>());
+        file.seekg(0, ios::beg);
+        fileContent.assign((istreambuf_iterator<char>(file)),
+                            istreambuf_iterator<char>());
         _fileContentChars = new char[fileContent.size() + 1];
-        std::copy(fileContent.begin(), fileContent.end(), _fileContentChars);
+        copy(fileContent.begin(), fileContent.end(), _fileContentChars);
         _fileContentChars[fileContent.size()] = '\0';
         xmlContent.parse<0>(_fileContentChars);
         _root = xmlContent.first_node(rootName.c_str());
@@ -402,7 +404,7 @@ public:
         rapidxml::xml_node<> *node = NULL;
         node = _root->first_node(valueName);
         if(node){
-            value = std::string(node->value()).compare("true")?false:true;
+            value = string(node->value()).compare("true")?false:true;
         }
     }
 
@@ -410,7 +412,7 @@ public:
         rapidxml::xml_node<> *node = NULL;
         node = _root->first_node(valueName);
         if(node){
-            value = utils::stringToInt(node->value());
+            value = stringToInt(node->value());
         }
     }
 
@@ -418,7 +420,7 @@ public:
         rapidxml::xml_node<> *node = NULL;
         node = _root->first_node(valueName);
         if(node){
-            value = utils::stringToUint(node->value());
+            value = stringToUint(node->value());
         }
     }
 
@@ -426,7 +428,7 @@ public:
         rapidxml::xml_node<> *node = NULL;
         node = _root->first_node(valueName);
         if(node){
-            value = utils::stringToUlong(node->value());
+            value = stringToUlong(node->value());
         }
     }
 
@@ -434,11 +436,11 @@ public:
         rapidxml::xml_node<> *node = NULL;
         node = _root->first_node(valueName);
         if(node){
-            value = utils::stringToDouble(node->value());
+            value = stringToDouble(node->value());
         }
     }
 
-    bool getStringValue(const char* valueName, std::string& value){
+    bool getStringValue(const char* valueName, string& value){
         rapidxml::xml_node<> *node = NULL;
         node = _root->first_node(valueName);
         if(node){
@@ -449,7 +451,7 @@ public:
         }
     }
 
-    void setStringValue(const char* valueName, std::string& value){
+    void setStringValue(const char* valueName, string& value){
         getStringValue(valueName, value);
     }
 
@@ -458,8 +460,8 @@ public:
         rapidxml::xml_node<> *node = NULL;
         node = _root->first_node(valueName);
         if(node){
-            std::stringstream line(node->value());
-            line >> mammut::utils::enumFromStringInternal(value);
+            stringstream line(node->value());
+            line >> enumFromStringInternal(value);
         }
     }
 };
@@ -483,13 +485,13 @@ typedef struct ArchData{
 
     // The file containing the voltage table. It is mandatory when
     // strategyFrequencies is STRATEGY_FREQUENCY_YES.
-    std::string voltageTableFile;
+    string voltageTableFile;
 
     ArchData():ticksPerNs(0),
                monitoringCost(0),
                voltageTableFile(""){;}
 
-    void loadXml(const std::string& archFileName){
+    void loadXml(const string& archFileName){
         XmlContent xc(archFileName, "archData");
         SETVALUE(xc, Double, ticksPerNs);
         SETVALUE(xc, Double, monitoringCost);
@@ -506,7 +508,7 @@ typedef struct ArchData{
 class AdaptivityParameters{
 
 private:
-    friend class AdaptivityManagerFarm;
+    friend class ManagerFarm;
 
     /**
      * Sets default parameters
@@ -527,13 +529,14 @@ private:
         strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
         mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
         mappingCollector = SERVICE_NODE_MAPPING_ALONE;
-        frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
+        frequencyGovernor = GOVERNOR_USERSPACE;
         turboBoost = false;
         frequencyLowerBound = 0;
         frequencyUpperBound = 0;
         fastReconfiguration = false;
         migrateCollector = false;
         smoothingFactor = 0;
+        persistenceValue = 0;
         samplingInterval = 0;
         underloadThresholdFarm = 80.0;
         overloadThresholdFarm = 90.0;
@@ -561,45 +564,242 @@ private:
             double msMonitoringCost = (archData.monitoringCost/
                                        archData.ticksPerNs*
                                        0.000001);
-            samplingInterval = std::ceil(msMonitoringCost*
+            samplingInterval = ceil(msMonitoringCost*
                                         (100.0 - maxMonitoringOverhead));
         }
 
+        if(!smoothingFactor){
+            switch(strategySmoothing){
+                case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
+                    smoothingFactor = 10;
+                }break;
+                case STRATEGY_SMOOTHING_EXPONENTIAL:{
+                    smoothingFactor = 0.5;
+                }break;
+            }
+        }
+
+        if(!persistenceValue){
+            switch(strategyPersistence){
+                case STRATEGY_PERSISTENCE_SAMPLES:{
+                    persistenceValue = 10;
+                }break;
+                case STRATEGY_PERSISTENCE_TASKS:{
+                    persistenceValue = 1000;
+                }break;
+                case STRATEGY_PERSISTENCE_VARIATION:{
+                    persistenceValue = 5;
+                }break;
+            }
+        }
+    }
+
+    bool isGovernorAvailable(Governor g){
+        return mammut.getInstanceCpuFreq()->isGovernorAvailable(g);
+    }
+
+    vector<Frequency> getAvailableFrequencies(){
+        vector<Frequency> frequencies;
+        CpuFreq* cpuFreq = mammut.getInstanceCpuFreq();
+        if(cpuFreq){
+            vector<Domain*> fDomains = cpuFreq->getDomains();
+            if(fDomains.size()){
+                frequencies = fDomains.front()->getAvailableFrequencies();
+            }
+        }
+        return frequencies;
+    }
+
+    bool isUnusedVcOffAvailable(){
+        vector<VirtualCore*> vc = mammut.getInstanceTopology()->
+                                  getVirtualCores();
+        for(size_t i = 0; i < vc.size(); i++){
+            if(vc.at(i)->isHotPluggable()){
+                return true;
+            }
+        }
+    }
+
+    bool isFrequencySettable(){
+        vector<Frequency> frequencies = getAvailableFrequencies();
+        return  isGovernorAvailable(GOVERNOR_USERSPACE) && frequencies.size();
+
+    }
+
+    bool isLowestFrequencySettable(){
+        return isGovernorAvailable(GOVERNOR_POWERSAVE) ||
+               isFrequencySettable();
+    }
+
+    bool isHighestFrequencySettable(){
+        return isGovernorAvailable(GOVERNOR_PERFORMANCE) ||
+               isFrequencySettable();
+    }
+
+    AdaptivityParametersValidation validateUnusedVc
+                                   (StrategyUnusedVirtualCores& s){
+        switch(s){
+            case STRATEGY_UNUSED_VC_OFF:{
+                if(!isUnusedVcOffAvailable()){
+                    return VALIDATION_UNUSED_VC_NO_OFF;
+                }
+            }break;
+            case STRATEGY_UNUSED_VC_LOWEST_FREQUENCY:{
+                if(!isLowestFrequencySettable()){
+                    return VALIDATION_UNUSED_VC_NO_FREQUENCIES;
+                }
+            }break;
+            case STRATEGY_UNUSED_VC_AUTO:{
+                if(isUnusedVcOffAvailable()){
+                    s = STRATEGY_UNUSED_VC_OFF;
+                }else if(isLowestFrequencySettable()){
+                    s = STRATEGY_UNUSED_VC_LOWEST_FREQUENCY;
+                }
+            }
+            default:
+                break;
+        }
+        return VALIDATION_OK;
+    }
+
+    bool serviceNodePerformance(){
+        return mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE ||
+               mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE;
+    }
+
+    AdaptivityParametersValidation validateFrequencies(){
+        vector<Frequency> availableFrequencies = getAvailableFrequencies();
+
         if(strategyFrequencies == STRATEGY_FREQUENCY_AUTO){
-            if(isGovernorAvailable(mammut::cpufreq::GOVERNOR_USERSPACE)){
+            if(isGovernorAvailable(GOVERNOR_USERSPACE) &&
+               availableFrequencies.size()){
                 strategyFrequencies = STRATEGY_FREQUENCY_YES;
             }else{
                 strategyFrequencies = STRATEGY_FREQUENCY_NO;
             }
         }
 
-        switch(strategySmoothing){
-            case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
-                smoothingFactor = 10;
+        if(strategyFrequencies != STRATEGY_FREQUENCY_NO &&
+           strategyMapping == STRATEGY_MAPPING_NO){
+                return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
+        }
+
+        if(strategyFrequencies == STRATEGY_FREQUENCY_YES){
+            if(archData.voltageTableFile.empty() ||
+               !existsFile(archData.voltageTableFile)){
+                return VALIDATION_VOLTAGE_FILE_NEEDED;
+            }
+        }
+
+        switch(strategyFrequencies){
+            case STRATEGY_FREQUENCY_AUTO:{
+                throw runtime_error("This should never happen.");
             }break;
-            case STRATEGY_SMOOTHING_EXPONENTIAL:{
-                smoothingFactor = 0.5;
+            case STRATEGY_FREQUENCY_NO:{
+                if(serviceNodePerformance()){
+                    return VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY;
+                }
+            }break;
+            case STRATEGY_FREQUENCY_OS:{
+                if(!isGovernorAvailable(frequencyGovernor)){
+                    return VALIDATION_GOVERNOR_UNSUPPORTED;
+                }
+                if(frequencyLowerBound || frequencyUpperBound){
+                    if(!availableFrequencies.size()){
+                        return VALIDATION_INVALID_FREQUENCY_BOUNDS;
+                    }
+
+                    if(frequencyLowerBound){
+                        if(!contains(availableFrequencies,
+                                     frequencyLowerBound)){
+                            return VALIDATION_INVALID_FREQUENCY_BOUNDS;
+                        }
+                    }else{
+                        frequencyLowerBound = availableFrequencies.front();
+                    }
+
+                    if(frequencyUpperBound){
+                        if(!contains(availableFrequencies,
+                                     frequencyUpperBound)){
+                            return VALIDATION_INVALID_FREQUENCY_BOUNDS;
+                        }
+                    }else{
+                        frequencyUpperBound = availableFrequencies.back();
+                    }
+                }
+                //TODO: Permettere di specificare i bound anche quando c'è
+                //      FREQUENCY_YES
+            }break;
+            case STRATEGY_FREQUENCY_MIN_CORES:
+            case STRATEGY_FREQUENCY_YES:{
+                if(!availableFrequencies.size()){
+                    return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
+                }
+
+                frequencyGovernor = GOVERNOR_USERSPACE;
+                if(!isGovernorAvailable(frequencyGovernor)){
+                    return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
+                }
+
+                if(serviceNodePerformance() &&
+                   !isHighestFrequencySettable()){
+                    return VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS;
+                }
+
             }break;
         }
 
-        switch(strategyPersistence){
-            case STRATEGY_PERSISTENCE_SAMPLES:{
-                persistenceValue = 10;
+        if(fastReconfiguration && !isHighestFrequencySettable()){
+            return VALIDATION_NO_FAST_RECONF;
+        }
+        return VALIDATION_OK;
+    }
+
+    AdaptivityParametersValidation validateContract(){
+        switch(contractType){
+            case CONTRACT_PERF_UTILIZATION:{
+                if(underloadThresholdFarm > overloadThresholdFarm     ||
+                   underloadThresholdWorker > overloadThresholdWorker ||
+                   underloadThresholdFarm < 0                         ||
+                   overloadThresholdFarm > 100                        ||
+                   underloadThresholdWorker < 0                       ||
+                   overloadThresholdWorker > 100){
+                    return VALIDATION_WRONG_CONTRACT_PARAMETERS;
+                }
             }break;
-            case STRATEGY_PERSISTENCE_TASKS:{
-                persistenceValue = 1000;
+            case CONTRACT_PERF_BANDWIDTH:{
+                if(requiredBandwidth <= 0){
+                    return VALIDATION_WRONG_CONTRACT_PARAMETERS;
+                }
             }break;
-            case STRATEGY_PERSISTENCE_VARIATION:{
-                persistenceValue = 5;
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                if(!expectedTasksNumber || !requiredCompletionTime){
+                    return VALIDATION_WRONG_CONTRACT_PARAMETERS;
+                }
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                if(powerBudget <= 0 ||
+                   strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES ||
+                   strategyPrediction == STRATEGY_PREDICTION_SIMPLE){
+                    return VALIDATION_WRONG_CONTRACT_PARAMETERS;
+                }
+            }break;
+            default:{
+                ;
             }break;
         }
+
+        if(maxPrimaryPredictionError < 0      ||
+           maxPrimaryPredictionError > 100.0  ||
+           maxSecondaryPredictionError < 0    ||
+           maxSecondaryPredictionError > 100.0){
+            return VALIDATION_WRONG_CONTRACT_PARAMETERS;
+        }
+
+        return VALIDATION_OK;
     }
 
-    bool isGovernorAvailable(mammut::cpufreq::Governor g){
-        return mammut.getInstanceCpuFreq()->isGovernorAvailable(g);
-    }
-
-    void loadXml(const std::string& paramFileName){
+    void loadXml(const string& paramFileName){
         XmlContent xc(paramFileName, "adaptivityParameters");
 
         SETVALUE(xc, Enum, contractType);
@@ -618,10 +818,10 @@ private:
         SETVALUE(xc, Enum, mappingEmitter);
         SETVALUE(xc, Enum, mappingCollector);
 
-        std::string g;
+        string g;
         if(xc.getStringValue("frequencyGovernor", g)){
-            std::transform(g.begin(), g.end(), g.begin(), ::tolower);
-            mammut::cpufreq::CpuFreq* cf = mammut.getInstanceCpuFreq();
+            transform(g.begin(), g.end(), g.begin(), ::tolower);
+            CpuFreq* cf = mammut.getInstanceCpuFreq();
             frequencyGovernor = cf->getGovernorFromGovernorName(g);
         }
 
@@ -648,7 +848,7 @@ private:
 
 public:
     // The mammut modules handler.
-    mammut::Mammut mammut;
+    Mammut mammut;
 
     // Architecture's specific data.
     ArchData archData;
@@ -702,18 +902,18 @@ public:
 
     // The frequency governor (only used when strategyFrequencies is
     // STRATEGY_FREQUENCY_OS) [default = GOVERNOR_USERSPACE].
-    cpufreq::Governor frequencyGovernor;
+    Governor frequencyGovernor;
 
     // Flag to enable/disable cores turbo boosting [default = false].
     bool turboBoost;
 
     // The frequency lower bound (only if strategyFrequency is
     // STRATEGY_FREQUENCY_OS) [default = unused].
-    cpufreq::Frequency frequencyLowerBound;
+    Frequency frequencyLowerBound;
 
     // The frequency upper bound (only if strategyFrequency is
     // STRATEGY_FREQUENCY_OS) [default = unused].
-    cpufreq::Frequency frequencyUpperBound;
+    Frequency frequencyUpperBound;
 
     // If true, before changing the number of workers the frequency will be
     // set to maximum to reduce the latency of the reconfiguration. The
@@ -732,12 +932,13 @@ public:
     bool migrateCollector;
 
     // The smoothing factor. It's meaning changes according to the smoothing
-    // strategy adopted. [default = 10 for moving average, 0.5 for exponential].
+    // strategy adopted. If 0, default value will be set.
+    // [default = 10 for moving average, 0.5 for exponential].
     double smoothingFactor;
 
     // The persistence value. It's meaning changes according to the persistence
-    // strategy adopted. [default = 10 for samples, 1000 for tasks, 5 for
-    // variation].
+    // strategy adopted. If 0, default value will be set.
+    // [default = 10 for samples, 1000 for tasks, 5 for variation].
     double persistenceValue;
 
     // The length of the sampling interval (in milliseconds) for the data
@@ -817,8 +1018,8 @@ public:
      * @param communicator The communicator used to instantiate the other
      *        modules. If NULL, the modules will be created as local modules.
      */
-    AdaptivityParameters(const std::string& paramFileName,
-                         const std::string& archFileName,
+    AdaptivityParameters(const string& paramFileName,
+                         const string& archFileName,
                          Communicator* const communicator = NULL):
           mammut(communicator){
         setDefault();
@@ -839,171 +1040,30 @@ public:
      * @return The validation result.
      */
     AdaptivityParametersValidation validate(){
+        AdaptivityParametersValidation r = VALIDATION_OK;
         setDefaultPost();
 
-        std::vector<cpufreq::Domain*> fDomains;
-        std::vector<topology::VirtualCore*> virtualCores;
-        std::vector<cpufreq::Frequency> availableFrequencies;
-
-        fDomains = mammut.getInstanceCpuFreq()->getDomains();
+        vector<VirtualCore*> virtualCores;
         virtualCores = mammut.getInstanceTopology()->getVirtualCores();
-        if(fDomains.size()){
-            availableFrequencies = fDomains.front()->getAvailableFrequencies();
-        }
-
-        if(strategyFrequencies != STRATEGY_FREQUENCY_NO &&
-           strategyMapping == STRATEGY_MAPPING_NO){
-            return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
-        }
 
         /** Validate frequency strategies. **/
-        if(strategyFrequencies != STRATEGY_FREQUENCY_NO){
-            if(!availableFrequencies.size()){
-                return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
-            }
-
-            if(strategyFrequencies != STRATEGY_FREQUENCY_OS){
-                frequencyGovernor = cpufreq::GOVERNOR_USERSPACE;
-                if(!isGovernorAvailable(frequencyGovernor)){
-                    return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
-                }
-            }
-            if(((mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE) ||
-                (mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE)) &&
-               !isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
-               !isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
-                return VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS;
-            }
-        }else{
-            if((mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE) ||
-               (mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE)){
-                return VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY;
-            }
-        }
-
-        /** Validate governor availability. **/
-        if(!isGovernorAvailable(frequencyGovernor)){
-            return VALIDATION_GOVERNOR_UNSUPPORTED;
-        }
-
-        /** Validate mapping strategy. **/
-        if(strategyMapping == STRATEGY_MAPPING_CACHE_EFFICIENT){
-            return VALIDATION_STRATEGY_MAPPING_UNSUPPORTED;
-        }
-
-        /** Validate frequency bounds. **/
-        if(frequencyLowerBound || frequencyUpperBound){
-            if(strategyFrequencies == STRATEGY_FREQUENCY_OS){
-                if(!availableFrequencies.size()){
-                    return VALIDATION_INVALID_FREQUENCY_BOUNDS;
-                }
-
-                if(frequencyLowerBound){
-                    if(!utils::contains(availableFrequencies,
-                                        frequencyLowerBound)){
-                        return VALIDATION_INVALID_FREQUENCY_BOUNDS;
-                    }
-                }else{
-                    frequencyLowerBound = availableFrequencies.at(0);
-                }
-
-                if(frequencyUpperBound){
-                    if(!utils::contains(availableFrequencies,
-                                        frequencyUpperBound)){
-                        return VALIDATION_INVALID_FREQUENCY_BOUNDS;
-                    }
-                }else{
-                    frequencyUpperBound = availableFrequencies.back();
-                }
-            }else{
-                return VALIDATION_INVALID_FREQUENCY_BOUNDS;
-            }
-        }
+        r = validateFrequencies();
+        if(r != VALIDATION_OK){return r;}
 
         /** Validate unused cores strategy. **/
-        switch(strategyInactiveVirtualCores){
-            case STRATEGY_UNUSED_VC_OFF:{
-                bool hotPluggableFound = false;
-                for(size_t i = 0; i < virtualCores.size(); i++){
-                    if(virtualCores.at(i)->isHotPluggable()){
-                        hotPluggableFound = true;
-                    }
-                }
-                if(!hotPluggableFound){
-                    return VALIDATION_UNUSED_VC_NO_OFF;
-                }
-            }break;
-            case STRATEGY_UNUSED_VC_LOWEST_FREQUENCY:{
-                if(!isGovernorAvailable(cpufreq::GOVERNOR_POWERSAVE) &&
-                   !isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE)){
-                    return VALIDATION_UNUSED_VC_NO_FREQUENCIES;
-                }
-            }break;
-            default:
-                break;
-        }
+        r = validateUnusedVc(strategyInactiveVirtualCores);
+        if(r != VALIDATION_OK){return r;}
+        validateUnusedVc(strategyUnusedVirtualCores);
+        if(r != VALIDATION_OK){return r;}
 
         /** Validate contract parameters. **/
-        switch(contractType){
-            case CONTRACT_PERF_UTILIZATION:{
-                if(underloadThresholdFarm > overloadThresholdFarm     ||
-                   underloadThresholdWorker > overloadThresholdWorker ||
-                   underloadThresholdFarm < 0                         ||
-                   overloadThresholdFarm > 100                        ||
-                   underloadThresholdWorker < 0                       ||
-                   overloadThresholdWorker > 100){
-                    return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-                }
-            }break;
-            case CONTRACT_PERF_BANDWIDTH:{
-                if(requiredBandwidth <= 0){
-                    return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-                }
-            }break;
-            case CONTRACT_PERF_COMPLETION_TIME:{
-                if(!expectedTasksNumber || !requiredCompletionTime){
-                    return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-                }
-            }break;
-            case CONTRACT_POWER_BUDGET:{
-                if(powerBudget <= 0 ||
-                   strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES ||
-                   strategyPrediction == STRATEGY_PREDICTION_SIMPLE){
-                    return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-                }
-            }break;
-            default:{
-                ;
-            }break;
-        }
+        r = validateContract();
+        if(r != VALIDATION_OK){return r;}
 
-        if(maxPrimaryPredictionError < 0      ||
-           maxPrimaryPredictionError > 100.0  ||
-           maxSecondaryPredictionError < 0    ||
-           maxSecondaryPredictionError > 100.0){
-            return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-        }
-
-        /** Validate voltage table. **/
-        if(strategyFrequencies == STRATEGY_FREQUENCY_YES){
-            if(archData.voltageTableFile.empty() ||
-               !utils::existsFile(archData.voltageTableFile)){
-                return VALIDATION_VOLTAGE_FILE_NEEDED;
-            }
-        }
-
-        /** Validate fast reconfiguration. **/
-        if(fastReconfiguration){
-            if(!isGovernorAvailable(cpufreq::GOVERNOR_PERFORMANCE) &&
-               (!isGovernorAvailable(cpufreq::GOVERNOR_USERSPACE) ||
-                !availableFrequencies.size())){
-                return VALIDATION_NO_FAST_RECONF;
-            }
-        }
-
-        /** Validate Hyperthreading strategies. **/
-        if(strategyHyperthreading == STRATEGY_HT_YES_SOONER){
-            throw std::runtime_error("Not yet supported.");
+        /** Validate unsupported strategies. **/
+        if(strategyHyperthreading == STRATEGY_HT_YES_SOONER ||
+           strategyMapping == STRATEGY_MAPPING_CACHE_EFFICIENT){
+            throw runtime_error("Not yet supported.");
         }
 
         return VALIDATION_OK;

@@ -33,7 +33,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "../farm.hpp"
+#include "../manager.hpp"
 #include "../predictors_impl.hpp"
 
 using namespace ff;
@@ -125,7 +125,7 @@ int main(int argc, char * argv[]) {
     adpff::AdaptivityParameters ap("parameters.xml",
                                    "archdata.xml");
     ap.observer = &obs;
-    adpff::AdaptivityManagerFarm amf(&farm, ap);
+    adpff::ManagerFarm amf(&farm, ap);
     amf.start();
     amf.join();
 
