@@ -1419,6 +1419,113 @@ private:
     }
 
     /**
+     * Prepares the nodes to freeze.
+     */
+    void prepareToFreeze(){
+        if(_emitter){
+            _emitter->prepareToFreeze();
+        }
+        for(size_t i = 0; i < _activeWorkers.size(); i++){
+            _activeWorkers.at(i)->prepareToFreeze();
+        }
+        if(_collector){
+            _collector->prepareToFreeze();
+        }
+    }
+
+    /**
+     * Freezes all the nodes.
+     */
+    void freeze(){
+        DEBUG("Asking the farm to freeze");
+        if(_emitter){
+            _emitter->freezeAll((void*)(_collector?FF_EOSW:FF_GO_OUT));
+        }
+        DEBUG("Wait for freezing");
+        for(size_t i = 0; i < _activeWorkers.size(); i++){
+            _activeWorkers.at(i)->wait_freezing();
+        }
+        if(_collector){
+            _collector->wait_freezing();
+        }
+        DEBUG("Farm freezed");
+    }
+
+    /**
+     * Notifies a change in the number of workers to all the nodes.
+     * @param numWorkers The new number of workers.
+     */
+    void notifyNewConfiguration(uint numWorkers){
+        if(_emitter){
+            _emitter->notifyWorkersChange(_currentConfiguration.numWorkers,
+                                          numWorkers);
+        }
+        for(size_t i = 0; i < numWorkers; i++){
+            adpff_node* w = _activeWorkers.at(i);
+            w->notifyWorkersChange(_currentConfiguration.numWorkers,
+                                   numWorkers);
+        }
+        if(_collector){
+            _collector->notifyWorkersChange(_currentConfiguration.numWorkers,
+                                            numWorkers);
+        }
+    }
+
+    /**
+     * Prepares the nodes to run.
+     * @param numWorkers The new number of workers.
+     */
+    void prepareToRun(uint numWorkers){
+        if(_emitter){
+            _emitter->prepareToRun();
+        }
+        for(size_t i = 0; i < numWorkers; i++){
+            _activeWorkers.at(i)->prepareToRun();
+        }
+        if(_collector){
+            _collector->prepareToRun();
+        }
+    }
+
+    /**
+     * Runs the farm with a new number of workers.
+     * @param numWorkers The new number of workers.
+     */
+    void run(uint numWorkers){
+        DEBUG("Asking the farm to start again");
+        if(_emitter){
+            _emitter->thawAll(numWorkers);
+        }
+        if(_collector){
+            _collector->thaw(true, numWorkers);
+        }
+        DEBUG("Farm started");
+    }
+
+    /**
+     * Checks if the application terminated.
+     */
+    bool terminated(){
+        if(_emitter &&
+           _emitter->isTerminated()){
+            return true;
+        }
+
+        for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
+            if(_activeWorkers.at(i)->isTerminated()){
+                return true;
+            }
+        }
+
+        if(_collector &&
+           _collector->isTerminated()){
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Changes the current farm configuration.
      * @param configuration The new configuration.
      * @param refine True if the data on the last configuration must be used
@@ -1456,67 +1563,26 @@ private:
                 }
             }
 
-            /** Freezes farm. **/
-            DEBUG("Asking the farm to freeze");
-            _emitter->freezeAll((void*)(_collector?FF_EOSW:FF_GO_OUT));
-            DEBUG("Wait for freezing");
-            for(size_t i = 0; i < _activeWorkers.size(); i++){
-                _activeWorkers.at(i)->wait_freezing();
-            }
-            if(_collector){
-                _collector->wait_freezing();
-            }
-            DEBUG("Farm freezed");
-
-            /** 
-             * When the farm is freezed the last sample is automatically
-             * stored by the workers.
-             **/
-            storeNewSample(false);
+            prepareToFreeze();
+            freeze();
 
             changeActiveNodes(configuration);
             updateUsedCpus();
+            notifyNewConfiguration(configuration.numWorkers);
 
-            /** Notify the nodes that a reconfiguration is happening. **/
-            if(_emitter){
-                _emitter->notifyWorkersChange(_currentConfiguration.numWorkers,
-                                              configuration.numWorkers);
-            }
-            for(size_t i = 0; i < configuration.numWorkers; i++){
-                adpff_node* w = _activeWorkers.at(i);
-                w->notifyWorkersChange(_currentConfiguration.numWorkers,
-                                       configuration.numWorkers);
-            }
-            if(_collector){
-                _collector->notifyWorkersChange(_currentConfiguration.numWorkers,
-                                                configuration.numWorkers);
-            }
+            prepareToRun(configuration.numWorkers);
+            run(configuration.numWorkers);
 
-            /** Prepare all the nodes for the new run. **/
-            if(_emitter){
-                _emitter->prepareToRun();
-            }
-            for(size_t i = 0; i < configuration.numWorkers; i++){
-                _activeWorkers.at(i)->prepareToRun();
-            }
-            if(_collector){
-                _collector->prepareToRun();
-            }
-
-
-            /** Start the farm again. **/
-            DEBUG("Asking the farm to start again");
-            _emitter->thawAll(configuration.numWorkers);
-            if(_collector){
-                _collector->thaw(true, configuration.numWorkers);
-            }
-            DEBUG("Farm started");
             if(_p.fastReconfiguration){
                 _cpufreq->rollback(rollbackPoints);
             }
+
+            // Must be done after rollback.
+            applyUnusedVCStrategy();
         }
         /****************** Workers change terminated ******************/
-        applyUnusedVCStrategy();
+
+
         /****************** P-state change started ******************/
         //TODO: Maybe sensitivity could not be satisfied with the maximum
         // number of workers but could be satisfied now.
@@ -1582,17 +1648,13 @@ private:
 
     /**
      * Store a new sample.
-     * @param ask If false, the request to the worker is not sent.
      **/
-    void storeNewSample(bool ask = true){
+    void storeNewSample(){
         MonitoredSample sample;
         WorkerSample ws;
         JoulesCpu joules;
 
-        if(ask){
-            askForWorkersSamples();
-        }
-
+        askForWorkersSamples();
         DEBUG("Waiting samples from workers");
         getWorkersSamples(ws);
         DEBUG("Samples arrived");
@@ -1802,6 +1864,8 @@ public:
         }
         if(_emitter){
             _emitter->init(_p.mammut, _p.archData.ticksPerNs);
+        }else{
+            throw runtime_error("Emitter is needed to use the manager.");
         }
         if(_collector){
             _collector->init(_p.mammut, _p.archData.ticksPerNs);
@@ -1845,7 +1909,7 @@ public:
             }
 
             double startSample = getMillisecondsTime();
-            while(!_farm->isfrozen()){
+            while(!terminated()){
                 double overheadMs = getMillisecondsTime() - startSample;
                 microsecsSleep = ((double)_p.samplingInterval - overheadMs)*
                                   (double)MAMMUT_MICROSECS_IN_MILLISEC;

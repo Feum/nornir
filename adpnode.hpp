@@ -131,6 +131,8 @@ class adpff_node: public ff_node{
 private:
     friend class ManagerFarm;
 
+    volatile bool _terminated;
+    volatile bool _goingToFreeze;
     TasksManager* _tasksManager;
     ThreadHandler* _thread;
     ManagementRequest _managementRequest;
@@ -258,6 +260,14 @@ private:
     }
 
     /**
+     * Called on the node before starting it.
+     * It must be called when the node is running.
+     */
+    void prepareToFreeze(){
+        _goingToFreeze = true;
+    }
+
+    /**
      * Called on the node before starting them.
      * It must be called when the node is frozen.
      */
@@ -265,6 +275,17 @@ private:
         taskcnt = 0;
         tickstot = 0;
         _startTicks = getticks();
+        _goingToFreeze = false;
+    }
+
+    /**
+     * Returns true if the farm has been terminated by the application,
+     * false otherwise.
+     * @return true if the farm has been terminated by the application,
+     * false otherwise.
+     */
+    bool isTerminated() const{
+        return _terminated;
     }
 
     void storeSample(){
@@ -316,7 +337,10 @@ private:
     }
 
     void callbackOut(void *p) CX11_KEYWORD(final){
-        storeSample();
+        if(!_goingToFreeze){
+            _terminated = true;
+            storeSample();
+        }
     }
 
 protected:
@@ -331,6 +355,8 @@ public:
      * Builds an adaptive node.
      */
     adpff_node():
+            _terminated(false),
+            _goingToFreeze(false),
             _tasksManager(NULL),
             _thread(NULL),
             _managementQ(1),
