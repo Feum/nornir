@@ -2,5 +2,5 @@
 <adaptivityParameters>
     <samplingInterval>1000</samplingInterval>
     <contractType>POWER_BUDGET</contractType>
-	<powerBudget>30</powerBudget> 
+    <powerBudget>30</powerBudget> 
 </adaptivityParameters>

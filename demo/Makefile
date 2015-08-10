@@ -1,9 +1,9 @@
 CXX                  = g++
-CXXFLAGS             = -Wall -g -pedantic -fpermissive
+CXXFLAGS             = -Wall -g -pedantic -fpermissive -DDEBUG_FARM -DDEBUG_NODE
 OPTIMIZE_FLAGS       = -O3 -finline-functions 
-INCS                 = -I../../Mammut -I/usr/include/libxml2 #-I/usr/include/armadillo_bits
+INCS                 = -I../../Mammut -I/usr/include/libxml2
 LDFLAGS              = -L../../Mammut/mammut
-LDLIBS               = -lm -pthread -lrt -lmammut -lprotobuf-lite -lmlpack -llapack -lblas
+LDLIBS               = -lm -pthread -lrt -lmammut -lprotobuf-lite -lmlpack -llapack -lblas -lgsl -lgslcblas
 TARGET               = demo-farm demo-parfor
 
 .PHONY: clean cleanall

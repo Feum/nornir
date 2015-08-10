@@ -618,6 +618,7 @@ private:
                 return true;
             }
         }
+        return false;
     }
 
     bool isFrequencySettable(){
@@ -669,7 +670,6 @@ private:
 
     AdaptivityParametersValidation validateFrequencies(){
         vector<Frequency> availableFrequencies = getAvailableFrequencies();
-
         if(strategyFrequencies == STRATEGY_FREQUENCY_AUTO){
             if(isGovernorAvailable(GOVERNOR_USERSPACE) &&
                availableFrequencies.size()){

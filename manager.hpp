@@ -972,19 +972,19 @@ private:
             currentDomain = _scalableDomains.at(i);
             if(!currentDomain->setGovernor(_p.frequencyGovernor)){
                 throw runtime_error("AdaptivityManagerFarm: Impossible to "
-                                         "set the specified governor.");
+                                    "set the specified governor.");
             }
             if(_p.frequencyGovernor != GOVERNOR_USERSPACE){
                 if(!currentDomain->setGovernorBounds(_p.frequencyLowerBound,
                                                      _p.frequencyUpperBound)){
                     throw runtime_error("AdaptivityManagerFarm: Impossible "
-                                             "to set the specified governor's "
-                                             "bounds.");
+                                        "to set the specified governor's "
+                                        "bounds.");
                 }
             }else if(_p.strategyFrequencies != STRATEGY_FREQUENCY_OS){
                 if(!currentDomain->setFrequencyUserspace(frequency)){
                     throw runtime_error("AdaptivityManagerFarm: Impossible "
-                                             "to set the specified frequency.");
+                                        "to set the specified frequency.");
                 }
             }
         }
@@ -1012,29 +1012,35 @@ private:
         updateUsedCpus();
         applyUnusedVCStrategy();
 
-        // Insert dummy constant frequency
-        _availableFrequencies.push_back(1.0);
+        if(reconfigureFrequency()){
+            // We suppose that all the domains have the same
+            // available frequencies.
+            _availableFrequencies = _cpufreq->getDomains().at(0)->
+                                    getAvailableFrequencies();
+
+            // Remove turbo boost frequency.
+            if(!_p.turboBoost && !_availableFrequencies.empty()){
+                if(intToString(_availableFrequencies.back()).at(3) == '1'){
+                    _availableFrequencies.pop_back();
+                }
+            }
+        }
+
+        if(_availableFrequencies.empty()){
+            // Insert dummy constant frequency
+            _availableFrequencies.push_back(1.0);
+        }
+
+        // Sets the current frequency to the highest possible.                                                                                                              
+        _currentConfiguration.frequency = _availableFrequencies.back();
 
         if(_p.strategyFrequencies != STRATEGY_FREQUENCY_NO){
-            if(_p.strategyFrequencies != STRATEGY_FREQUENCY_OS){
-                // We suppose that all the domains have the same
-                // available frequencies.
-                _availableFrequencies = _cpufreq->getDomains().at(0)->
-                                        getAvailableFrequencies();
-
-                // Remove turbo boost frequency.
-                if(!_p.turboBoost){
-                    if(intToString(_availableFrequencies.back()).at(3) == '1'){
-                        _availableFrequencies.pop_back();
-                    }
-                }
-
-                // Sets the current frequency to the highest possible.
-                _currentConfiguration.frequency = _availableFrequencies.back();
-            }
             updatePstate(_currentConfiguration.frequency);
         }
     }
+
+
+
 
     /**
      * Returns the maximum primary prediction error.
@@ -1462,6 +1468,12 @@ private:
             }
             DEBUG("Farm freezed");
 
+            /** 
+             * When the farm is freezed the last sample is automatically
+             * stored by the workers.
+             **/
+            storeNewSample(false);
+
             changeActiveNodes(configuration);
             updateUsedCpus();
 
@@ -1553,40 +1565,37 @@ private:
      * Obtain workers samples.
      * @param sample A worker sample. It will be filled by this call with the
      *               global data of the farm.
-     * @return True if all the workers are still running, false otherwise.
      */
-    bool getWorkersSamples(WorkerSample& sample){
+    void getWorkersSamples(WorkerSample& sample){
         adpff_node* w;
         sample = WorkerSample();
         for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
             WorkerSample tmp;
             w = _activeWorkers.at(i);
-            if(!w->getSampleResponse(tmp,
-                                     _p.strategyPolling,
-                                     _samples->average().latency)){
-                return false;
-            }
+            w->getSampleResponse(tmp, _p.strategyPolling,
+                                 _samples->average().latency);
             sample += tmp;
         }
         sample.loadPercentage /= _currentConfiguration.numWorkers;
         sample.latency /= _currentConfiguration.numWorkers;
-        return true;
     }
 
     /**
      * Store a new sample.
-     * @param askWorkers If false, the request to the worker is not sent.
-     * @return false if the farm is not running anymore, true otherwise.
+     * @param ask If false, the request to the worker is not sent.
      **/
-    bool storeNewSample(){
-        askForWorkersSamples();
-
+    void storeNewSample(bool ask = true){
         MonitoredSample sample;
         WorkerSample ws;
         JoulesCpu joules;
-        if(!getWorkersSamples(ws)){
-            return false;
+
+        if(ask){
+            askForWorkersSamples();
         }
+
+        DEBUG("Waiting samples from workers");
+        getWorkersSamples(ws);
+        DEBUG("Samples arrived");
 
         _totalTasks += ws.tasksCount;
         if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
@@ -1625,7 +1634,6 @@ private:
         _samples->add(sample);
 
         DEBUGB(samplesFile << *_samples << "\n");
-        return true;
     }
 
     /**
@@ -1731,10 +1739,15 @@ public:
             _availableVirtualCores(getAvailableVirtualCores()),
             _emitterVirtualCore(NULL),
             _collectorVirtualCore(NULL){
+
+        AdaptivityParametersValidation apv = _p.validate();
+        if(apv != VALIDATION_OK){
+            throw runtime_error("Invalid adaptivity parameters: " + apv);
+        }
         /** If voltage table file is specified, then load the table. **/
         if(_p.archData.voltageTableFile.compare("")){
             loadVoltageTable(_voltageTable,
-                                      _p.archData.voltageTableFile);
+                             _p.archData.voltageTableFile);
         }
 
         _samples = NULL;
@@ -1784,8 +1797,6 @@ public:
 
         _farm->run_then_freeze(_maxNumWorkers);
 
-        //TODO: Is already running when exits from that call?
-
         for(size_t i = 0; i < _activeWorkers.size(); i++){
             _activeWorkers.at(i)->init(_p.mammut, _p.archData.ticksPerNs);
         }
@@ -1834,7 +1845,7 @@ public:
             }
 
             double startSample = getMillisecondsTime();
-            while(true){
+            while(!_farm->isfrozen()){
                 double overheadMs = getMillisecondsTime() - startSample;
                 microsecsSleep = ((double)_p.samplingInterval - overheadMs)*
                                   (double)MAMMUT_MICROSECS_IN_MILLISEC;
@@ -1844,9 +1855,7 @@ public:
                 usleep(microsecsSleep);
                 startSample = getMillisecondsTime();
 
-                if(!storeNewSample()){
-                    goto controlLoopEnd;
-                }
+                storeNewSample();
 
                 if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
                     uint now = getMillisecondsTime()/1000.0;
@@ -1881,7 +1890,6 @@ public:
                 }
             }
         }
-    controlLoopEnd:
 
         uint duration = getMillisecondsTime() - _startTimeMs;
         if(_p.observer){

@@ -126,8 +126,11 @@ int main(int argc, char * argv[]) {
                                    "archdata.xml");
     ap.observer = &obs;
     adpff::ManagerFarm amf(&farm, ap);
+    std::cout << "Starting manager. " << std::endl;
     amf.start();
+    std::cout << "Manager started. " << std::endl;
     amf.join();
+    std::cout << "Manager joined. " << std::endl;
 
     /*
     if (farm.run_and_wait_end()<0) {

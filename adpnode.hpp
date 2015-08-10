@@ -161,9 +161,13 @@ private:
         size_t tid = getOSThreadId();
         if(!tid){
             throw runtime_error("Node init() called before "
-                                     "thread creation.");
+                                "thread creation.");
         }
         _tasksManager = mammut.getInstanceTask();
+        if(!_tasksManager){
+            throw runtime_error("Node init(): impossible to "
+                                "get the tasks manager.");
+        }
         _thread = _tasksManager->getThreadHandler(getpid(), tid);
         _ticksPerNs = ticksPerNs;
     }
@@ -177,7 +181,7 @@ private:
     }
 
     // Sleeps for a given amount of nanoseconds
-    static inline void nsleep(long ns) {
+    static inline void nSleep(long ns) {
 #if defined(__linux__)
         struct timespec req={0};
         time_t sec = ns/NSECS_IN_SECS;
@@ -195,15 +199,11 @@ private:
      *               time 'askForSample' has been called.
      * @param strategyPolling Strategy to apply if the queue is empty.
      * @param avgLatency Current average latency of the workers (in ns).
-     * @return true if the node is running, false otherwise.
      */
-    bool getSampleResponse(WorkerSample& sample,
+    void getSampleResponse(WorkerSample& sample,
                            StrategyPolling strategyPolling,
                            double avgLatency){
         while(_responseQ.empty()){
-            if(ff_node::isfrozen()){
-                return false;
-            }
             switch(strategyPolling){
                 case STRATEGY_POLLING_SPINNING:{
                     continue;
@@ -212,16 +212,15 @@ private:
                     PAUSE();
                 }break;
                 case STRATEGY_POLLING_SLEEP_SMALL:{
-                    nsleep(0);
+                    nSleep(0);
                 }break;
                 case STRATEGY_POLLING_SLEEP_LATENCY:{
-                    nsleep(avgLatency);
+                    nSleep(avgLatency);
                 }break;
             }
         }
         _responseQ.inc();
         sample = _sampleResponse;
-        return true;
     }
 
     /**
@@ -316,6 +315,11 @@ private:
         }
     }
 
+    void callbackOut(void *p) CX11_KEYWORD(final){
+        storeSample();
+    }
+
+protected:
     bool ff_send_out(void * task,
                      unsigned long retry=((unsigned long)-1),
                      unsigned long ticks=(TICKS2WAIT)) CX11_KEYWORD(final){
