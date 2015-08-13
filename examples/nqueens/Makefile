@@ -24,8 +24,8 @@
 # ---------------------------------------------------------------------------
 
 FF_HOME              = ../..
-CC                   = /home/desensi/bin/gcc
-CXX                  = /home/desensi/bin/g++
+CC                   = gcc
+CXX                  = g++
 LINK_OPT             = 
 VERSION              = 
 OPTIMIZE_FLAGS       = -O3 -finline-functions 

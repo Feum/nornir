@@ -274,9 +274,15 @@ private:
     size_t _minNumPoints;
     size_t _numCalibrationPoints;
     uint _calibrationStartMs;
+    bool _firstPointGenerated;
 
     bool highError() const;
+    void refine();
 protected:
+    /**
+     *  Override this method to provide custom ways to generate
+     *  configurations for calibration.
+     **/
     virtual FarmConfiguration generateConfiguration() const = 0;
     virtual void reset(){;}
 public:
@@ -284,13 +290,7 @@ public:
 
     virtual ~Calibrator(){;}
 
-    /**
-     * Override this member function to have custom
-     * ways to create calibration points.
-     *
-     * @return The next calibration point to be used.
-     */
-    virtual FarmConfiguration getNextConfiguration();
+    FarmConfiguration getNextConfiguration();
 
     std::vector<CalibrationStats> getCalibrationsStats() const;
 };

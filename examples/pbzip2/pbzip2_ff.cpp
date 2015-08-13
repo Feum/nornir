@@ -154,6 +154,7 @@
 #include <mammut/energy/energy.hpp>
 #include <mammut/cpufreq/cpufreq.hpp>
 #include <mammut/utils.hpp>
+#include "../../manager.hpp"
 #include "../../predictors_impl.hpp"
 
 /* ------------------ FastFlow specific ---------------- */
@@ -183,9 +184,6 @@ inline void operator delete[] (void * ptr) {
     return ff::FFAllocator::instance()->free(ptr);
 }
 #endif
-
-#include <ff/farm.hpp>
-
 
 // FastFlow's task type 
 struct ff_task_t {
@@ -292,7 +290,6 @@ int testCompressedData(char *);
 ssize_t bufread(int hf, char *buf, size_t bsize);
 int detectCPUs(void);
 
-#include "../../farm.hpp"
 #include <fstream>
 
 /*
@@ -2565,8 +2562,11 @@ int main(int argc, char* argv[])
 						if (w[i]) ((Consumer *)(w[i]))->set_comp_decomp(1);
 					
 					if (FW) FW->set_input_data(OutFilename);
-					
+                                        adpff::ManagerFarm amf(&farm, ap);
+                                        amf.start();
+                                        amf.join();
 					/* joining threads */
+#if 0
 					if (farm.run_then_freeze()<0) {
 						fprintf(stderr, "pbzip2_ff: *ERROR: starting farm\n");
 						errLevel = 1;
@@ -2579,7 +2579,7 @@ int main(int argc, char* argv[])
 						errLevel = 1;
 						continue;				    
 					}
-					
+#endif					
 					if (P->getErrLevel() != 0)
 						errLevel = 1;
 				}
@@ -2617,7 +2617,10 @@ int main(int argc, char* argv[])
 					if (w[i]) ((Consumer *)(w[i]))->set_comp_decomp(0);
 				
 				if (FW) FW->set_input_data(OutFilename);
-
+                                adpff::ManagerFarm amf(&farm, ap);
+                                amf.start();
+                                amf.join();
+#if 0
 				if (farm.run_then_freeze()<0) {
 					fprintf(stderr, "pbzip2_ff: *ERROR: starting farm\n");
 					errLevel = 1;
@@ -2631,7 +2634,7 @@ int main(int argc, char* argv[])
 				    errLevel = 1;
 				    continue;				    
 				}
-
+#endif
 				/* -------------------------------- */
 			}
 			else

@@ -131,6 +131,7 @@ class adpff_node: public ff_node{
 private:
     friend class ManagerFarm;
 
+    volatile bool _started;
     volatile bool _terminated;
     volatile bool _goingToFreeze;
     TasksManager* _tasksManager;
@@ -153,23 +154,20 @@ private:
     }
 
     /**
-     * Initializes the node. It must be called
-     * when the node is already running.
+     * Initializes the node.
      * @param mammut A Mammut handle.
      * @param ticksPerNs The number of ticks in a nanosecond.
      */
     void init(Mammut& mammut,
               double ticksPerNs){
-        size_t tid = getOSThreadId();
-        if(!tid){
-            throw runtime_error("Node init() called before "
-                                "thread creation.");
-        }
+        while(!_started){;}
         _tasksManager = mammut.getInstanceTask();
         if(!_tasksManager){
             throw runtime_error("Node init(): impossible to "
                                 "get the tasks manager.");
         }
+        size_t tid = getOSThreadId();
+        assert(tid != 0);
         _thread = _tasksManager->getThreadHandler(getpid(), tid);
         _ticksPerNs = ticksPerNs;
     }
@@ -313,6 +311,7 @@ private:
     }
 
     void callbackIn(void *p) CX11_KEYWORD(final){
+        _started = true;
         if(!_managementQ.empty()){
             _managementQ.inc();
             switch(_managementRequest.type){
@@ -320,14 +319,16 @@ private:
                     storeSample();
                 }break;
                 case MGMT_REQ_FREEZE:{
+                    DEBUG("Freeze request received");
                     ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
                     lb->broadcast_task(_managementRequest.mark);
+                    DEBUG("Task broadcasted");
 
                     /** Waits for restart request from manager. **/
                     while(_managementQ.empty()){;}
                     _managementQ.inc();
                     DEBUGB(assert(_managementRequest.type == MGMT_REQ_THAW));
-                    lb->thaw(true, _managementRequest.numWorkers);
+                    lb->thawWorkers(true, _managementRequest.numWorkers);
                 }break;
                 default:{
                     throw runtime_error("Unexpected mgmt request.");
@@ -336,25 +337,18 @@ private:
         }
     }
 
-    void callbackOut(void *p) CX11_KEYWORD(final){
+    void eosnotify(ssize_t) CX11_KEYWORD(final){
         if(!_goingToFreeze){
             _terminated = true;
             storeSample();
         }
-    }
-
-protected:
-    bool ff_send_out(void * task,
-                     unsigned long retry=((unsigned long)-1),
-                     unsigned long ticks=(TICKS2WAIT)) CX11_KEYWORD(final){
-        callbackIn(task);
-        return ff_node::ff_send_out(task, retry, ticks);
     }
 public:
     /**
      * Builds an adaptive node.
      */
     adpff_node():
+            _started(false),
             _terminated(false),
             _goingToFreeze(false),
             _tasksManager(NULL),

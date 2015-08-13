@@ -39,8 +39,13 @@
 #ifndef ADAPTIVE_FASTFLOW_FARM_HPP_
 #define ADAPTIVE_FASTFLOW_FARM_HPP_
 
+#ifndef TRACE_FASTFLOW
 #define TRACE_FASTFLOW
+#endif
+
+#ifndef FF_TASK_CALLBACK
 #define FF_TASK_CALLBACK
+#endif
 
 #include "parameters.hpp"
 #include "predictors.hpp"
@@ -238,8 +243,8 @@ typedef struct FarmConfiguration{
     uint numWorkers;
     Frequency frequency;
 
-    FarmConfiguration():numWorkers(0), frequency(0){;}
-    FarmConfiguration(uint numWorkers, Frequency frequency = 0):
+    FarmConfiguration():numWorkers(1), frequency(1){;}
+    FarmConfiguration(uint numWorkers, Frequency frequency = 1):
                      numWorkers(numWorkers), frequency(frequency){;}
 }FarmConfiguration;
 
@@ -1269,10 +1274,6 @@ private:
 
         double bestPrimaryPrediction = 0;
         double bestSecondaryPrediction = 0;
-        double primaryPredictionSub = 0;
-        double secondaryPredictionSub = 0;
-
-        double bestSecondaryValue = 0;
         double bestSuboptimalValue = getPrimaryValue();
 
         bool feasibleSolutionFound = false;
@@ -1282,11 +1283,11 @@ private:
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
                 // We have to minimize the power/energy.
-                bestSecondaryValue = numeric_limits<double>::max();
+                bestSecondaryPrediction = numeric_limits<double>::max();
             }break;
             case CONTRACT_POWER_BUDGET:{
                 // We have to maximize the bandwidth.
-                bestSecondaryValue = numeric_limits<double>::min();
+                bestSecondaryPrediction = numeric_limits<double>::min();
             }break;
             default:{
                 ;
@@ -1323,8 +1324,7 @@ private:
                         secondaryPrediction *= remainingTime;
                     }
                     if(isBestSecondaryValue(secondaryPrediction,
-                                            bestSecondaryValue)){
-                        bestSecondaryValue = secondaryPrediction;
+                                            bestSecondaryPrediction)){
                         bestConfiguration = currentConf;
                         feasibleSolutionFound = true;
                         bestPrimaryPrediction = primaryPrediction;
@@ -1335,8 +1335,6 @@ private:
                                                bestSuboptimalValue)){
                     bestSuboptimalValue = primaryPrediction;
                     bestSuboptimalConfiguration = currentConf;
-                    primaryPredictionSub = primaryPrediction;
-                    secondaryPredictionSub = secondaryPrediction;
                 }
             }
         }
@@ -1346,8 +1344,11 @@ private:
             _secondaryPrediction = bestSecondaryPrediction;
             return bestConfiguration;
         }else{
-            _primaryPrediction = primaryPredictionSub;
-            _secondaryPrediction = secondaryPredictionSub;
+            _primaryPrediction = bestSuboptimalValue;
+            // TODO: This check now works because both service time and power are always  > 0
+            // In the future we must find another way to indicat that secondary prediction
+            // has not been done. 
+            _secondaryPrediction = -1;
             return bestSuboptimalConfiguration;
         }
     }
@@ -1390,8 +1391,8 @@ private:
      * @param configuration The new configuration.
      */
     void changeActiveNodes(FarmConfiguration& configuration){
-        uint workersNumDiff = abs(_currentConfiguration.numWorkers -
-                                  configuration.numWorkers);
+        uint workersNumDiff = abs((int)_currentConfiguration.numWorkers -
+                                  (int)configuration.numWorkers);
         if(_currentConfiguration.numWorkers > configuration.numWorkers){
             /** Move workers from active to inactive. **/
             moveEndToFront(_activeWorkers, _inactiveWorkers, workersNumDiff);
@@ -1437,18 +1438,15 @@ private:
      * Freezes all the nodes.
      */
     void freeze(){
-        DEBUG("Asking the farm to freeze");
         if(_emitter){
             _emitter->freezeAll((void*)(_collector?FF_EOSW:FF_GO_OUT));
         }
-        DEBUG("Wait for freezing");
         for(size_t i = 0; i < _activeWorkers.size(); i++){
             _activeWorkers.at(i)->wait_freezing();
         }
         if(_collector){
             _collector->wait_freezing();
         }
-        DEBUG("Farm freezed");
     }
 
     /**
@@ -1492,14 +1490,12 @@ private:
      * @param numWorkers The new number of workers.
      */
     void run(uint numWorkers){
-        DEBUG("Asking the farm to start again");
         if(_emitter){
             _emitter->thawAll(numWorkers);
         }
         if(_collector){
-            _collector->thaw(true, numWorkers);
+            _farm->getgt()->thaw(true, numWorkers);
         }
-        DEBUG("Farm started");
     }
 
     /**
@@ -1528,11 +1524,8 @@ private:
     /**
      * Changes the current farm configuration.
      * @param configuration The new configuration.
-     * @param refine True if the data on the last configuration must be used
-     *               to refine the model.
      */
-    void changeConfiguration(FarmConfiguration configuration,
-                             bool refine = true){
+    void changeConfiguration(FarmConfiguration configuration){
         if(configuration == _currentConfiguration){
             return;
         }
@@ -1544,12 +1537,6 @@ private:
             throw runtime_error("AdaptivityManagerFarm: fatal error, trying to "
                                 "activate more workers than the maximum "
                                 "allowed.");
-        }
-
-        /****************** Refine the model ******************/
-        if(refine){
-            _primaryPredictor->refine();
-            _secondaryPredictor->refine();
         }
 
         /****************** Workers change started ******************/
@@ -1655,9 +1642,7 @@ private:
         JoulesCpu joules;
 
         askForWorkersSamples();
-        DEBUG("Waiting samples from workers");
         getWorkersSamples(ws);
-        DEBUG("Samples arrived");
 
         _totalTasks += ws.tasksCount;
         if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
@@ -1905,7 +1890,7 @@ public:
         }else{
             /* Force the first calibration point. **/
             if(_calibrator){
-                changeConfiguration(_calibrator->getNextConfiguration(), false);
+                changeConfiguration(_calibrator->getNextConfiguration());
             }
 
             double startSample = getMillisecondsTime();

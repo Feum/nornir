@@ -61,10 +61,11 @@ void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
     _physicalCores = usedPhysicalCores;
     ++_numPredictors;
 
-    _invScalFactorPhysical = 1.0 / (usedPhysicalCores * ((double)configuration.frequency /
-                                                         (double)_manager._availableFrequencies.at(0)));
-    ++_numPredictors;
-
+    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
+        _invScalFactorPhysical = 1.0 / (usedPhysicalCores * ((double)configuration.frequency /
+                                                             (double)_manager._availableFrequencies.at(0)));
+        ++_numPredictors;
+    }
 
     if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
         _workers = (double)configuration.numWorkers;
@@ -104,7 +105,9 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
     size_t rowId = 0;
     //TODO: !!!
     matrix(rowId++, columnId) = _physicalCores;
-    matrix(rowId++, columnId) = _invScalFactorPhysical;
+    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
+        matrix(rowId++, columnId) = _invScalFactorPhysical;
+    }
     if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
         matrix(rowId++, columnId) = _workers;
         matrix(rowId++, columnId) = _invScalFactorWorkers;
@@ -274,9 +277,9 @@ void PredictorLinearRegression::refine(){
 }
 
 void PredictorLinearRegression::prepareForPredictions(){
-    if(!_observations.size()){
-        throw std::runtime_error("prepareForPredictions: No points are "
-                                 "present");
+    if(_observations.size() < getMinimumPointsNeeded()){
+        throw std::runtime_error("prepareForPredictions: Not enough " 
+                                 "points are present");
     }
 
     // One observation per column.
@@ -288,8 +291,9 @@ void PredictorLinearRegression::prepareForPredictions(){
     for(obs_it iterator = _observations.begin();
                iterator != _observations.end();
                iterator++){
-        iterator->second.data->toArmaRow(i, dataMl);
-        responsesMl(i) = iterator->second.response;
+        const Observation& obs = iterator->second;
+        obs.data->toArmaRow(i, dataMl);
+        responsesMl(i) = obs.response;
         ++i;
     }
 
@@ -351,9 +355,22 @@ double PredictorSimple::predict(const FarmConfiguration& configuration){
 
 Calibrator::Calibrator(ManagerFarm& manager):
         _manager(manager), _state(CALIBRATION_SEEDS),
-        _numCalibrationPoints(0), _calibrationStartMs(0){
+        _numCalibrationPoints(0), _calibrationStartMs(0),
+        _firstPointGenerated(false){
     _minNumPoints = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
                              _manager._secondaryPredictor->getMinimumPointsNeeded());
+    DEBUG("Minimum number of points required for calibration: " << _minNumPoints);
+    //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
+}
+
+void Calibrator::refine(){
+    // We have to refine only if a new configuration will be generated.
+    if(_state == CALIBRATION_FINISHED &&
+       !_manager.isContractViolated()){
+        return;
+    }
+    _manager._primaryPredictor->refine();
+    _manager._secondaryPredictor->refine();
 }
 
 bool Calibrator::highError() const{
@@ -361,8 +378,17 @@ bool Calibrator::highError() const{
     double secondaryValue = _manager.getSecondaryValue();
     double primaryError = std::abs((primaryValue - _manager._primaryPrediction)/
                                    primaryValue)*100.0;
-    double secondaryError = std::abs((secondaryValue - _manager._secondaryPrediction)/
-                                     secondaryValue)*100.0;
+    double secondaryError;
+
+    // TODO: This check now works because both service time and power are always  > 0
+    // In the future we must find another way to indicat that secondary prediction
+    // has not been done.
+    if(_manager._secondaryPrediction >= 0.0){
+        secondaryError = std::abs((secondaryValue - _manager._secondaryPrediction)/
+                                   secondaryValue)*100.0;
+    }else{
+        secondaryError = 0.0;
+    }
     DEBUG("Primary prediction: " << _manager._primaryPrediction << " " <<
           "Secondary prediction: " << _manager._secondaryPrediction);
     DEBUG("Primary error: " << primaryError << " " <<
@@ -376,6 +402,22 @@ FarmConfiguration Calibrator::getNextConfiguration(){
 
     if(_numCalibrationPoints == 0){
         _calibrationStartMs = getMillisecondsTime();
+    }
+
+    /**
+     * The first point is generated as soon as the application starts.
+     * Accordingly, we do not executed tasks in the original configuration
+     * used to create the application. For this reason, we do not use
+     * it to refine the model.
+     * E.g. The application has been created with configuration X
+     * and as soon as it starts we move it to configuration Y.
+     * We do not refine with configuration X since it has never
+     * been real executed.
+     **/
+    if(_firstPointGenerated){
+        refine();
+    }else{
+        _firstPointGenerated = true;
     }
 
     switch(_state){
@@ -454,6 +496,8 @@ std::vector<CalibrationStats> Calibrator::getCalibrationsStats() const{
 CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(ManagerFarm& manager):
         Calibrator(manager), _manager(manager){
     uint d = _manager.getConfigurationDimension();
+    DEBUG("[Calibrator] Will generate low discrepancy points in " << d <<
+          " dimensions");
     const gsl_qrng_type* generatorType;
     switch(_manager._p.strategyCalibration){
         case STRATEGY_CALIBRATION_NIEDERREITER:{
@@ -489,14 +533,14 @@ FarmConfiguration CalibratorLowDiscrepancy::generateConfiguration() const{
     gsl_qrng_get(_generator, _normalizedPoint);
 
     if(_manager.reconfigureWorkers()){
-        r.numWorkers = _normalizedPoint[nextPointId++]*
-                       (double)_manager._maxNumWorkers;
+        r.numWorkers =std::ceil(_normalizedPoint[nextPointId++]*
+                                (double)_manager._maxNumWorkers);
         if(!r.numWorkers){r.numWorkers = 1;}
     }
 
     if(_manager.reconfigureFrequency()){
-        size_t frequencyId = _normalizedPoint[nextPointId++]*
-                             (double)_manager._availableFrequencies.size();
+        size_t frequencyId = std::ceil(_normalizedPoint[nextPointId++]*
+                                       (double)_manager._availableFrequencies.size());
         if(frequencyId == _manager._availableFrequencies.size()){--frequencyId;}
         r.frequency = _manager._availableFrequencies.at(frequencyId);
     }

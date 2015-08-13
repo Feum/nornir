@@ -109,9 +109,10 @@
 #include <cstdlib>
 #include <ctime>
 
-#include <ff/allocator.hpp>
-#include "../../farm.hpp"
+#include "../../manager.hpp"
 #include "../../predictors_impl.hpp"
+
+#include <ff/allocator.hpp>
 
 using namespace adpff;
 
@@ -220,7 +221,7 @@ void printResults(time_t* pt1, time_t* pt2)
     }
 }
 
-class Worker: public adp_ff_node {
+class Worker: public adpff_node {
 private:
     SOLUTIONTYPE workersolutions;
 
@@ -300,7 +301,7 @@ private:
 public:
     Worker(int boardsize): workersolutions(0), board_size(boardsize), firstInit(true) {}
 
-    int adp_svc_init() {
+    int svc_init() {
         if(firstInit){
             if (ffalloc.register4free()<0) {
                 error("Worker, register4free fails\n");
@@ -315,7 +316,7 @@ public:
     }
 
 
-    void * adp_svc(void * t) {
+    void * svc(void * t) {
         ff_task_t * task  = (ff_task_t *)t;
 
         Nqueen(task);
@@ -331,7 +332,7 @@ public:
 
 
 // the load-balancer filter
-class Emitter: public adp_ff_node {
+class Emitter: public adpff_node {
 private:
     void streamit(int board_size, int depth) {
         int aQueenBitCol[MAX_BOARDSIZE]; /* marks colummns which already have queens */
@@ -453,7 +454,7 @@ private:
 public:
     Emitter(int boardsize, int depth):boardsize(boardsize),depth(depth),firstInit(true) {};
 
-    int adp_svc_init() {
+    int svc_init() {
         if(firstInit){
             if (ffalloc.registerAllocator()<0) {
                 error("Emitter, registerAllocator fails\n");
@@ -466,7 +467,7 @@ public:
         return 0;
     }
 
-    void * adp_svc(void *) {
+    void * svc(void *) {
         if(!tasks.empty()){
             ff_task_t* t = tasks.back();
             tasks.pop_back();
@@ -529,7 +530,7 @@ int main(int argc, char** argv) {
     adpff::Observer obs;
     adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
-    adpff::adp_ff_farm<> farm(ap, false, 8192, 8192, false, DEF_MAX_NUM_WORKERS, true);
+    ff_farm<> farm(false, 8192, 8192, false, DEF_MAX_NUM_WORKERS, true);
     Emitter E(boardsize, depth);
     farm.add_emitter(&E);
 
@@ -542,12 +543,10 @@ int main(int argc, char** argv) {
     time(&t1);
     printf("Start: \t%s", ctime(&t1));
 
-    //  if (farm.run_and_wait_end()<0) {
-    if(farm.run_then_freeze() < 0){
-        error("running farm\n");
-        return -1;
-    }
-    farm.wait();
+    adpff::ManagerFarm amf(&farm, ap);
+    amf.start();
+    amf.join();  
+
     std::cout << "Finished" << std::endl;
 
     time(&t2);
