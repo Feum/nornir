@@ -4,7 +4,7 @@ OPTIMIZE_FLAGS       = -O3 -finline-functions
 INCS                 = -I../../Mammut -I/usr/include/libxml2
 LDFLAGS              = -L../../Mammut/mammut
 LDLIBS               = -lm -pthread -lrt -lmammut -lprotobuf-lite -lmlpack -llapack -lblas -lgsl -lgslcblas
-TARGET               = demo-farm demo-parfor
+TARGET               = demo-farm demo-farm-sendout
 
 .PHONY: clean cleanall
 

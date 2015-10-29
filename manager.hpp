@@ -614,8 +614,7 @@ private:
      *         false otherwise
      */
     bool reconfigureFrequency() const{
-        return _p.strategyFrequencies == STRATEGY_FREQUENCY_YES ||
-               _p.strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES;
+        return _p.knobFrequencies == KNOB_FREQUENCY_YES;
     }
 
     /**
@@ -679,12 +678,12 @@ private:
      */
     vector<VirtualCore*> getAvailableVirtualCores(){
         vector<VirtualCore*> r;
-        if(_p.strategyMapping == STRATEGY_MAPPING_AUTO){
-            _p.strategyMapping = STRATEGY_MAPPING_LINEAR;
+        if(_p.knobMapping == KNOB_MAPPING_AUTO){
+            _p.knobMapping = KNOB_MAPPING_LINEAR;
         }
 
-        switch(_p.strategyMapping){
-            case STRATEGY_MAPPING_LINEAR:{
+        switch(_p.knobMapping){
+            case KNOB_MAPPING_LINEAR:{
                /*
                 * Generates a vector of virtual cores to be used for linear
                 * mapping.node. It contains first one virtual core per physical
@@ -695,7 +694,7 @@ private:
 
                 size_t virtualUsed = 0;
                 size_t virtualPerPhysical;
-                if(_p.strategyHyperthreading != STRATEGY_HT_NO){
+                if(_p.knobHyperthreading != KNOB_HT_NO){
                     virtualPerPhysical = _topology->getVirtualCores().size() /
                                          _topology->getPhysicalCores().size();
                 }else{
@@ -713,7 +712,7 @@ private:
                     ++virtualUsed;
                 }
             }break;
-            case STRATEGY_MAPPING_CACHE_EFFICIENT:{
+            case KNOB_MAPPING_CACHE_EFFICIENT:{
                 throw runtime_error("Not yet supported.");
             }
             default:
@@ -728,26 +727,26 @@ private:
      */
     uint numScalableServiceNodes(){
         return (_emitter &&
-                _p.mappingEmitter != SERVICE_NODE_MAPPING_PERFORMANCE) +
+                _p.knobMappingEmitter != KNOB_SNODE_MAPPING_PERFORMANCE) +
                (_collector &&
-                _p.mappingEmitter != SERVICE_NODE_MAPPING_PERFORMANCE);
+                _p.knobMappingEmitter != KNOB_SNODE_MAPPING_PERFORMANCE);
     }
 
     /**
      * Manages mapping of emitter and collector.
      */
     void manageServiceNodesPerformance(){
-        if((_p.mappingEmitter != SERVICE_NODE_MAPPING_ALONE) && !_emitter){
-            _p.mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
+        if((_p.knobMappingEmitter != KNOB_SNODE_MAPPING_ALONE) && !_emitter){
+            _p.knobMappingEmitter = KNOB_SNODE_MAPPING_ALONE;
         }
 
-        if((_p.mappingCollector != SERVICE_NODE_MAPPING_ALONE) && !_collector){
-            _p.mappingCollector = SERVICE_NODE_MAPPING_ALONE;
+        if((_p.knobMappingCollector != KNOB_SNODE_MAPPING_ALONE) && !_collector){
+            _p.knobMappingCollector = KNOB_SNODE_MAPPING_ALONE;
         }
 
-        if((_p.mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE &&
+        if((_p.knobMappingEmitter == KNOB_SNODE_MAPPING_PERFORMANCE &&
                 !_emitterSensitivitySatisfied) ||
-           (_p.mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE &&
+           (_p.knobMappingCollector == KNOB_SNODE_MAPPING_PERFORMANCE &&
                    !_collectorSensitivitySatisfied)){
             size_t scalableVCNum = _activeWorkers.size() +
                                    numScalableServiceNodes();
@@ -767,7 +766,7 @@ private:
             if(perfPhyCores.size()){
                 size_t index = 0;
 
-                if(_p.mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE){
+                if(_p.knobMappingEmitter == KNOB_SNODE_MAPPING_PERFORMANCE){
                     VirtualCore* vc = perfPhyCores.at(index)->getVirtualCore();
                     setDomainToHighestFrequency(_cpufreq->getDomain(vc));
                     _emitterVirtualCore = vc;
@@ -775,7 +774,7 @@ private:
                     index = (index + 1) % perfPhyCores.size();
                 }
 
-                if(_p.mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE){
+                if(_p.knobMappingCollector == KNOB_SNODE_MAPPING_PERFORMANCE){
                     VirtualCore* vc = perfPhyCores.at(index)->getVirtualCore();
                     setDomainToHighestFrequency(_cpufreq->getDomain(vc));
                     _collectorVirtualCore = vc;
@@ -801,7 +800,7 @@ private:
         size_t nextIndex = 0;
         if(_emitter && !_emitterVirtualCore){
             emitterIndex = nextIndex;
-            if(_p.mappingEmitter != SERVICE_NODE_MAPPING_COLLAPSED){
+            if(_p.knobMappingEmitter != KNOB_SNODE_MAPPING_COLLAPSED){
                 nextIndex = (nextIndex + 1) % _availableVirtualCores.size();
             }
         }
@@ -811,7 +810,7 @@ private:
                     _availableVirtualCores.size();
 
         if(_collector && !_collectorVirtualCore){
-            if(_p.mappingCollector == SERVICE_NODE_MAPPING_COLLAPSED){
+            if(_p.knobMappingCollector == KNOB_SNODE_MAPPING_COLLAPSED){
                 nextIndex = (nextIndex - 1) % _availableVirtualCores.size();
             }
             collectorIndex = nextIndex;
@@ -986,11 +985,6 @@ private:
                                         "to set the specified governor's "
                                         "bounds.");
                 }
-            }else if(_p.strategyFrequencies != STRATEGY_FREQUENCY_OS){
-                if(!currentDomain->setFrequencyUserspace(frequency)){
-                    throw runtime_error("AdaptivityManagerFarm: Impossible "
-                                        "to set the specified frequency.");
-                }
             }
         }
     }
@@ -1000,7 +994,7 @@ private:
      * prepares frequencies and governors for running.
      */
     void mapAndSetFrequencies(){
-        if(_p.strategyMapping == STRATEGY_MAPPING_NO){
+        if(_p.knobMapping == KNOB_MAPPING_NO){
             return;
         }
 
@@ -1039,7 +1033,7 @@ private:
         // Sets the current frequency to the highest possible.                                                                                                              
         _currentConfiguration.frequency = _availableFrequencies.back();
 
-        if(_p.strategyFrequencies != STRATEGY_FREQUENCY_NO){
+        if(_p.knobFrequencies != KNOB_FREQUENCY_NO){
             updatePstate(_currentConfiguration.frequency);
         }
     }
@@ -1573,7 +1567,7 @@ private:
         /****************** P-state change started ******************/
         //TODO: Maybe sensitivity could not be satisfied with the maximum
         // number of workers but could be satisfied now.
-        if(_p.strategyFrequencies != STRATEGY_FREQUENCY_NO){
+        if(_p.knobFrequencies != KNOB_FREQUENCY_NO){
             updatePstate(configuration.frequency);
         }
         /****************** P-state change terminated ******************/

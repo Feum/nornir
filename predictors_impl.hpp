@@ -58,16 +58,23 @@ void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
     _numPredictors = 0;
     double usedPhysicalCores = std::min(configuration.numWorkers, _manager._numPhysicalCores);
 
+    /*
     _physicalCores = usedPhysicalCores;
     ++_numPredictors;
+    */
 
-    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
-        _invScalFactorPhysical = 1.0 / (usedPhysicalCores * ((double)configuration.frequency /
-                                                             (double)_manager._availableFrequencies.at(0)));
+    if(_manager._p.knobFrequencies == KNOB_FREQUENCY_YES){
+        _invScalFactorFreq = (double)_manager._availableFrequencies.at(0) /
+                             (double)configuration.frequency;
+        ++_numPredictors;
+
+        _invScalFactorFreqAndCores = (double)_manager._availableFrequencies.at(0) /
+                                 (usedPhysicalCores * (double)configuration.frequency);
         ++_numPredictors;
     }
 
-    if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
+    /*
+    if(_manager._p.knobHyperthreading != KNOB_HT_NO){
         _workers = (double)configuration.numWorkers;
         ++_numPredictors;
 
@@ -75,6 +82,7 @@ void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
                                                                             (double)_manager._availableFrequencies.at(0)));
         ++_numPredictors;
     }
+    */
     /*
     if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
         _frequency = configuration.frequency;
@@ -85,7 +93,7 @@ void RegressionDataServiceTime::init(const FarmConfiguration& configuration){
 
 RegressionDataServiceTime::RegressionDataServiceTime(const ManagerFarm& manager):
         RegressionData(manager),
-        _physicalCores(0), _invScalFactorPhysical(0),
+        _physicalCores(0), _invScalFactorFreqAndCores(0),
         _workers(0), _invScalFactorWorkers(0),
         _frequency(0), _numPredictors(0){
     init(manager._currentConfiguration);
@@ -104,14 +112,17 @@ uint RegressionDataServiceTime::getNumPredictors() const{
 void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) const{
     size_t rowId = 0;
     //TODO: !!!
-    matrix(rowId++, columnId) = _physicalCores;
-    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
-        matrix(rowId++, columnId) = _invScalFactorPhysical;
+    //matrix(rowId++, columnId) = _physicalCores;
+    if(_manager._p.knobFrequencies == KNOB_FREQUENCY_YES){
+        matrix(rowId++, columnId) = _invScalFactorFreq;
+        matrix(rowId++, columnId) = _invScalFactorFreqAndCores;
     }
-    if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
+    /*
+    if(_manager._p.knobHyperthreading != KNOB_HT_NO){
         matrix(rowId++, columnId) = _workers;
         matrix(rowId++, columnId) = _invScalFactorWorkers;
     }
+    */
     /*
     if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
         matrix(rowId++, columnId) = _frequency;
@@ -123,16 +134,16 @@ void RegressionDataPower::init(const FarmConfiguration& configuration){
     _numPredictors = 0;
     double usedPhysicalCores = std::min(configuration.numWorkers, _manager._numPhysicalCores);
 
-    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
+    if(_manager._p.knobFrequencies == KNOB_FREQUENCY_YES){
         double voltage = _manager.getVoltage(configuration);
         uint usedCpus;
-        if(_manager._p.strategyMapping == STRATEGY_MAPPING_LINEAR){
-            switch(_manager._p.strategyHyperthreading){
-                case STRATEGY_HT_NO:{
+        if(_manager._p.knobMapping == KNOB_MAPPING_LINEAR){
+            switch(_manager._p.knobHyperthreading){
+                case KNOB_HT_NO:{
                     usedCpus = std::ceil((double) configuration.numWorkers /
                                          (double) _manager._numPhysicalCoresPerCpu);
                 }break;
-                case STRATEGY_HT_YES_LATER:{
+                case KNOB_HT_YES_LATER:{
                     usedCpus = std::ceil((double) configuration.numWorkers /
                                          (double) _manager._numPhysicalCoresPerCpu);
                     if(configuration.numWorkers > _manager._numPhysicalCores){
@@ -143,7 +154,7 @@ void RegressionDataPower::init(const FarmConfiguration& configuration){
                     }
                     ++_numPredictors;
                 }break;
-                case STRATEGY_HT_YES_SOONER:{
+                case KNOB_HT_YES_SOONER:{
                     usedCpus = std::ceil((double) configuration.numWorkers /
                                          ((double) _manager._numPhysicalCoresPerCpu * (double) _manager._numVirtualCoresPerPhysicalCore));
                 }break;
@@ -190,13 +201,13 @@ uint RegressionDataPower::getNumPredictors() const{
 void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
     size_t rowId = 0;
     matrix(rowId++, columnId) = _dynamicPowerModel;
-    if(_manager._p.strategyFrequencies == STRATEGY_FREQUENCY_YES){
+    if(_manager._p.knobFrequencies == KNOB_FREQUENCY_YES){
         matrix(rowId++, columnId) = _voltagePerUsedSockets;
         if(_manager._numCpus > 1){
             matrix(rowId++, columnId) = _voltagePerUnusedSockets;
         }
     }
-    if(_manager._p.strategyHyperthreading != STRATEGY_HT_NO){
+    if(_manager._p.knobHyperthreading != KNOB_HT_NO){
         matrix(rowId++, columnId) = _additionalContextes;
     }
 }

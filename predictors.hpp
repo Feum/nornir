@@ -91,7 +91,8 @@ public:
 class RegressionDataServiceTime: public RegressionData{
 private:
     double _physicalCores;
-    double _invScalFactorPhysical;
+    double _invScalFactorFreq;
+    double _invScalFactorFreqAndCores;
     double _workers;
     double _invScalFactorWorkers;
     double _frequency;

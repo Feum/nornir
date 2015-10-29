@@ -37,7 +37,7 @@
 #include <cmath>
 #include <fcntl.h>
 //#include <sys/mman.h>
-#include <farm.hpp>
+#include <manager.hpp>
 #include <predictors_impl.hpp>
 #include <cholconst.h>
 #include <complex.h>

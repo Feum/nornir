@@ -79,74 +79,86 @@ template<> char const* enumStrings<ContractType>::data[] = {
     "POWER_BUDGET"
 };
 
-
-/// Possible reconfiguration strategies.
+/// Cores knob.
 typedef enum{
-    // Chooses YES or NO according to the possibility of the system.
-    STRATEGY_FREQUENCY_AUTO = 0,
+    // The best solution is dinamically chosen.
+    KNOB_CORES_AUTO = 0,
 
-    // Reconfigures frequencies and number of workers. If contractType is
-    // of type CONTRACT_PERF_*, it tries to minimize the consumed power.
-    // If contractType is of type CONTRACT_POWER_*, it tries to maximize
-    // the performances.
-    STRATEGY_FREQUENCY_YES,
+    // Doesn't changes the number of used cores.
+    KNOB_CORES_NO,
 
-    // Does not reconfigure frequencies.
-    STRATEGY_FREQUENCY_NO,
+    // Changes the number of threads used by the application.
+    KNOB_CORES_CHANGE,
 
-    // The frequencies are managed by OS governor.
-    // The governor must be set in 'frequencyGovernor' parameter.
-    STRATEGY_FREQUENCY_OS,
+    // Instead of changing the number of threads it changes the mapping.
+    KNOB_CORES_REMAP
+}KnobCores;
 
-    // Reconfigures frequencies and number of workers. Tries always to
-    // minimize the number of virtual cores used. Only valid if contract
-    // type is CONTRACT_PERF_*.
-    STRATEGY_FREQUENCY_MIN_CORES,
-}StrategyFrequencies;
-
-template<> char const* enumStrings<StrategyFrequencies>::data[] = {
-    "YES",
+template<> char const* enumStrings<KnobCores>::data[] = {
+    "AUTO",
     "NO",
-    "OS",
-    "MIN_CORES"
+    "CHANGE",
+    "REMAP"
 };
 
-/// Possible mapping strategies.
+/// Frequency knob.
 typedef enum{
-    // Mapping decisions will be performed by the operating system.
-    STRATEGY_MAPPING_NO = 0,
+    // Chooses YES or NO according to the possibility of the system.
+    KNOB_FREQUENCY_AUTO = 0,
 
-    // Mapping strategy will be automatically chosen at runtime.
-    STRATEGY_MAPPING_AUTO,
+    // Enables the possibility to dinamically change the frequencies.
+    KNOB_FREQUENCY_YES,
+
+    // Disables the possibility to dinamically change the frequencies.
+    KNOB_FREQUENCY_NO,
+}KnobFrequencies;
+
+template<> char const* enumStrings<KnobFrequencies>::data[] = {
+    "AUTO",
+    "YES",
+    "NO"
+};
+
+/// Mapping knob.
+typedef enum{
+    // Best mapping decisions will be at runtime.
+    KNOB_MAPPING_AUTO = 0,
+
+    // Mapping decisions will be performed by the operating system.
+    KNOB_MAPPING_NO,
 
     // Tries to keep the threads as close as possible.
-    STRATEGY_MAPPING_LINEAR,
+    KNOB_MAPPING_LINEAR,
 
     // Tries to make good use of the shared caches.
     // Particularly useful when threads have large working sets.
-    STRATEGY_MAPPING_CACHE_EFFICIENT
-}StrategyMapping;
+    KNOB_MAPPING_CACHE_EFFICIENT
+}KnobMapping;
 
-template<> char const* enumStrings<StrategyMapping>::data[] = {
-    "NO",
+template<> char const* enumStrings<KnobMapping>::data[] = {
     "AUTO",
+    "NO",
     "LINEAR",
     "CACHE_EFFICIENT"
 };
 
-/// Possible hyperthreading strategies.
+/// Hyperthreading knob.
 typedef enum{
+    // The runtime system will decide at runtime if use or not hyperthreading.
+    KNOB_HT_AUTO = 0,
+
     // Hyperthreading is not used.
-    STRATEGY_HT_NO = 0,
+    KNOB_HT_NO = 0,
 
     // Hyperthreading is used since the beginning.
-    STRATEGY_HT_YES_SOONER,
+    KNOB_HT_YES_SOONER,
 
     // Hyperthreading is used only when we used all the physical cores.
-    STRATEGY_HT_YES_LATER
-}StrategyHyperthreading;
+    KNOB_HT_YES_LATER
+}KnobHyperthreading;
 
-template<> char const* enumStrings<StrategyHyperthreading>::data[] = {
+template<> char const* enumStrings<KnobHyperthreading>::data[] = {
+    "AUTO",
     "NO",
     "YES_SOONER",
     "YES_LATER"
@@ -155,11 +167,11 @@ template<> char const* enumStrings<StrategyHyperthreading>::data[] = {
 /// Possible strategies to apply for unused virtual cores. For unused virtual
 /// cores we mean those never used or those used only on some conditions.
 typedef enum{
-    // Nothing is done on unused virtual cores.
-    STRATEGY_UNUSED_VC_NONE = 0,
-
     // Automatically choose one of the other strategies.
-    STRATEGY_UNUSED_VC_AUTO,
+    STRATEGY_UNUSED_VC_AUTO = 0,
+
+    // Nothing is done on unused virtual cores.
+    STRATEGY_UNUSED_VC_NONE,
 
     // Set the virtual cores to the lowest frequency (only
     // possible if all the other virtual cores on the same
@@ -172,8 +184,8 @@ typedef enum{
 }StrategyUnusedVirtualCores;
 
 template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
-    "NONE",
     "AUTO",
+    "NONE",
     "LOWEST_FREQUENCY",
     "OFF"
 };
@@ -207,22 +219,26 @@ template<> char const* enumStrings<StrategyPredictionError>::data[] = {
     "COEFFVAR"
 };
 
-/// Possible mappings for a service node (emitter or collector).
+/// Service nodes (emitter or collector) mapping knob.
 typedef enum{
+    // The mapping is automatically chosen by the runtime system.
+    KNOB_SNODE_MAPPING_AUTO = 0,
+
     // The service node is mapped on a physical core where no workers
     // are mapped.
-    SERVICE_NODE_MAPPING_ALONE = 0,
+    KNOB_SNODE_MAPPING_ALONE,
 
     // The service node is mapped on a physical core together with a worker.
-    SERVICE_NODE_MAPPING_COLLAPSED,
+    KNOB_SNODE_MAPPING_COLLAPSED,
 
     // The service node is mapped on an independent voltage domain and
     // is kept running at maximum performances (only available when
     // strategyFrequencies != STRATEGY_FREQUENCY_NO).
-    SERVICE_NODE_MAPPING_PERFORMANCE
-}ServiceNodeMapping;
+    KNOB_SNODE_MAPPING_PERFORMANCE
+}KnobServiceNodeMapping;
 
-template<> char const* enumStrings<ServiceNodeMapping>::data[] = {
+template<> char const* enumStrings<KnobServiceNodeMapping>::data[] = {
+    "AUTO",
     "ALONE",
     "COLLAPSED",
     "PERFORMANCE"
@@ -327,6 +343,13 @@ template<> char const* enumStrings<StrategyPersistence>::data[] = {
 typedef enum{
     // Parameters are ok.
     VALIDATION_OK = 0,
+
+    // Frequency can be changed by the operating system and the flag
+    // "constant_tsc" is not present on the CPU. Accordingly, since we
+    // realy on getticks() to perform measurements, the amount of ticks
+    // per second may change with the frequency, probably causing inaccuracy
+    // in the measurements.
+    VALIDATION_NO_CONSTANT_TSC,
 
     // strategyFrequencies can be different from STRATEGY_FREQUENCY_NO
     // only if strategyMapping is different from STRATEGY_MAPPING_NO.
@@ -515,9 +538,12 @@ private:
      */
     void setDefault(){
         contractType = CONTRACT_NONE;
-        strategyMapping = STRATEGY_MAPPING_LINEAR;
-        strategyHyperthreading = STRATEGY_HT_NO;
-        strategyFrequencies = STRATEGY_FREQUENCY_AUTO;
+        knobCores = KNOB_CORES_AUTO;
+        knobFrequencies = KNOB_FREQUENCY_AUTO;
+        knobMapping = KNOB_MAPPING_AUTO;
+        knobMappingEmitter = KNOB_SNODE_MAPPING_AUTO;
+        knobMappingCollector = KNOB_SNODE_MAPPING_AUTO;
+        knobHyperthreading = KNOB_HT_AUTO;
         strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
         strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
@@ -527,8 +553,6 @@ private:
         strategyCalibration = STRATEGY_CALIBRATION_SOBOL;
         strategyPolling = STRATEGY_POLLING_SLEEP_LATENCY;
         strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
-        mappingEmitter = SERVICE_NODE_MAPPING_ALONE;
-        mappingCollector = SERVICE_NODE_MAPPING_ALONE;
         frequencyGovernor = GOVERNOR_USERSPACE;
         turboBoost = false;
         frequencyLowerBound = 0;
@@ -656,7 +680,7 @@ private:
                 }else if(isLowestFrequencySettable()){
                     s = STRATEGY_UNUSED_VC_LOWEST_FREQUENCY;
                 }
-            }
+            }break;
             default:
                 break;
         }
@@ -664,74 +688,55 @@ private:
     }
 
     bool serviceNodePerformance(){
-        return mappingEmitter == SERVICE_NODE_MAPPING_PERFORMANCE ||
-               mappingCollector == SERVICE_NODE_MAPPING_PERFORMANCE;
+        return knobMappingEmitter == KNOB_SNODE_MAPPING_PERFORMANCE ||
+               knobMappingCollector == KNOB_SNODE_MAPPING_PERFORMANCE;
     }
 
-    AdaptivityParametersValidation validateFrequencies(){
+    AdaptivityParametersValidation validateKnobCores(){
+        if(knobCores == KNOB_CORES_AUTO){
+            knobCores = KNOB_CORES_CHANGE;
+        }
+        return VALIDATION_OK;
+    }
+
+    AdaptivityParametersValidation validateKnobFrequencies(){
         vector<Frequency> availableFrequencies = getAvailableFrequencies();
-        if(strategyFrequencies == STRATEGY_FREQUENCY_AUTO){
+        vector<VirtualCore*> virtualCores;
+        virtualCores = mammut.getInstanceTopology()->getVirtualCores();
+
+        if(knobFrequencies == KNOB_FREQUENCY_AUTO){
             if(isGovernorAvailable(GOVERNOR_USERSPACE) &&
                availableFrequencies.size()){
-                strategyFrequencies = STRATEGY_FREQUENCY_YES;
+                knobFrequencies = KNOB_FREQUENCY_YES;
             }else{
-                strategyFrequencies = STRATEGY_FREQUENCY_NO;
+                knobFrequencies = KNOB_FREQUENCY_NO;
             }
         }
 
-        if(strategyFrequencies != STRATEGY_FREQUENCY_NO &&
-           strategyMapping == STRATEGY_MAPPING_NO){
-                return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
-        }
-
-        if(strategyFrequencies == STRATEGY_FREQUENCY_YES){
+        if(knobFrequencies == KNOB_FREQUENCY_NO){
+            for(size_t i = 0; i < virtualCores.size(); i++){
+                if(!virtualCores.at(i)->hasFlag("constant_tsc")){
+                    return VALIDATION_NO_CONSTANT_TSC;
+                }
+            }
+        }else if(knobMapping == KNOB_MAPPING_NO){
+            return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
             if(archData.voltageTableFile.empty() ||
                !existsFile(archData.voltageTableFile)){
                 return VALIDATION_VOLTAGE_FILE_NEEDED;
             }
         }
 
-        switch(strategyFrequencies){
-            case STRATEGY_FREQUENCY_AUTO:{
+        switch(knobFrequencies){
+            case KNOB_FREQUENCY_AUTO:{
                 throw runtime_error("This should never happen.");
             }break;
-            case STRATEGY_FREQUENCY_NO:{
+            case KNOB_FREQUENCY_NO:{
                 if(serviceNodePerformance()){
                     return VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY;
                 }
             }break;
-            case STRATEGY_FREQUENCY_OS:{
-                if(!isGovernorAvailable(frequencyGovernor)){
-                    return VALIDATION_GOVERNOR_UNSUPPORTED;
-                }
-                if(frequencyLowerBound || frequencyUpperBound){
-                    if(!availableFrequencies.size()){
-                        return VALIDATION_INVALID_FREQUENCY_BOUNDS;
-                    }
-
-                    if(frequencyLowerBound){
-                        if(!contains(availableFrequencies,
-                                     frequencyLowerBound)){
-                            return VALIDATION_INVALID_FREQUENCY_BOUNDS;
-                        }
-                    }else{
-                        frequencyLowerBound = availableFrequencies.front();
-                    }
-
-                    if(frequencyUpperBound){
-                        if(!contains(availableFrequencies,
-                                     frequencyUpperBound)){
-                            return VALIDATION_INVALID_FREQUENCY_BOUNDS;
-                        }
-                    }else{
-                        frequencyUpperBound = availableFrequencies.back();
-                    }
-                }
-                //TODO: Permettere di specificare i bound anche quando c'è
-                //      FREQUENCY_YES
-            }break;
-            case STRATEGY_FREQUENCY_MIN_CORES:
-            case STRATEGY_FREQUENCY_YES:{
+            case KNOB_FREQUENCY_YES:{
                 if(!availableFrequencies.size()){
                     return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
                 }
@@ -751,6 +756,31 @@ private:
 
         if(fastReconfiguration && !isHighestFrequencySettable()){
             return VALIDATION_NO_FAST_RECONF;
+        }
+        return VALIDATION_OK;
+    }
+
+    AdaptivityParametersValidation validateKnobMapping(){
+        if(knobMapping == KNOB_MAPPING_AUTO){
+            knobMapping = KNOB_MAPPING_LINEAR;
+        }
+        return VALIDATION_OK;
+    }
+
+    AdaptivityParametersValidation validateKnobSnodeMapping(){
+        if(knobMappingEmitter == KNOB_SNODE_MAPPING_AUTO){
+            knobMappingEmitter = KNOB_SNODE_MAPPING_ALONE;
+        }
+
+        if(knobMappingCollector == KNOB_SNODE_MAPPING_AUTO){
+            knobMappingCollector = KNOB_SNODE_MAPPING_ALONE;
+        }
+        return VALIDATION_OK;
+    }
+
+    AdaptivityParametersValidation validateKnobHt(){
+        if(knobHyperthreading == KNOB_HT_AUTO){
+            knobHyperthreading = KNOB_HT_NO;
         }
         return VALIDATION_OK;
     }
@@ -779,7 +809,6 @@ private:
             }break;
             case CONTRACT_POWER_BUDGET:{
                 if(powerBudget <= 0 ||
-                   strategyFrequencies == STRATEGY_FREQUENCY_MIN_CORES ||
                    strategyPrediction == STRATEGY_PREDICTION_SIMPLE){
                     return VALIDATION_WRONG_CONTRACT_PARAMETERS;
                 }
@@ -803,9 +832,9 @@ private:
         XmlContent xc(paramFileName, "adaptivityParameters");
 
         SETVALUE(xc, Enum, contractType);
-        SETVALUE(xc, Enum, strategyMapping);
-        SETVALUE(xc, Enum, strategyHyperthreading);
-        SETVALUE(xc, Enum, strategyFrequencies);
+        SETVALUE(xc, Enum, knobMapping);
+        SETVALUE(xc, Enum, knobHyperthreading);
+        SETVALUE(xc, Enum, knobFrequencies);
         SETVALUE(xc, Enum, strategyUnusedVirtualCores);
         SETVALUE(xc, Enum, strategyInactiveVirtualCores);
         SETVALUE(xc, Enum, strategyPrediction);
@@ -815,8 +844,8 @@ private:
         SETVALUE(xc, Enum, strategyCalibration);
         SETVALUE(xc, Enum, strategyPolling);
         SETVALUE(xc, Enum, strategyPersistence);
-        SETVALUE(xc, Enum, mappingEmitter);
-        SETVALUE(xc, Enum, mappingCollector);
+        SETVALUE(xc, Enum, knobMappingEmitter);
+        SETVALUE(xc, Enum, knobMappingCollector);
 
         string g;
         if(xc.getStringValue("frequencyGovernor", g)){
@@ -857,16 +886,25 @@ public:
     // [default = CONTRACT_NONE].
     ContractType contractType;
 
-    //  The mapping strategy [default = STRATEGY_MAPPING_LINEAR].
-    StrategyMapping strategyMapping;
+    // The cores knob [default = KNOB_CORES_AUTO].
+    KnobCores knobCores;
 
-    // The hyperthreading strategy [default = STRATEGY_HT_NO].
-    StrategyHyperthreading strategyHyperthreading;
+    // The frequency knob. It can be KNOB_FREQUENCY_YES
+    // only if knobMapping is different from KNOB_MAPPING_NO
+    // [default = KNOB_FREQUENCY_AUTO].
+    KnobFrequencies knobFrequencies;
 
-    // The frequency strategy. It can be different from STRATEGY_FREQUENCY_NO
-    // only if strategyMapping is different from STRATEGY_MAPPING_NO
-    // [default = STRATEGY_FREQUENCY_AUTO].
-    StrategyFrequencies strategyFrequencies;
+    //  The mapping knob [default = KNOB_MAPPING_AUTO].
+    KnobMapping knobMapping;
+
+    // Emitter mapping knob [default = KNOB_SNODE_MAPPING_AUTO].
+    KnobServiceNodeMapping knobMappingEmitter;
+
+    // Collector mapping knob [default = KNOB_SNODE_MAPPING_AUTO].
+    KnobServiceNodeMapping knobMappingCollector;
+
+    // The hyperthreading knob [default = KNOB_HT_AUTO].
+    KnobHyperthreading knobHyperthreading;
 
     // Strategy for virtual cores that are never used
     // [default = STRATEGY_UNUSED_VC_NONE].
@@ -920,12 +958,6 @@ public:
     // frequency will be be set again to the correct value after the farm
     // is restarted [default = false].
     bool fastReconfiguration;
-
-    // Emitter mapping [default = SERVICE_NODE_MAPPING_ALONE].
-    ServiceNodeMapping mappingEmitter;
-
-    // Collector mapping [default = SERVICE_NODE_MAPPING_ALONE].
-    ServiceNodeMapping mappingCollector;
 
     // If true, when a reconfiguration occur, the collector is migrated to a
     // different virtual core (if needed) [default = false].
@@ -1043,11 +1075,24 @@ public:
         AdaptivityParametersValidation r = VALIDATION_OK;
         setDefaultPost();
 
-        vector<VirtualCore*> virtualCores;
-        virtualCores = mammut.getInstanceTopology()->getVirtualCores();
+        /** Validate cores knob. **/
+        r = validateKnobCores();
+        if(r != VALIDATION_OK){return r;}
 
-        /** Validate frequency strategies. **/
-        r = validateFrequencies();
+        /** Validate frequency knob. **/
+        r = validateKnobFrequencies();
+        if(r != VALIDATION_OK){return r;}
+
+        /** Validate mapping knob. **/
+        r = validateKnobMapping();
+        if(r != VALIDATION_OK){return r;}
+
+        /** Validate service nodes mapping knob. **/
+        r = validateKnobSnodeMapping();
+        if(r != VALIDATION_OK){return r;}
+
+        /** Validate hyperthreading knob. **/
+        r = validateKnobHt();
         if(r != VALIDATION_OK){return r;}
 
         /** Validate unused cores strategy. **/
@@ -1061,8 +1106,8 @@ public:
         if(r != VALIDATION_OK){return r;}
 
         /** Validate unsupported strategies. **/
-        if(strategyHyperthreading == STRATEGY_HT_YES_SOONER ||
-           strategyMapping == STRATEGY_MAPPING_CACHE_EFFICIENT){
+        if(knobHyperthreading == KNOB_HT_YES_SOONER ||
+           knobMapping == KNOB_MAPPING_CACHE_EFFICIENT){
             throw runtime_error("Not yet supported.");
         }
 

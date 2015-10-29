@@ -1,7 +1,7 @@
 # Make file for parallel BZIP2
 SHELL = /bin/sh
 
-FF_HOME = /home/desensi/include/
+MAMMUT_HOME = /home/daniele/Code/Mammut
 
 # Compiler to use
 CC = g++
@@ -23,11 +23,11 @@ all: pbzip2 pbzip2_ff
 
 # FastFlow version
 pbzip2_ff: pbzip2_ff.cpp
-	$(CC) $(CFLAGS) -I$(FF_HOME) -I$(INCS) $< -o $@ -L$(LIBS) -pthread -lbz2 
+	$(CC) $(CFLAGS) -I$(MAMMUT_HOME) $< -o $@ -L$(LIBS) -pthread -lbz2 -L$(MAMMUT_HOME)/mammut -lmammut -lprotobuf-lite -pthread -lmlpack -llapack -lblas -lgsl -lgslcblas
 
 # FastFlow version
 streamzip: streamzip.cpp
-	$(CC) $(CFLAGS) -I$(FF_HOME) -I$(INCS) $< -o $@ -L$(LIBS) -pthread -lbz2 
+	$(CC) $(CFLAGS)  $< -o $@ -L$(LIBS) -pthread -lbz2 
 
 # Standard pbzip2 compile
 pbzip2: pbzip2.cpp

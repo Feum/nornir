@@ -1,4 +1,4 @@
-/** 
+/* 
  * ************************************************************************  
  *  File  : pbzip2_ff.cpp
  *
@@ -185,6 +185,9 @@ inline void operator delete[] (void * ptr) {
 }
 #endif
 
+#include <ff/farm.hpp>
+
+
 // FastFlow's task type 
 struct ff_task_t {
     ff_task_t(char * in, unsigned int buffSize, int blockNum):
@@ -290,7 +293,6 @@ int testCompressedData(char *);
 ssize_t bufread(int hf, char *buf, size_t bsize);
 int detectCPUs(void);
 
-#include <fstream>
 
 /*
  *********************************************************
@@ -376,10 +378,8 @@ public:
 
 	// called just once at very beginning
         int svc_init() {
-	  static int alreadycalled = 0;
-		if (OutputStdOut == 0 && !alreadycalled)
+		if (OutputStdOut == 0)
 		{
-		  alreadycalled = 1;
 			hOutfile = open(OutFilename, O_RDWR | O_CREAT | O_TRUNC | O_BINARY, FILE_MODE);
 			// check to see if file creation was successful
 			if (hOutfile == -1)
@@ -472,7 +472,6 @@ public:
 	}
 	
 	void svc_end() {
-#if 0
 		if (OutputStdOut == 0)
 			close(hOutfile);
 		if ((QuietMode != 1))
@@ -481,7 +480,6 @@ public:
 		}
 		
 		OutputBuffer.clear();
-#endif
 	}
 	
 private:
@@ -915,12 +913,7 @@ ssize_t bufread(int hf, char *buf, size_t bsize)
  * FastFlow's emitter filter.
  */
 
-class Producer: public adpff::adpff_node{
-private:
-  char *FileData;
-  OFF_T inSize;
-  int blockNum;
-  int ret;
+class Producer: public adpff::adpff_node {
 public:
 	Producer():
 	    hInfile(-1),blockSize(0),fileSize(0), comp_decomp(0),bz2NumBlocks(0) {}
@@ -932,14 +925,13 @@ public:
 		comp_decomp=cd;
 		bz2BlockList.clear();
 	        bz2NumBlocks=0;
-
-		FileData = NULL;
-		inSize = 0;
-		blockNum = 0;
-		ret = 0;
 	}
 
 	inline int producer(int hInfile, int blockSize) {
+		char *FileData = NULL;
+		OFF_T inSize = 0;
+		int blockNum = 0;
+		int ret = 0;
 		//int pret = -1;
 		
 		// We will now totally ignore the fileSize and read the data as it
@@ -948,8 +940,7 @@ public:
 		// be appended to the file as it's processed (e.g. log files).
 		
 		// keep going until all the file is processed
-	  //		while (1)
-	  if(1)
+		while (1)
 		{
 			// set buffer size
 			inSize = blockSize;
@@ -984,7 +975,7 @@ public:
 					delete [] FileData;
 				WHY_THIS_ONE(pthread_mutex_unlock(MemMutex));
 				NumBlocks = blockNum;
-				return 0;
+				break;
 			}
 			else if (ret < 0)
 			{
@@ -1006,9 +997,9 @@ public:
 			ff_send_out(task);  
 			
 			blockNum++;
-			return 1;
 		} // while
 		
+		close(hInfile);
 		
 		return 0;
 	}	
@@ -1278,28 +1269,20 @@ public:
 			blockNum++;
 			
 		} // for
-				
+		
+		close(hInfile);
+		
 		return 0;
 	}
 	
 	
 	void * svc(void * notused) {
-	  if (comp_decomp==0) {
+		if (comp_decomp==0) 
 			errLevel = producer(hInfile,blockSize);
-			if(errLevel == 1){
- 				return GO_ON;
-			}
-	  }
 		else 
 			errLevel = producer_decompress_phase2();
 		return NULL; // exit
 	}
-
-   ~Producer(){
-     if(hInfile){
-    close(hInfile);
-     }
-  }
 	
 	int getErrLevel() const { return errLevel;}
 	
@@ -1323,7 +1306,7 @@ private:
  * FastFlow's worker filter.
  */
 
-class Consumer: public adpff::adpff_node{
+class Consumer: public adpff::adpff_node {
 public:
 	Consumer():comp_decomp(0) {}
 
@@ -2188,10 +2171,7 @@ int main(int argc, char* argv[])
 	#endif
 	
 	/* ----- define FastFlow farm ----- */
-	adpff::Observer obs;
- 	adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
-	ap.observer = &obs;
-        ff::ff_farm<> farm(false, 0, numCPU*20); 
+	ff::ff_farm<> farm(false, 0, numCPU*20); 
 	farm.set_scheduling_ondemand(); // set on-demand scheduling policy
 	std::vector<ff::ff_node *> w;
 	Producer * P = new Producer;
@@ -2529,10 +2509,6 @@ int main(int argc, char* argv[])
 
 		// set global variable
 		NumBlocks = numBlocks;
-		std::cout << "Number of blocks: " << numBlocks << std::endl;
-		struct timeval tv;
-		gettimeofday(&tv, NULL);
-		double start_time_ms = (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
 		
 		if (decompress == 1)
 		{
@@ -2562,24 +2538,27 @@ int main(int argc, char* argv[])
 						if (w[i]) ((Consumer *)(w[i]))->set_comp_decomp(1);
 					
 					if (FW) FW->set_input_data(OutFilename);
-                                        adpff::ManagerFarm amf(&farm, ap);
-                                        amf.start();
-                                        amf.join();
-					/* joining threads */
+					
+					adpff::Observer obs;
+				    adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
+				    ap.observer = &obs;
+				    adpff::ManagerFarm amf(&farm, ap);
+                    amf.start();
+                    amf.join();
 #if 0
+					/* joining threads */
 					if (farm.run_then_freeze()<0) {
 						fprintf(stderr, "pbzip2_ff: *ERROR: starting farm\n");
 						errLevel = 1;
 						continue;
 					}
 					
-					if (farm.wait()<0) {
-					  //					if (farm.wait_freezing()<0) {
+					if (farm.wait_freezing()<0) {
 						fprintf(stderr, "pbzip2_ff: *ERROR: waiting farm\n");
 						errLevel = 1;
 						continue;				    
 					}
-#endif					
+#endif
 					if (P->getErrLevel() != 0)
 						errLevel = 1;
 				}
@@ -2617,24 +2596,27 @@ int main(int argc, char* argv[])
 					if (w[i]) ((Consumer *)(w[i]))->set_comp_decomp(0);
 				
 				if (FW) FW->set_input_data(OutFilename);
-                                adpff::ManagerFarm amf(&farm, ap);
-                                amf.start();
-                                amf.join();
+
+				adpff::Observer obs;
+				adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
+				ap.observer = &obs;
+				adpff::ManagerFarm amf(&farm, ap);
+				amf.start();
+				amf.join();
 #if 0
 				if (farm.run_then_freeze()<0) {
 					fprintf(stderr, "pbzip2_ff: *ERROR: starting farm\n");
 					errLevel = 1;
 					continue;
 				}
-
 				/* joining threads */
-				if (farm.wait()<0) {
-				  //				if (farm.wait_freezing()<0) {
+				if (farm.wait_freezing()<0) {
 				    fprintf(stderr, "pbzip2_ff: *ERROR: waiting farm\n");
 				    errLevel = 1;
 				    continue;				    
 				}
 #endif
+
 				/* -------------------------------- */
 			}
 			else
@@ -2648,6 +2630,7 @@ int main(int argc, char* argv[])
 					errLevel = 1;
 			}
 		} // else
+
 
 		if (OutputStdOut == 0)
 		{
@@ -2676,13 +2659,7 @@ int main(int argc, char* argv[])
 
 		if (QuietMode != 1)
 			fprintf(stderr, "-------------------------------------------\n");
-		gettimeofday(&tv, NULL);
-		double now = (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
-		printf("CompletionTimeSecs: %f\n", (now - start_time_ms)/1000.0);
-		farm.ffStats(std::cout);
-
 	} /* for */
-
 
 	/* ------ reclaim FastFlow's memory ----- */
 	if (P)  delete P;
