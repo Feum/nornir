@@ -37,11 +37,11 @@
 #include <cmath>
 #include <fcntl.h>
 //#include <sys/mman.h>
-#include <manager.hpp>
-#include <predictors_impl.hpp>
 #include <cholconst.h>
 #include <complex.h>
 #include <common.h>
+#include "../../predictors.cpp"
+#include "../../src/manager.cpp"
 
 // generic worker
 class Worker: public adpff::adp_ff_node {
@@ -202,7 +202,7 @@ int main(int argc,
 	}
 	
     // Farm declaration
-    adpff::AdaptivityParameters ap;
+    adpff::Parameters ap;
     adpff::adp_ff_farm<> farm(ap);
 	
 	// Emitter declaration

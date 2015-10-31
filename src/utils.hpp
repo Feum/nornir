@@ -33,6 +33,8 @@
 #ifndef UTILS_HPP_
 #define UTILS_HPP_
 
+#include <fstream>
+#include <stdexcept>
 #include <vector>
 
 #define NSECS_IN_SECS 1000000000.0
@@ -40,7 +42,7 @@
 namespace adpff{
 
 /**
- * Represents a moving average technique.
+ * Represents a smoothing technique.
  * Requirement: There must exists the following functions:
  *   - 'T squareRoot(const T&)' to compute the square root.
  *   - 'void regularize(T&)' to set the values < 0 to zero.
@@ -56,27 +58,69 @@ template <typename T> class Smoother{
 public:
     virtual ~Smoother(){;}
 
+    /**
+     * Returns the smoothing factor.
+     * @return The smoothing factor.
+     */
     virtual double getSmoothingFactor() const = 0;
 
+    /**
+     * Sets the smoothing factor.
+     * @param s The smoothing factor.
+     */
     virtual void setSmoothingFactor(double s) = 0;
 
+    /**
+     * Adds a sample to the smoother.
+     * @param value The sample to be added.
+     */
     virtual void add(const T& value) = 0;
 
+    /**
+     * Gets the last stored sample.
+     * @return The last stored sample.
+     */
     virtual T getLastSample() const = 0;
 
+    /**
+     * Resets the smoother.
+     */
     virtual void reset() = 0;
 
+    /**
+     * Returns the number of samples stored by the smoother.
+     * @return The number of samples stored by the smoother.
+     */
     virtual size_t size() const = 0;
 
+    /**
+     * Returns the average of the stored samples.
+     * @return The average of the stored samples.
+     */
     virtual T average() const = 0;
 
+    /**
+     * Returns the variance of the stored samples.
+     * @return The variance of the stored samples.
+     */
     virtual T variance() const = 0;
 
+    /**
+     * Returns the standard deviation of the stored samples.
+     * @return The standard deviation of the stored samples.
+     */
     virtual T standardDeviation() const = 0;
 
+    /**
+     * Returns the coefficient of variation of the stored samples.
+     * @return The coefficient of variation of the stored samples.
+     */
     virtual T coefficientVariation() const = 0;
 };
 
+/**
+ * Smoothing technique: Moving average
+ */
 template<typename T> class MovingAverageSimple: public Smoother<T>{
 private:
     std::vector<T> _windowImpl;
@@ -178,6 +222,7 @@ public:
         return _coefficientVariation;
     }
 };
+
 
 template<typename T> class MovingAverageExponential: public Smoother<T>{
 private:

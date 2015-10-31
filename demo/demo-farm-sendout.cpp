@@ -33,13 +33,12 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "../manager.hpp"
-#include "../predictors_impl.hpp"
+#include "../src/manager.cpp"
 
 using namespace ff;
 
 // generic worker
-class Worker: public adpff::adpff_node{
+class Worker: public adpff::AdaptiveNode{
 public:
     int svc_init(){
         std::cout << "Worker svc_init called" << std::endl;
@@ -61,7 +60,7 @@ public:
 };
 
 // the gatherer filter
-class Collector: public adpff::adpff_node {
+class Collector: public adpff::AdaptiveNode {
 public:
     void * svc(void * task) {
         int * t = (int *)task;
@@ -71,7 +70,7 @@ public:
 };
 
 // the load-balancer filter
-class Emitter: public adpff::adpff_node {
+class Emitter: public adpff::AdaptiveNode {
 public:
     Emitter(int max_task):ntask(max_task) {};
 
@@ -123,7 +122,7 @@ int main(int argc, char * argv[]) {
     farm.add_collector(&C);
     
     adpff::Observer obs;
-    adpff::AdaptivityParameters ap("parameters.xml",
+    adpff::Parameters ap("parameters.xml",
                                    "archdata.xml");
     ap.observer = &obs;
     adpff::ManagerFarm amf(&farm, ap);
@@ -132,13 +131,6 @@ int main(int argc, char * argv[]) {
     std::cout << "Manager started. " << std::endl;
     amf.join();
     std::cout << "Manager joined. " << std::endl;
-
-    /*
-    if (farm.run_and_wait_end()<0) {
-        error("running farm\n");
-        return -1;
-    }
-    */
 
     std::cout << "Farm end" << std::endl;
     std::cerr << "DONE, time= " << farm.ffTime() << " (ms)\n";

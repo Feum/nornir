@@ -2,9 +2,9 @@
 #include <cstdio>
 #include <vector>
 #include <farm.hpp>
-#include <predictors_impl.hpp>
 #include <mammut/mammut.hpp>
 #include <mammut/utils.hpp>
+#include "../../predictors.cpp"
 
 using namespace ff;
 
@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
     }
 
     Obs obs;
-    adpff::AdaptivityParameters ap("demo-fastflow.xml");
+    adpff::Parameters ap("demo-fastflow.xml");
     ap.observer = &obs;
     adpff::adp_ff_farm<> farm(ap);
     Emitter E(N);

@@ -109,10 +109,8 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "../../manager.hpp"
-#include "../../predictors_impl.hpp"
-
 #include <ff/allocator.hpp>
+#include "../../src/manager.hpp"
 
 using namespace adpff;
 
@@ -221,7 +219,7 @@ void printResults(time_t* pt1, time_t* pt2)
     }
 }
 
-class Worker: public adpff_node {
+class Worker: public AdaptiveNode {
 private:
     SOLUTIONTYPE workersolutions;
 
@@ -332,7 +330,7 @@ public:
 
 
 // the load-balancer filter
-class Emitter: public adpff_node {
+class Emitter: public AdaptiveNode {
 private:
     void streamit(int board_size, int depth) {
         int aQueenBitCol[MAX_BOARDSIZE]; /* marks colummns which already have queens */
@@ -528,7 +526,7 @@ int main(int argc, char** argv) {
     ffalloc.init();
 
     adpff::Observer obs;
-    adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
+    adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     ff_farm<> farm(false, 8192, 8192, false, DEF_MAX_NUM_WORKERS, true);
     Emitter E(boardsize, depth);

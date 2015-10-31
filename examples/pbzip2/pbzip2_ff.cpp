@@ -154,8 +154,7 @@
 #include <mammut/energy/energy.hpp>
 #include <mammut/cpufreq/cpufreq.hpp>
 #include <mammut/utils.hpp>
-#include "../../manager.hpp"
-#include "../../predictors_impl.hpp"
+#include "../../src/manager.cpp"
 
 /* ------------------ FastFlow specific ---------------- */
 
@@ -363,7 +362,7 @@ char *memstr(char *searchBuf, int searchBufSize, char *searchString, int searchS
  * FastFlow's collector filter.
  */
 
-class FileWriter: public adpff::adpff_node {
+class FileWriter: public adpff::AdaptiveNode {
 public:
         FileWriter():
 		OutFilename(NULL),currBlock(0),hOutfile(1),// default to stdout
@@ -913,7 +912,7 @@ ssize_t bufread(int hf, char *buf, size_t bsize)
  * FastFlow's emitter filter.
  */
 
-class Producer: public adpff::adpff_node {
+class Producer: public adpff::AdaptiveNode {
 public:
 	Producer():
 	    hInfile(-1),blockSize(0),fileSize(0), comp_decomp(0),bz2NumBlocks(0) {}
@@ -1306,7 +1305,7 @@ private:
  * FastFlow's worker filter.
  */
 
-class Consumer: public adpff::adpff_node {
+class Consumer: public adpff::AdaptiveNode {
 public:
 	Consumer():comp_decomp(0) {}
 
@@ -2540,7 +2539,7 @@ int main(int argc, char* argv[])
 					if (FW) FW->set_input_data(OutFilename);
 					
 					adpff::Observer obs;
-				    adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
+				    adpff::Parameters ap("parameters.xml", "archdata.xml");
 				    ap.observer = &obs;
 				    adpff::ManagerFarm amf(&farm, ap);
                     amf.start();
@@ -2598,7 +2597,7 @@ int main(int argc, char* argv[])
 				if (FW) FW->set_input_data(OutFilename);
 
 				adpff::Observer obs;
-				adpff::AdaptivityParameters ap("parameters.xml", "archdata.xml");
+				adpff::Parameters ap("parameters.xml", "archdata.xml");
 				ap.observer = &obs;
 				adpff::ManagerFarm amf(&farm, ap);
 				amf.start();

@@ -39,10 +39,10 @@
 #include <fcntl.h>
 //#include <sys/mman.h>
 #include <farm.hpp>
-#include <predictors_impl.hpp>
 #include <cholconst.h>
 #include <complex.h>
 #include <common.h>
+#include "../../predictors.cpp"
 
 
 using namespace ff;
@@ -442,7 +442,7 @@ int main(int argc,
 	}
 	
 	// Farm declaration
-	adpff::AdaptivityParameters ap;
+	adpff::Parameters ap;
     adpff::adp_ff_farm<> farm(ap);
     
 	// Emitter declaration

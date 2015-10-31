@@ -1,6 +1,3 @@
-MAMMUTROOT           = /home/desensi/Mammut
-export INCS          = -I$(realpath ..) -I$(MAMMUTROOT) -I/usr/include/libxml2
-export LIBS          = -lpthread -L$(MAMMUTROOT)/mammut -lmammut -lprotobuf-lite -lrt -lgsl -lgslcblas -lmlpack -llapack -lblas
 APPS                 = quicksort nqueens pbzip2  #cholesky #matmul pbzip2
 
 .PHONY: all clean cleanall

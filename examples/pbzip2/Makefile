@@ -1,16 +1,10 @@
 # Make file for parallel BZIP2
 SHELL = /bin/sh
 
-MAMMUT_HOME = /home/daniele/Code/Mammut
-
-# Compiler to use
-CC = g++
-CFLAGS = -DNO_CMAKE_CONFIG -O2 -finline-functions --std=c++11 -g
-
 # Comment out CFLAGS line below for compatability mode for 32bit file sizes
 # (less than 2GB) and systems that have compilers that treat int as 64bit
 # natively (ie: modern AIX)
-CFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DDEBUG_FARM -DDEBUG_NODE -DDEBUG_PREDICTORS
+CXXFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DDEBUG_FARM -DDEBUG_NODE -DDEBUG_PREDICTORS
 
 # Uncomment CFLAGS line below if you want to compile pbzip2 without load
 # average support for systems that do not support it
@@ -23,19 +17,19 @@ all: pbzip2 pbzip2_ff
 
 # FastFlow version
 pbzip2_ff: pbzip2_ff.cpp
-	$(CC) $(CFLAGS) -I$(MAMMUT_HOME) $< -o $@ -L$(LIBS) -pthread -lbz2 -L$(MAMMUT_HOME)/mammut -lmammut -lprotobuf-lite -pthread -lmlpack -llapack -lblas -lgsl -lgslcblas
+	$(CXX) $(CXXFLAGS) $(INCS) $< -o $@ $(LDFLAGS) $(LDLIBS) -lbz2 
 
 # FastFlow version
 streamzip: streamzip.cpp
-	$(CC) $(CFLAGS)  $< -o $@ -L$(LIBS) -pthread -lbz2 
+	$(CXX) $(CXXFLAGS)  $< -o $@ -L$(LIBS) -pthread -lbz2 
 
 # Standard pbzip2 compile
 pbzip2: pbzip2.cpp
-	$(CC) $(CFLAGS) $^ -o pbzip2 -pthread -lpthread -lbz2
+	$(CXX) $(CXXFLAGS) $^ -o pbzip2 -pthread -lpthread -lbz2
 
 # Choose this if you want to compile in a static version of the libbz2 library
 pbzip2-static: pbzip2.cpp libbz2.a
-	$(CC) $(CFLAGS) $^ -o pbzip2 -pthread -lpthread -I. -L. -lbz2
+	$(CXX) $(CXXFLAGS) $^ -o pbzip2 -pthread -lpthread -I. -L. -lbz2
 
 # Install the binary pbzip2 program and man page
 install: pbzip2

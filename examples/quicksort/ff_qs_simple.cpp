@@ -42,69 +42,9 @@
  */
 
 #include <stdio.h>
-#include "../../farm.hpp"
-#include "../../predictors_impl.hpp"
+#include "../../src/manager.hpp"
 
 using namespace adpff;
-
-class Obs: public adpff::adp_ff_farm_observer{
-private:
-    std::ofstream _statsFile;
-    std::ofstream _energyFile;
-    mammut::energy::JoulesCpu _totalUsedJoules, _totalUnusedJoules;
-public:
-    Obs(){
-        _statsFile.open("stats.txt");
-        if(!_statsFile.is_open()){
-            throw std::runtime_error("Obs: Impossible to open stats file.");
-        }
-        _statsFile << "# [[EmitterVc][WorkersVc][CollectorVc]] NumWorkers,Frequency CurrentBandwidth CurrentUtilization" << std::endl;
-
-        _energyFile.open("energy.txt");
-        if(!_energyFile.is_open()){
-            throw std::runtime_error("Obs: Impossible to open energy file.");
-        }
-        _energyFile << "# UsedVCCpuWattsy UsedVCCoresWatts UsedVCGraphicWatts UsedVCDRAMWatts" << std::endl;
-    }
-
-    ~Obs(){
-        double duration = (mammut::utils::getMillisecondsTime() - _startMonitoringMs) / 1000.0;
-        _energyFile << _totalUsedJoules.cpu/duration << " " << _totalUsedJoules.cores/duration << " " << _totalUsedJoules.graphic/duration << " " << _totalUsedJoules.dram/duration << std::endl;
-        _statsFile.close();
-        _energyFile.close();
-    }
-
-    void observe(){
-        /****************** Stats ******************/
-        _statsFile << time(NULL);
-        _statsFile << " [";
-        if(_emitterVirtualCore){
-            _statsFile << "[" << _emitterVirtualCore->getVirtualCoreId() << "]";
-        }
-
-        _statsFile << "[";
-        for(size_t i = 0; i < _workersVirtualCore.size(); i++){
-            _statsFile << _workersVirtualCore.at(i)->getVirtualCoreId() << ",";
-        }
-        _statsFile << "]";
-
-        if(_collectorVirtualCore){
-            _statsFile << "[" << _collectorVirtualCore->getVirtualCoreId() << "]";
-        }
-        _statsFile << "] ";
-
-        _statsFile << _numberOfWorkers << "," << _currentFrequency << " ";
-        _statsFile << _averageBandwidth << " ";
-        _statsFile << _averageUtilization << " ";
-        _statsFile << std::endl;
-        /****************** Energy ******************/
-
-        _energyFile << _averageWatts.cpu << " " << _averageWatts.cores << " " << _averageWatts.graphic << " " << _averageWatts.dram << " ";
-        _energyFile << std::endl;
-        _totalUsedJoules += _averageWatts;
-    }
-};
-
 
 //FastFlow task type
 typedef struct {
@@ -203,9 +143,9 @@ void usage() {
 }
 
 
-class Worker: public adp_ff_node {
+class Worker: public AdaptiveNode {
 public:
-    void * adp_svc(void * t) {
+    void * svc(void * t) {
         ff_task * task = (ff_task*)t;
         int i=task->i, j=task->j;
         
@@ -221,11 +161,11 @@ public:
     }
 };
 
-class Emitter: public adp_ff_node {
+class Emitter: public AdaptiveNode {
 public:
     Emitter():streamlen(0) {};
 
-    void * adp_svc(void * t) {  
+    void * svc(void * t) {
         ff_task * task = (ff_task*)t;
         if (task == NULL) {
             int pivot = FindPivot(0,size-1);
@@ -302,10 +242,7 @@ int main(int argc, char *argv[]) {
     
     initArray();
     
-    Obs obs;
-    adpff::AdaptivityParameters ap("demo-fastflow.xml");
-    ap.observer = &obs;
-    adpff::adp_ff_farm<> farm(ap, false);
+    ff::ff_farm<> farm;
 
     Emitter E;
     farm.add_emitter(&E);
@@ -314,13 +251,16 @@ int main(int argc, char *argv[]) {
     farm.add_workers(w);
     farm.wrap_around();
     
-    printf("starting....\n");
-    //if (farm.run_and_wait_end()<0) {
-    if (farm.run_then_freeze()<0) {
-        error("running farm\n");
-        return -1;
-    }
-    farm.wait();
+    adpff::Observer obs;
+    adpff::Parameters ap("parameters.xml", "archdata.xml");
+    ap.observer = &obs;
+    adpff::ManagerFarm amf(&farm, ap);
+    std::cout << "Starting manager. " << std::endl;
+    amf.start();
+    std::cout << "Manager started. " << std::endl;
+    amf.join();
+    std::cout << "Manager joined. " << std::endl;
+
     printf("Time: %g (ms)\n", farm.ffTime());
     
     if (0) print_array();

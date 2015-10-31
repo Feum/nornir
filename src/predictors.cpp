@@ -1,5 +1,5 @@
 /*
- * predictors_impl.hpp
+ * predictors.cpp
  *
  * Created on: 10/07/2015
  *
@@ -25,12 +25,10 @@
  * =========================================================================
  */
 
-/*! \file predictors_impl.hpp
+/*!
+ * \file predictors.cpp
  * \brief Predictors used by adaptive farm.
- *
  */
-#ifndef PREDICTORS_IMPL_HPP_
-#define PREDICTORS_IMPL_HPP_
 
 #include "predictors.hpp"
 #include "manager.hpp"
@@ -136,7 +134,7 @@ void RegressionDataPower::init(const FarmConfiguration& configuration){
 
     if(_manager._p.knobFrequencies == KNOB_FREQUENCY_YES){
         double voltage = _manager.getVoltage(configuration);
-        uint usedCpus;
+        uint usedCpus = 0;
         if(_manager._p.knobMapping == KNOB_MAPPING_LINEAR){
             switch(_manager._p.knobHyperthreading){
                 case KNOB_HT_NO:{
@@ -564,4 +562,3 @@ void CalibratorLowDiscrepancy::reset(){
 
 }
 
-#endif //PREDICTORS_IMPL_HPP_

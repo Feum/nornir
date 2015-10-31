@@ -1,5 +1,5 @@
 /*
- * adpnode.hpp
+ * node.hpp
  *
  * Created on: 23/03/2015
  *
@@ -28,34 +28,21 @@
 #ifndef ADAPTIVE_FASTFLOW_NODE_HPP_
 #define ADAPTIVE_FASTFLOW_NODE_HPP_
 
+#include "./parameters.hpp"
+
 #include <ff/node.hpp>
 #include <mammut/mammut.hpp>
-#include <mammut/module.hpp>
-#include <mammut/utils.hpp>
-
-#include <fstream>
-#include <streambuf>
-#include <string>
-#include <time.h>
 
 #undef DEBUG
 #undef DEBUGB
 
-#ifdef DEBUG_NODE
-#define DEBUG(x) do { cerr << x << endl; } while (0)
-#define DEBUGB(x) do {x;} while(0)
-#else
-#define DEBUG(x)
-#define DEBUGB(x)
-#endif
 
 namespace adpff{
 
 using namespace std;
 
 using namespace ff;
-using namespace mammut::cpufreq;
-using namespace mammut::energy;
+using namespace mammut;
 using namespace mammut::task;
 using namespace mammut::topology;
 
@@ -127,7 +114,7 @@ typedef struct{
  *
  * This class wraps a ff_node to let it reconfigurable.
  */
-class adpff_node: public ff_node{
+class AdaptiveNode: public ff_node{
 private:
     friend class ManagerFarm;
 
@@ -140,6 +127,8 @@ private:
     WorkerSample _sampleResponse;
     double _ticksPerNs;
     ticks _startTicks;
+    ticks _ticksTot;
+    ticks _tasksCount;
 
     // Queue used by the manager to notify that a request is present
     // on _managementRequest.
@@ -149,49 +138,25 @@ private:
     // on _sampleResponse.
     ff::SWSR_Ptr_Buffer _responseQ;
 
-    double ticksToSeconds(double ticks){
-        return (ticks/_ticksPerNs)/NSECS_IN_SECS;
-    }
+    /**
+     * Converts ticks to seconds.
+     * @param ticks The ticks to be converted.
+     * @return The amount of seconds corresponding to the value of ticks.
+     */
+    double ticksToSeconds(double ticks) const;
 
     /**
      * Initializes the node.
      * @param mammut A Mammut handle.
      * @param ticksPerNs The number of ticks in a nanosecond.
      */
-    void init(Mammut& mammut,
-              double ticksPerNs){
-        while(!_started){;}
-        _tasksManager = mammut.getInstanceTask();
-        if(!_tasksManager){
-            throw runtime_error("Node init(): impossible to "
-                                "get the tasks manager.");
-        }
-        size_t tid = getOSThreadId();
-        assert(tid != 0);
-        _thread = _tasksManager->getThreadHandler(getpid(), tid);
-        _ticksPerNs = ticksPerNs;
-    }
+    void init(Mammut& mammut, double ticksPerNs);
 
     /**
      * Moves this node on a specific virtual core.
      * @param vc The virtual core where this nodes must be moved.
      */
-    void move(VirtualCore* vc){
-        _thread->move(vc);
-    }
-
-    // Sleeps for a given amount of nanoseconds
-    static inline void nSleep(long ns) {
-#if defined(__linux__)
-        struct timespec req={0};
-        time_t sec = ns/NSECS_IN_SECS;
-        req.tv_sec = sec;
-        req.tv_nsec = ns - sec*NSECS_IN_SECS;
-        nanosleep(&req, NULL);
-#else
-        throw runtime_error("Nanosleep not supported on this OS.");
-#endif
-    }
+    void move(VirtualCore* vc);
 
     /**
      * The result of askForSample call.
@@ -202,79 +167,35 @@ private:
      */
     void getSampleResponse(WorkerSample& sample,
                            StrategyPolling strategyPolling,
-                           double avgLatency){
-        while(_responseQ.empty()){
-            switch(strategyPolling){
-                case STRATEGY_POLLING_SPINNING:{
-                    continue;
-                }break;
-                case STRATEGY_POLLING_PAUSE:{
-                    PAUSE();
-                }break;
-                case STRATEGY_POLLING_SLEEP_SMALL:{
-                    nSleep(0);
-                }break;
-                case STRATEGY_POLLING_SLEEP_LATENCY:{
-                    nSleep(avgLatency);
-                }break;
-            }
-        }
-        _responseQ.inc();
-        sample = _sampleResponse;
-    }
+                           double avgLatency);
 
     /**
     * Ask the node for a sample of the statistics computed since the last
     * time this method has been called.
     * The result can be retrieved with getSampleResponse call.
     */
-    void askForSample(){
-        _managementRequest.type = MGMT_REQ_GET_AND_RESET_SAMPLE;
-        // The value pushed in the queue will not be read,
-        // it could be anything except NULL.
-        _managementQ.push(&_managementRequest);
-    }
+    void askForSample();
 
     /**
      * Tells the node to freeze the farm.
      */
-    void freezeAll(void* mark){
-        _managementRequest.type = MGMT_REQ_FREEZE;
-        _managementRequest.mark = mark;
-        // The value pushed in the queue will not be read, it could be
-        // anything except NULL.
-        _managementQ.push(&_managementRequest);
-    }
+    void freezeAll(void* mark);
 
     /**
      * Thaws the farm.
      */
-    void thawAll(size_t numWorkers){
-        _managementRequest.type = MGMT_REQ_THAW;
-        _managementRequest.numWorkers = numWorkers;
-        // The value pushed in the queue will not be read, it could be
-        // anything except NULL.
-        _managementQ.push(&_managementRequest);
-    }
-
+    void thawAll(size_t numWorkers);
     /**
      * Called on the node before starting it.
      * It must be called when the node is running.
      */
-    void prepareToFreeze(){
-        _goingToFreeze = true;
-    }
+    void prepareToFreeze();
 
     /**
      * Called on the node before starting them.
      * It must be called when the node is frozen.
      */
-    void prepareToRun(){
-        taskcnt = 0;
-        tickstot = 0;
-        _startTicks = getticks();
-        _goingToFreeze = false;
-    }
+    void prepareToRun();
 
     /**
      * Returns true if the farm has been terminated by the application,
@@ -282,92 +203,35 @@ private:
      * @return true if the farm has been terminated by the application,
      * false otherwise.
      */
-    bool isTerminated() const{
-        return _terminated;
-    }
+    bool isTerminated() const;
 
-    void storeSample(){
-        int dummy;
-        int* dummyPtr = &dummy;
-        ticks now = getticks();
-        ticks totalTicks = now - _startTicks;
-        _sampleResponse.loadPercentage = ((double) (tickstot) /
-                                          (double) totalTicks) * 100.0;
-        _sampleResponse.tasksCount = taskcnt;
-        if(taskcnt){
-            _sampleResponse.latency = ((double)tickstot / (double)taskcnt) /
-                                      _ticksPerNs;
-        }else{
-            _sampleResponse.latency = 0.0;
-        }
-        _sampleResponse.bandwidthTotal = (double) taskcnt /
-                                         ticksToSeconds(totalTicks);
+    /**
+     * Stores a sample.
+     */
+    void storeSample();
 
-        taskcnt = 0;
-        tickstot = 0;
-        _startTicks = now;
+    /**
+     * The callback that will be executed by the ff_node before
+     * reading a task from the queue.
+     * @param p Is the lb_t or gt_t in case of emitter or collector.
+     */
+    void callbackIn(void *p) CX11_KEYWORD(final);
 
-        _responseQ.push(dummyPtr);
-    }
+    /**
+     * Notify the end of stream.
+     */
+    void eosnotify(ssize_t) CX11_KEYWORD(final);
 
-    void callbackIn(void *p) CX11_KEYWORD(final){
-        _started = true;
-        if(!_managementQ.empty()){
-            _managementQ.inc();
-            switch(_managementRequest.type){
-                case MGMT_REQ_GET_AND_RESET_SAMPLE:{
-                    storeSample();
-                }break;
-                case MGMT_REQ_FREEZE:{
-                    DEBUG("Freeze request received");
-                    ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
-                    lb->broadcast_task(_managementRequest.mark);
-                    DEBUG("Task broadcasted");
-
-                    /** Waits for restart request from manager. **/
-                    while(_managementQ.empty()){;}
-                    _managementQ.inc();
-                    DEBUGB(assert(_managementRequest.type == MGMT_REQ_THAW));
-                    lb->thawWorkers(true, _managementRequest.numWorkers);
-                }break;
-                default:{
-                    throw runtime_error("Unexpected mgmt request.");
-                }break;
-            }
-        }
-    }
-
-    void eosnotify(ssize_t) CX11_KEYWORD(final){
-        if(!_goingToFreeze){
-            _terminated = true;
-            storeSample();
-        }
-    }
 public:
     /**
      * Builds an adaptive node.
      */
-    adpff_node():
-            _started(false),
-            _terminated(false),
-            _goingToFreeze(false),
-            _tasksManager(NULL),
-            _thread(NULL),
-            _managementQ(1),
-            _responseQ(1){
-        prepareToRun();
-        _managementQ.init();
-        _responseQ.init();
-    }
+    AdaptiveNode();
 
     /**
      * Destroyes this adaptive node.
      */
-    ~adpff_node(){
-        if(_thread){
-            _tasksManager->releaseThreadHandler(_thread);
-        }
-    }
+    ~AdaptiveNode();
 
     /**
      * This method can be implemented by the nodes to be aware of a change
@@ -382,7 +246,7 @@ public:
      * @param newNumWorkers The new number of workers.
      */
     virtual void notifyWorkersChange(size_t oldNumWorkers,
-                                     size_t newNumWorkers){;}
+                                     size_t newNumWorkers);
 };
 
 }

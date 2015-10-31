@@ -23,19 +23,6 @@
 #
 # ---------------------------------------------------------------------------
 
-FF_HOME              = ../..
-CC                   = gcc
-CXX                  = g++
-LINK_OPT             = 
-VERSION              = 
-OPTIMIZE_FLAGS       = -O3 -finline-functions 
-CXXFLAGS             = -DNO_CMAKE_CONFIG -Wall --std=c++11  -g #-DTRACE_FASTFLOW
-CFLAGS               =
-LDFLAGS              = 
-INCS                 += -I$(FF_HOME)
-LIBS                 += -lpthread
-
-INCLUDES             = -I. $(INCS)
 TARGET               = nq_ff nq_ff_acc nq
 
 
@@ -48,10 +35,10 @@ TARGET               = nq_ff nq_ff_acc nq
 all: $(TARGET)
 
 nq_ff: nq_ff.cpp
-	$(CXX) $(INCS) $(CXXFLAGS) $(OPTIMIZE_FLAGS) $< -o $@ $(LIBS)
+	$(CXX) $(INCS) $(CXXFLAGS) $(OPTIMIZE_FLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
 
 nq_ff_acc: nq_ff_acc.cpp
-	$(CXX) $(INCS) $(CXXFLAGS) $(OPTIMIZE_FLAGS) $< -o $@ $(LIBS)
+	$(CXX) $(INCS) $(CXXFLAGS) $(OPTIMIZE_FLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
 
 nq: nq.c
 	$(CXX) $(CFLAGS) $(OPTIMIZE_FLAGS) $< -o $@
