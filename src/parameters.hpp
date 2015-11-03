@@ -40,14 +40,6 @@ namespace adpff{
 
 class Observer;
 
-using namespace std;
-using namespace mammut::cpufreq;
-using namespace mammut::topology;
-using namespace mammut::utils;
-using mammut::Communicator;
-using mammut::Mammut;
-using mammut::utils::enumStrings;
-
 /// Possible contracts requested by the user.
 typedef enum{
     // No contract required.
@@ -73,38 +65,29 @@ typedef enum{
 
 /// Cores knob.
 typedef enum{
-    // The best solution is dinamically chosen.
-    KNOB_CORES_AUTO = 0,
+    // Doesn't changes the number of used workers.
+    KNOB_WORKERS_NO = 0,
 
-    // Doesn't changes the number of used cores.
-    KNOB_CORES_NO,
-
-    // Changes the number of threads used by the application.
-    KNOB_CORES_CHANGE,
-
-    // Instead of changing the number of threads it changes the mapping.
-    KNOB_CORES_REMAP
-}KnobCores;
+    // Changes the number of workers used by the application.
+    KNOB_WORKERS_YES,
+}KnobConfWorkers;
 
 /// Frequency knob.
 typedef enum{
-    // Chooses YES or NO according to the possibility of the system.
-    KNOB_FREQUENCY_AUTO = 0,
+    // Disables the possibility to dinamically change the frequencies.
+    KNOB_FREQUENCY_NO,
 
     // Enables the possibility to dinamically change the frequencies.
     KNOB_FREQUENCY_YES,
-
-    // Disables the possibility to dinamically change the frequencies.
-    KNOB_FREQUENCY_NO,
-}KnobFrequencies;
+}KnobConfFrequencies;
 
 /// Mapping knob.
 typedef enum{
-    // Best mapping decisions will be at runtime.
-    KNOB_MAPPING_AUTO = 0,
-
     // Mapping decisions will be performed by the operating system.
-    KNOB_MAPPING_NO,
+    KNOB_MAPPING_NO = 0,
+
+    // Best mapping decisions will be at runtime.
+    KNOB_MAPPING_AUTO,
 
     // Tries to keep the threads as close as possible.
     KNOB_MAPPING_LINEAR,
@@ -112,22 +95,22 @@ typedef enum{
     // Tries to make good use of the shared caches.
     // Particularly useful when threads have large working sets.
     KNOB_MAPPING_CACHE_EFFICIENT
-}KnobMapping;
+}KnobConfMapping;
 
 /// Hyperthreading knob.
 typedef enum{
-    // The runtime system will decide at runtime if use or not hyperthreading.
-    KNOB_HT_AUTO = 0,
-
     // Hyperthreading is not used.
     KNOB_HT_NO = 0,
 
+    // The runtime system will decide at runtime if use or not hyperthreading.
+    KNOB_HT_AUTO,
+
     // Hyperthreading is used since the beginning.
-    KNOB_HT_YES_SOONER,
+    KNOB_HT_SOONER,
 
     // Hyperthreading is used only when we used all the physical cores.
-    KNOB_HT_YES_LATER
-}KnobHyperthreading;
+    KNOB_HT_LATER
+}KnobConfHyperthreading;
 
 /// Possible strategies to apply for unused virtual cores. For unused virtual
 /// cores we mean those never used or those used only on some conditions.
@@ -169,8 +152,11 @@ typedef enum{
 
 /// Service nodes (emitter or collector) mapping knob.
 typedef enum{
+    // The service node is not explicitly mapped.
+    KNOB_SNODE_MAPPING_NO = 0,
+
     // The mapping is automatically chosen by the runtime system.
-    KNOB_SNODE_MAPPING_AUTO = 0,
+    KNOB_SNODE_MAPPING_AUTO,
 
     // The service node is mapped on a physical core where no workers
     // are mapped.
@@ -178,12 +164,7 @@ typedef enum{
 
     // The service node is mapped on a physical core together with a worker.
     KNOB_SNODE_MAPPING_COLLAPSED,
-
-    // The service node is mapped on an independent voltage domain and
-    // is kept running at maximum performances (only available when
-    // strategyFrequencies != STRATEGY_FREQUENCY_NO).
-    KNOB_SNODE_MAPPING_PERFORMANCE
-}KnobServiceNodeMapping;
+}KnobConfSNodeMapping;
 
 /// Possible ways to smooth the values.
 typedef enum{
@@ -316,7 +297,7 @@ public:
      * @param fileName The name of the XML file.
      * @param rootName The name of the root.
      */
-    XmlTree(const string& fileName, const string& rootName);
+    XmlTree(const std::string& fileName, const std::string& rootName);
 
     ~XmlTree();
 
@@ -372,7 +353,7 @@ public:
      * @param value The value that will contain the element
      *              valueName (if present).
      */
-    void getString(const char* valueName, string& value);
+    void getString(const char* valueName, std::string& value);
 
     /**
      * If an element named 'valueName' is present, its value is
@@ -404,13 +385,13 @@ typedef struct ArchData{
 
     // The file containing the voltage table. It is mandatory when
     // strategyFrequencies is STRATEGY_FREQUENCY_YES.
-    string voltageTableFile;
+    std::string voltageTableFile;
 
     ArchData():ticksPerNs(0),
                monitoringCost(0),
                voltageTableFile(""){;}
 
-    void loadXml(const string& archFileName);
+    void loadXml(const std::string& archFileName);
 }ArchData;
 
 /*!
@@ -440,13 +421,13 @@ private:
      * @param g The governor.
      * @return true if the governor is available, false otherwise.
      */
-    bool isGovernorAvailable(Governor g);
+    bool isGovernorAvailable(mammut::cpufreq::Governor g);
 
     /**
      * Gets the frequencies available on this machine.
      * @return A vector containing the frequencies available on this machine.
      */
-    vector<Frequency> getAvailableFrequencies();
+    std::vector<mammut::cpufreq::Frequency> getAvailableFrequencies();
 
     /**
      * Checks if it is possible to turn off the cores.
@@ -477,25 +458,11 @@ private:
     bool isHighestFrequencySettable();
 
     /**
-     * Checks if performance mapping has been required from one of the two
-     * service nodes.
-     * @return true if performance mapping has been required from one of
-     *         the two service nodes, false otherwise.
-     */
-    bool serviceNodePerformance();
-
-    /**
      * Validates the strategy required for unused virtual cores.
      * @param s The strategy required for unused virtual cores.
      * @return The result of the validation.
      */
     ParametersValidation validateUnusedVc(StrategyUnusedVirtualCores& s);
-
-    /**
-     * Validates the cores knob.
-     * @return The result of the validation.
-     */
-    ParametersValidation validateKnobCores();
 
     /**
      * Validates the frequency knob.
@@ -532,11 +499,11 @@ private:
      * of an XML file.
      * @param fileName The name of the XML file.
      */
-    void loadXml(const string& fileName);
+    void loadXml(const std::string& fileName);
 
 public:
     // The mammut modules handler.
-    Mammut mammut;
+    mammut::Mammut mammut;
 
     // Architecture's specific data.
     ArchData archData;
@@ -545,25 +512,25 @@ public:
     // [default = CONTRACT_NONE].
     ContractType contractType;
 
-    // The cores knob [default = KNOB_CORES_AUTO].
-    KnobCores knobCores;
+    // The workers knob [default = KNOB_WORKERS_YES].
+    KnobConfWorkers knobWorkers;
 
     // The frequency knob. It can be KNOB_FREQUENCY_YES
     // only if knobMapping is different from KNOB_MAPPING_NO
     // [default = KNOB_FREQUENCY_AUTO].
-    KnobFrequencies knobFrequencies;
+    KnobConfFrequencies knobFrequencies;
 
     //  The mapping knob [default = KNOB_MAPPING_AUTO].
-    KnobMapping knobMapping;
+    KnobConfMapping knobMapping;
 
     // Emitter mapping knob [default = KNOB_SNODE_MAPPING_AUTO].
-    KnobServiceNodeMapping knobMappingEmitter;
+    KnobConfSNodeMapping knobMappingEmitter;
 
     // Collector mapping knob [default = KNOB_SNODE_MAPPING_AUTO].
-    KnobServiceNodeMapping knobMappingCollector;
+    KnobConfSNodeMapping knobMappingCollector;
 
     // The hyperthreading knob [default = KNOB_HT_AUTO].
-    KnobHyperthreading knobHyperthreading;
+    KnobConfHyperthreading knobHyperthreading;
 
     // Strategy for virtual cores that are never used
     // [default = STRATEGY_UNUSED_VC_NONE].
@@ -597,20 +564,8 @@ public:
     // Persistence strategy [default = STRATEGY_PERSISTENCE_SAMPLES].
     StrategyPersistence strategyPersistence;
 
-    // The frequency governor (only used when strategyFrequencies is
-    // STRATEGY_FREQUENCY_OS) [default = GOVERNOR_USERSPACE].
-    Governor frequencyGovernor;
-
     // Flag to enable/disable cores turbo boosting [default = false].
     bool turboBoost;
-
-    // The frequency lower bound (only if strategyFrequency is
-    // STRATEGY_FREQUENCY_OS) [default = unused].
-    Frequency frequencyLowerBound;
-
-    // The frequency upper bound (only if strategyFrequency is
-    // STRATEGY_FREQUENCY_OS) [default = unused].
-    Frequency frequencyUpperBound;
 
     // If true, before changing the number of workers the frequency will be
     // set to maximum to reduce the latency of the reconfiguration. The
@@ -695,7 +650,7 @@ public:
      * @param communicator The communicator used to instantiate the other
      *        modules. If NULL, the modules will be created as local modules.
      */
-    Parameters(Communicator* const communicator = NULL);
+    Parameters(mammut::Communicator* const communicator = NULL);
 
     /**
      * Creates the adaptivity parameters.
@@ -706,9 +661,9 @@ public:
      * @param communicator The communicator used to instantiate the other
      *        modules. If NULL, the modules will be created as local modules.
      */
-    Parameters(const string& paramFileName,
-               const string& archFileName,
-               Communicator* const communicator = NULL);
+    Parameters(const std::string& paramFileName,
+               const std::string& archFileName,
+               mammut::Communicator* const communicator = NULL);
 
     /**
      * Destroyes these parameters.

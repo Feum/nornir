@@ -34,7 +34,7 @@
 
 #include "utils.hpp"
 
-#include <map>
+#include <mammut/mammut.hpp>
 
 #include <ff/farm.hpp>
 
@@ -43,12 +43,14 @@
 
 #include <gsl/gsl_qrng.h>
 
+#include <map>
+
 using namespace mlpack::regression;
 
 namespace adpff{
 
 class ManagerFarm;
-class FarmConfiguration;
+class KnobsValues;
 
 /**
  * Represents a sample to be used in the regression.
@@ -57,7 +59,10 @@ class RegressionData{
 protected:
     const ManagerFarm& _manager;
 public:
-    RegressionData(const ManagerFarm& manager):_manager(manager){;}
+    RegressionData(const ManagerFarm& manager):
+        _manager(manager){
+        ;
+    }
 
     /**
      * Initializes the regression data with the current configuration.
@@ -66,9 +71,10 @@ public:
 
     /**
      * Initializes the regression data.
-     * @param configuration The configuration to insert as data.
+     * @param values The values to insert as data.
      */
-    virtual void init(const FarmConfiguration& configuration) = 0;
+
+    virtual void init(const KnobsValues& values) = 0;
 
     /**
      * Transforms this sample into an Armadillo's row.
@@ -90,21 +96,18 @@ public:
  */
 class RegressionDataServiceTime: public RegressionData{
 private:
-    double _physicalCores;
+    mammut::cpufreq::Frequency _minFrequency;
     double _invScalFactorFreq;
     double _invScalFactorFreqAndCores;
-    double _workers;
-    double _invScalFactorWorkers;
-    double _frequency;
 
     uint _numPredictors;
 public:
-    void init(const FarmConfiguration& configuration);
+    void init(const KnobsValues& values);
 
     RegressionDataServiceTime(const ManagerFarm& manager);
 
     RegressionDataServiceTime(const ManagerFarm& manager,
-                              const FarmConfiguration& configuration);
+                              const KnobsValues& values);
 
     uint getNumPredictors() const;
 
@@ -124,12 +127,12 @@ private:
 
     uint _numPredictors;
 public:
-    void init(const FarmConfiguration& configuration);
+    void init(const KnobsValues& values);
 
     RegressionDataPower(const ManagerFarm& manager);
 
     RegressionDataPower(const ManagerFarm& manager,
-                        const FarmConfiguration& configuration);
+                        const KnobsValues& values);
 
     uint getNumPredictors() const;
 
@@ -178,11 +181,11 @@ public:
     virtual void prepareForPredictions() = 0;
 
     /**
-     * Predicts the value at a specific configuration.
-     * @param configuration The configuration.
-     * @return The predicted value at a specific configuration.
+     * Predicts the value at specific knobs values.
+     * @param values The values.
+     * @return The predicted value at a specific combination of knobs values.
      */
-    virtual double predict(const FarmConfiguration& configuration) = 0;
+    virtual double predict(const KnobsValues& values) = 0;
 };
 
 
@@ -200,7 +203,7 @@ private:
     const ManagerFarm& _manager;
     LinearRegression _lr;
 
-    typedef std::map<FarmConfiguration, Observation> Observations;
+    typedef std::map<KnobsValues, Observation> Observations;
     Observations _observations;
     typedef Observations::iterator obs_it;
 
@@ -222,7 +225,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const FarmConfiguration& configuration);
+    double predict(const KnobsValues& configuration);
 };
 
 /*
@@ -237,15 +240,15 @@ private:
     PredictorType _type;
     const ManagerFarm& _manager;
 
-    double getScalingFactor(const FarmConfiguration& configuration);
+    double getScalingFactor(const KnobsValues& values);
 
-    double getPowerPrediction(const FarmConfiguration& configuration);
+    double getPowerPrediction(const KnobsValues& values);
 public:
     PredictorSimple(PredictorType type, const ManagerFarm& manager);
 
     void prepareForPredictions();
 
-    double predict(const FarmConfiguration& configuration);
+    double predict(const KnobsValues& configuration);
 };
 
 /**
@@ -282,16 +285,16 @@ private:
 protected:
     /**
      *  Override this method to provide custom ways to generate
-     *  configurations for calibration.
+     *  knobs values for calibration.
      **/
-    virtual FarmConfiguration generateConfiguration() const = 0;
+    virtual KnobsValues generateKnobsValues() const = 0;
     virtual void reset(){;}
 public:
     Calibrator(ManagerFarm& manager);
 
     virtual ~Calibrator(){;}
 
-    FarmConfiguration getNextConfiguration();
+    KnobsValues getNextKnobsValues();
 
     std::vector<CalibrationStats> getCalibrationsStats() const;
 };
@@ -306,7 +309,7 @@ private:
     gsl_qrng* _generator;
     double* _normalizedPoint;
 protected:
-    FarmConfiguration generateConfiguration() const;
+    KnobsValues generateKnobsValues() const;
     void reset();
 public:
     CalibratorLowDiscrepancy(ManagerFarm& manager);

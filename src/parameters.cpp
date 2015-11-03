@@ -29,6 +29,14 @@
 
 namespace adpff{
 
+using namespace std;
+using namespace mammut::cpufreq;
+using namespace mammut::topology;
+using namespace mammut::utils;
+using mammut::Communicator;
+using mammut::Mammut;
+using mammut::utils::enumStrings;
+
 XmlTree::XmlTree(const string& fileName,
            const string& rootName){
     rapidxml::xml_document<> xmlContent;
@@ -121,8 +129,8 @@ void ArchData::loadXml(const string& archFileName){
 
 void Parameters::setDefault(){
     contractType = CONTRACT_NONE;
-    knobCores = KNOB_CORES_AUTO;
-    knobFrequencies = KNOB_FREQUENCY_AUTO;
+    knobWorkers = KNOB_WORKERS_YES;
+    knobFrequencies = KNOB_FREQUENCY_YES;
     knobMapping = KNOB_MAPPING_AUTO;
     knobMappingEmitter = KNOB_SNODE_MAPPING_AUTO;
     knobMappingCollector = KNOB_SNODE_MAPPING_AUTO;
@@ -136,10 +144,7 @@ void Parameters::setDefault(){
     strategyCalibration = STRATEGY_CALIBRATION_SOBOL;
     strategyPolling = STRATEGY_POLLING_SLEEP_LATENCY;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
-    frequencyGovernor = GOVERNOR_USERSPACE;
     turboBoost = false;
-    frequencyLowerBound = 0;
-    frequencyUpperBound = 0;
     fastReconfiguration = false;
     migrateCollector = false;
     smoothingFactor = 0;
@@ -244,13 +249,7 @@ bool Parameters::isHighestFrequencySettable(){
            isFrequencySettable();
 }
 
-bool Parameters::serviceNodePerformance(){
-    return knobMappingEmitter == KNOB_SNODE_MAPPING_PERFORMANCE ||
-           knobMappingCollector == KNOB_SNODE_MAPPING_PERFORMANCE;
-}
-
-ParametersValidation Parameters::validateUnusedVc
-                               (StrategyUnusedVirtualCores& s){
+ParametersValidation Parameters::validateUnusedVc(StrategyUnusedVirtualCores& s){
     switch(s){
         case STRATEGY_UNUSED_VC_OFF:{
             if(!isUnusedVcOffAvailable()){
@@ -275,25 +274,15 @@ ParametersValidation Parameters::validateUnusedVc
     return VALIDATION_OK;
 }
 
-ParametersValidation Parameters::validateKnobCores(){
-    if(knobCores == KNOB_CORES_AUTO){
-        knobCores = KNOB_CORES_CHANGE;
-    }
-    return VALIDATION_OK;
-}
-
 ParametersValidation Parameters::validateKnobFrequencies(){
     vector<Frequency> availableFrequencies = getAvailableFrequencies();
     vector<VirtualCore*> virtualCores;
     virtualCores = mammut.getInstanceTopology()->getVirtualCores();
 
-    if(knobFrequencies == KNOB_FREQUENCY_AUTO){
-        if(isGovernorAvailable(GOVERNOR_USERSPACE) &&
-           availableFrequencies.size()){
-            knobFrequencies = KNOB_FREQUENCY_YES;
-        }else{
-            knobFrequencies = KNOB_FREQUENCY_NO;
-        }
+    if(knobFrequencies == KNOB_FREQUENCY_YES &&
+       !(isGovernorAvailable(GOVERNOR_USERSPACE) &&
+         availableFrequencies.size())){
+        knobFrequencies = KNOB_FREQUENCY_NO;
     }
 
     if(knobFrequencies == KNOB_FREQUENCY_NO){
@@ -310,34 +299,8 @@ ParametersValidation Parameters::validateKnobFrequencies(){
         }
     }
 
-    switch(knobFrequencies){
-        case KNOB_FREQUENCY_AUTO:{
-            throw runtime_error("This should never happen.");
-        }break;
-        case KNOB_FREQUENCY_NO:{
-            if(serviceNodePerformance()){
-                return VALIDATION_EC_SENSITIVE_WRONG_F_STRATEGY;
-            }
-        }break;
-        case KNOB_FREQUENCY_YES:{
-            if(!availableFrequencies.size()){
-                return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
-            }
-
-            frequencyGovernor = GOVERNOR_USERSPACE;
-            if(!isGovernorAvailable(frequencyGovernor)){
-                return VALIDATION_STRATEGY_FREQUENCY_UNSUPPORTED;
-            }
-
-            if(serviceNodePerformance() &&
-               !isHighestFrequencySettable()){
-                return VALIDATION_EC_SENSITIVE_MISSING_GOVERNORS;
-            }
-
-        }break;
-    }
-
-    if(fastReconfiguration && !isHighestFrequencySettable()){
+    if((fastReconfiguration && !isHighestFrequencySettable()) ||
+        knobFrequencies == KNOB_FREQUENCY_NO){
         return VALIDATION_NO_FAST_RECONF;
     }
     return VALIDATION_OK;
@@ -419,31 +382,28 @@ template<> char const* enumStrings<ContractType>::data[] = {
     "POWER_BUDGET"
 };
 
-template<> char const* enumStrings<KnobCores>::data[] = {
-    "AUTO",
+template<> char const* enumStrings<KnobConfWorkers>::data[] = {
     "NO",
-    "CHANGE",
-    "REMAP"
+    "YES"
 };
 
-template<> char const* enumStrings<KnobFrequencies>::data[] = {
-    "AUTO",
-    "YES",
-    "NO"
+template<> char const* enumStrings<KnobConfFrequencies>::data[] = {
+    "NO",
+    "YES"
 };
 
-template<> char const* enumStrings<KnobMapping>::data[] = {
-    "AUTO",
+template<> char const* enumStrings<KnobConfMapping>::data[] = {
     "NO",
+    "AUTO",
     "LINEAR",
     "CACHE_EFFICIENT"
 };
 
-template<> char const* enumStrings<KnobHyperthreading>::data[] = {
-    "AUTO",
+template<> char const* enumStrings<KnobConfHyperthreading>::data[] = {
     "NO",
-    "YES_SOONER",
-    "YES_LATER"
+    "AUTO",
+    "SOONER",
+    "LATER"
 };
 
 template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
@@ -463,11 +423,11 @@ template<> char const* enumStrings<StrategyPredictionError>::data[] = {
     "COEFFVAR"
 };
 
-template<> char const* enumStrings<KnobServiceNodeMapping>::data[] = {
+template<> char const* enumStrings<KnobConfSNodeMapping>::data[] = {
+    "NO",
     "AUTO",
     "ALONE",
     "COLLAPSED",
-    "PERFORMANCE"
 };
 
 template<> char const* enumStrings<StrategySmoothing>::data[] = {
@@ -520,17 +480,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xc, Enum, knobMappingEmitter);
     SETVALUE(xc, Enum, knobMappingCollector);
 
-    string g = "";
-    xc.getString("frequencyGovernor", g);
-    if(g.compare("")){
-        transform(g.begin(), g.end(), g.begin(), ::tolower);
-        CpuFreq* cf = mammut.getInstanceCpuFreq();
-        frequencyGovernor = cf->getGovernorFromGovernorName(g);
-    }
-
     SETVALUE(xc, Bool, turboBoost);
-    SETVALUE(xc, Uint, frequencyLowerBound);
-    SETVALUE(xc, Uint, frequencyUpperBound);
     SETVALUE(xc, Bool, fastReconfiguration);
     SETVALUE(xc, Double, smoothingFactor);
     SETVALUE(xc, Double, persistenceValue);
@@ -571,10 +521,6 @@ ParametersValidation Parameters::validate(){
     ParametersValidation r = VALIDATION_OK;
     setDefaultPost();
 
-    /** Validate cores knob. **/
-    r = validateKnobCores();
-    if(r != VALIDATION_OK){return r;}
-
     /** Validate frequency knob. **/
     r = validateKnobFrequencies();
     if(r != VALIDATION_OK){return r;}
@@ -594,7 +540,7 @@ ParametersValidation Parameters::validate(){
     /** Validate unused cores strategy. **/
     r = validateUnusedVc(strategyInactiveVirtualCores);
     if(r != VALIDATION_OK){return r;}
-    validateUnusedVc(strategyUnusedVirtualCores);
+    r = validateUnusedVc(strategyUnusedVirtualCores);
     if(r != VALIDATION_OK){return r;}
 
     /** Validate contract parameters. **/
@@ -602,7 +548,7 @@ ParametersValidation Parameters::validate(){
     if(r != VALIDATION_OK){return r;}
 
     /** Validate unsupported strategies. **/
-    if(knobHyperthreading == KNOB_HT_YES_SOONER ||
+    if(knobHyperthreading == KNOB_HT_SOONER ||
        knobMapping == KNOB_MAPPING_CACHE_EFFICIENT){
         throw runtime_error("Not yet supported.");
     }

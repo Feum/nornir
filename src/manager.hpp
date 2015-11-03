@@ -39,6 +39,7 @@
 #ifndef ADAPTIVE_FASTFLOW_FARM_HPP_
 #define ADAPTIVE_FASTFLOW_FARM_HPP_
 
+#include "knob.hpp"
 #include "parameters.hpp"
 #include "predictors.hpp"
 #include "node.hpp"
@@ -58,6 +59,7 @@ namespace adpff{
 class Parameters;
 class ManagerFarm;
 
+//TODO REMOVE USING
 using namespace std;
 using namespace ff;
 using namespace mammut::cpufreq;
@@ -68,21 +70,95 @@ using namespace mammut::utils;
 
 struct MonitoredSample;
 
-/*!
- * \internal
- * \struct FarmConfiguration
- * \brief Represents a possible farm configuration.
- *
- * This struct represent a possible farm configuration.
- */
-typedef struct FarmConfiguration{
-    uint numWorkers;
-    Frequency frequency;
+typedef enum{
+    KNOB_TYPE_WORKERS = 0,
+    KNOB_TYPE_MAPPING,
+    KNOB_TYPE_FREQUENCY,
+    KNOB_TYPE_NUM // <---- This must always be the last value
+}KnobType;
 
-    FarmConfiguration():numWorkers(1), frequency(1){;}
-    FarmConfiguration(uint numWorkers, Frequency frequency = 1):
-                     numWorkers(numWorkers), frequency(frequency){;}
-}FarmConfiguration;
+class KnobsValues{
+private:
+    double values[KNOB_TYPE_NUM];
+public:
+    inline double& operator[](KnobType idx){
+        return values[idx];
+    }
+
+    inline double operator[](KnobType idx) const{
+        return values[idx];
+    }
+};
+
+class FarmConfiguration: public mammut::utils::NonCopyable {
+private:
+    Knob* _knobs[KNOB_TYPE_NUM];
+    const Parameters& _p;
+    std::vector<KnobsValues> _combinations;
+    void combinations(vector<vector<double> > array, size_t i,
+                      vector<double> accum);
+public:
+    FarmConfiguration(const Parameters& p, ff::ff_farm<>& farm);
+
+    ~FarmConfiguration();
+
+    /**
+     * Gets all the possible combinations of knobs values.
+     * @return A vector containing all the possible combinations
+     *         of knobs values.
+     */
+    const std::vector<KnobsValues>& getAllRealCombinations();
+
+    /**
+     * Sets the highest frequency to reduce the reconfiguration time.
+     */
+    void setFastReconfiguration();
+
+    /**
+     * Returns a specified knob.
+     * @param t The type of the knob to return.
+     * @return The specified knob.
+     */
+    const Knob* getKnob(KnobType t) const;
+
+    /**
+     * Sets all the knobs to their maximum.
+     */
+    void maxAllKnobs();
+
+    /**
+     * Returns the real value of a specific knob.
+     * @param t The type of the knob.
+     * @return The real value of the specified knob.
+     */
+    double getRealValue(KnobType t) const;
+
+    /**
+     * Returns the real values for all the knobs.
+     * @return The real values for all the knobs.
+     */
+    KnobsValues getRealValues() const;
+
+    /**
+     * Returns the relative value of a specific knob.
+     * @param t The type of the knob.
+     * @return The relative value of a specific knob.
+     */
+    double getRelativeValue(KnobType t) const;
+
+    /**
+     * Sets the relative values for the knobs.
+     * @param values The relative values of the knobs.
+     */
+    void setRelativeValues(const KnobsValues& values);
+
+    /**
+     * Sets the real values for the knobs.
+     * @param values The real values of the knobs.
+     */
+    void setRealValues(const KnobsValues& values);
+};
+
 
 /*!
  * \class AdaptivityManagerFarm
@@ -157,58 +233,14 @@ private:
     // The collector (if present).
     AdaptiveNode* _collector;
 
-    // The currently running workers.
-    vector<AdaptiveNode*> _activeWorkers;
-
-    // Workers that can run but are not currently running.
-    vector<AdaptiveNode*> _inactiveWorkers;
-
-    // The maximum number of workers that can be activated by the manager.
-    size_t _maxNumWorkers;
-
-    // If true, the user requested sensitivity for emitter and the
-    // request has been satisfied.
-    bool _emitterSensitivitySatisfied;
-
-    // If true, the user requested sensitivity for collector and the
-    // request has been satisfied.
-    bool _collectorSensitivitySatisfied;
+    // The vector of active workers.
+    std::vector<AdaptiveNode*> _activeWorkers;
 
     // The current configuration of the farm.
-    FarmConfiguration _currentConfiguration;
-
-    // CPUs currently used by farm nodes.
-    vector<CpuId> _usedCpus;
-
-    // CPUs not used by farm nodes.
-    vector<CpuId> _unusedCpus;
-
-    // The available virtual cores, sorted according to  the mapping strategy.
-    const vector<VirtualCore*> _availableVirtualCores;
-
-    // The virtual cores where the active workers are running.
-    vector<VirtualCore*> _activeWorkersVirtualCores;
-
-    ///< The virtual cores where the inactive workers are running.
-    vector<VirtualCore*> _inactiveWorkersVirtualCores;
-
-    // Virtual cores not used by the farm nodes.
-    vector<VirtualCore*> _unusedVirtualCores;
-
-    // The virtual core where the emitter (if present) is running.
-    VirtualCore* _emitterVirtualCore;
-
-    // The virtual core where the collector (if present) is running.
-    VirtualCore* _collectorVirtualCore;
-
-    // The domains on which frequency scaling is applied.
-    vector<Domain*> _scalableDomains;
+    FarmConfiguration _configuration;
 
     // The voltage table.
     VoltageTable _voltageTable;
-
-    // The available frequencies on this machine.
-    vector<Frequency> _availableFrequencies;
 
     // Monitored samples;
     Smoother<MonitoredSample>* _samples;
@@ -247,123 +279,11 @@ private:
 #endif
 
     /**
-     * Returns true if the number of workers must be reconfigured.
-     * @return true if the number of workers must be reconfigured,
-     *         false otherwise
-     */
-    bool reconfigureWorkers() const;
-
-    /**
-     * Returns true if the frequencies must be reconfigured.
-     * @return true if the frequencies must be reconfigured,
-     *         false otherwise
-     */
-    bool reconfigureFrequency() const;
-
-    /**
-     * Returns the number of dimensions of a configuration,
-     * i.e. the number of different decisions that can
-     * be taken at runtime.
-     */
-    uint getConfigurationDimension() const;
-
-    /**
-     * If possible, finds a set of physical cores belonging to domains
-     * different from those of virtual cores in 'virtualCores' vector.
-     * @param virtualCores A vector of virtual cores.
-     * @return A set of physical cores that can always run at the highest
-     *         frequency.
-     */
-    vector<PhysicalCore*> getSepDomainsPhyCores(const vector<VirtualCore*>&
-                                                      virtualCores) const;
-
-    /**
      * Set a specified domain to the highest frequency.
      * @param domain The domain.
      */
     void setDomainToHighestFrequency(const Domain* domain);
 
-    /**
-     * Computes the available virtual cores, sorting them according to
-     * the specified mapping strategy.
-     * @return The available virtual cores, sorted according to the
-     *         specified mapping strategy.
-     */
-    vector<VirtualCore*> getAvailableVirtualCores();
-
-    /**
-     * Returns the number of scalable service nodes.
-     * @return The number of scalable service nodes.
-     */
-    uint numScalableServiceNodes();
-
-    /**
-     * Manages mapping of emitter and collector.
-     */
-    void manageServiceNodesPerformance();
-
-    /**
-     * Generates mapping indexes. They are indexes to be used on
-     * _availableVirtualCores vector to get the corresponding virtual core
-     * where a specific node must be mapped.
-     * @param emitterIndex The index of the emitter.
-     * @param firstWorkerIndex The index of the first worker
-     *                         (the others follow).
-     * @param collectorIndex The index of the collector (if present).
-     */
-    void getMappingIndexes(size_t& emitterIndex,
-                           size_t& firstWorkerIndex,
-                           size_t& collectorIndex);
-
-    /**
-     * Computes the virtual cores where the nodes must be mapped
-     * and pins these nodes on the virtual cores.
-     */
-    void mapNodesToVirtualCores();
-
-    /**
-     * Applies the OFF strategy for a specified set of virtual cores.
-     * @param unusedVirtualCores The virtual cores.
-     */
-    void applyUnusedVCStrategyOff(const vector<VirtualCore*>& unusedVc);
-
-    /**
-     * Applies the LOWEST_FREQUENCY strategy for a specified set of
-     * virtual cores.
-     * @param unusedVirtualCores The virtual cores.
-     */
-    void applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& vc);
-
-    /**
-     * Applies a specific strategy for a specified set of virtual cores.
-     * @param strategyUnused The unused strategy.
-     * @param unusedVirtualCores The virtual cores.
-     */
-    void applyUnusedVCStrategy(StrategyUnusedVirtualCores strategyUnused,
-                               const vector<VirtualCore*>& vc);
-    /**
-     * Apply the strategies for inactive and unused virtual cores.
-     */
-    void applyUnusedVCStrategy();
-
-    /**
-     * Updates the scalable domains vector.
-     */
-    void updateScalableDomains();
-
-    /**
-     * Set a specific P-state for the virtual cores used by
-     * the current active workers, emitter (if not sensitive) and
-     * collector (if not sensitive).
-     * @param frequency The frequency to be set.
-     */
-    void updatePstate(Frequency frequency);
-
-    /**
-     * Map the nodes to virtual cores and
-     * prepares frequencies and governors for running.
-     */
-    void mapAndSetFrequencies();
 
     /**
      * Returns the maximum primary prediction error.
@@ -420,11 +340,11 @@ private:
     bool isFeasiblePrimaryValue(double value, double tolerance = 0) const;
 
     /**
-     * Returns the voltage at a specific configuration.
-     * @param configuration The configuration.
-     * @return The voltage at that configuration.
+     * Returns the voltage at a specific combinations of knobs values.
+     * @param values The combination.
+     * @return The voltage at that combination.
      */
-    double getVoltage(const FarmConfiguration& configuration) const;
+    double getVoltage(const KnobsValues& values) const;
 
     /**
      * Checks if x is a best suboptimal monitored value than y.
@@ -440,48 +360,10 @@ private:
     bool isBestSecondaryValue(double x, double y) const;
 
     /**
-     * Computes the new configuration of the farm after a contract violation.
-     * @return The new configuration.
+     * Computes the new knobs values for the farm.
+     * @return The new knobs values.
      */
-    FarmConfiguration getNewConfiguration();
-    /**
-     * Updates the currently used and unused CPUs.
-     */
-    void updateUsedCpus();
-
-    /**
-     * Changes the active and inactive nodes according to the new configuration.
-     * @param configuration The new configuration.
-     */
-    void changeActiveNodes(FarmConfiguration& configuration);
-
-    /**
-     * Prepares the nodes to freeze.
-     */
-    void prepareToFreeze();
-
-    /**
-     * Freezes all the nodes.
-     */
-    void freeze();
-
-    /**
-     * Notifies a change in the number of workers to all the nodes.
-     * @param numWorkers The new number of workers.
-     */
-    void notifyNewConfiguration(uint numWorkers);
-
-    /**
-     * Prepares the nodes to run.
-     * @param numWorkers The new number of workers.
-     */
-    void prepareToRun(uint numWorkers);
-
-    /**
-     * Runs the farm with a new number of workers.
-     * @param numWorkers The new number of workers.
-     */
-    void run(uint numWorkers);
+    KnobsValues getNewKnobsValues();
 
     /**
      * Checks if the application terminated.
@@ -492,7 +374,7 @@ private:
      * Changes the current farm configuration.
      * @param configuration The new configuration.
      */
-    void changeConfiguration(FarmConfiguration configuration);
+    void changeRelative(KnobsValues values);
 
     /**
      * Send data to observer.
@@ -582,52 +464,57 @@ public:
                               uint durationMs);
 };
 
-inline ostream& operator<<(ostream& os, const FarmConfiguration& obj){
+inline ostream& operator<<(ostream& os, const KnobsValues& obj){
     os << "[";
-    os << obj.numWorkers << ", ";
-    os << obj.frequency;
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        os << obj[(KnobType) i] << ", ";
+    }
     os << "]";
     return os;
 }
 
-inline bool operator==(const FarmConfiguration& lhs,
-                       const FarmConfiguration& rhs){
-    return lhs.numWorkers == rhs.numWorkers &&
-           lhs.frequency == rhs.frequency;
+inline bool operator==(const KnobsValues& lhs,
+                       const KnobsValues& rhs){
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        if(lhs[(KnobType) i] !=
+           rhs[(KnobType) i]){
+            return false;
+        }
+    }
+    return true;
 }
 
-inline bool operator!=(const FarmConfiguration& lhs,
-                       const FarmConfiguration& rhs){
+inline bool operator!=(const KnobsValues& lhs,
+                       const KnobsValues& rhs){
     return !operator==(lhs,rhs);
 }
 
-inline bool operator<(const FarmConfiguration& lhs,
-                      const FarmConfiguration& rhs){
-    if(lhs.numWorkers < rhs.numWorkers){
-        return true;
-    }
-    if(lhs.numWorkers > rhs.numWorkers){
-        return false;
-    }
-
-    if(lhs.frequency < rhs.frequency){
-        return true;
+inline bool operator<(const KnobsValues& lhs,
+                      const KnobsValues& rhs){
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        if(lhs[(KnobType) i] <
+           rhs[(KnobType) i]){
+            return true;
+        }else if(lhs[(KnobType) i] >
+                 rhs[(KnobType) i]){
+            return false;
+        }
     }
     return false;
 }
 
-inline bool operator>(const FarmConfiguration& lhs,
-                      const FarmConfiguration& rhs){
+inline bool operator>(const KnobsValues& lhs,
+                      const KnobsValues& rhs){
     return operator< (rhs,lhs);
 }
 
-inline bool operator<=(const FarmConfiguration& lhs,
-                       const FarmConfiguration& rhs){
+inline bool operator<=(const KnobsValues& lhs,
+                       const KnobsValues& rhs){
     return !operator> (lhs,rhs);
 }
 
-inline bool operator>=(const FarmConfiguration& lhs,
-                       const FarmConfiguration& rhs){
+inline bool operator>=(const KnobsValues& lhs,
+                       const KnobsValues& rhs){
     return !operator< (lhs,rhs);
 }
 

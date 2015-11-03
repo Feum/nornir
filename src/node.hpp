@@ -39,12 +39,6 @@
 
 namespace adpff{
 
-using namespace std;
-
-using namespace ff;
-using namespace mammut;
-using namespace mammut::task;
-using namespace mammut::topology;
 
 /*!
  * \internal
@@ -114,15 +108,17 @@ typedef struct{
  *
  * This class wraps a ff_node to let it reconfigurable.
  */
-class AdaptiveNode: public ff_node{
+class AdaptiveNode: public ff::ff_node{
 private:
     friend class ManagerFarm;
+    friend class KnobWorkers;
+    friend class KnobMapping;
 
     volatile bool _started;
     volatile bool _terminated;
     volatile bool _goingToFreeze;
-    TasksManager* _tasksManager;
-    ThreadHandler* _thread;
+    mammut::task::TasksManager* _tasksManager;
+    mammut::task::ThreadHandler* _thread;
     ManagementRequest _managementRequest;
     WorkerSample _sampleResponse;
     double _ticksPerNs;
@@ -150,13 +146,13 @@ private:
      * @param mammut A Mammut handle.
      * @param ticksPerNs The number of ticks in a nanosecond.
      */
-    void init(Mammut& mammut, double ticksPerNs);
+    void init(mammut::Mammut& mammut, double ticksPerNs);
 
     /**
      * Moves this node on a specific virtual core.
      * @param vc The virtual core where this nodes must be moved.
      */
-    void move(VirtualCore* vc);
+    void move(mammut::topology::VirtualCore* vc);
 
     /**
      * The result of askForSample call.

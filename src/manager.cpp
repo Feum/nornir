@@ -64,39 +64,6 @@ using namespace mammut::task;
 using namespace mammut::topology;
 using namespace mammut::utils;
 
-bool ManagerFarm::reconfigureWorkers() const{
-    return true;
-}
-
-bool ManagerFarm::reconfigureFrequency() const{
-    return _p.knobFrequencies == KNOB_FREQUENCY_YES;
-}
-
-uint ManagerFarm::getConfigurationDimension() const{
-    uint numDimensions = 0;
-    if(reconfigureWorkers()){++numDimensions;}
-    if(reconfigureFrequency()){++numDimensions;}
-    return numDimensions;
-}
-
-vector<PhysicalCore*> ManagerFarm::getSepDomainsPhyCores(
-        const vector<VirtualCore*>& virtualCores) const{
-    vector<Domain*> allDomains = _cpufreq->getDomains();
-    vector<Domain*> hypotheticWDomains = _cpufreq->getDomains(virtualCores);
-    vector<PhysicalCore*> physicalCoresInUnusedDomains;
-    if(allDomains.size() > hypotheticWDomains.size()){
-       for(size_t i = 0; i < allDomains.size(); i++){
-           Domain* currentDomain = allDomains.at(i);
-           if(!contains(hypotheticWDomains, currentDomain)){
-               insertToEnd(_topology->virtualToPhysical(
-                                  currentDomain->getVirtualCores()),
-                                  physicalCoresInUnusedDomains);
-           }
-       }
-    }
-    return physicalCoresInUnusedDomains;
-}
-
 void ManagerFarm::setDomainToHighestFrequency(const Domain* domain){
     if(!domain->setGovernor(GOVERNOR_PERFORMANCE)){
         if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
@@ -106,318 +73,6 @@ void ManagerFarm::setDomainToHighestFrequency(const Domain* domain){
                                 "emitter/collector. Try to run it without "
                                 "sensitivity parameters.");
         }
-    }
-}
-
-vector<VirtualCore*> ManagerFarm::getAvailableVirtualCores(){
-    vector<VirtualCore*> r;
-    if(_p.knobMapping == KNOB_MAPPING_AUTO){
-        _p.knobMapping = KNOB_MAPPING_LINEAR;
-    }
-
-    switch(_p.knobMapping){
-        case KNOB_MAPPING_LINEAR:{
-           /*
-            * Generates a vector of virtual cores to be used for linear
-            * mapping.node. It contains first one virtual core per physical
-            * core (virtual cores on the same CPU are consecutive).
-            * Then, the other groups of virtual cores follow.
-            */
-            vector<Cpu*> cpus = _topology->getCpus();
-
-            size_t virtualUsed = 0;
-            size_t virtualPerPhysical;
-            if(_p.knobHyperthreading != KNOB_HT_NO){
-                virtualPerPhysical = _topology->getVirtualCores().size() /
-                                     _topology->getPhysicalCores().size();
-            }else{
-                virtualPerPhysical = 1;
-            }
-            while(virtualUsed < virtualPerPhysical){
-                for(size_t i = 0; i < cpus.size(); i++){
-                    vector<PhysicalCore*> phyCores = cpus.at(i)->
-                                                     getPhysicalCores();
-                    for(size_t j = 0; j < phyCores.size(); j++){
-                        r.push_back(phyCores.at(j)->getVirtualCores().
-                                                    at(virtualUsed));
-                    }
-                }
-                ++virtualUsed;
-            }
-        }break;
-        case KNOB_MAPPING_CACHE_EFFICIENT:{
-            throw runtime_error("Not yet supported.");
-        }
-        default:
-            break;
-    }
-    return r;
-}
-
-uint ManagerFarm::numScalableServiceNodes(){
-    return (_emitter &&
-            _p.knobMappingEmitter != KNOB_SNODE_MAPPING_PERFORMANCE) +
-           (_collector &&
-            _p.knobMappingEmitter != KNOB_SNODE_MAPPING_PERFORMANCE);
-}
-
-void ManagerFarm::manageServiceNodesPerformance(){
-    if((_p.knobMappingEmitter != KNOB_SNODE_MAPPING_ALONE) && !_emitter){
-        _p.knobMappingEmitter = KNOB_SNODE_MAPPING_ALONE;
-    }
-
-    if((_p.knobMappingCollector != KNOB_SNODE_MAPPING_ALONE) && !_collector){
-        _p.knobMappingCollector = KNOB_SNODE_MAPPING_ALONE;
-    }
-
-    if((_p.knobMappingEmitter == KNOB_SNODE_MAPPING_PERFORMANCE &&
-            !_emitterSensitivitySatisfied) ||
-       (_p.knobMappingCollector == KNOB_SNODE_MAPPING_PERFORMANCE &&
-               !_collectorSensitivitySatisfied)){
-        size_t scalableVCNum = _activeWorkers.size() +
-                               numScalableServiceNodes();
-
-        // When sensitive is specified, we always choose the WEC mapping.
-        vector<VirtualCore*>::const_iterator scalEnd;
-        if(scalableVCNum < _availableVirtualCores.size()){
-            scalEnd = _availableVirtualCores.begin() + scalableVCNum;
-        }else{
-            scalEnd = _availableVirtualCores.end();
-        }
-
-        vector<VirtualCore*> scalableVC(_availableVirtualCores.begin(),
-                                        scalEnd);
-        vector<PhysicalCore*> perfPhyCores;
-        perfPhyCores = getSepDomainsPhyCores(scalableVC);
-        if(perfPhyCores.size()){
-            size_t index = 0;
-
-            if(_p.knobMappingEmitter == KNOB_SNODE_MAPPING_PERFORMANCE){
-                VirtualCore* vc = perfPhyCores.at(index)->getVirtualCore();
-                setDomainToHighestFrequency(_cpufreq->getDomain(vc));
-                _emitterVirtualCore = vc;
-                _emitterSensitivitySatisfied = true;
-                index = (index + 1) % perfPhyCores.size();
-            }
-
-            if(_p.knobMappingCollector == KNOB_SNODE_MAPPING_PERFORMANCE){
-                VirtualCore* vc = perfPhyCores.at(index)->getVirtualCore();
-                setDomainToHighestFrequency(_cpufreq->getDomain(vc));
-                _collectorVirtualCore = vc;
-                _collectorSensitivitySatisfied = true;
-                index = (index + 1) % perfPhyCores.size();
-            }
-        }
-    }
-}
-
-void ManagerFarm::getMappingIndexes(size_t& emitterIndex,
-                       size_t& firstWorkerIndex,
-                       size_t& collectorIndex){
-    size_t nextIndex = 0;
-    if(_emitter && !_emitterVirtualCore){
-        emitterIndex = nextIndex;
-        if(_p.knobMappingEmitter != KNOB_SNODE_MAPPING_COLLAPSED){
-            nextIndex = (nextIndex + 1) % _availableVirtualCores.size();
-        }
-    }
-
-    firstWorkerIndex = nextIndex;
-    nextIndex = (nextIndex + _activeWorkers.size()) %
-                _availableVirtualCores.size();
-
-    if(_collector && !_collectorVirtualCore){
-        if(_p.knobMappingCollector == KNOB_SNODE_MAPPING_COLLAPSED){
-            nextIndex = (nextIndex - 1) % _availableVirtualCores.size();
-        }
-        collectorIndex = nextIndex;
-    }
-}
-
-void ManagerFarm::mapNodesToVirtualCores(){
-    size_t emitterIndex, firstWorkerIndex, collectorIndex;
-    getMappingIndexes(emitterIndex, firstWorkerIndex, collectorIndex);
-
-    //TODO: Che succede se la farm ha l'emitter di default? (non estende
-    //      adaptive node e quindi la getThreadHandler non c'e' (fallisce
-    //      lo static_cast prima)):(
-    if(_emitter){
-        if(!_emitterVirtualCore){
-            _emitterVirtualCore = _availableVirtualCores.at(emitterIndex);
-        }
-        if(!_emitterVirtualCore->isHotPlugged()){
-            _emitterVirtualCore->hotPlug();
-        }
-        _emitter->move(_emitterVirtualCore);
-    }
-
-    for(size_t i = 0; i < _activeWorkers.size(); i++){
-        VirtualCore* vc = _availableVirtualCores.at((firstWorkerIndex + i) %
-                          _availableVirtualCores.size());
-        _activeWorkersVirtualCores.push_back(vc);
-        if(!vc->isHotPlugged()){
-            vc->hotPlug();
-        }
-        _activeWorkers.at(i)->move(vc);
-    }
-
-    if(_collector){
-        if(!_collectorVirtualCore){
-            _collectorVirtualCore = _availableVirtualCores.
-                                    at(collectorIndex);
-        }
-        if(!_collectorVirtualCore->isHotPlugged()){
-            _collectorVirtualCore->hotPlug();
-        }
-        _collector->move(_collectorVirtualCore);
-    }
-}
-
-void ManagerFarm::applyUnusedVCStrategyOff(const vector<VirtualCore*>& unusedVc){
-    for(size_t i = 0; i < unusedVc.size(); i++){
-        VirtualCore* vc = unusedVc.at(i);
-        if(vc->isHotPluggable() && vc->isHotPlugged()){
-            vc->hotUnplug();
-        }
-    }
-}
-
-void ManagerFarm::applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& vc){
-    vector<Domain*> unusedDomains = _cpufreq->getDomainsComplete(vc);
-    for(size_t i = 0; i < unusedDomains.size(); i++){
-        Domain* domain = unusedDomains.at(i);
-        if(!domain->setGovernor(GOVERNOR_POWERSAVE)){
-            if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
-               !domain->setLowestFrequencyUserspace()){
-                throw runtime_error("AdaptivityManagerFarm: Impossible to "
-                                    "set lowest frequency for unused "
-                                    "virtual cores.");
-            }
-        }
-    }
-}
-
-void ManagerFarm::applyUnusedVCStrategy(StrategyUnusedVirtualCores strategyUnused,
-                           const vector<VirtualCore*>& vc){
-    switch(strategyUnused){
-        case STRATEGY_UNUSED_VC_OFF:{
-            applyUnusedVCStrategyOff(vc);
-        }break;
-        case STRATEGY_UNUSED_VC_LOWEST_FREQUENCY:{
-            applyUnusedVCStrategyLowestFreq(vc);
-        }break;
-        default:{
-            return;
-        }
-    }
-}
-
-void ManagerFarm::applyUnusedVCStrategy(){
-    /**
-     * OFF 'includes' LOWEST_FREQUENCY. i.e. If we shutdown all the
-     * virtual cores on a domain, we can also lower its frequency to
-     * the minimum.
-     */
-    vector<VirtualCore*> virtualCores;
-    if(_p.strategyInactiveVirtualCores != STRATEGY_UNUSED_VC_NONE){
-        insertToEnd(_inactiveWorkersVirtualCores, virtualCores);
-    }
-    if(_p.strategyUnusedVirtualCores != STRATEGY_UNUSED_VC_NONE){
-        insertToEnd(_unusedVirtualCores, virtualCores);
-    }
-    applyUnusedVCStrategy(STRATEGY_UNUSED_VC_LOWEST_FREQUENCY, virtualCores);
-
-
-    virtualCores.clear();
-    if(_p.strategyInactiveVirtualCores == STRATEGY_UNUSED_VC_OFF){
-        insertToEnd(_inactiveWorkersVirtualCores, virtualCores);
-    }
-    if(_p.strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_OFF){
-        insertToEnd(_unusedVirtualCores, virtualCores);
-    }
-    applyUnusedVCStrategy(STRATEGY_UNUSED_VC_OFF, virtualCores);
-}
-
-void ManagerFarm::updateScalableDomains(){
-    vector<VirtualCore*> scalableVirtualCores = _activeWorkersVirtualCores;
-    /**
-     * Node sensitivity may be not satisfied both because it was not
-     * requested, or because it was requested but it was not possible
-     * to satisfy it. In both cases, we need to scale the virtual core
-     * of the node as we scale the others.
-     */
-    if(_emitter && !_emitterSensitivitySatisfied){
-        scalableVirtualCores.push_back(_emitterVirtualCore);
-    }
-    if(_collector && !_collectorSensitivitySatisfied){
-        scalableVirtualCores.push_back(_collectorVirtualCore);
-    }
-
-    _scalableDomains = _cpufreq->getDomains(scalableVirtualCores);
-}
-
-void ManagerFarm::updatePstate(Frequency frequency){
-    updateScalableDomains();
-    Domain* currentDomain;
-    for(size_t i = 0; i < _scalableDomains.size(); i++){
-        currentDomain = _scalableDomains.at(i);
-        if(!currentDomain->setGovernor(_p.frequencyGovernor)){
-            throw runtime_error("AdaptivityManagerFarm: Impossible to "
-                                "set the specified governor.");
-        }
-        if(_p.frequencyGovernor != GOVERNOR_USERSPACE){
-            if(!currentDomain->setGovernorBounds(_p.frequencyLowerBound,
-                                                 _p.frequencyUpperBound)){
-                throw runtime_error("AdaptivityManagerFarm: Impossible "
-                                    "to set the specified governor's "
-                                    "bounds.");
-            }
-        }
-    }
-}
-
-void ManagerFarm::mapAndSetFrequencies(){
-    if(_p.knobMapping == KNOB_MAPPING_NO){
-        return;
-    }
-
-    manageServiceNodesPerformance();
-    mapNodesToVirtualCores();
-    for(size_t i = 0; i < _availableVirtualCores.size(); i++){
-        VirtualCore* vc = _availableVirtualCores.at(i);
-        if(vc != _emitterVirtualCore && vc != _collectorVirtualCore &&
-           !contains(_activeWorkersVirtualCores, vc) &&
-           !contains(_inactiveWorkersVirtualCores, vc)){
-            _unusedVirtualCores.push_back(vc);
-        }
-    }
-    updateUsedCpus();
-    applyUnusedVCStrategy();
-
-    if(reconfigureFrequency()){
-        // We suppose that all the domains have the same
-        // available frequencies.
-        _availableFrequencies = _cpufreq->getDomains().at(0)->
-                                getAvailableFrequencies();
-
-        // Remove turbo boost frequency.
-        if(!_p.turboBoost && !_availableFrequencies.empty()){
-            if(intToString(_availableFrequencies.back()).at(3) == '1'){
-                _availableFrequencies.pop_back();
-            }
-        }
-    }
-
-    if(_availableFrequencies.empty()){
-        // Insert dummy constant frequency
-        _availableFrequencies.push_back(1.0);
-    }
-
-    // Sets the current frequency to the highest possible.
-    _currentConfiguration.frequency = _availableFrequencies.back();
-
-    if(_p.knobFrequencies != KNOB_FREQUENCY_NO){
-        updatePstate(_currentConfiguration.frequency);
     }
 }
 
@@ -523,9 +178,9 @@ bool ManagerFarm::isFeasiblePrimaryValue(double value, double tolerance) const{
     return false;
 }
 
-double ManagerFarm::getVoltage(const FarmConfiguration& configuration) const{
-    VoltageTableKey key(configuration.numWorkers,
-                                 configuration.frequency);
+//TODO Move in predictors.cpp
+double ManagerFarm::getVoltage(const KnobsValues& values) const{
+    VoltageTableKey key(values[KNOB_TYPE_WORKERS], values[KNOB_TYPE_FREQUENCY]);
     VoltageTableIterator it = _voltageTable.find(key);
     if(it != _voltageTable.end()){
         return it->second;
@@ -586,9 +241,9 @@ bool ManagerFarm::isBestSecondaryValue(double x, double y) const{
     return false;
 }
 
-FarmConfiguration ManagerFarm::getNewConfiguration(){
-    FarmConfiguration bestConfiguration;
-    FarmConfiguration bestSuboptimalConfiguration = _currentConfiguration;
+KnobsValues ManagerFarm::getNewKnobsValues(){
+    KnobsValues bestValues;
+    KnobsValues bestSuboptimalValues = _configuration.getRealValues();
 
     double primaryPrediction = 0;
     double secondaryPrediction = 0;
@@ -619,178 +274,57 @@ FarmConfiguration ManagerFarm::getNewConfiguration(){
     _secondaryPredictor->prepareForPredictions();
 
     unsigned int remainingTime = 0;
-    for(size_t i = 1; i <= _maxNumWorkers; i++){
-        for(size_t j = 0; j < _availableFrequencies.size(); j++){
-            FarmConfiguration currentConf(i, _availableFrequencies.at(j));
-            primaryPrediction = _primaryPredictor->predict(currentConf);
-            switch(_p.contractType){
-                case CONTRACT_PERF_COMPLETION_TIME:{
-                    remainingTime = (double) _remainingTasks /
-                                     primaryPrediction;
-                }break;
-                case CONTRACT_PERF_UTILIZATION:{
-                    primaryPrediction = (_samples->average().bandwidth /
-                                         primaryPrediction) *
-                                         _samples->average().utilization;
-                }break;
-                default:{
-                    ;
-                }
+    vector<KnobsValues> combinations = _configuration.getAllRealCombinations();
+    for(size_t i = 0; i < combinations.size(); i++){
+        KnobsValues currentValues = combinations.at(i);
+        primaryPrediction = _primaryPredictor->predict(currentValues);
+        switch(_p.contractType){
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                remainingTime = (double) _remainingTasks /
+                                 primaryPrediction;
+            }break;
+            case CONTRACT_PERF_UTILIZATION:{
+                primaryPrediction = (_samples->average().bandwidth /
+                                     primaryPrediction) *
+                                     _samples->average().utilization;
+            }break;
+            default:{
+                ;
             }
+        }
 
-            if(isFeasiblePrimaryValue(primaryPrediction)){
-                secondaryPrediction = _secondaryPredictor->
-                                      predict(currentConf);
-                if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-                    secondaryPrediction *= remainingTime;
-                }
-                if(isBestSecondaryValue(secondaryPrediction,
-                                        bestSecondaryPrediction)){
-                    bestConfiguration = currentConf;
-                    feasibleSolutionFound = true;
-                    bestPrimaryPrediction = primaryPrediction;
-                    bestSecondaryPrediction = secondaryPrediction;
-                }
-            }else if(!feasibleSolutionFound &&
-                     isBestSuboptimalValue(primaryPrediction,
-                                           bestSuboptimalValue)){
-                bestSuboptimalValue = primaryPrediction;
-                bestSuboptimalConfiguration = currentConf;
+        if(isFeasiblePrimaryValue(primaryPrediction)){
+            secondaryPrediction = _secondaryPredictor->
+                                  predict(currentValues);
+            if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+                secondaryPrediction *= remainingTime;
             }
+            if(isBestSecondaryValue(secondaryPrediction,
+                                    bestSecondaryPrediction)){
+                bestValues = currentValues;
+                feasibleSolutionFound = true;
+                bestPrimaryPrediction = primaryPrediction;
+                bestSecondaryPrediction = secondaryPrediction;
+            }
+        }else if(!feasibleSolutionFound &&
+                 isBestSuboptimalValue(primaryPrediction,
+                                       bestSuboptimalValue)){
+            bestSuboptimalValue = primaryPrediction;
+            bestSuboptimalValues = currentValues;
         }
     }
 
     if(feasibleSolutionFound){
         _primaryPrediction = bestPrimaryPrediction;
         _secondaryPrediction = bestSecondaryPrediction;
-        return bestConfiguration;
+        return bestValues;
     }else{
         _primaryPrediction = bestSuboptimalValue;
         // TODO: This check now works because both service time and power are always  > 0
         // In the future we must find another way to indicat that secondary prediction
         // has not been done.
         _secondaryPrediction = -1;
-        return bestSuboptimalConfiguration;
-    }
-}
-
-void ManagerFarm::updateUsedCpus(){
-    _usedCpus.clear();
-    _unusedCpus.clear();
-    for(size_t i = 0; i < _activeWorkersVirtualCores.size(); i++){
-        CpuId cpuId = _activeWorkersVirtualCores.at(i)->getCpuId();
-        if(!contains(_usedCpus, cpuId)){
-            _usedCpus.push_back(cpuId);
-        }
-    }
-    if(_emitterVirtualCore){
-        CpuId cpuId = _emitterVirtualCore->getCpuId();
-        if(!contains(_usedCpus, cpuId)){
-            _usedCpus.push_back(cpuId);
-        }
-    }
-    if(_collectorVirtualCore){
-        CpuId cpuId = _collectorVirtualCore->getCpuId();
-        if(!contains(_usedCpus, cpuId)){
-            _usedCpus.push_back(cpuId);
-        }
-    }
-
-    vector<Cpu*> cpus = _topology->getCpus();
-    for(size_t i = 0; i < cpus.size(); i++){
-        if(!contains(_usedCpus, cpus.at(i)->getCpuId())){
-            _unusedCpus.push_back(cpus.at(i)->getCpuId());
-        }
-    }
-}
-
-void ManagerFarm::changeActiveNodes(FarmConfiguration& configuration){
-    uint workersNumDiff = abs((int)_currentConfiguration.numWorkers -
-                              (int)configuration.numWorkers);
-    if(_currentConfiguration.numWorkers > configuration.numWorkers){
-        /** Move workers from active to inactive. **/
-        moveEndToFront(_activeWorkers, _inactiveWorkers, workersNumDiff);
-        moveEndToFront(_activeWorkersVirtualCores,
-                       _inactiveWorkersVirtualCores, workersNumDiff);
-    }else{
-        /** Move workers from inactive to active. **/
-        /**
-         * We need to map them again because if virtual cores were
-         * shutdown, the threads that were running on them have been moved
-         * on different virtual cores. Accordingly, when started again they
-         * would not be run on the correct virtual cores.
-         */
-        for(size_t i = 0; i < workersNumDiff; i++){
-            VirtualCore* vc = _inactiveWorkersVirtualCores.at(i);
-            if(!vc->isHotPlugged()){
-                vc->hotPlug();
-            }
-            _inactiveWorkers.at(i)->move(vc);
-        }
-        moveFrontToEnd(_inactiveWorkers, _activeWorkers, workersNumDiff);
-        moveFrontToEnd(_inactiveWorkersVirtualCores,
-                       _activeWorkersVirtualCores, workersNumDiff);
-    }
-}
-
-void ManagerFarm::prepareToFreeze(){
-    if(_emitter){
-        _emitter->prepareToFreeze();
-    }
-    for(size_t i = 0; i < _activeWorkers.size(); i++){
-        _activeWorkers.at(i)->prepareToFreeze();
-    }
-    if(_collector){
-        _collector->prepareToFreeze();
-    }
-}
-
-void ManagerFarm::freeze(){
-    if(_emitter){
-        _emitter->freezeAll((void*)(_collector?FF_EOSW:FF_GO_OUT));
-    }
-    for(size_t i = 0; i < _activeWorkers.size(); i++){
-        _activeWorkers.at(i)->wait_freezing();
-    }
-    if(_collector){
-        _collector->wait_freezing();
-    }
-}
-
-void ManagerFarm::notifyNewConfiguration(uint numWorkers){
-    if(_emitter){
-        _emitter->notifyWorkersChange(_currentConfiguration.numWorkers,
-                                      numWorkers);
-    }
-    for(size_t i = 0; i < numWorkers; i++){
-        AdaptiveNode* w = _activeWorkers.at(i);
-        w->notifyWorkersChange(_currentConfiguration.numWorkers,
-                               numWorkers);
-    }
-    if(_collector){
-        _collector->notifyWorkersChange(_currentConfiguration.numWorkers,
-                                        numWorkers);
-    }
-}
-
-void ManagerFarm::prepareToRun(uint numWorkers){
-    if(_emitter){
-        _emitter->prepareToRun();
-    }
-    for(size_t i = 0; i < numWorkers; i++){
-        _activeWorkers.at(i)->prepareToRun();
-    }
-    if(_collector){
-        _collector->prepareToRun();
-    }
-}
-
-void ManagerFarm::run(uint numWorkers){
-    if(_emitter){
-        _emitter->thawAll(numWorkers);
-    }
-    if(_collector){
-        _farm->getgt()->thaw(true, numWorkers);
+        return bestSuboptimalValues;
     }
 }
 
@@ -800,7 +334,7 @@ bool ManagerFarm::terminated(){
         return true;
     }
 
-    for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
+    for(size_t i = 0; i < _activeWorkers.size(); i++){
         if(_activeWorkers.at(i)->isTerminated()){
             return true;
         }
@@ -814,59 +348,9 @@ bool ManagerFarm::terminated(){
     return false;
 }
 
-void ManagerFarm::changeConfiguration(FarmConfiguration configuration){
-    if(configuration == _currentConfiguration){
-        return;
-    }
-
-    if(!configuration.numWorkers){
-        throw runtime_error("AdaptivityManagerFarm: fatal error, trying to "
-                            "activate zero workers.");
-    }else if(configuration.numWorkers > _maxNumWorkers){
-        throw runtime_error("AdaptivityManagerFarm: fatal error, trying to "
-                            "activate more workers than the maximum "
-                            "allowed.");
-    }
-
-    /****************** Workers change started ******************/
-    if(_currentConfiguration.numWorkers != configuration.numWorkers){
-        vector<RollbackPoint> rollbackPoints;
-        if(_p.fastReconfiguration){
-            for(size_t i = 0; i < _scalableDomains.size(); i++){
-                Domain* d = _scalableDomains.at(i);
-                rollbackPoints.push_back(d->getRollbackPoint());
-                setDomainToHighestFrequency(d);
-            }
-        }
-
-        prepareToFreeze();
-        freeze();
-
-        changeActiveNodes(configuration);
-        updateUsedCpus();
-        notifyNewConfiguration(configuration.numWorkers);
-
-        prepareToRun(configuration.numWorkers);
-        run(configuration.numWorkers);
-
-        if(_p.fastReconfiguration){
-            _cpufreq->rollback(rollbackPoints);
-        }
-
-        // Must be done after rollback.
-        applyUnusedVCStrategy();
-    }
-    /****************** Workers change terminated ******************/
-
-
-    /****************** P-state change started ******************/
-    //TODO: Maybe sensitivity could not be satisfied with the maximum
-    // number of workers but could be satisfied now.
-    if(_p.knobFrequencies != KNOB_FREQUENCY_NO){
-        updatePstate(configuration.frequency);
-    }
-    /****************** P-state change terminated ******************/
-    _currentConfiguration = configuration;
+void ManagerFarm::changeRelative(KnobsValues values){
+    _configuration.setRelativeValues(values);
+    _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
 
     /****************** Clean state ******************/
     _lastStoredSampleMs = getMillisecondsTime();
@@ -877,12 +361,13 @@ void ManagerFarm::changeConfiguration(FarmConfiguration configuration){
 
 void ManagerFarm::observe(){
     if(_p.observer){
+        const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration.getKnob(KNOB_TYPE_MAPPING));
         _p.observer->observe(_lastStoredSampleMs,
-                             _currentConfiguration.numWorkers,
-                             _currentConfiguration.frequency,
-                             _emitterVirtualCore,
-                             _activeWorkersVirtualCores,
-                             _collectorVirtualCore,
+                             _configuration.getRealValue(KNOB_TYPE_WORKERS),
+                             _configuration.getRealValue(KNOB_TYPE_FREQUENCY),
+                             kMapping->getEmitterVirtualCore(),
+                             kMapping->getWorkersVirtualCore(),
+                             kMapping->getCollectorVirtualCore(),
                              _samples->getLastSample().bandwidth,
                              _samples->average().bandwidth,
                              _samples->coefficientVariation().bandwidth,
@@ -892,23 +377,24 @@ void ManagerFarm::observe(){
 }
 
 void ManagerFarm::askForWorkersSamples(){
-    for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
+    for(size_t i = 0; i < _activeWorkers.size(); i++){
         _activeWorkers.at(i)->askForSample();
     }
 }
 
 void ManagerFarm::getWorkersSamples(WorkerSample& sample){
     AdaptiveNode* w;
+    uint numActiveWorkers = _activeWorkers.size();
     sample = WorkerSample();
-    for(size_t i = 0; i < _currentConfiguration.numWorkers; i++){
+    for(size_t i = 0; i < numActiveWorkers; i++){
         WorkerSample tmp;
         w = _activeWorkers.at(i);
         w->getSampleResponse(tmp, _p.strategyPolling,
                              _samples->average().latency);
         sample += tmp;
     }
-    sample.loadPercentage /= _currentConfiguration.numWorkers;
-    sample.latency /= _currentConfiguration.numWorkers;
+    sample.loadPercentage /= numActiveWorkers;
+    sample.latency /= numActiveWorkers;
 }
 
 void ManagerFarm::storeNewSample(){
@@ -928,13 +414,9 @@ void ManagerFarm::storeNewSample(){
         }
     }
 
-    for(size_t i = 0; i < _usedCpus.size(); i++){
-        CounterCpu* cc = _energy->getCounterCpu(_usedCpus.at(i));
-        joules += cc->getJoules();
-    }
-    for(size_t i = 0; i < _unusedCpus.size(); i++){
-        CounterCpu* cc = _energy->getCounterCpu(_unusedCpus.at(i));
-        joules += cc->getJoules();
+    vector<CounterCpu*> energyCounters = _energy->getCountersCpu();
+    for(size_t i = 0; i < energyCounters.size(); i++){
+        joules += energyCounters.at(i)->getJoules();
     }
 
     double now = getMillisecondsTime();
@@ -1021,10 +503,17 @@ void ManagerFarm::initPredictors(){
         }break;
     }
 }
+Parameters validate(Parameters& p){
+    ParametersValidation apv = p.validate();
+    if(apv != VALIDATION_OK){
+        throw runtime_error("Invalid adaptivity parameters: " + apv);
+    }
+    return p;
+}
 
 ManagerFarm::ManagerFarm(ff_farm<>* farm, Parameters parameters):
         _farm(farm),
-        _p(parameters),
+        _p(validate(parameters)),
         _startTimeMs(0),
         _cpufreq(_p.mammut.getInstanceCpuFreq()),
         _energy(_p.mammut.getInstanceEnergy()),
@@ -1036,16 +525,8 @@ ManagerFarm::ManagerFarm(ff_farm<>* farm, Parameters parameters):
                                 size()),
         _numVirtualCoresPerPhysicalCore(_topology->getPhysicalCore(0)->
                                         getVirtualCores().size()),
-        _emitterSensitivitySatisfied(false),
-        _collectorSensitivitySatisfied(false),
-        _availableVirtualCores(getAvailableVirtualCores()),
-        _emitterVirtualCore(NULL),
-        _collectorVirtualCore(NULL){
+        _configuration(parameters, *farm){
 
-    ParametersValidation apv = _p.validate();
-    if(apv != VALIDATION_OK){
-        throw runtime_error("Invalid adaptivity parameters: " + apv);
-    }
     /** If voltage table file is specified, then load the table. **/
     if(_p.archData.voltageTableFile.compare("")){
         loadVoltageTable(_voltageTable,
@@ -1088,10 +569,12 @@ void ManagerFarm::run(){
     for(size_t i = 0; i < w.size(); i++){
         _activeWorkers.push_back(static_cast<AdaptiveNode*>(w[i]));
     }
-    _maxNumWorkers = _activeWorkers.size();
-    _currentConfiguration = FarmConfiguration(_maxNumWorkers, 0);
 
-    _farm->run_then_freeze(_maxNumWorkers);
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        _configuration.maxAllKnobs();
+    }
+
+    _farm->run_then_freeze(_activeWorkers.size());
 
     for(size_t i = 0; i < _activeWorkers.size(); i++){
         _activeWorkers.at(i)->init(_p.mammut, _p.archData.ticksPerNs);
@@ -1115,7 +598,6 @@ void ManagerFarm::run(){
         }
     }
 
-    mapAndSetFrequencies();
     _energy->resetCountersCpu();
 
     _lastStoredSampleMs = _startTimeMs;
@@ -1139,7 +621,7 @@ void ManagerFarm::run(){
     }else{
         /* Force the first calibration point. **/
         if(_calibrator){
-            changeConfiguration(_calibrator->getNextConfiguration());
+            changeRelative(_calibrator->getNextKnobsValues());
         }
 
         double startSample = getMillisecondsTime();
@@ -1169,20 +651,18 @@ void ManagerFarm::run(){
 
             if(!persist()){
                 bool reconfigurationRequired = false;
-                FarmConfiguration nextConfiguration;
+                KnobsValues nextValues;
 
                 if(_calibrator){
-                    nextConfiguration = _calibrator->getNextConfiguration();
-                    if(nextConfiguration != _currentConfiguration){
-                        reconfigurationRequired = true;
-                    }
+                    nextValues = _calibrator->getNextKnobsValues();
+                    reconfigurationRequired = true;
                 }else if(isContractViolated()){
-                    nextConfiguration = getNewConfiguration();
+                    nextValues = getNewKnobsValues();
                     reconfigurationRequired = true;
                 }
 
                 if(reconfigurationRequired){
-                    changeConfiguration(nextConfiguration);
+                    changeRelative(nextValues);
                     startSample = getMillisecondsTime();
                 }
             }
@@ -1327,5 +807,107 @@ void Observer::summaryStats(const vector<CalibrationStats>&
     _summaryFile << endl;
 }
 
+FarmConfiguration::FarmConfiguration(const Parameters& p, ff::ff_farm<>& farm):_p(p){
+    _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p.knobWorkers, farm);
+    _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p.knobMapping,
+                                                p.knobMappingEmitter,
+                                                p.knobMappingCollector,
+                                                p.knobHyperthreading,
+                                                p.mammut,
+                                                dynamic_cast<AdaptiveNode*>(farm.getEmitter()),
+                                                dynamic_cast<AdaptiveNode*>(farm.getCollector()),
+                                                *((KnobWorkers*)_knobs[KNOB_TYPE_WORKERS]));
+    _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p.knobFrequencies,
+                                                    p.mammut,
+                                                    p.turboBoost,
+                                                    p.strategyInactiveVirtualCores,
+                                                    p.strategyUnusedVirtualCores,
+                                                    *((KnobMapping*)_knobs[KNOB_TYPE_MAPPING]));
+
+    std::vector<std::vector<double>> values;
+    std::vector<double> accum;
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        values.push_back(_knobs[i]->getAllowedValues());
+    }
+    combinations(values, 0, accum);
+}
+
+FarmConfiguration::~FarmConfiguration(){
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        delete _knobs[i];
+    }
+}
+
+//TODO: Works even if a vector is empty? (i.e. a knob has no values)
+void FarmConfiguration::combinations(vector<vector<double> > array, size_t i, vector<double> accum){
+    if(i == array.size()){
+        KnobsValues kv;
+        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            kv[(KnobType) i] = accum.at(i);
+        }
+        _combinations.push_back(kv);
+    }else{
+        vector<double> row = array.at(i);
+        for(size_t j = 0; j < row.size(); ++j){
+            vector<double> tmp(accum);
+            tmp.push_back(row[j]);
+            combinations(array, i+1, tmp);
+        }
+    }
+}
+
+const std::vector<KnobsValues>& FarmConfiguration::getAllRealCombinations(){
+    return _combinations;
+}
+
+void FarmConfiguration::setFastReconfiguration(){
+    if(_p.fastReconfiguration){
+        ((KnobFrequency*) _knobs[KNOB_TYPE_FREQUENCY])->setRelativeValue(100.0);
+    }
+}
+
+const Knob* FarmConfiguration::getKnob(KnobType t) const{
+    return _knobs[t];
+}
+
+void FarmConfiguration::maxAllKnobs(){
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        _knobs[(KnobType) i]->setToMax();
+    }
+}
+
+double FarmConfiguration::getRealValue(KnobType t) const{
+    return _knobs[t]->getRealValue();
+}
+
+KnobsValues FarmConfiguration::getRealValues() const{
+    KnobsValues kv;
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        kv[(KnobType) i] = getRealValue((KnobType) i);
+    }
+    return kv;
+}
+
+double FarmConfiguration::getRelativeValue(KnobType t) const{
+    return _knobs[t]->getRelativeValue();
+}
+
+void FarmConfiguration::setRelativeValues(const KnobsValues& values){
+    // Fast reconfiguration is valid only for knobs changed before
+    // the frequency knob.
+    setFastReconfiguration();
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        _knobs[i]->setRelativeValue(values[(KnobType)i]);
+    }
+}
+
+void FarmConfiguration::setRealValues(const KnobsValues& values){
+    // Fast reconfiguration is valid only for knobs changed before
+    // the frequency knob.
+    setFastReconfiguration();
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        _knobs[i]->setRealValue(values[(KnobType)i]);
+    }
+}
 
 }

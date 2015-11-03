@@ -51,9 +51,13 @@
 
 namespace adpff{
 
+using namespace std;
+
 using namespace ff;
-using namespace mammut::cpufreq;
-using namespace mammut::energy;
+using namespace mammut;
+using namespace mammut::task;
+using namespace mammut::topology;
+
 
 // Sleeps for a given amount of nanoseconds
 static inline void nSleep(long ns) {
