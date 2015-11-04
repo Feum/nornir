@@ -43,8 +43,8 @@
 #undef DEBUG
 #undef DEBUGB
 
-#ifdef DEBUG_FARM
-#define DEBUG(x) do { cerr << x << endl; } while (0)
+#ifdef DEBUG_MANAGER
+#define DEBUG(x) do { cerr << "[Manager] " << x << endl; } while (0)
 #define DEBUGB(x) do {x;} while(0)
 #else
 #define DEBUG(x)
@@ -386,6 +386,7 @@ void ManagerFarm::getWorkersSamples(WorkerSample& sample){
     AdaptiveNode* w;
     uint numActiveWorkers = _activeWorkers.size();
     sample = WorkerSample();
+
     for(size_t i = 0; i < numActiveWorkers; i++){
         WorkerSample tmp;
         w = _activeWorkers.at(i);
@@ -503,7 +504,8 @@ void ManagerFarm::initPredictors(){
         }break;
     }
 }
-Parameters validate(Parameters& p){
+
+Parameters& validate(Parameters& p){
     ParametersValidation apv = p.validate();
     if(apv != VALIDATION_OK){
         throw runtime_error("Invalid adaptivity parameters: " + apv);
@@ -525,7 +527,7 @@ ManagerFarm::ManagerFarm(ff_farm<>* farm, Parameters parameters):
                                 size()),
         _numVirtualCoresPerPhysicalCore(_topology->getPhysicalCore(0)->
                                         getVirtualCores().size()),
-        _configuration(parameters, *farm){
+        _configuration(_p, *farm){
 
     /** If voltage table file is specified, then load the table. **/
     if(_p.archData.voltageTableFile.compare("")){
@@ -562,44 +564,47 @@ ManagerFarm::~ManagerFarm(){
     DEBUGB(samplesFile.close());
 }
 
-void ManagerFarm::run(){
-    _emitter = static_cast<AdaptiveNode*>(_farm->getEmitter());
-    _collector = static_cast<AdaptiveNode*>(_farm->getCollector());
+void ManagerFarm::initNodes() {
+    _emitter = dynamic_cast<AdaptiveNode*>(_farm->getEmitter());
+    _collector = dynamic_cast<AdaptiveNode*>(_farm->getCollector());
     svector<ff_node*> w = _farm->getWorkers();
     for(size_t i = 0; i < w.size(); i++){
-        _activeWorkers.push_back(static_cast<AdaptiveNode*>(w[i]));
+        _activeWorkers.push_back(dynamic_cast<AdaptiveNode*>(w[i]));
     }
 
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        _configuration.maxAllKnobs();
-    }
-
-    _farm->run_then_freeze(_activeWorkers.size());
-
-    for(size_t i = 0; i < _activeWorkers.size(); i++){
+    for (size_t i = 0; i < _activeWorkers.size(); i++) {
         _activeWorkers.at(i)->init(_p.mammut, _p.archData.ticksPerNs);
     }
-    if(_emitter){
+    if (_emitter) {
         _emitter->init(_p.mammut, _p.archData.ticksPerNs);
-    }else{
+    } else {
         throw runtime_error("Emitter is needed to use the manager.");
     }
-    if(_collector){
+    if (_collector) {
         _collector->init(_p.mammut, _p.archData.ticksPerNs);
     }
+}
+
+void ManagerFarm::cleanNodes() {
+    for (size_t i = 0; i < _activeWorkers.size(); i++) {
+        _activeWorkers.at(i)->clean();
+    }
+    if (_emitter) {
+        _emitter->clean();
+    }
+    if (_collector) {
+        _collector->clean();
+    }
+}
+
+void ManagerFarm::run(){
+    _farm->run_then_freeze(_farm->getNWorkers());
+
+    initNodes();
+    _configuration.maxAllKnobs();
 
     _startTimeMs = getMillisecondsTime();
-
-    if(_cpufreq->isBoostingSupported()){
-        if(_p.turboBoost){
-            _cpufreq->enableBoosting();
-        }else{
-            _cpufreq->disableBoosting();
-        }
-    }
-
     _energy->resetCountersCpu();
-
     _lastStoredSampleMs = _startTimeMs;
     if(_p.observer){
         _p.observer->_startMonitoringMs = _lastStoredSampleMs;
@@ -625,6 +630,7 @@ void ManagerFarm::run(){
         }
 
         double startSample = getMillisecondsTime();
+
         while(!terminated()){
             double overheadMs = getMillisecondsTime() - startSample;
             microsecsSleep = ((double)_p.samplingInterval - overheadMs)*
@@ -636,6 +642,7 @@ void ManagerFarm::run(){
             startSample = getMillisecondsTime();
 
             storeNewSample();
+            DEBUG("New sample stored.");
 
             if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
                 uint now = getMillisecondsTime()/1000.0;
@@ -667,6 +674,7 @@ void ManagerFarm::run(){
                 }
             }
         }
+        DEBUG("Terminated.");
     }
 
     uint duration = getMillisecondsTime() - _startTimeMs;
@@ -678,6 +686,8 @@ void ManagerFarm::run(){
         }
         _p.observer->summaryStats(cs, duration);
     }
+
+    cleanNodes();
 }
 
 double Observer::calibrationDurationToPerc(const CalibrationStats& cs,
@@ -871,6 +881,7 @@ const Knob* FarmConfiguration::getKnob(KnobType t) const{
 }
 
 void FarmConfiguration::maxAllKnobs(){
+    DEBUG("Maxing all the knobs.");
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         _knobs[(KnobType) i]->setToMax();
     }
@@ -899,6 +910,7 @@ void FarmConfiguration::setRelativeValues(const KnobsValues& values){
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         _knobs[i]->setRelativeValue(values[(KnobType)i]);
     }
+    DEBUG("Changed relative knobs values.");
 }
 
 void FarmConfiguration::setRealValues(const KnobsValues& values){
@@ -908,6 +920,7 @@ void FarmConfiguration::setRealValues(const KnobsValues& values){
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         _knobs[i]->setRealValue(values[(KnobType)i]);
     }
+    DEBUG("Changed real knobs values.");
 }
 
 }

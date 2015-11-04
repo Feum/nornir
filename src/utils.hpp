@@ -34,6 +34,7 @@
 #define UTILS_HPP_
 
 #include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <vector>
 
@@ -319,6 +320,16 @@ std::ofstream& operator<<(std::ofstream& os, const Smoother<T>& obj){
     os << obj.variance() << "\t";
     os << obj.standardDeviation() << "\t";
     return os;
+}
+
+template<typename T>
+std::ostream& operator<< (std::ostream& out, const std::vector<T>& v){
+    if(v.empty()){
+        out << '[';
+        std::copy(v.begin(), v.end(), std::ostream_iterator<T>(out, ", "));
+        out << "\b\b]";
+    }
+    return out;
 }
 
 }

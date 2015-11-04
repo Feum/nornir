@@ -274,7 +274,7 @@ private:
     // The prediction done for the secondary value for the chosen configuration.
     double _secondaryPrediction;
 
-#ifdef DEBUG_FARM
+#ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
 
@@ -415,6 +415,16 @@ private:
      * Initializes the predictors
      */
     void initPredictors();
+
+    /**
+     * Initializes the adaptive nodes.
+     */
+    void initNodes();
+
+    /**
+     * Cleans the adaptive nodes.
+     */
+    void cleanNodes();
 };
 
 /*!

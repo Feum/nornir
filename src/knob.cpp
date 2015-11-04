@@ -36,6 +36,17 @@
 #include <cmath>
 #include <vector>
 
+#undef DEBUG
+#undef DEBUGB
+
+#ifdef DEBUG_KNOB
+#define DEBUG(x) do { cerr << "[Knob] " << x << endl; } while (0)
+#define DEBUGB(x) do {x;} while(0)
+#else
+#define DEBUG(x)
+#define DEBUGB(x)
+#endif
+
 namespace adpff{
 
 using namespace mammut;
@@ -51,19 +62,16 @@ void Knob::setRelativeValue(double v){
     // Maps from the range [0, 100] to the real range.
     vector<double> values = getAllowedValues();
     if(values.size()){
-        uint index = round((double)(values.size() - 1) *
-                           (v / 100.0));
-
-        _relativeValue = v;
+        uint index = round((double)(values.size() - 1) * (v / 100.0));
         setRealValue(values.at(index));
+        _relativeValue = v;
     }
 }
 
 void Knob::setRealValue(double v){
-    if(getAllowedValues().size() &&
-       v != _realValue){
+    if(getAllowedValues().size()){
+        changeValueReal(v);
         _realValue = v;
-        changeValueReal(_realValue);
     }
 }
 
@@ -87,10 +95,12 @@ bool Knob::autoFind() const{
 KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, ff_farm<>& farm):
         _confWorkers(confWorkers), _farm(farm){
     _emitter = dynamic_cast<AdaptiveNode*>(_farm.getEmitter());
-    svector<ff_node*> workers = _farm.getNWorkers();
+    svector<ff_node*> workers = _farm.getWorkers();
     for(size_t i = 0; i < workers.size(); i++){
         _activeWorkers.push_back(dynamic_cast<AdaptiveNode*>(workers[i]));
     }
+    _realValue = workers.size();
+    _relativeValue = 1;
     _collector = dynamic_cast<AdaptiveNode*>(_farm.getCollector());
 
     if(confWorkers == KNOB_WORKERS_YES){
@@ -102,15 +112,31 @@ KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, ff_farm<>& farm):
     }
 }
 
+#ifdef DEBUG_KNOB
+std::ostream& operator<< (std::ostream& out, const std::vector<AdaptiveNode*>& v){
+    out << "[";
+    for(size_t i = 0; i < v.size(); i++){
+        out << (v.at(i))->getOSThreadId() << ", ";
+    }
+    out << "]";
+    return out;
+}
+#endif
+
 void KnobWorkers::changeValueReal(double v){
-    prepareToFreeze();
-    freeze();
+    if(v != _realValue){
+        DEBUG("[Workers] Changing real value to: " << v);
+        prepareToFreeze();
+        freeze();
 
-    changeActiveNodes(v);
-    notifyNewConfiguration(v);
+        changeActiveWorkers(v);
+        notifyNewConfiguration(v);
 
-    prepareToRun(v);
-    run(v);
+        prepareToRun(v);
+        run(v);
+        DEBUG("[Workers] Active Workers: " << _activeWorkers);
+        DEBUG("[Workers] Inactive Workers: " << _inactiveWorkers);
+    }
 }
 
 std::vector<double> KnobWorkers::getAllowedValues() const{
@@ -174,7 +200,7 @@ void KnobWorkers::run(uint numWorkers){
     }
 }
 
-void KnobWorkers::changeActiveNodes(uint v){
+void KnobWorkers::changeActiveWorkers(uint v){
     uint workersNumDiff = abs(_realValue - v);
     if(_realValue > v){
         /** Move workers from active to inactive. **/
@@ -219,7 +245,19 @@ KnobMapping::KnobMapping(KnobConfMapping confMapping,
     ;
 }
 
+#ifdef DEBUG_KNOB
+std::ostream& operator<< (std::ostream& out, const std::vector<VirtualCore*>& v){
+    out << "[";
+    for(size_t i = 0; i < v.size(); i++){
+        out << (v.at(i))->getVirtualCoreId() << ", ";
+    }
+    out << "]";
+    return out;
+}
+#endif
+
 void KnobMapping::changeValueReal(double v){
+    DEBUG("[Mapping] Changing real value to: " << enumToString<KnobConfMapping>((KnobConfMapping)v));
     setVcOrder();
 
     switch((KnobConfMapping) v){
@@ -240,6 +278,10 @@ void KnobMapping::changeValueReal(double v){
             _unusedVirtualCores.push_back(vc);
         }
     }
+
+    DEBUG("[Mapping] Active VCs: " << _activeVirtualCores);
+    DEBUG("[Mapping] Inactive VCs: " << _inactiveVirtualCores);
+    DEBUG("[Mapping] Unused VCs: " << _unusedVirtualCores);
 }
 
 std::vector<double> KnobMapping::getAllowedValues() const{
@@ -292,25 +334,21 @@ void KnobMapping::getMappingIndexes(size_t& emitterIndex,
                                     size_t& firstWorkerIndex,
                                     size_t& collectorIndex){
     size_t nextIndex = 0;
-    if(_emitter && !_emitterVirtualCore){
+    if(_emitter){
         emitterIndex = nextIndex;
         if(_confEmitterMapping == KNOB_SNODE_MAPPING_ALONE){
             nextIndex = (nextIndex + 1) % _vcOrder.size();
         }
     }
 
-    firstWorkerIndex = nextIndex;
-    nextIndex = (nextIndex + (uint)_knobWorkers.getRealValue()) %
-                _vcOrder.size();
-    //TODO Con troppi workers potrebbe non rispettare l'alone.
-    // SOluzione: Invece di avere direttamente l'id, mettere gli id in un
-    // vettore e rimuovere gli id gia utilizzati da emitter o collector
-    if(_collector && !_collectorVirtualCore){
-        if(_confCollectorMapping == KNOB_SNODE_MAPPING_COLLAPSED){
-            nextIndex = (nextIndex - 1) % _vcOrder.size();
-        }
+    if(_collector){
         collectorIndex = nextIndex;
+        if(_confCollectorMapping == KNOB_SNODE_MAPPING_ALONE){
+            nextIndex = (nextIndex + 1) % _vcOrder.size();
+        }
     }
+
+    firstWorkerIndex = nextIndex;
 }
 
 void KnobMapping::setVcOrder(){
@@ -359,8 +397,6 @@ void KnobMapping::performLinearMapping(){
     const vector<AdaptiveNode*>& activeWorkers = _knobWorkers.getActiveWorkers();
     const vector<AdaptiveNode*>& inactiveWorkers = _knobWorkers.getInactiveWorkers();
 
-    vector<VirtualCore*> remainingCores = _vcOrder;
-    reverse(remainingCores.begin(), remainingCores.end());
     _activeVirtualCores.clear();
     _inactiveVirtualCores.clear();
 
@@ -371,20 +407,23 @@ void KnobMapping::performLinearMapping(){
             _emitterVirtualCore->hotPlug();
         }
         _emitter->move(_emitterVirtualCore);
-        remainingCores.pop_back();
     }
 
 
+    size_t nextWorkerIndex = firstWorkerIndex;
     for(size_t i = 0; i < activeWorkers.size(); i++){
-        VirtualCore* vc = _vcOrder.at((firstWorkerIndex + i) %
-                          _vcOrder.size());
+        VirtualCore* vc = _vcOrder.at(nextWorkerIndex);
+
         _workersVirtualCores.push_back(vc);
         _activeVirtualCores.push_back(vc);
         if(!vc->isHotPlugged()){
             vc->hotPlug();
         }
         activeWorkers.at(i)->move(vc);
-        remainingCores.pop_back();
+
+        if(++nextWorkerIndex == _vcOrder.size()){
+            nextWorkerIndex = firstWorkerIndex;
+        }
     }
 
     if(_collector && _confCollectorMapping != KNOB_SNODE_MAPPING_NO){
@@ -394,12 +433,14 @@ void KnobMapping::performLinearMapping(){
             _collectorVirtualCore->hotPlug();
         }
         _collector->move(_collectorVirtualCore);
-        remainingCores.pop_back();
     }
 
-    for(size_t i = 0; i < inactiveWorkers.size() && !remainingCores.empty(); i++){
-        _inactiveVirtualCores.push_back(remainingCores.back());
-        remainingCores.pop_back();
+    for(size_t i = 0; i < _vcOrder.size(); i++){
+        VirtualCore* currentVc = _vcOrder.at(i);
+        if(!contains(_activeVirtualCores, currentVc) &&
+           !contains(_unusedVirtualCores, currentVc)){
+            _inactiveVirtualCores.push_back(currentVc);
+        }
     }
 }
 
@@ -424,6 +465,17 @@ void KnobMapping::updateUsedCpus(){
 }
 */
 
+#ifdef DEBUG_KNOB
+std::ostream& operator<< (std::ostream& out, const std::vector<Domain*>& v){
+    out << "[";
+    for(size_t i = 0; i < v.size(); i++){
+        out << (v.at(i))->getId() << ", ";
+    }
+    out << "]";
+    return out;
+}
+#endif
+
 KnobFrequency::KnobFrequency(KnobConfFrequencies confFrequency,
                              const Mammut& mammut, bool useTurboBoost,
                              StrategyUnusedVirtualCores inactiveVc,
@@ -445,19 +497,39 @@ KnobFrequency::KnobFrequency(KnobConfFrequencies confFrequency,
         }
     }
 
+    if(_cpufreqHandle->isBoostingSupported()){
+        if(useTurboBoost){
+            _cpufreqHandle->enableBoosting();
+        }else{
+            _cpufreqHandle->disableBoosting();
+        }
+    }
+
     if(_availableFrequencies.empty()){
         // Insert dummy constant frequency
         _availableFrequencies.push_back(1.0);
     }
 
     if(_confFrequency == KNOB_FREQUENCY_YES){
+        _scalableDomains = _frequencyHandler->getDomains();
+        Domain* currentDomain;
+        for(size_t i = 0; i < _scalableDomains.size(); i++){
+            currentDomain = _scalableDomains.at(i);
+            if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
+                throw runtime_error("AdaptivityManagerFarm: Impossible "
+                                    "to set the specified governor.");
+            }
+        }
         for(size_t i = 0; i < _availableFrequencies.size(); i++){
             _allowedValues.push_back(_availableFrequencies.at(i));
+
         }
+        DEBUG("[Frequency] Setting userspace governor. Scalable domains: " << _scalableDomains);
     }
 }
 
 void KnobFrequency::changeValueReal(double v){
+    DEBUG("[Frequency] Changing real value to: " << v);
     _scalableDomains = _frequencyHandler->getDomains(_knobMapping.getActiveVirtualCores());
     Domain* currentDomain;
     for(size_t i = 0; i < _scalableDomains.size(); i++){
@@ -467,6 +539,7 @@ void KnobFrequency::changeValueReal(double v){
                                 "to set the specified frequency.");
         }
     }
+    DEBUG("[Frequency] Frequency changed for domains: " << _scalableDomains);
 }
 
 std::vector<double> KnobFrequency::getAllowedValues() const{

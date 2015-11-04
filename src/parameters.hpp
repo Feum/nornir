@@ -401,10 +401,7 @@ typedef struct ArchData{
  * This class contains parameters for adaptivity choices.
  */
 class Parameters{
-
 private:
-    friend class ManagerFarm;
-
     /**
      * Sets default parameters
      */

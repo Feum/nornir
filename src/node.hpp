@@ -149,6 +149,11 @@ private:
     void init(mammut::Mammut& mammut, double ticksPerNs);
 
     /**
+     * Cleans then node.
+     */
+    void clean();
+
+    /**
      * Moves this node on a specific virtual core.
      * @param vc The virtual core where this nodes must be moved.
      */

@@ -129,7 +129,7 @@ private:
      * Changes the active and inactive nodes according to the new configuration.
      * @param v The new number of nodes.
      */
-    void changeActiveNodes(uint v);
+    void changeActiveWorkers(uint v);
 
     /**
      * Notifies a change in the number of workers to all the nodes.

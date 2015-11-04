@@ -37,8 +37,7 @@ using mammut::Communicator;
 using mammut::Mammut;
 using mammut::utils::enumStrings;
 
-XmlTree::XmlTree(const string& fileName,
-           const string& rootName){
+XmlTree::XmlTree(const string& fileName, const string& rootName){
     rapidxml::xml_document<> xmlContent;
     ifstream file(fileName.c_str());
     if(!file.is_open()){
@@ -462,41 +461,41 @@ template<> char const* enumStrings<StrategyPersistence>::data[] = {
 };
 
 void Parameters::loadXml(const string& paramFileName){
-    XmlTree xc(paramFileName, "adaptivityParameters");
+    XmlTree xt(paramFileName, "adaptivityParameters");
 
-    SETVALUE(xc, Enum, contractType);
-    SETVALUE(xc, Enum, knobMapping);
-    SETVALUE(xc, Enum, knobHyperthreading);
-    SETVALUE(xc, Enum, knobFrequencies);
-    SETVALUE(xc, Enum, strategyUnusedVirtualCores);
-    SETVALUE(xc, Enum, strategyInactiveVirtualCores);
-    SETVALUE(xc, Enum, strategyPrediction);
-    SETVALUE(xc, Enum, strategyPredictionErrorPrimary);
-    SETVALUE(xc, Enum, strategyPredictionErrorSecondary);
-    SETVALUE(xc, Enum, strategySmoothing);
-    SETVALUE(xc, Enum, strategyCalibration);
-    SETVALUE(xc, Enum, strategyPolling);
-    SETVALUE(xc, Enum, strategyPersistence);
-    SETVALUE(xc, Enum, knobMappingEmitter);
-    SETVALUE(xc, Enum, knobMappingCollector);
+    SETVALUE(xt, Enum, contractType);
+    SETVALUE(xt, Enum, knobMapping);
+    SETVALUE(xt, Enum, knobHyperthreading);
+    SETVALUE(xt, Enum, knobFrequencies);
+    SETVALUE(xt, Enum, strategyUnusedVirtualCores);
+    SETVALUE(xt, Enum, strategyInactiveVirtualCores);
+    SETVALUE(xt, Enum, strategyPrediction);
+    SETVALUE(xt, Enum, strategyPredictionErrorPrimary);
+    SETVALUE(xt, Enum, strategyPredictionErrorSecondary);
+    SETVALUE(xt, Enum, strategySmoothing);
+    SETVALUE(xt, Enum, strategyCalibration);
+    SETVALUE(xt, Enum, strategyPolling);
+    SETVALUE(xt, Enum, strategyPersistence);
+    SETVALUE(xt, Enum, knobMappingEmitter);
+    SETVALUE(xt, Enum, knobMappingCollector);
 
-    SETVALUE(xc, Bool, turboBoost);
-    SETVALUE(xc, Bool, fastReconfiguration);
-    SETVALUE(xc, Double, smoothingFactor);
-    SETVALUE(xc, Double, persistenceValue);
-    SETVALUE(xc, Uint, samplingInterval);
-    SETVALUE(xc, Double, underloadThresholdFarm);
-    SETVALUE(xc, Double, overloadThresholdFarm);
-    SETVALUE(xc, Double, underloadThresholdWorker);
-    SETVALUE(xc, Double, overloadThresholdWorker);
-    SETVALUE(xc, Bool, migrateCollector);
-    SETVALUE(xc, Double, requiredBandwidth);
-    SETVALUE(xc, Uint, requiredCompletionTime);
-    SETVALUE(xc, Ulong, expectedTasksNumber);
-    SETVALUE(xc, Double, powerBudget);
-    SETVALUE(xc, Double, maxPrimaryPredictionError);
-    SETVALUE(xc, Double, maxSecondaryPredictionError);
-    SETVALUE(xc, Double, maxMonitoringOverhead);
+    SETVALUE(xt, Bool, turboBoost);
+    SETVALUE(xt, Bool, fastReconfiguration);
+    SETVALUE(xt, Double, smoothingFactor);
+    SETVALUE(xt, Double, persistenceValue);
+    SETVALUE(xt, Uint, samplingInterval);
+    SETVALUE(xt, Double, underloadThresholdFarm);
+    SETVALUE(xt, Double, overloadThresholdFarm);
+    SETVALUE(xt, Double, underloadThresholdWorker);
+    SETVALUE(xt, Double, overloadThresholdWorker);
+    SETVALUE(xt, Bool, migrateCollector);
+    SETVALUE(xt, Double, requiredBandwidth);
+    SETVALUE(xt, Uint, requiredCompletionTime);
+    SETVALUE(xt, Ulong, expectedTasksNumber);
+    SETVALUE(xt, Double, powerBudget);
+    SETVALUE(xt, Double, maxPrimaryPredictionError);
+    SETVALUE(xt, Double, maxSecondaryPredictionError);
+    SETVALUE(xt, Double, maxMonitoringOverhead);
 }
 
 Parameters::Parameters(Communicator* const communicator):

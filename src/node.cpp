@@ -42,7 +42,7 @@
 #undef DEBUGB
 
 #ifdef DEBUG_NODE
-#define DEBUG(x) do { cerr << x << endl; } while (0)
+#define DEBUG(x) do { cerr << "[Node] " << x << endl; } while (0)
 #define DEBUGB(x) do {x;} while(0)
 #else
 #define DEBUG(x)
@@ -87,6 +87,13 @@ void AdaptiveNode::init(Mammut& mammut, double ticksPerNs){
     assert(tid != 0);
     _thread = _tasksManager->getThreadHandler(getpid(), tid);
     _ticksPerNs = ticksPerNs;
+}
+
+void AdaptiveNode::clean(){
+    if(_thread){
+        _tasksManager->releaseThreadHandler(_thread);
+        _thread = NULL;
+    }
 }
 
 void AdaptiveNode::move(VirtualCore* vc){
@@ -228,9 +235,7 @@ AdaptiveNode::AdaptiveNode():
 }
 
 AdaptiveNode::~AdaptiveNode(){
-    if(_thread){
-        _tasksManager->releaseThreadHandler(_thread);
-    }
+    clean();
 }
 
 void AdaptiveNode::notifyWorkersChange(size_t oldNumWorkers,

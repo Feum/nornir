@@ -37,7 +37,7 @@
 #undef DEBUGB
 
 #ifdef DEBUG_PREDICTORS
-#define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
+#define DEBUG(x) do { std::cerr << "[Predictors] " << x << std::endl; } while (0)
 #define DEBUGB(x) do {x} while (0)
 #else
 #define DEBUG(x)
@@ -518,9 +518,11 @@ CalibratorLowDiscrepancy::~CalibratorLowDiscrepancy(){
 KnobsValues CalibratorLowDiscrepancy::generateKnobsValues() const{
     KnobsValues r;
     gsl_qrng_get(_generator, _normalizedPoint);
+    size_t nextCoordinate = 0;
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         if(_manager._configuration.getKnob((KnobType) i)->autoFind()){
-            r[(KnobType)i] = _normalizedPoint[i]*100.0;
+            r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
+            ++nextCoordinate;
         }else{
             r[(KnobType)i] = 0;
         }
