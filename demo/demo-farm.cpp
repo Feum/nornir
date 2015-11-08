@@ -37,6 +37,9 @@
 
 using namespace ff;
 
+//#define MICROSECSSLEEP 200000
+#define MICROSECSSLEEP 1000000
+
 // generic worker
 class Worker: public adpff::AdaptiveNode{
 public:
@@ -47,7 +50,7 @@ public:
 
     void * svc(void * task) {
         int * t = (int *)task;
-        sleep(1);
+        usleep(MICROSECSSLEEP);
         std::cout << "Worker " << ff_node::get_my_id()
                   << " received task " << *t << "\n";
         return task;
@@ -74,7 +77,7 @@ public:
     Emitter(int max_task):ntask(max_task) {};
 
     void * svc(void *) {
-        sleep(1);
+        usleep(MICROSECSSLEEP);
         int * task = new int(ntask);
         --ntask;
         if (ntask<0){

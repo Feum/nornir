@@ -76,17 +76,24 @@ double AdaptiveNode::ticksToSeconds(double ticks) const{
     return (ticks/_ticksPerNs)/NSECS_IN_SECS;
 }
 
-void AdaptiveNode::init(Mammut& mammut, double ticksPerNs){
-    while(!_started){;}
+void AdaptiveNode::initPreRun(Mammut& mammut, double ticksPerNs, NodeType nodeType){
     _tasksManager = mammut.getInstanceTask();
     if(!_tasksManager){
         throw runtime_error("Node init(): impossible to "
                             "get the tasks manager.");
     }
+    _ticksPerNs = ticksPerNs;
+    _nodeType = nodeType;
+}
+
+void AdaptiveNode::initPostRun(){
+    while(!_started){;}
     size_t tid = getOSThreadId();
     assert(tid != 0);
     _thread = _tasksManager->getThreadHandler(getpid(), tid);
-    _ticksPerNs = ticksPerNs;
+    if(_nodeType == NODE_TYPE_EMITTER){
+        DEBUG("EMITTERTID: " << tid);
+    }
 }
 
 void AdaptiveNode::clean(){
@@ -127,7 +134,8 @@ void AdaptiveNode::askForSample(){
     _managementRequest.type = MGMT_REQ_GET_AND_RESET_SAMPLE;
     // The value pushed in the queue will not be read,
     // it could be anything except NULL.
-    _managementQ.push(&_managementRequest);
+    while(!_managementQ.push(&_managementRequest));
+    DEBUG("ASKFORSAMPLE");
 }
 
 void AdaptiveNode::freezeAll(void* mark){
@@ -135,7 +143,12 @@ void AdaptiveNode::freezeAll(void* mark){
     _managementRequest.mark = mark;
     // The value pushed in the queue will not be read, it could be
     // anything except NULL.
-    _managementQ.push(&_managementRequest);
+    DEBUG("FREEZEALLBEF");
+    while(!_managementQ.push(&_managementRequest));
+    DEBUG("FREEZEALLAFT");
+    if(_nodeType == NODE_TYPE_EMITTER){
+        DEBUG("Pushed freeze req");
+    }
 }
 
 void AdaptiveNode::thawAll(size_t numWorkers){
@@ -143,7 +156,9 @@ void AdaptiveNode::thawAll(size_t numWorkers){
     _managementRequest.numWorkers = numWorkers;
     // The value pushed in the queue will not be read, it could be
     // anything except NULL.
-    _managementQ.push(&_managementRequest);
+    DEBUG("THAWALLBEF");
+    while(!_managementQ.push(&_managementRequest));
+    DEBUG("THAWALLAFT");
 }
 
 void AdaptiveNode::prepareToFreeze(){
@@ -151,6 +166,10 @@ void AdaptiveNode::prepareToFreeze(){
 }
 
 void AdaptiveNode::prepareToRun(){
+    while(!_responseQ.empty()){
+        DEBUG("Clearing response Q.");
+        _responseQ.inc();
+    }
     _startTicks = getticks();
     _goingToFreeze = false;
     _tasksCount = 0;
@@ -182,25 +201,30 @@ void AdaptiveNode::storeSample(){
     _ticksTot = 0;
     _startTicks = now;
 
-    _responseQ.push(dummyPtr);
+    assert(_responseQ.push(dummyPtr));
 }
 
 void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
     _started = true;
+
     if(!_managementQ.empty()){
         _managementQ.inc();
+        if(_nodeType == NODE_TYPE_EMITTER){
+            DEBUG("Popped something");
+        }
         switch(_managementRequest.type){
             case MGMT_REQ_GET_AND_RESET_SAMPLE:{
+                DEBUG("Get and reset received");
                 storeSample();
             }break;
             case MGMT_REQ_FREEZE:{
                 DEBUG("Freeze request received");
                 ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
                 lb->broadcast_task(_managementRequest.mark);
-                DEBUG("Task broadcasted");
+                DEBUG("Broadcasted");
 
                 /** Waits for restart request from manager. **/
-                while(_managementQ.empty()){;}
+                while(_managementQ.empty());
                 _managementQ.inc();
                 DEBUGB(assert(_managementRequest.type == MGMT_REQ_THAW));
                 lb->thawWorkers(true, _managementRequest.numWorkers);
@@ -215,7 +239,9 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
 void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
     if(!_goingToFreeze){
         _terminated = true;
-        storeSample();
+        if(_nodeType == NODE_TYPE_WORKER){
+            storeSample();
+        }
     }
 }
 
@@ -228,10 +254,10 @@ AdaptiveNode::AdaptiveNode():
         _ticksTot(0),
         _tasksCount(0),
         _managementQ(1),
-        _responseQ(1){
-    prepareToRun();
+        _responseQ(2){
     _managementQ.init();
     _responseQ.init();
+    prepareToRun();
 }
 
 AdaptiveNode::~AdaptiveNode(){

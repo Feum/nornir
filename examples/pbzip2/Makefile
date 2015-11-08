@@ -16,7 +16,7 @@ PREFIX = /usr
 all: pbzip2 pbzip2_ff
 
 # FastFlow version
-pbzip2_ff: pbzip2_ff.cpp
+pbzip2_ff: pbzip2_ff.cpp ../../src/libgrape.a
 	$(CXX) $(CXXFLAGS) $(INCS) $< -o $@ $(LDFLAGS) $(LDLIBS) -lbz2 
 
 # FastFlow version

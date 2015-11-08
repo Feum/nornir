@@ -482,9 +482,6 @@ private:
     std::vector<ff_task_t*> tasks;
 };
 
-
-
-
 /* main routine for N Queens program.*/
 int main(int argc, char** argv) {
     bool check=false;
@@ -528,7 +525,8 @@ int main(int argc, char** argv) {
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
-    ff_farm<> farm(false, 8192, 8192, false, DEF_MAX_NUM_WORKERS, true);
+    size_t bufSize = 128; //8192;
+    ff_farm<> farm(false, bufSize, bufSize, false, DEF_MAX_NUM_WORKERS, true);
     Emitter E(boardsize, depth);
     farm.add_emitter(&E);
 

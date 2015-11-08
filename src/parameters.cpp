@@ -135,7 +135,6 @@ void Parameters::setDefault(){
     knobMappingCollector = KNOB_SNODE_MAPPING_AUTO;
     knobHyperthreading = KNOB_HT_AUTO;
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
-    strategyInactiveVirtualCores = STRATEGY_UNUSED_VC_NONE;
     strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
     strategyPredictionErrorPrimary = STRATEGY_PREDICTION_ERROR_CONSTANT;
     strategyPredictionErrorSecondary = STRATEGY_PREDICTION_ERROR_CONSTANT;
@@ -298,9 +297,17 @@ ParametersValidation Parameters::validateKnobFrequencies(){
         }
     }
 
-    if((fastReconfiguration && !isHighestFrequencySettable()) ||
-        knobFrequencies == KNOB_FREQUENCY_NO){
+    if(fastReconfiguration &&
+       (!isHighestFrequencySettable() || knobFrequencies == KNOB_FREQUENCY_NO)){
         return VALIDATION_NO_FAST_RECONF;
+    }
+
+    if(mammut.getInstanceCpuFreq()->isBoostingSupported()){
+        if(turboBoost){
+            mammut.getInstanceCpuFreq()->enableBoosting();
+        }else{
+            mammut.getInstanceCpuFreq()->disableBoosting();
+        }
     }
     return VALIDATION_OK;
 }
@@ -468,7 +475,6 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, knobHyperthreading);
     SETVALUE(xt, Enum, knobFrequencies);
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
-    SETVALUE(xt, Enum, strategyInactiveVirtualCores);
     SETVALUE(xt, Enum, strategyPrediction);
     SETVALUE(xt, Enum, strategyPredictionErrorPrimary);
     SETVALUE(xt, Enum, strategyPredictionErrorSecondary);
@@ -537,8 +543,6 @@ ParametersValidation Parameters::validate(){
     if(r != VALIDATION_OK){return r;}
 
     /** Validate unused cores strategy. **/
-    r = validateUnusedVc(strategyInactiveVirtualCores);
-    if(r != VALIDATION_OK){return r;}
     r = validateUnusedVc(strategyUnusedVirtualCores);
     if(r != VALIDATION_OK){return r;}
 

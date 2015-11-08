@@ -329,23 +329,28 @@ KnobsValues ManagerFarm::getNewKnobsValues(){
 }
 
 bool ManagerFarm::terminated(){
-    if(_emitter &&
-       _emitter->isTerminated()){
-        return true;
-    }
+    /**
+     * We do not need to wait if the emitter is terminated.
+     * Indeed, if the workers terminated, the emitter surely terminated
+     * too.
+     */
 
     for(size_t i = 0; i < _activeWorkers.size(); i++){
-        if(_activeWorkers.at(i)->isTerminated()){
-            return true;
+        if(!_activeWorkers.at(i)->isTerminated()){
+            return false;
+        }else{
+            DEBUG("Worker " << i << " terminated.");
         }
     }
 
     if(_collector &&
-       _collector->isTerminated()){
-        return true;
+       !_collector->isTerminated()){
+        return false;
+    }else{
+        DEBUG("Collector terminated.");
     }
 
-    return false;
+    return true;
 }
 
 void ManagerFarm::changeRelative(KnobsValues values){
@@ -505,10 +510,11 @@ void ManagerFarm::initPredictors(){
     }
 }
 
+#include <string>
 Parameters& validate(Parameters& p){
     ParametersValidation apv = p.validate();
     if(apv != VALIDATION_OK){
-        throw runtime_error("Invalid adaptivity parameters: " + apv);
+        throw runtime_error("Invalid adaptivity parameters: " + std::to_string(apv));
     }
     return p;
 }
@@ -564,7 +570,7 @@ ManagerFarm::~ManagerFarm(){
     DEBUGB(samplesFile.close());
 }
 
-void ManagerFarm::initNodes() {
+void ManagerFarm::initNodesPreRun() {
     _emitter = dynamic_cast<AdaptiveNode*>(_farm->getEmitter());
     _collector = dynamic_cast<AdaptiveNode*>(_farm->getCollector());
     svector<ff_node*> w = _farm->getWorkers();
@@ -573,15 +579,25 @@ void ManagerFarm::initNodes() {
     }
 
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
-        _activeWorkers.at(i)->init(_p.mammut, _p.archData.ticksPerNs);
+        _activeWorkers.at(i)->initPreRun(_p.mammut, _p.archData.ticksPerNs, NODE_TYPE_WORKER);
     }
     if (_emitter) {
-        _emitter->init(_p.mammut, _p.archData.ticksPerNs);
+        _emitter->initPreRun(_p.mammut, _p.archData.ticksPerNs, NODE_TYPE_EMITTER);
     } else {
         throw runtime_error("Emitter is needed to use the manager.");
     }
     if (_collector) {
-        _collector->init(_p.mammut, _p.archData.ticksPerNs);
+        _collector->initPreRun(_p.mammut, _p.archData.ticksPerNs, NODE_TYPE_COLLECTOR);
+    }
+}
+
+void ManagerFarm::initNodesPostRun() {
+    for (size_t i = 0; i < _activeWorkers.size(); i++) {
+        _activeWorkers.at(i)->initPostRun();
+    }
+    _emitter->initPostRun();
+    if (_collector) {
+        _collector->initPostRun();
     }
 }
 
@@ -598,9 +614,9 @@ void ManagerFarm::cleanNodes() {
 }
 
 void ManagerFarm::run(){
+    initNodesPreRun();
     _farm->run_then_freeze(_farm->getNWorkers());
-
-    initNodes();
+    initNodesPostRun();
     _configuration.maxAllKnobs();
 
     _startTimeMs = getMillisecondsTime();
@@ -830,7 +846,6 @@ FarmConfiguration::FarmConfiguration(const Parameters& p, ff::ff_farm<>& farm):_
     _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p.knobFrequencies,
                                                     p.mammut,
                                                     p.turboBoost,
-                                                    p.strategyInactiveVirtualCores,
                                                     p.strategyUnusedVirtualCores,
                                                     *((KnobMapping*)_knobs[KNOB_TYPE_MAPPING]));
 

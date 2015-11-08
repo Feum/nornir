@@ -75,7 +75,7 @@ typedef enum{
 /// Frequency knob.
 typedef enum{
     // Disables the possibility to dinamically change the frequencies.
-    KNOB_FREQUENCY_NO,
+    KNOB_FREQUENCY_NO = 0,
 
     // Enables the possibility to dinamically change the frequencies.
     KNOB_FREQUENCY_YES,
@@ -112,8 +112,7 @@ typedef enum{
     KNOB_HT_LATER
 }KnobConfHyperthreading;
 
-/// Possible strategies to apply for unused virtual cores. For unused virtual
-/// cores we mean those never used or those used only on some conditions.
+/// Possible strategies to apply for unused virtual cores.
 typedef enum{
     // Automatically choose one of the other strategies.
     STRATEGY_UNUSED_VC_AUTO = 0,
@@ -514,7 +513,7 @@ public:
 
     // The frequency knob. It can be KNOB_FREQUENCY_YES
     // only if knobMapping is different from KNOB_MAPPING_NO
-    // [default = KNOB_FREQUENCY_AUTO].
+    // [default = KNOB_FREQUENCY_YES].
     KnobConfFrequencies knobFrequencies;
 
     //  The mapping knob [default = KNOB_MAPPING_AUTO].
@@ -529,13 +528,8 @@ public:
     // The hyperthreading knob [default = KNOB_HT_AUTO].
     KnobConfHyperthreading knobHyperthreading;
 
-    // Strategy for virtual cores that are never used
-    // [default = STRATEGY_UNUSED_VC_NONE].
+    // Strategy for unused virtual cores [default = STRATEGY_UNUSED_VC_NONE].
     StrategyUnusedVirtualCores strategyUnusedVirtualCores;
-
-    // Strategy for virtual cores that become inactive after a workers
-    // reconfiguration [default = STRATEGY_UNUSED_VC_NONE].
-    StrategyUnusedVirtualCores strategyInactiveVirtualCores;
 
     // Strategy to be used to predict power and performance values
     // [default = STRATEGY_PREDICTION_REGRESSION_LINEAR].

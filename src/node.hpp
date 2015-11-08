@@ -39,6 +39,12 @@
 
 namespace adpff{
 
+typedef enum{
+    NODE_TYPE_EMITTER,
+    NODE_TYPE_WORKER,
+    NODE_TYPE_COLLECTOR
+}NodeType;
+
 
 /*!
  * \internal
@@ -125,6 +131,7 @@ private:
     ticks _startTicks;
     ticks _ticksTot;
     ticks _tasksCount;
+    NodeType _nodeType;
 
     // Queue used by the manager to notify that a request is present
     // on _managementRequest.
@@ -142,11 +149,18 @@ private:
     double ticksToSeconds(double ticks) const;
 
     /**
-     * Initializes the node.
+     * Operations that need to take place before the node is already running.
      * @param mammut A Mammut handle.
      * @param ticksPerNs The number of ticks in a nanosecond.
+     * @param nodeType The type of the node.
      */
-    void init(mammut::Mammut& mammut, double ticksPerNs);
+    void initPreRun(mammut::Mammut& mammut, double ticksPerNs, NodeType nodeType);
+
+
+    /**
+     * Operations that need to take place after the node is already running.
+     */
+    void initPostRun();
 
     /**
      * Cleans then node.

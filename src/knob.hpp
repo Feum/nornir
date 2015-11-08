@@ -101,8 +101,14 @@ public:
     std::vector<double> getAllowedValues() const;
     uint getNumActiveWorkers() const;
     const std::vector<AdaptiveNode*>& getActiveWorkers() const;
-    const std::vector<AdaptiveNode*>& getInactiveWorkers() const;
 private:
+    /**
+     * Returns all the workers of the farm.
+     * @param farm The farm.
+     * @return All the workers of the farm
+     */
+    std::vector<AdaptiveNode*> getAllWorkers(const ff::ff_farm<>& farm) const;
+
     /**
      * Prepares the nodes to freeze.
      */
@@ -126,12 +132,6 @@ private:
     void run(uint numWorkers);
 
     /**
-     * Changes the active and inactive nodes according to the new configuration.
-     * @param v The new number of nodes.
-     */
-    void changeActiveWorkers(uint v);
-
-    /**
      * Notifies a change in the number of workers to all the nodes.
      * @param numWorkers The new number of workers.
      */
@@ -142,8 +142,8 @@ private:
     ff::ff_farm<>& _farm;
     AdaptiveNode* _emitter;
     AdaptiveNode* _collector;
+    const std::vector<AdaptiveNode*> _allWorkers;
     std::vector<AdaptiveNode*> _activeWorkers;
-    std::vector<AdaptiveNode*> _inactiveWorkers;
     std::vector<double> _knobValues;
 };
 
@@ -165,7 +165,6 @@ public:
     const std::vector<mammut::topology::VirtualCore*>& getWorkersVirtualCore() const;
 
     const std::vector<mammut::topology::VirtualCore*>& getActiveVirtualCores() const;
-    const std::vector<mammut::topology::VirtualCore*>& getInactiveVirtualCores() const;
     const std::vector<mammut::topology::VirtualCore*>& getUnusedVirtualCores() const;
 private:
     /**
@@ -181,10 +180,10 @@ private:
                            size_t& collectorIndex);
 
     /**
-     * Computes the available virtual cores, sorting them according to
-     * the specified mapping strategy.
+     * Computes the mapping order of virtual cores for linear
+     * mapping.
      */
-    void setVcOrder();
+    void computeVcOrderLinear();
 
     /**
      * Performs a linear mapping of the nodes on the available virtual cores.
@@ -197,10 +196,11 @@ private:
     KnobConfHyperthreading _confHyperthreading;
 
     // The available virtual cores, sorted according to the mapping strategy.
-    std::vector<mammut::topology::VirtualCore*> _vcOrder;
+    std::vector<mammut::topology::VirtualCore*>& _vcOrder;
+    std::vector<mammut::topology::VirtualCore*> _vcOrderLinear;
+    std::vector<mammut::topology::VirtualCore*> _vcOrderCacheEfficient;
 
     std::vector<mammut::topology::VirtualCore*> _activeVirtualCores;
-    std::vector<mammut::topology::VirtualCore*> _inactiveVirtualCores;
     std::vector<mammut::topology::VirtualCore*> _unusedVirtualCores;
 
     mammut::topology::VirtualCore* _emitterVirtualCore;
@@ -217,7 +217,6 @@ public:
     KnobFrequency(KnobConfFrequencies confFrequency,
                   const mammut::Mammut& mammut,
                   bool useTurboBoost,
-                  StrategyUnusedVirtualCores inactiveVc,
                   StrategyUnusedVirtualCores unusedVc,
                   const KnobMapping& knobMapping);
     void changeValueReal(double v);
@@ -232,11 +231,8 @@ private:
     mammut::cpufreq::CpuFreq* _frequencyHandler;
     mammut::topology::Topology* _topologyHandler;
     mammut::cpufreq::CpuFreq* _cpufreqHandle;
-    StrategyUnusedVirtualCores _inactiveVc;
     StrategyUnusedVirtualCores _unusedVc;
     const KnobMapping& _knobMapping;
-    std::vector<mammut::cpufreq::Frequency> _availableFrequencies;
-    std::vector<mammut::cpufreq::Domain*> _scalableDomains;
 };
 
 }

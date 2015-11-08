@@ -417,9 +417,14 @@ private:
     void initPredictors();
 
     /**
-     * Initializes the adaptive nodes.
+     * Operations that need to take place before running the nodes.
      */
-    void initNodes();
+    void initNodesPreRun();
+
+    /**
+     * Operations that need to take place after running the nodes.
+     */
+    void initNodesPostRun();
 
     /**
      * Cleans the adaptive nodes.
