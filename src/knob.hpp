@@ -36,7 +36,7 @@ namespace adpff{
 
 class Knob: public mammut::utils::NonCopyable{
 public:
-    Knob():_relativeValue(-1), _realValue(-1){;}
+    Knob():_realValue(-1){;}
 
     /**
      * Changes the value of this knob.
@@ -90,7 +90,6 @@ protected:
      */
     virtual void changeValueReal(double v) = 0;
 
-    double _relativeValue;
     double _realValue;
 };
 

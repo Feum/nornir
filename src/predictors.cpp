@@ -381,7 +381,7 @@ bool Calibrator::highError() const{
 }
 
 KnobsValues Calibrator::getNextKnobsValues(){
-    KnobsValues fc;
+    KnobsValues kv;
 
     if(_numCalibrationPoints == 0){
         _calibrationStartMs = getMillisecondsTime();
@@ -405,30 +405,30 @@ KnobsValues Calibrator::getNextKnobsValues(){
 
     switch(_state){
         case CALIBRATION_SEEDS:{
-            fc = generateKnobsValues();
+            kv = generateRelativeKnobsValues();
             if(_numCalibrationPoints + 1 >= _minNumPoints){
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: Moving to predict");
             }
         }break;
         case CALIBRATION_TRY_PREDICT:{
-            fc = _manager.getNewKnobsValues();
+            kv = _manager.getBestKnobsValues();
             _state = CALIBRATION_EXTRA_POINT;
             DEBUG("[Calibrator]: Moving to extra");
         }break;
         case CALIBRATION_EXTRA_POINT:{
             if(highError()){
-                fc = generateKnobsValues();
+                kv = generateRelativeKnobsValues();
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: High error");
                 DEBUG("[Calibrator]: Moving to predict");
             }else if(_manager.isContractViolated()){
                 DEBUG("[Calibrator]: Contract violated");
-                fc = _manager.getNewKnobsValues();
+                kv = _manager.getBestKnobsValues();
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: Moving to predict");
             }else{
-                fc = _manager.getNewKnobsValues();
+                kv = _manager.getBestKnobsValues();
                 _state = CALIBRATION_FINISHED;
                 _manager._primaryPredictor->clear();
                 _manager._secondaryPredictor->clear();
@@ -441,7 +441,7 @@ KnobsValues Calibrator::getNextKnobsValues(){
                 _calibrationStats.push_back(cs);
                 DEBUG("[Calibrator]: Moving to finished");
                 DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints - 1 <<
-                      " steps with configuration " << fc);
+                      " steps with configuration " << kv);
             }
         }break;
         case CALIBRATION_FINISHED:{
@@ -454,13 +454,13 @@ KnobsValues Calibrator::getNextKnobsValues(){
             }else*/
             if(_manager.isContractViolated()){
                 reset();
-                fc = generateKnobsValues();
+                kv = generateRelativeKnobsValues();
                 _numCalibrationPoints = 1;
                 _state = CALIBRATION_SEEDS;
                 _calibrationStartMs = getMillisecondsTime();
                 DEBUG("[Calibrator]: Moving to seeds");
             }else{
-                fc = _manager._configuration.getRealValues();
+                kv = _manager._configuration.getRealValues();
             }
         }break;
     }
@@ -469,7 +469,7 @@ KnobsValues Calibrator::getNextKnobsValues(){
         ++_numCalibrationPoints;
     }
 
-    return fc;
+    return kv;
 }
 
 std::vector<CalibrationStats> Calibrator::getCalibrationsStats() const{
@@ -515,8 +515,8 @@ CalibratorLowDiscrepancy::~CalibratorLowDiscrepancy(){
     delete[] _normalizedPoint;
 }
 
-KnobsValues CalibratorLowDiscrepancy::generateKnobsValues() const{
-    KnobsValues r;
+KnobsValues CalibratorLowDiscrepancy::generateRelativeKnobsValues() const{
+    KnobsValues r(KNOB_VALUE_RELATIVE);
     gsl_qrng_get(_generator, _normalizedPoint);
     size_t nextCoordinate = 0;
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
@@ -524,7 +524,12 @@ KnobsValues CalibratorLowDiscrepancy::generateKnobsValues() const{
             r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
             ++nextCoordinate;
         }else{
-            r[(KnobType)i] = 0;
+            /**
+             * If we do not need to automatically find the value for this knob,
+             * then it has only 0 or 1 possible value. Accordingly, we can set
+             * it to any value. Here we set it to 100.0 for readability.
+             */
+            r[(KnobType)i] = 100.0;
         }
     }
     return r;

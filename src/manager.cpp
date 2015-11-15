@@ -241,8 +241,8 @@ bool ManagerFarm::isBestSecondaryValue(double x, double y) const{
     return false;
 }
 
-KnobsValues ManagerFarm::getNewKnobsValues(){
-    KnobsValues bestValues;
+KnobsValues ManagerFarm::getBestKnobsValues(){
+    KnobsValues bestValues(KNOB_VALUE_REAL);
     KnobsValues bestSuboptimalValues = _configuration.getRealValues();
 
     double primaryPrediction = 0;
@@ -294,8 +294,7 @@ KnobsValues ManagerFarm::getNewKnobsValues(){
         }
 
         if(isFeasiblePrimaryValue(primaryPrediction)){
-            secondaryPrediction = _secondaryPredictor->
-                                  predict(currentValues);
+            secondaryPrediction = _secondaryPredictor->predict(currentValues);
             if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
                 secondaryPrediction *= remainingTime;
             }
@@ -321,7 +320,7 @@ KnobsValues ManagerFarm::getNewKnobsValues(){
     }else{
         _primaryPrediction = bestSuboptimalValue;
         // TODO: This check now works because both service time and power are always  > 0
-        // In the future we must find another way to indicat that secondary prediction
+        // In the future we must find another way to indicate that secondary prediction
         // has not been done.
         _secondaryPrediction = -1;
         return bestSuboptimalValues;
@@ -353,8 +352,8 @@ bool ManagerFarm::terminated(){
     return true;
 }
 
-void ManagerFarm::changeRelative(KnobsValues values){
-    _configuration.setRelativeValues(values);
+void ManagerFarm::changeKnobs(KnobsValues values){
+    _configuration.setValues(values);
     _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
 
     /****************** Clean state ******************/
@@ -533,7 +532,19 @@ ManagerFarm::ManagerFarm(ff_farm<>* farm, Parameters parameters):
                                 size()),
         _numVirtualCoresPerPhysicalCore(_topology->getPhysicalCore(0)->
                                         getVirtualCores().size()),
-        _configuration(_p, *farm){
+        _emitter(NULL),
+        _collector(NULL),
+        _configuration(_p, *farm),
+        _samples(NULL),
+        _totalTasks(0),
+        _remainingTasks(0),
+        _deadline(0),
+        _lastStoredSampleMs(0),
+        _calibrator(NULL),
+        _primaryPredictor(NULL),
+        _secondaryPredictor(NULL),
+        _primaryPrediction(0),
+        _secondaryPrediction(0){
 
     /** If voltage table file is specified, then load the table. **/
     if(_p.archData.voltageTableFile.compare("")){
@@ -642,7 +653,7 @@ void ManagerFarm::run(){
     }else{
         /* Force the first calibration point. **/
         if(_calibrator){
-            changeRelative(_calibrator->getNextKnobsValues());
+            changeKnobs(_calibrator->getNextKnobsValues());
         }
 
         double startSample = getMillisecondsTime();
@@ -673,19 +684,11 @@ void ManagerFarm::run(){
             observe();
 
             if(!persist()){
-                bool reconfigurationRequired = false;
-                KnobsValues nextValues;
-
                 if(_calibrator){
-                    nextValues = _calibrator->getNextKnobsValues();
-                    reconfigurationRequired = true;
+                    changeKnobs(_calibrator->getNextKnobsValues());
+                    startSample = getMillisecondsTime();
                 }else if(isContractViolated()){
-                    nextValues = getNewKnobsValues();
-                    reconfigurationRequired = true;
-                }
-
-                if(reconfigurationRequired){
-                    changeRelative(nextValues);
+                    changeKnobs(getBestKnobsValues());
                     startSample = getMillisecondsTime();
                 }
             }
@@ -866,7 +869,7 @@ FarmConfiguration::~FarmConfiguration(){
 //TODO: Works even if a vector is empty? (i.e. a knob has no values)
 void FarmConfiguration::combinations(vector<vector<double> > array, size_t i, vector<double> accum){
     if(i == array.size()){
-        KnobsValues kv;
+        KnobsValues kv(KNOB_VALUE_REAL);
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
             kv[(KnobType) i] = accum.at(i);
         }
@@ -907,20 +910,17 @@ double FarmConfiguration::getRealValue(KnobType t) const{
 }
 
 KnobsValues FarmConfiguration::getRealValues() const{
-    KnobsValues kv;
+    KnobsValues kv(KNOB_VALUE_REAL);
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         kv[(KnobType) i] = getRealValue((KnobType) i);
     }
     return kv;
 }
 
-double FarmConfiguration::getRelativeValue(KnobType t) const{
-    return _knobs[t]->getRelativeValue();
-}
-
 void FarmConfiguration::setRelativeValues(const KnobsValues& values){
     // Fast reconfiguration is valid only for knobs changed before
     // the frequency knob.
+    assert(values.areRelative());
     setFastReconfiguration();
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         _knobs[i]->setRelativeValue(values[(KnobType)i]);
@@ -931,11 +931,22 @@ void FarmConfiguration::setRelativeValues(const KnobsValues& values){
 void FarmConfiguration::setRealValues(const KnobsValues& values){
     // Fast reconfiguration is valid only for knobs changed before
     // the frequency knob.
+    assert(values.areReal());
     setFastReconfiguration();
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         _knobs[i]->setRealValue(values[(KnobType)i]);
     }
     DEBUG("Changed real knobs values.");
+}
+
+void FarmConfiguration::setValues(const KnobsValues& values){
+    if(values.areReal()){
+        setRealValues(values);
+    }else if(values.areRelative()){
+        setRelativeValues(values);
+    }else{
+        throw std::runtime_error("KnobsValues with undefined type.");
+    }
 }
 
 }

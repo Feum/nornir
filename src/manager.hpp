@@ -77,16 +77,29 @@ typedef enum{
     KNOB_TYPE_NUM // <---- This must always be the last value
 }KnobType;
 
+typedef enum{
+    KNOB_VALUE_UNDEF = 0,
+    KNOB_VALUE_REAL,
+    KNOB_VALUE_RELATIVE
+}KnobValueType;
+
 class KnobsValues{
 private:
-    double values[KNOB_TYPE_NUM];
+    KnobValueType _type;
+    double _values[KNOB_TYPE_NUM];
 public:
+    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){;}
+
+    inline bool areRelative() const{return _type == KNOB_VALUE_RELATIVE;}
+
+    inline bool areReal() const{return _type == KNOB_VALUE_REAL;}
+
     inline double& operator[](KnobType idx){
-        return values[idx];
+        return _values[idx];
     }
 
     inline double operator[](KnobType idx) const{
-        return values[idx];
+        return _values[idx];
     }
 };
 
@@ -97,6 +110,8 @@ private:
     std::vector<KnobsValues> _combinations;
     void combinations(vector<vector<double> > array, size_t i,
                       vector<double> accum);
+    void setRelativeValues(const KnobsValues& values);
+    void setRealValues(const KnobsValues& values);
 public:
     FarmConfiguration(const Parameters& p, ff::ff_farm<>& farm);
 
@@ -140,23 +155,11 @@ public:
     KnobsValues getRealValues() const;
 
     /**
-     * Returns the relative value of a specific knob.
-     * @param t The type of the knob.
-     * @return The relative value of a specific knob.
+     * Sets values for the knobs (may be relative or real).
+     * @param values The values of the knobs.
      */
-    double getRelativeValue(KnobType t) const;
+    void setValues(const KnobsValues& values);
 
-    /**
-     * Sets the relative values for the knobs.
-     * @param values The relative values of the knobs.
-     */
-    void setRelativeValues(const KnobsValues& values);
-
-    /**
-     * Sets the real values for the knobs.
-     * @param values The real values of the knobs.
-     */
-    void setRealValues(const KnobsValues& values);
 };
 
 
@@ -360,10 +363,10 @@ private:
     bool isBestSecondaryValue(double x, double y) const;
 
     /**
-     * Computes the new knobs values for the farm.
-     * @return The new knobs values.
+     * Computes the best relative knobs values for the farm.
+     * @return The best relative knobs values.
      */
-    KnobsValues getNewKnobsValues();
+    KnobsValues getBestKnobsValues();
 
     /**
      * Checks if the application terminated.
@@ -371,10 +374,10 @@ private:
     bool terminated();
 
     /**
-     * Changes the current farm configuration.
-     * @param configuration The new configuration.
+     * Changes the knobs.
+     * @param values The new knobs values.
      */
-    void changeRelative(KnobsValues values);
+    void changeKnobs(KnobsValues values);
 
     /**
      * Send data to observer.

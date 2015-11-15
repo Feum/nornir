@@ -64,7 +64,6 @@ void Knob::setRelativeValue(double v){
     if(values.size()){
         uint index = round((double)(values.size() - 1) * (v / 100.0));
         setRealValue(values.at(index));
-        _relativeValue = v;
     }
 }
 
@@ -77,11 +76,6 @@ void Knob::setRealValue(double v){
 
 void Knob::setToMax(){
     setRelativeValue(100.0);
-}
-
-
-double Knob::getRelativeValue() const{
-    return _relativeValue;
 }
 
 double Knob::getRealValue() const{
@@ -98,7 +92,6 @@ KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, ff_farm<>& farm):
     _collector = dynamic_cast<AdaptiveNode*>(_farm.getCollector());
 
     _realValue = _allWorkers.size();
-    _relativeValue = 1;
 
     if(confWorkers == KNOB_WORKERS_YES){
         for(size_t i = 0; i < _allWorkers.size(); i++){

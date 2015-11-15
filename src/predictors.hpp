@@ -183,9 +183,9 @@ public:
     /**
      * Predicts the value at specific knobs values.
      * @param values The values.
-     * @return The predicted value at a specific combination of knobs values.
+     * @return The predicted value at a specific combination of real knobs values.
      */
-    virtual double predict(const KnobsValues& values) = 0;
+    virtual double predict(const KnobsValues& realValues) = 0;
 };
 
 
@@ -212,8 +212,7 @@ private:
 
     double getCurrentResponse() const;
 public:
-    PredictorLinearRegression(PredictorType type,
-                              const ManagerFarm& manager);
+    PredictorLinearRegression(PredictorType type, const ManagerFarm& manager);
 
     ~PredictorLinearRegression();
 
@@ -285,15 +284,20 @@ private:
 protected:
     /**
      *  Override this method to provide custom ways to generate
-     *  knobs values for calibration.
+     *  relative knobs values for calibration.
+     *  @return The relative knobs values.
      **/
-    virtual KnobsValues generateKnobsValues() const = 0;
+    virtual KnobsValues generateRelativeKnobsValues() const = 0;
     virtual void reset(){;}
 public:
     Calibrator(ManagerFarm& manager);
 
     virtual ~Calibrator(){;}
 
+    /**
+     * Returns the next values to be set for the knobs.
+     * @return The next values to be set for the knobs.
+     */
     KnobsValues getNextKnobsValues();
 
     std::vector<CalibrationStats> getCalibrationsStats() const;
@@ -309,7 +313,7 @@ private:
     gsl_qrng* _generator;
     double* _normalizedPoint;
 protected:
-    KnobsValues generateKnobsValues() const;
+    KnobsValues generateRelativeKnobsValues() const;
     void reset();
 public:
     CalibratorLowDiscrepancy(ManagerFarm& manager);
