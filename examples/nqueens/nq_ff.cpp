@@ -112,6 +112,7 @@
 #include <ff/allocator.hpp>
 #include "../../src/manager.hpp"
 
+//#define USE_FF_ALLOCATOR
 using namespace adpff;
 
 /* 
@@ -301,10 +302,12 @@ public:
 
     int svc_init() {
         if(firstInit){
+#ifdef USE_FF_ALLOCATOR
             if (ffalloc.register4free()<0) {
                 error("Worker, register4free fails\n");
                 return -1;
             }
+#endif
         
             board_minus = board_size - 1; /* board size - 1 */
             mask = (1 << board_size) - 1; /* if board size is N, mask consists of N 1's */
@@ -318,7 +321,11 @@ public:
         ff_task_t * task  = (ff_task_t *)t;
 
         Nqueen(task);
+#ifdef USE_FF_ALLOCATOR
         ffalloc.free(task);
+#else
+        delete task;
+#endif
         return GO_ON;
     }
     
@@ -417,7 +424,11 @@ private:
                 assert(numrows<board_minus);
                 
                 if (numrows == (depth-1)) {
+#ifdef USE_FF_ALLOCATOR
                     ff_task_t * task = (ff_task_t*)ffalloc.malloc(sizeof(ff_task_t));
+#else
+                    ff_task_t * task = new ff_task_t;
+#endif
                     task->numrow           = numrows;
                     task->aQueenBitCol     = aQueenBitCol[numrows];
                     task->aQueenBitNegDiag = aQueenBitNegDiag[numrows];
@@ -454,10 +465,12 @@ public:
 
     int svc_init() {
         if(firstInit){
+#ifdef USE_FF_ALLOCATOR
             if (ffalloc.registerAllocator()<0) {
                 error("Emitter, registerAllocator fails\n");
                 return -1;
             }
+#endif
             streamit(boardsize,depth);
             std::cout << "All the stream have been created." << std::endl;
             firstInit = false;
@@ -520,10 +533,13 @@ int main(int argc, char** argv) {
     }
 
     // init allocator
+#ifdef USE_FF_ALLOCATOR
     ffalloc.init();
+#endif
 
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
+    //adpff::Parameters ap;
     ap.observer = &obs;
     size_t bufSize = 128; //8192;
     ff_farm<> farm(false, bufSize, bufSize, false, DEF_MAX_NUM_WORKERS, true);

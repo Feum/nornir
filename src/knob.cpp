@@ -460,12 +460,6 @@ KnobFrequency::KnobFrequency(KnobConfFrequencies confFrequency,
     if(_confFrequency == KNOB_FREQUENCY_YES){
         std::vector<mammut::cpufreq::Frequency> availableFrequencies;
         availableFrequencies = _frequencyHandler->getDomains().at(0)->getAvailableFrequencies();
-        // Remove turbo boost frequency.
-        if(!useTurboBoost){
-            if(intToString(availableFrequencies.back()).at(3) == '1'){
-                availableFrequencies.pop_back();
-            }
-        }
 
         std::vector<mammut::cpufreq::Domain*> scalableDomains;
         scalableDomains = _frequencyHandler->getDomains();
