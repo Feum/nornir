@@ -377,6 +377,7 @@ void KnobMapping::performLinearMapping(){
     const vector<AdaptiveNode*>& activeWorkers = _knobWorkers.getActiveWorkers();
 
     _activeVirtualCores.clear();
+    _workersVirtualCores.clear();
 
     if(_emitter && _confEmitterMapping != KNOB_SNODE_MAPPING_NO){
         _emitterVirtualCore = _vcOrder.at(emitterIndex);

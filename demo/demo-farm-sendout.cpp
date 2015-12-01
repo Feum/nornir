@@ -122,8 +122,7 @@ int main(int argc, char * argv[]) {
     farm.add_collector(&C);
     
     adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml",
-                                   "archdata.xml");
+    adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     adpff::ManagerFarm amf(&farm, ap);
     std::cout << "Starting manager. " << std::endl;
