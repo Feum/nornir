@@ -104,7 +104,7 @@ double ManagerFarm::getPrimaryValue(const MonitoredSample& sample) const{
             return sample.bandwidth;
         }break;
         case CONTRACT_POWER_BUDGET:{
-            return sample.watts.cores;
+            return sample.watts;
         }break;
         default:{
             return 0;
@@ -117,7 +117,7 @@ double ManagerFarm::getSecondaryValue(const MonitoredSample& sample) const{
         case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
-            return sample.watts.cores;
+            return sample.watts;
         }break;
         case CONTRACT_POWER_BUDGET:{
             return sample.bandwidth;
@@ -359,7 +359,7 @@ void ManagerFarm::changeKnobs(KnobsValues values){
     /****************** Clean state ******************/
     _lastStoredSampleMs = getMillisecondsTime();
     _samples->reset();
-    _energy->resetCountersCpu();
+    _counter->reset();
     _totalTasks = 0;
 }
 
@@ -405,7 +405,7 @@ void ManagerFarm::getWorkersSamples(WorkerSample& sample){
 void ManagerFarm::storeNewSample(){
     MonitoredSample sample;
     WorkerSample ws;
-    JoulesCpu joules;
+    Joules joules;
 
     askForWorkersSamples();
     getWorkersSamples(ws);
@@ -419,9 +419,13 @@ void ManagerFarm::storeNewSample(){
         }
     }
 
-    vector<CounterCpu*> energyCounters = _energy->getCountersCpu();
-    for(size_t i = 0; i < energyCounters.size(); i++){
-        joules += energyCounters.at(i)->getJoules();
+    switch(_counter->getType()){
+        case COUNTER_CPUS:{
+            joules = ((CounterCpus*) _counter)->getJoulesCoresAll();
+        }break;
+        default:{
+            joules = _counter->getJoules();
+        }break;
     }
 
     double now = getMillisecondsTime();
@@ -439,7 +443,7 @@ void ManagerFarm::storeNewSample(){
     sample.bandwidth = ws.bandwidthTotal;
     sample.latency = ws.latency;
 
-    _energy->resetCountersCpu();
+    _counter->reset();
     _samples->add(sample);
 
     DEBUGB(samplesFile << *_samples << "\n");
@@ -523,7 +527,7 @@ ManagerFarm::ManagerFarm(ff_farm<>* farm, Parameters parameters):
         _p(validate(parameters)),
         _startTimeMs(0),
         _cpufreq(_p.mammut.getInstanceCpuFreq()),
-        _energy(_p.mammut.getInstanceEnergy()),
+        _counter(_p.mammut.getInstanceEnergy()->getCounter()),
         _task(_p.mammut.getInstanceTask()),
         _topology(_p.mammut.getInstanceTopology()),
         _numCpus(_topology->getCpus().size()),
@@ -631,7 +635,7 @@ void ManagerFarm::run(){
     _configuration.maxAllKnobs();
 
     _startTimeMs = getMillisecondsTime();
-    _energy->resetCountersCpu();
+    _counter->reset();
     _lastStoredSampleMs = _startTimeMs;
     if(_p.observer){
         _p.observer->_startMonitoringMs = _lastStoredSampleMs;
@@ -736,10 +740,7 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
     _statsFile << "SmoothedBandwidth" << "\t";
     _statsFile << "CoeffVarBandwidth" << "\t";
     _statsFile << "SmoothedUtilization" << "\t";
-    _statsFile << "SmoothedWattsCpu" << "\t";
-    _statsFile << "SmoothedWattsCores" << "\t";
-    _statsFile << "SmoothedWattsGraphic" << "\t";
-    _statsFile << "SmoothedWattsDram" << "\t";
+    _statsFile << "SmoothedWatts" << "\t";
     _statsFile << endl;
 
     _calibrationFile << "NumSteps" << "\t";
@@ -770,7 +771,7 @@ void Observer::observe(unsigned int timeStamp,
                      double smoothedBandwidth,
                      double coeffVarBandwidth,
                      double smoothedUtilization,
-                     JoulesCpu smoothedWatts){
+                     Joules smoothedWatts){
     _statsFile << timeStamp - _startMonitoringMs << "\t";
     _statsFile << "[";
     if(emitterVirtualCore){
@@ -795,14 +796,11 @@ void Observer::observe(unsigned int timeStamp,
     _statsFile << coeffVarBandwidth << "\t";
     _statsFile << smoothedUtilization << "\t";
 
-    _statsFile << smoothedWatts.cpu << "\t";
-    _statsFile << smoothedWatts.cores << "\t";
-    _statsFile << smoothedWatts.graphic << "\t";
-    _statsFile << smoothedWatts.dram << "\t";
+    _statsFile << smoothedWatts << "\t";
 
     _statsFile << endl;
 
-    _totalWatts += smoothedWatts.cores;
+    _totalWatts += smoothedWatts;
     _totalBw += currentBandwidth;
     _numSamples++;
 }

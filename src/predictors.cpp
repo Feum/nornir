@@ -223,7 +223,7 @@ double PredictorLinearRegression::getCurrentResponse() const{
             r = 1.0 / _manager._samples->average().bandwidth;
         }break;
         case PREDICTION_POWER:{
-            r = _manager._samples->average().watts.cores;
+            r = _manager._samples->average().watts;
         }break;
     }
     return r;

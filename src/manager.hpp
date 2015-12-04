@@ -209,8 +209,8 @@ private:
     // The cpufreq module.
     CpuFreq* _cpufreq;
 
-    // The energy module.
-    Energy* _energy;
+    // The energy counter.
+    Counter* _counter;
 
     // The task module.
     TasksManager* _task;
@@ -471,7 +471,7 @@ public:
                          double smoothedBandwidth,
                          double coeffVarBandwidth,
                          double smoothedUtilization,
-                         JoulesCpu smoothedWatts);
+                         Joules smoothedWatts);
 
     virtual void calibrationStats(const vector<CalibrationStats>&
                                   calibrationStats,
@@ -537,12 +537,12 @@ inline bool operator>=(const KnobsValues& lhs,
 }
 
 typedef struct MonitoredSample{
-    JoulesCpu watts; ///< Watts consumed by all the CPUs.
+    Joules watts; ///< Consumed watts.
     double bandwidth; ///< Bandwidth of the entire farm.
     double utilization; ///< Utilization of the entire farm.
     double latency; ///< Average latency of a worker (nanoseconds).
 
-    MonitoredSample():bandwidth(0), utilization(0), latency(0){;}
+    MonitoredSample():watts(0),bandwidth(0), utilization(0), latency(0){;}
 
     void swap(MonitoredSample& x){
         using std::swap;
@@ -658,25 +658,16 @@ inline ostream& operator<<(ostream& os, const MonitoredSample& obj){
 }
 
 inline ofstream& operator<<(ofstream& os, const MonitoredSample& obj){
-    os << obj.watts.cores << "\t";
+    os << obj.watts << "\t";
     os << obj.bandwidth << "\t";
     os << obj.utilization << "\t";
     os << obj.latency << "\t";
     return os;
 }
 
-inline JoulesCpu squareRoot(const JoulesCpu& x){
-    JoulesCpu r;
-    r.cores = x.cores?sqrt(x.cores):0;
-    r.cpu = x.cpu?sqrt(x.cpu):0;
-    r.graphic = x.graphic?sqrt(x.graphic):0;
-    r.dram = x.dram?sqrt(x.dram):0;
-    return r;
-}
-
 inline MonitoredSample squareRoot(const MonitoredSample& x){
     MonitoredSample r;
-    r.watts = squareRoot(x.watts);
+    r.watts = x.watts?sqrt(x.watts):0;
     r.bandwidth = x.bandwidth?sqrt(x.bandwidth):0;
     r.utilization = x.utilization?sqrt(x.utilization):0;
     r.latency = x.latency?sqrt(x.latency):0;
@@ -685,10 +676,7 @@ inline MonitoredSample squareRoot(const MonitoredSample& x){
 
 
 inline void regularize(MonitoredSample& x){
-    if(x.watts.cpu < 0){x.watts.cpu = 0;}
-    if(x.watts.cores < 0){x.watts.cores = 0;}
-    if(x.watts.graphic < 0){x.watts.graphic = 0;}
-    if(x.watts.dram < 0){x.watts.dram = 0;}
+    if(x.watts < 0){x.watts = 0;}
     if(x.bandwidth < 0){x.bandwidth = 0;}
     if(x.utilization < 0){x.utilization = 0;}
     if(x.latency < 0){x.latency = 0;}
