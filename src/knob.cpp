@@ -86,11 +86,22 @@ bool Knob::autoFind() const{
     return getAllowedValues().size() > 1;
 }
 
-KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, ff_farm<>& farm):
-        _confWorkers(confWorkers), _farm(farm), _allWorkers(getAllWorkers(farm)){
-    _emitter = dynamic_cast<AdaptiveNode*>(_farm.getEmitter());
-    _collector = dynamic_cast<AdaptiveNode*>(_farm.getCollector());
+#ifdef DEBUG_KNOB
+std::ostream& operator<< (std::ostream& out, const std::vector<AdaptiveNode*>& v){
+    out << "[";
+    for(size_t i = 0; i < v.size(); i++){
+        out << (v.at(i))->getOSThreadId() << ", ";
+    }
+    out << "]";
+    return out;
+}
+#endif
 
+KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
+                         AdaptiveNode* collector, ff::ff_gatherer* gt,
+                         const std::vector<AdaptiveNode*> workers):
+        _confWorkers(confWorkers), _emitter(emitter), _collector(collector),
+        _gt(gt), _allWorkers(workers){
     _realValue = _allWorkers.size();
 
     if(confWorkers == KNOB_WORKERS_YES){
@@ -102,26 +113,6 @@ KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, ff_farm<>& farm):
     }
     _activeWorkers = _allWorkers;
 }
-
-vector<AdaptiveNode*> KnobWorkers::getAllWorkers(const ff_farm<>& farm) const{
-    svector<ff_node*> workers = _farm.getWorkers();
-    std::vector<AdaptiveNode*> adpWorkers;
-    for(size_t i = 0; i < workers.size(); i++){
-        adpWorkers.push_back(dynamic_cast<AdaptiveNode*>(workers[i]));
-    }
-    return adpWorkers;
-}
-
-#ifdef DEBUG_KNOB
-std::ostream& operator<< (std::ostream& out, const std::vector<AdaptiveNode*>& v){
-    out << "[";
-    for(size_t i = 0; i < v.size(); i++){
-        out << (v.at(i))->getOSThreadId() << ", ";
-    }
-    out << "]";
-    return out;
-}
-#endif
 
 void KnobWorkers::changeValueReal(double v){
     if(v != _realValue){
@@ -202,7 +193,7 @@ void KnobWorkers::run(uint numWorkers){
     }
     DEBUG("[Workers] Running the collector.");
     if(_collector){
-        _farm.getgt()->thaw(true, numWorkers);
+        _gt->thaw(true, numWorkers);
     }
 }
 

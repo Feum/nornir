@@ -64,7 +64,8 @@ using namespace mammut::task;
 using namespace mammut::topology;
 using namespace mammut::utils;
 
-void ManagerFarm::setDomainToHighestFrequency(const Domain* domain){
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::setDomainToHighestFrequency(const Domain* domain){
     if(!domain->setGovernor(GOVERNOR_PERFORMANCE)){
         if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
            !domain->setHighestFrequencyUserspace()){
@@ -76,7 +77,8 @@ void ManagerFarm::setDomainToHighestFrequency(const Domain* domain){
     }
 }
 
-double ManagerFarm::getMaxPredictionErrorPrimary() const{
+template <typename lb_t, typename gt_t>
+double ManagerFarm<lb_t, gt_t>::getMaxPredictionErrorPrimary() const{
     double r = _p.maxPrimaryPredictionError;
     if(_p.strategyPredictionErrorPrimary ==
        STRATEGY_PREDICTION_ERROR_COEFFVAR){
@@ -85,7 +87,8 @@ double ManagerFarm::getMaxPredictionErrorPrimary() const{
     return r;
 }
 
-double ManagerFarm::getMaxPredictionErrorSecondary() const{
+template <typename lb_t, typename gt_t>
+double ManagerFarm<lb_t, gt_t>::getMaxPredictionErrorSecondary() const{
     double r = _p.maxSecondaryPredictionError;
     if(_p.strategyPredictionErrorSecondary ==
        STRATEGY_PREDICTION_ERROR_COEFFVAR){
@@ -94,7 +97,8 @@ double ManagerFarm::getMaxPredictionErrorSecondary() const{
     return r;
 }
 
-double ManagerFarm::getPrimaryValue(const MonitoredSample& sample) const{
+template <typename lb_t, typename gt_t>
+double ManagerFarm<lb_t, gt_t>::getPrimaryValue(const MonitoredSample& sample) const{
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
             return sample.utilization;
@@ -112,7 +116,8 @@ double ManagerFarm::getPrimaryValue(const MonitoredSample& sample) const{
     }
 }
 
-double ManagerFarm::getSecondaryValue(const MonitoredSample& sample) const{
+template <typename lb_t, typename gt_t>
+double ManagerFarm<lb_t, gt_t>::getSecondaryValue(const MonitoredSample& sample) const{
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_BANDWIDTH:
@@ -128,15 +133,18 @@ double ManagerFarm::getSecondaryValue(const MonitoredSample& sample) const{
     }
 }
 
-double ManagerFarm::getPrimaryValue() const{
+template <typename lb_t, typename gt_t>
+double ManagerFarm<lb_t, gt_t>::getPrimaryValue() const{
     return getPrimaryValue(_samples->average());
 }
 
-double ManagerFarm::getSecondaryValue() const{
+template <typename lb_t, typename gt_t>
+double ManagerFarm<lb_t, gt_t>::getSecondaryValue() const{
     return getSecondaryValue(_samples->average());
 }
 
-bool ManagerFarm::isContractViolated() const{
+template <typename lb_t, typename gt_t>
+bool ManagerFarm<lb_t, gt_t>::isContractViolated() const{
     double tolerance = 0;
     double maxError = getMaxPredictionErrorPrimary();
     switch(_p.contractType){
@@ -158,176 +166,8 @@ bool ManagerFarm::isContractViolated() const{
     return !isFeasiblePrimaryValue(getPrimaryValue(), tolerance);
 }
 
-bool ManagerFarm::isFeasiblePrimaryValue(double value, double tolerance) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            return value > _p.underloadThresholdFarm - tolerance &&
-                   value < _p.overloadThresholdFarm + tolerance;
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            return value > _p.requiredBandwidth - tolerance;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            return value < _p.powerBudget + tolerance;
-        }break;
-        default:{
-            return false;
-        }break;
-    }
-    return false;
-}
-
-//TODO Move in predictors.cpp
-double ManagerFarm::getVoltage(const KnobsValues& values) const{
-    VoltageTableKey key(values[KNOB_TYPE_WORKERS], values[KNOB_TYPE_FREQUENCY]);
-    VoltageTableIterator it = _voltageTable.find(key);
-    if(it != _voltageTable.end()){
-        return it->second;
-    }else{
-        throw runtime_error("Frequency and/or number of virtual cores "
-                                 "not found in voltage table.");
-    }
-}
-
-bool ManagerFarm::isBestSuboptimalValue(double x, double y) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            // Concerning utilization factors, if both are suboptimal,
-            // we prefer the closest to the lower bound.
-            double distanceX, distanceY;
-            distanceX = _p.underloadThresholdFarm - x;
-            distanceY = _p.underloadThresholdFarm - y;
-            if(distanceX > 0 && distanceY < 0){
-                return true;
-            }else if(distanceX < 0 && distanceY > 0){
-                return false;
-            }else{
-                return abs(distanceX) < abs(distanceY);
-            }
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            // Concerning bandwidths, if both are suboptimal,
-            // we prefer the higher one.
-            return x > y;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            // Concerning power budgets, if both are suboptimal,
-            // we prefer the lowest one.
-            return x < y;
-        }break;
-        default:{
-            ;
-        }break;
-    }
-    return false;
-}
-
-bool ManagerFarm::isBestSecondaryValue(double x, double y) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_BANDWIDTH:{
-            return x < y;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            return x > y;
-        }break;
-        default:{
-            ;
-        }break;
-    }
-    return false;
-}
-
-KnobsValues ManagerFarm::getBestKnobsValues(){
-    KnobsValues bestValues(KNOB_VALUE_REAL);
-    KnobsValues bestSuboptimalValues = _configuration.getRealValues();
-
-    double primaryPrediction = 0;
-    double secondaryPrediction = 0;
-
-    double bestPrimaryPrediction = 0;
-    double bestSecondaryPrediction = 0;
-    double bestSuboptimalValue = getPrimaryValue();
-
-    bool feasibleSolutionFound = false;
-
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            // We have to minimize the power/energy.
-            bestSecondaryPrediction = numeric_limits<double>::max();
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            // We have to maximize the bandwidth.
-            bestSecondaryPrediction = numeric_limits<double>::min();
-        }break;
-        default:{
-            ;
-        }break;
-    }
-
-    _primaryPredictor->prepareForPredictions();
-    _secondaryPredictor->prepareForPredictions();
-
-    unsigned int remainingTime = 0;
-    vector<KnobsValues> combinations = _configuration.getAllRealCombinations();
-    for(size_t i = 0; i < combinations.size(); i++){
-        KnobsValues currentValues = combinations.at(i);
-        primaryPrediction = _primaryPredictor->predict(currentValues);
-        switch(_p.contractType){
-            case CONTRACT_PERF_COMPLETION_TIME:{
-                remainingTime = (double) _remainingTasks /
-                                 primaryPrediction;
-            }break;
-            case CONTRACT_PERF_UTILIZATION:{
-                primaryPrediction = (_samples->average().bandwidth /
-                                     primaryPrediction) *
-                                     _samples->average().utilization;
-            }break;
-            default:{
-                ;
-            }
-        }
-
-        if(isFeasiblePrimaryValue(primaryPrediction)){
-            secondaryPrediction = _secondaryPredictor->predict(currentValues);
-            if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-                secondaryPrediction *= remainingTime;
-            }
-            if(isBestSecondaryValue(secondaryPrediction,
-                                    bestSecondaryPrediction)){
-                bestValues = currentValues;
-                feasibleSolutionFound = true;
-                bestPrimaryPrediction = primaryPrediction;
-                bestSecondaryPrediction = secondaryPrediction;
-            }
-        }else if(!feasibleSolutionFound &&
-                 isBestSuboptimalValue(primaryPrediction,
-                                       bestSuboptimalValue)){
-            bestSuboptimalValue = primaryPrediction;
-            bestSuboptimalValues = currentValues;
-        }
-    }
-
-    if(feasibleSolutionFound){
-        _primaryPrediction = bestPrimaryPrediction;
-        _secondaryPrediction = bestSecondaryPrediction;
-        return bestValues;
-    }else{
-        _primaryPrediction = bestSuboptimalValue;
-        // TODO: This check now works because both service time and power are always  > 0
-        // In the future we must find another way to indicate that secondary prediction
-        // has not been done.
-        _secondaryPrediction = -1;
-        return bestSuboptimalValues;
-    }
-}
-
-bool ManagerFarm::terminated(){
+template <typename lb_t, typename gt_t>
+bool ManagerFarm<lb_t, gt_t>::terminated(){
     /**
      * We do not need to wait if the emitter is terminated.
      * Indeed, if the workers terminated, the emitter surely terminated
@@ -352,18 +192,23 @@ bool ManagerFarm::terminated(){
     return true;
 }
 
-void ManagerFarm::changeKnobs(KnobsValues values){
-    _configuration.setValues(values);
-    _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::changeKnobs(){
+    KnobsValues values = _calibrator->getNextKnobsValues();
+    if(values != _configuration.getRealValues()){
+        _configuration.setValues(values);
+        _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
 
-    /****************** Clean state ******************/
-    _lastStoredSampleMs = getMillisecondsTime();
-    _samples->reset();
-    _counter->reset();
-    _totalTasks = 0;
+        /****************** Clean state ******************/
+        _lastStoredSampleMs = getMillisecondsTime();
+        _samples->reset();
+        _counter->reset();
+        _totalTasks = 0;
+    }
 }
 
-void ManagerFarm::observe(){
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::observe(){
     if(_p.observer){
         const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration.getKnob(KNOB_TYPE_MAPPING));
         _p.observer->observe(_lastStoredSampleMs,
@@ -380,13 +225,15 @@ void ManagerFarm::observe(){
     }
 }
 
-void ManagerFarm::askForWorkersSamples(){
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::askForWorkersSamples(){
     for(size_t i = 0; i < _activeWorkers.size(); i++){
         _activeWorkers.at(i)->askForSample();
     }
 }
 
-void ManagerFarm::getWorkersSamples(WorkerSample& sample){
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::getWorkersSamples(WorkerSample& sample){
     AdaptiveNode* w;
     uint numActiveWorkers = _activeWorkers.size();
     sample = WorkerSample();
@@ -402,7 +249,8 @@ void ManagerFarm::getWorkersSamples(WorkerSample& sample){
     sample.latency /= numActiveWorkers;
 }
 
-void ManagerFarm::storeNewSample(){
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     MonitoredSample sample;
     WorkerSample ws;
     Joules joules;
@@ -449,7 +297,8 @@ void ManagerFarm::storeNewSample(){
     DEBUGB(samplesFile << *_samples << "\n");
 }
 
-bool ManagerFarm::persist() const{
+template <typename lb_t, typename gt_t>
+bool ManagerFarm<lb_t, gt_t>::persist() const{
     bool r = false;
     switch(_p.strategyPersistence){
         case STRATEGY_PERSISTENCE_SAMPLES:{
@@ -468,48 +317,12 @@ bool ManagerFarm::persist() const{
     return r;
 }
 
-void ManagerFarm::initCalibrator(){
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::initPredictors(){
     if(_p.strategyCalibration == STRATEGY_CALIBRATION_RANDOM){
-        ;
+        ; //CREARE
     }else{
-        _calibrator = new CalibratorLowDiscrepancy(*this);
-    }
-}
-
-void ManagerFarm::initPredictors(){
-    PredictorType primary, secondary;
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            primary = PREDICTION_BANDWIDTH;
-            secondary = PREDICTION_POWER;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            primary = PREDICTION_POWER;
-            secondary = PREDICTION_BANDWIDTH;
-        }break;
-        default:{
-            return;
-        }break;
-    }
-
-    switch(_p.strategyPrediction){
-        case STRATEGY_PREDICTION_SIMPLE:{
-            _primaryPredictor = new PredictorSimple(primary, *this);
-            _secondaryPredictor = new PredictorSimple(secondary, *this);
-            _calibrator = NULL;
-        }break;
-        case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
-            _primaryPredictor = new PredictorLinearRegression(primary,
-                                                              *this);
-            _secondaryPredictor = new PredictorLinearRegression(secondary,
-                                                                *this);
-            initCalibrator();
-        }break;
-        default:{
-            ;
-        }break;
+        _calibrator = new CalibratorLowDiscrepancy(p, *this);
     }
 }
 
@@ -522,7 +335,8 @@ Parameters& validate(Parameters& p){
     return p;
 }
 
-ManagerFarm::ManagerFarm(ff_farm<>* farm, Parameters parameters):
+template <typename lb_t, typename gt_t>
+ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters parameters):
         _farm(farm),
         _p(validate(parameters)),
         _startTimeMs(0),
@@ -536,9 +350,10 @@ ManagerFarm::ManagerFarm(ff_farm<>* farm, Parameters parameters):
                                 size()),
         _numVirtualCoresPerPhysicalCore(_topology->getPhysicalCore(0)->
                                         getVirtualCores().size()),
-        _emitter(NULL),
-        _collector(NULL),
-        _configuration(_p, *farm),
+        _emitter(dynamic_cast<AdaptiveNode*>(farm->getEmitter())),
+        _collector(dynamic_cast<AdaptiveNode*>(farm->getCollector())),
+        _activeWorkers(convertWorkers(farm->getWorkers())),
+        _configuration<lb_t, gt_t>(_p, *farm),
         _samples(NULL),
         _totalTasks(0),
         _remainingTasks(0),
@@ -550,28 +365,21 @@ ManagerFarm::ManagerFarm(ff_farm<>* farm, Parameters parameters):
         _primaryPrediction(0),
         _secondaryPrediction(0){
 
-    /** If voltage table file is specified, then load the table. **/
-    if(_p.archData.voltageTableFile.compare("")){
-        loadVoltageTable(_voltageTable,
-                         _p.archData.voltageTableFile);
-    }
-
     _samples = NULL;
     switch(_p.strategySmoothing){
     case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
-        _samples = new MovingAverageSimple<MonitoredSample>
-                                (_p.smoothingFactor);
+        _samples = new MovingAverageSimple<MonitoredSample>(_p.smoothingFactor);
     }break;
     case STRATEGY_SMOOTHING_EXPONENTIAL:{
-        _samples = new MovingAverageExponential<MonitoredSample>
-                                (_p.smoothingFactor);
+        _samples = new MovingAverageExponential<MonitoredSample>(_p.smoothingFactor);
     }break;
     }
 
     DEBUGB(samplesFile.open("samples.csv"));
 }
 
-ManagerFarm::~ManagerFarm(){
+template <typename lb_t, typename gt_t>
+ManagerFarm<lb_t, gt_t>::~ManagerFarm(){
     delete _samples;
     if(_primaryPredictor){
         delete _primaryPredictor;
@@ -585,14 +393,8 @@ ManagerFarm::~ManagerFarm(){
     DEBUGB(samplesFile.close());
 }
 
-void ManagerFarm::initNodesPreRun() {
-    _emitter = dynamic_cast<AdaptiveNode*>(_farm->getEmitter());
-    _collector = dynamic_cast<AdaptiveNode*>(_farm->getCollector());
-    svector<ff_node*> w = _farm->getWorkers();
-    for(size_t i = 0; i < w.size(); i++){
-        _activeWorkers.push_back(dynamic_cast<AdaptiveNode*>(w[i]));
-    }
-
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::initNodesPreRun() {
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
         _activeWorkers.at(i)->initPreRun(_p.mammut, _p.archData.ticksPerNs, NODE_TYPE_WORKER);
     }
@@ -606,7 +408,8 @@ void ManagerFarm::initNodesPreRun() {
     }
 }
 
-void ManagerFarm::initNodesPostRun() {
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::initNodesPostRun() {
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
         _activeWorkers.at(i)->initPostRun();
     }
@@ -616,7 +419,8 @@ void ManagerFarm::initNodesPostRun() {
     }
 }
 
-void ManagerFarm::cleanNodes() {
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::cleanNodes() {
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
         _activeWorkers.at(i)->clean();
     }
@@ -628,9 +432,10 @@ void ManagerFarm::cleanNodes() {
     }
 }
 
-void ManagerFarm::run(){
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::run(){
     initNodesPreRun();
-    _farm->run_then_freeze(_farm->getNWorkers());
+    _farm->run_then_freeze();
     initNodesPostRun();
     _configuration.maxAllKnobs();
 
@@ -656,9 +461,8 @@ void ManagerFarm::run(){
         observe();
     }else{
         /* Force the first calibration point. **/
-        if(_calibrator){
-            changeKnobs(_calibrator->getNextKnobsValues());
-        }
+        assert(_calibrator);
+        changeKnobs();
 
         double startSample = getMillisecondsTime();
 
@@ -688,13 +492,9 @@ void ManagerFarm::run(){
             observe();
 
             if(!persist()){
-                if(_calibrator){
-                    changeKnobs(_calibrator->getNextKnobsValues());
-                    startSample = getMillisecondsTime();
-                }else if(isContractViolated()){
-                    changeKnobs(getBestKnobsValues());
-                    startSample = getMillisecondsTime();
-                }
+                assert(_calibrator);
+                changeKnobs();
+                startSample = getMillisecondsTime();
             }
         }
         DEBUG("Terminated.");
@@ -832,119 +632,6 @@ void Observer::summaryStats(const vector<CalibrationStats>&
     _summaryFile << (double) durationMs / 1000.0 << "\t";
     _summaryFile << totalCalibrationPerc << "\t";
     _summaryFile << endl;
-}
-
-FarmConfiguration::FarmConfiguration(const Parameters& p, ff::ff_farm<>& farm):_p(p){
-    _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p.knobWorkers, farm);
-    _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p.knobMapping,
-                                                p.knobMappingEmitter,
-                                                p.knobMappingCollector,
-                                                p.knobHyperthreading,
-                                                p.mammut,
-                                                dynamic_cast<AdaptiveNode*>(farm.getEmitter()),
-                                                dynamic_cast<AdaptiveNode*>(farm.getCollector()),
-                                                *((KnobWorkers*)_knobs[KNOB_TYPE_WORKERS]));
-    _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p.knobFrequencies,
-                                                    p.mammut,
-                                                    p.turboBoost,
-                                                    p.strategyUnusedVirtualCores,
-                                                    *((KnobMapping*)_knobs[KNOB_TYPE_MAPPING]));
-
-    std::vector<std::vector<double>> values;
-    std::vector<double> accum;
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        values.push_back(_knobs[i]->getAllowedValues());
-    }
-    combinations(values, 0, accum);
-}
-
-FarmConfiguration::~FarmConfiguration(){
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        delete _knobs[i];
-    }
-}
-
-//TODO: Works even if a vector is empty? (i.e. a knob has no values)
-void FarmConfiguration::combinations(vector<vector<double> > array, size_t i, vector<double> accum){
-    if(i == array.size()){
-        KnobsValues kv(KNOB_VALUE_REAL);
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            kv[(KnobType) i] = accum.at(i);
-        }
-        _combinations.push_back(kv);
-    }else{
-        vector<double> row = array.at(i);
-        for(size_t j = 0; j < row.size(); ++j){
-            vector<double> tmp(accum);
-            tmp.push_back(row[j]);
-            combinations(array, i+1, tmp);
-        }
-    }
-}
-
-const std::vector<KnobsValues>& FarmConfiguration::getAllRealCombinations(){
-    return _combinations;
-}
-
-void FarmConfiguration::setFastReconfiguration(){
-    if(_p.fastReconfiguration){
-        ((KnobFrequency*) _knobs[KNOB_TYPE_FREQUENCY])->setRelativeValue(100.0);
-    }
-}
-
-const Knob* FarmConfiguration::getKnob(KnobType t) const{
-    return _knobs[t];
-}
-
-void FarmConfiguration::maxAllKnobs(){
-    DEBUG("Maxing all the knobs.");
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        _knobs[(KnobType) i]->setToMax();
-    }
-}
-
-double FarmConfiguration::getRealValue(KnobType t) const{
-    return _knobs[t]->getRealValue();
-}
-
-KnobsValues FarmConfiguration::getRealValues() const{
-    KnobsValues kv(KNOB_VALUE_REAL);
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        kv[(KnobType) i] = getRealValue((KnobType) i);
-    }
-    return kv;
-}
-
-void FarmConfiguration::setRelativeValues(const KnobsValues& values){
-    // Fast reconfiguration is valid only for knobs changed before
-    // the frequency knob.
-    assert(values.areRelative());
-    setFastReconfiguration();
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        _knobs[i]->setRelativeValue(values[(KnobType)i]);
-    }
-    DEBUG("Changed relative knobs values.");
-}
-
-void FarmConfiguration::setRealValues(const KnobsValues& values){
-    // Fast reconfiguration is valid only for knobs changed before
-    // the frequency knob.
-    assert(values.areReal());
-    setFastReconfiguration();
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        _knobs[i]->setRealValue(values[(KnobType)i]);
-    }
-    DEBUG("Changed real knobs values.");
-}
-
-void FarmConfiguration::setValues(const KnobsValues& values){
-    if(values.areReal()){
-        setRealValues(values);
-    }else if(values.areRelative()){
-        setRelativeValues(values);
-    }else{
-        throw std::runtime_error("KnobsValues with undefined type.");
-    }
 }
 
 }

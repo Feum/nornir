@@ -33,6 +33,8 @@
 #include "predictors.hpp"
 #include "manager.hpp"
 
+#include <mammut/cpufreq/cpufreq.hpp>
+
 #undef DEBUG
 #undef DEBUGB
 
@@ -336,38 +338,75 @@ double PredictorSimple::predict(const KnobsValues& values){
     return 0.0;
 }
 
-Calibrator::Calibrator(ManagerFarm& manager):
-        _manager(manager), _state(CALIBRATION_SEEDS),
+Calibrator::Calibrator(const Parameters& p,
+                       const FarmConfiguration& configuration):
+        _p(p),
+        _configuration(configuration),
+        _state(CALIBRATION_SEEDS),
         _numCalibrationPoints(0), _calibrationStartMs(0),
-        _firstPointGenerated(false){
-    _minNumPoints = std::max(_manager._primaryPredictor->getMinimumPointsNeeded(),
-                             _manager._secondaryPredictor->getMinimumPointsNeeded());
+        _firstPointGenerated(false), _primaryPrediction(0),
+        _secondaryPrediction(0){
+
+    /** If voltage table file is specified, then load the table. **/
+    if(_p.archData.voltageTableFile.compare("")){
+        loadVoltageTable(_voltageTable, _p.archData.voltageTableFile);
+    }
+
+    PredictorType primary, secondary;
+    switch(p.contractType){
+        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_COMPLETION_TIME:{
+            primary = PREDICTION_BANDWIDTH;
+            secondary = PREDICTION_POWER;
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            primary = PREDICTION_POWER;
+            secondary = PREDICTION_BANDWIDTH;
+        }break;
+        default:{
+            return;
+        }break;
+    }
+
+    switch(p.strategyPrediction){
+        case STRATEGY_PREDICTION_SIMPLE:{
+            _primaryPredictor = new PredictorSimple(primary, *this);
+            _secondaryPredictor = new PredictorSimple(secondary, *this);
+        }break;
+        case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
+            _primaryPredictor = new PredictorLinearRegression(primary, *this);
+            _secondaryPredictor = new PredictorLinearRegression(secondary, *this);
+        }break;
+        default:{
+            ;
+        }break;
+    }
+    _minNumPoints = std::max(_primaryPredictor->getMinimumPointsNeeded(),
+                             _secondaryPredictor->getMinimumPointsNeeded());
     DEBUG("Minimum number of points required for calibration: " << _minNumPoints);
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
 }
 
-void Calibrator::refine(){
+void Calibrator::refine(bool isContractViolated){
     // We have to refine only if a new configuration will be generated.
-    if(_state == CALIBRATION_FINISHED &&
-       !_manager.isContractViolated()){
+    if(_state == CALIBRATION_FINISHED && isContractViolated){
         return;
     }
-    _manager._primaryPredictor->refine();
-    _manager._secondaryPredictor->refine();
+    _primaryPredictor->refine();
+    _secondaryPredictor->refine();
 }
 
-bool Calibrator::highError() const{
-    double primaryValue = _manager.getPrimaryValue();
-    double secondaryValue = _manager.getSecondaryValue();
-    double primaryError = std::abs((primaryValue - _manager._primaryPrediction)/
+bool Calibrator::highError(double primaryValue, double secondaryValue) const{
+    double primaryError = std::abs((primaryValue - _primaryPrediction)/
                                    primaryValue)*100.0;
     double secondaryError;
 
     // TODO: This check now works because both service time and power are always  > 0
     // In the future we must find another way to indicat that secondary prediction
     // has not been done.
-    if(_manager._secondaryPrediction >= 0.0){
-        secondaryError = std::abs((secondaryValue - _manager._secondaryPrediction)/
+    if(_secondaryPrediction >= 0.0){
+        secondaryError = std::abs((secondaryValue - _secondaryPrediction)/
                                    secondaryValue)*100.0;
     }else{
         secondaryError = 0.0;
@@ -376,11 +415,180 @@ bool Calibrator::highError() const{
           "Secondary prediction: " << _manager._secondaryPrediction);
     DEBUG("Primary error: " << primaryError << " " <<
           "Secondary error: " << secondaryError);
-    return primaryError > _manager._p.maxPrimaryPredictionError ||
-           secondaryError > _manager._p.maxSecondaryPredictionError;
+    return primaryError > _p.maxPrimaryPredictionError ||
+           secondaryError > _p.maxSecondaryPredictionError;
 }
 
-KnobsValues Calibrator::getNextKnobsValues(){
+double Calibrator::getVoltage(const KnobsValues& values) const{
+    VoltageTableKey key(values[KNOB_TYPE_WORKERS], values[KNOB_TYPE_FREQUENCY]);
+    VoltageTableIterator it = _voltageTable.find(key);
+    if(it != _voltageTable.end()){
+        return it->second;
+    }else{
+        throw runtime_error("Frequency and/or number of virtual cores "
+                                 "not found in voltage table.");
+    }
+}
+
+bool Calibrator::isBestSuboptimalValue(double x, double y) const{
+    switch(_p.contractType){
+        case CONTRACT_PERF_UTILIZATION:{
+            // Concerning utilization factors, if both are suboptimal,
+            // we prefer the closest to the lower bound.
+            double distanceX, distanceY;
+            distanceX = _p.underloadThresholdFarm - x;
+            distanceY = _p.underloadThresholdFarm - y;
+            if(distanceX > 0 && distanceY < 0){
+                return true;
+            }else if(distanceX < 0 && distanceY > 0){
+                return false;
+            }else{
+                return abs(distanceX) < abs(distanceY);
+            }
+        }break;
+        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_COMPLETION_TIME:{
+            // Concerning bandwidths, if both are suboptimal,
+            // we prefer the higher one.
+            return x > y;
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            // Concerning power budgets, if both are suboptimal,
+            // we prefer the lowest one.
+            return x < y;
+        }break;
+        default:{
+            ;
+        }break;
+    }
+    return false;
+}
+
+bool Calibrator::isBestSecondaryValue(double x, double y) const{
+    switch(_p.contractType){
+        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_COMPLETION_TIME:
+        case CONTRACT_PERF_BANDWIDTH:{
+            return x < y;
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            return x > y;
+        }break;
+        default:{
+            ;
+        }break;
+    }
+    return false;
+}
+
+bool Calibrator::isFeasiblePrimaryValue(double value, double tolerance) const{
+    switch(_p.contractType){
+        case CONTRACT_PERF_UTILIZATION:{
+            return value > _p.underloadThresholdFarm - tolerance &&
+                   value < _p.overloadThresholdFarm + tolerance;
+        }break;
+        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_COMPLETION_TIME:{
+            return value > _p.requiredBandwidth - tolerance;
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            return value < _p.powerBudget + tolerance;
+        }break;
+        default:{
+            return false;
+        }break;
+    }
+    return false;
+}
+
+KnobsValues Calibrator::getBestKnobsValues(double primaryValue, double secondaryValue){
+    KnobsValues bestValues(KNOB_VALUE_REAL);
+    KnobsValues bestSuboptimalValues = _configuration.getRealValues();
+
+    double primaryPrediction = 0;
+    double secondaryPrediction = 0;
+
+    double bestPrimaryPrediction = 0;
+    double bestSecondaryPrediction = 0;
+    double bestSuboptimalValue = primaryValue;
+
+    bool feasibleSolutionFound = false;
+
+    switch(_p.contractType){
+        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_COMPLETION_TIME:{
+            // We have to minimize the power/energy.
+            bestSecondaryPrediction = numeric_limits<double>::max();
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            // We have to maximize the bandwidth.
+            bestSecondaryPrediction = numeric_limits<double>::min();
+        }break;
+        default:{
+            ;
+        }break;
+    }
+
+    _primaryPredictor->prepareForPredictions();
+    _secondaryPredictor->prepareForPredictions();
+
+    unsigned int remainingTime = 0;
+    vector<KnobsValues> combinations = _configuration.getAllRealCombinations();
+    for(size_t i = 0; i < combinations.size(); i++){
+        KnobsValues currentValues = combinations.at(i);
+        primaryPrediction = _primaryPredictor->predict(currentValues);
+        switch(_p.contractType){
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                remainingTime = (double) _remainingTasks / primaryPrediction;
+            }break;
+            case CONTRACT_PERF_UTILIZATION:{
+                primaryPrediction = (_samples->average().bandwidth /
+                                     primaryPrediction) *
+                                     _samples->average().utilization;
+            }break;
+            default:{
+                ;
+            }
+        }
+
+        if(isFeasiblePrimaryValue(primaryPrediction)){
+            secondaryPrediction = _secondaryPredictor->predict(currentValues);
+            if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+                secondaryPrediction *= remainingTime;
+            }
+            if(isBestSecondaryValue(secondaryPrediction,
+                                    bestSecondaryPrediction)){
+                bestValues = currentValues;
+                feasibleSolutionFound = true;
+                bestPrimaryPrediction = primaryPrediction;
+                bestSecondaryPrediction = secondaryPrediction;
+            }
+        }else if(!feasibleSolutionFound &&
+                 isBestSuboptimalValue(primaryPrediction,
+                                       bestSuboptimalValue)){
+            bestSuboptimalValue = primaryPrediction;
+            bestSuboptimalValues = currentValues;
+        }
+    }
+
+    if(feasibleSolutionFound){
+        _primaryPrediction = bestPrimaryPrediction;
+        _secondaryPrediction = bestSecondaryPrediction;
+        return bestValues;
+    }else{
+        _primaryPrediction = bestSuboptimalValue;
+        // TODO: This check now works because both service time and power are always  > 0
+        // In the future we must find another way to indicate that secondary prediction
+        // has not been done.
+        _secondaryPrediction = -1;
+        return bestSuboptimalValues;
+    }
+}
+
+KnobsValues Calibrator::getNextKnobsValues(bool isContractViolated,
+                                           double primaryValue,
+                                           double secondaryValue){
     KnobsValues kv;
 
     if(_numCalibrationPoints == 0){
@@ -398,7 +606,7 @@ KnobsValues Calibrator::getNextKnobsValues(){
      * been real executed.
      **/
     if(_firstPointGenerated){
-        refine();
+        refine(isContractViolated);
     }else{
         _firstPointGenerated = true;
     }
@@ -412,26 +620,26 @@ KnobsValues Calibrator::getNextKnobsValues(){
             }
         }break;
         case CALIBRATION_TRY_PREDICT:{
-            kv = _manager.getBestKnobsValues();
+            kv = getBestKnobsValues(primaryValue, secondaryValue);
             _state = CALIBRATION_EXTRA_POINT;
             DEBUG("[Calibrator]: Moving to extra");
         }break;
         case CALIBRATION_EXTRA_POINT:{
-            if(highError()){
+            if(highError(primaryValue, secondaryValue)){
                 kv = generateRelativeKnobsValues();
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: High error");
                 DEBUG("[Calibrator]: Moving to predict");
-            }else if(_manager.isContractViolated()){
+            }else if(isContractViolated){
                 DEBUG("[Calibrator]: Contract violated");
-                kv = _manager.getBestKnobsValues();
+                kv = getBestKnobsValues(primaryValue, secondaryValue);
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: Moving to predict");
             }else{
-                kv = _manager.getBestKnobsValues();
+                kv = getBestKnobsValues(primaryValue, secondaryValue);
                 _state = CALIBRATION_FINISHED;
-                _manager._primaryPredictor->clear();
-                _manager._secondaryPredictor->clear();
+                _primaryPredictor->clear();
+                _secondaryPredictor->clear();
 
                 CalibrationStats cs;
                 // We do -1 because we counted the current point and now we
@@ -452,7 +660,7 @@ KnobsValues Calibrator::getNextKnobsValues(){
                 _state = CALIBRATION_SEEDS;
                 DEBUG("========Moving to seeds");
             }else*/
-            if(_manager.isContractViolated()){
+            if(isContractViolated){
                 reset();
                 kv = generateRelativeKnobsValues();
                 _numCalibrationPoints = 1;
@@ -460,7 +668,7 @@ KnobsValues Calibrator::getNextKnobsValues(){
                 _calibrationStartMs = getMillisecondsTime();
                 DEBUG("[Calibrator]: Moving to seeds");
             }else{
-                kv = _manager._configuration.getRealValues();
+                kv = _configuration.getRealValues();
             }
         }break;
     }
@@ -476,18 +684,18 @@ std::vector<CalibrationStats> Calibrator::getCalibrationsStats() const{
     return _calibrationStats;
 }
 
-CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(ManagerFarm& manager):
-        Calibrator(manager), _manager(manager){
+CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(const Parameters& p, const FarmConfiguration& configuration):
+        Calibrator(p, configuration), _p(p), _configuration(configuration){
     uint d = 0;
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        if(_manager._configuration.getKnob((KnobType) i)->autoFind()){
+        if(_configuration.getKnob((KnobType) i)->autoFind()){
             ++d;
         }
     }
     DEBUG("[Calibrator] Will generate low discrepancy points in " << d <<
           " dimensions");
     const gsl_qrng_type* generatorType;
-    switch(_manager._p.strategyCalibration){
+    switch(_p.strategyCalibration){
         case STRATEGY_CALIBRATION_NIEDERREITER:{
             generatorType = gsl_qrng_niederreiter_2;
         }break;
@@ -503,7 +711,7 @@ CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(ManagerFarm& manager):
         default:{
             throw std::runtime_error("CalibratorLowDiscrepancy: Unknown "
                                      "generator type: " +
-                                     _manager._p.strategyCalibration);
+                                     _p.strategyCalibration);
         }break;
     }
     _generator = gsl_qrng_alloc(generatorType, d);
@@ -520,7 +728,7 @@ KnobsValues CalibratorLowDiscrepancy::generateRelativeKnobsValues() const{
     gsl_qrng_get(_generator, _normalizedPoint);
     size_t nextCoordinate = 0;
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        if(_manager._configuration.getKnob((KnobType) i)->autoFind()){
+        if(_configuration.getKnob((KnobType) i)->autoFind()){
             r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
             ++nextCoordinate;
         }else{

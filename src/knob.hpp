@@ -95,19 +95,15 @@ protected:
 
 class KnobWorkers: public Knob{
 public:
-    KnobWorkers(KnobConfWorkers confWorkers, ff::ff_farm<>& farm);
+    KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
+                AdaptiveNode* collector, ff::ff_gatherer* gt,
+                const std::vector<AdaptiveNode*> workers);
+
     void changeValueReal(double v);
     std::vector<double> getAllowedValues() const;
     uint getNumActiveWorkers() const;
     const std::vector<AdaptiveNode*>& getActiveWorkers() const;
 private:
-    /**
-     * Returns all the workers of the farm.
-     * @param farm The farm.
-     * @return All the workers of the farm
-     */
-    std::vector<AdaptiveNode*> getAllWorkers(const ff::ff_farm<>& farm) const;
-
     /**
      * Prepares the nodes to freeze.
      */
@@ -136,12 +132,11 @@ private:
      */
     void notifyNewConfiguration(uint numWorkers);
 
-
     KnobConfWorkers _confWorkers;
-    ff::ff_farm<>& _farm;
     AdaptiveNode* _emitter;
     AdaptiveNode* _collector;
-    const std::vector<AdaptiveNode*> _allWorkers;
+    ff::ff_gatherer* _gt;
+    const std::vector<AdaptiveNode*>& _allWorkers;
     std::vector<AdaptiveNode*> _activeWorkers;
     std::vector<double> _knobValues;
 };

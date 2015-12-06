@@ -32,6 +32,7 @@
 #ifndef PREDICTORS_HPP_
 #define PREDICTORS_HPP_
 
+#include "configuration.hpp"
 #include "utils.hpp"
 
 #include <mammut/mammut.hpp>
@@ -49,15 +50,12 @@ using namespace mlpack::regression;
 
 namespace adpff{
 
-class ManagerFarm;
 class KnobsValues;
 
 /**
  * Represents a sample to be used in the regression.
  */
 class RegressionData{
-protected:
-    const ManagerFarm& _manager;
 public:
     RegressionData(const ManagerFarm& manager):
         _manager(manager){
@@ -200,7 +198,6 @@ typedef struct{
 class PredictorLinearRegression: public Predictor{
 private:
     PredictorType _type;
-    const ManagerFarm& _manager;
     LinearRegression _lr;
 
     typedef std::map<KnobsValues, Observation> Observations;
@@ -237,7 +234,6 @@ public:
 class PredictorSimple: public Predictor{
 private:
     PredictorType _type;
-    const ManagerFarm& _manager;
 
     double getScalingFactor(const KnobsValues& values);
 
@@ -271,16 +267,64 @@ typedef struct{
  */
 class Calibrator{
 private:
-    ManagerFarm& _manager;
+    const Parameters& _p;
+    const FarmConfiguration& _configuration;
     CalibrationState _state;
     std::vector<CalibrationStats> _calibrationStats;
     size_t _minNumPoints;
     size_t _numCalibrationPoints;
     uint _calibrationStartMs;
     bool _firstPointGenerated;
+    mammut::cpufreq::VoltageTable _voltageTable;
 
-    bool highError() const;
-    void refine();
+    // The predictor of the primary value.
+    Predictor* _primaryPredictor;
+
+    // The predictor of the secondary value.
+    Predictor* _secondaryPredictor;
+
+    // The prediction done for the primary value for the chosen configuration.
+    double _primaryPrediction;
+
+    // The prediction done for the secondary value for the chosen configuration.
+    double _secondaryPrediction;
+
+    bool highError(double primaryValue, double secondaryValue) const;
+    void refine(bool isContractViolated);
+
+    /**
+     * Returns the voltage at a specific combinations of knobs values.
+     * @param values The combination.
+     * @return The voltage at that combination.
+     */
+    double getVoltage(const KnobsValues& values) const;
+
+    /**
+     * Checks if x is a best suboptimal monitored value than y.
+     * @param x The first monitored value.
+     * @param y The second monitored value.
+     * @return True if x is a best suboptimal monitored value than y,
+     *         false otherwise.
+     */
+    bool isBestSuboptimalValue(double x, double y) const;
+
+    /**
+     * Returns true if x is a best secondary value than y, false otherwise.
+     */
+    bool isBestSecondaryValue(double x, double y) const;
+
+    /**
+     * Checks if a specific primary value respects the required contract.
+     * @param value The value to be checked.
+     * @param tolerance The percentage of tolerance allowed for the check
+     */
+    bool isFeasiblePrimaryValue(double value, double tolerance = 0) const;
+
+    /**
+     * Computes the best relative knobs values for the farm.
+     * @return The best relative knobs values.
+     */
+    KnobsValues getBestKnobsValues(double primaryValue, double secondaryValue);
 protected:
     /**
      *  Override this method to provide custom ways to generate
@@ -290,15 +334,21 @@ protected:
     virtual KnobsValues generateRelativeKnobsValues() const = 0;
     virtual void reset(){;}
 public:
-    Calibrator(ManagerFarm& manager);
+    Calibrator(const Parameters& p, const FarmConfiguration& configuration);
 
     virtual ~Calibrator(){;}
 
     /**
      * Returns the next values to be set for the knobs.
+     * @param isContractViolated True if the contract has been violated,
+     *        false otherwise.
+     * @param primaryValue The primary value.
+     * @param secondaryValue The secondary value.
+     *
      * @return The next values to be set for the knobs.
      */
-    KnobsValues getNextKnobsValues();
+    KnobsValues getNextKnobsValues(bool isContractViolated,
+                                   double primaryValue, double secondaryValue);
 
     std::vector<CalibrationStats> getCalibrationsStats() const;
 };
@@ -309,14 +359,16 @@ public:
  */
 class CalibratorLowDiscrepancy: public Calibrator{
 private:
-    ManagerFarm& _manager;
+    const Parameters& _p;
+    const FarmConfiguration& _configuration;
     gsl_qrng* _generator;
     double* _normalizedPoint;
 protected:
     KnobsValues generateRelativeKnobsValues() const;
     void reset();
 public:
-    CalibratorLowDiscrepancy(ManagerFarm& manager);
+    CalibratorLowDiscrepancy(const Parameters& p,
+                             const FarmConfiguration& configuration);
     ~CalibratorLowDiscrepancy();
 };
 

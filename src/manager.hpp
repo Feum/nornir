@@ -39,6 +39,7 @@
 #ifndef ADAPTIVE_FASTFLOW_FARM_HPP_
 #define ADAPTIVE_FASTFLOW_FARM_HPP_
 
+#include "configuration.hpp"
 #include "knob.hpp"
 #include "parameters.hpp"
 #include "predictors.hpp"
@@ -57,7 +58,6 @@
 namespace adpff{
 
 class Parameters;
-class ManagerFarm;
 
 //TODO REMOVE USING
 using namespace std;
@@ -103,72 +103,21 @@ public:
     }
 };
 
-class FarmConfiguration: public mammut::utils::NonCopyable {
-private:
-    Knob* _knobs[KNOB_TYPE_NUM];
-    const Parameters& _p;
-    std::vector<KnobsValues> _combinations;
-    void combinations(vector<vector<double> > array, size_t i,
-                      vector<double> accum);
-    void setRelativeValues(const KnobsValues& values);
-    void setRealValues(const KnobsValues& values);
-public:
-    FarmConfiguration(const Parameters& p, ff::ff_farm<>& farm);
-
-    ~FarmConfiguration();
-
-    /**
-     * Gets all the possible combinations of knobs values.
-     * @return A vector containing all the possible combinations
-     *         of knobs values.
-     */
-    const std::vector<KnobsValues>& getAllRealCombinations();
-
-    /**
-     * Sets the highest frequency to reduce the reconfiguration time.
-     */
-    void setFastReconfiguration();
-
-    /**
-     * Returns a specified knob.
-     * @param t The type of the knob to return.
-     * @return The specified knob.
-     */
-    const Knob* getKnob(KnobType t) const;
-
-    /**
-     * Sets all the knobs to their maximum.
-     */
-    void maxAllKnobs();
-
-    /**
-     * Returns the real value of a specific knob.
-     * @param t The type of the knob.
-     * @return The real value of the specified knob.
-     */
-    double getRealValue(KnobType t) const;
-
-    /**
-     * Returns the real values for all the knobs.
-     * @return The real values for all the knobs.
-     */
-    KnobsValues getRealValues() const;
-
-    /**
-     * Sets values for the knobs (may be relative or real).
-     * @param values The values of the knobs.
-     */
-    void setValues(const KnobsValues& values);
-
-};
-
+static std::vector<AdaptiveNode*> convertWorkers(svector<ff_node*> w){
+    std::vector<AdaptiveNode*> r;
+    for(size_t i = 0; i < w.size(); i++){
+        r.push_back(dynamic_cast<AdaptiveNode*>(w[i]));
+    }
+    return r;
+}
 
 /*!
- * \class AdaptivityManagerFarm
+ * \class ManagerFarm
  * \brief This class manages the adaptivity in farm based computations.
  *
  * This class manages the adaptivity in farm based computations.
  */
+template <typename lb_t, typename gt_t>
 class ManagerFarm: public Thread{
     friend class PredictorSimple;
     friend class PredictorLinearRegression;
@@ -177,7 +126,6 @@ class ManagerFarm: public Thread{
     friend class RegressionDataPower;
     friend class Calibrator;
     friend class CalibratorLowDiscrepancy;
-
 public:
     /**
      * Creates a farm adaptivity manager.
@@ -185,7 +133,7 @@ public:
      * @param adaptivityParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerFarm(ff_farm<>* farm, Parameters adaptivityParameters);
+    ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters adaptivityParameters);
 
     /**
      * Destroyes this adaptivity manager.
@@ -198,7 +146,7 @@ public:
     void run();
 private:
     // The managed farm.
-    ff_farm<>* _farm;
+    ff_farm<lb_t, gt_t>* _farm;
 
     // The parameters used to take management decisions.
     Parameters _p;
@@ -242,9 +190,6 @@ private:
     // The current configuration of the farm.
     FarmConfiguration _configuration;
 
-    // The voltage table.
-    VoltageTable _voltageTable;
-
     // Monitored samples;
     Smoother<MonitoredSample>* _samples;
 
@@ -264,18 +209,6 @@ private:
 
     // The calibrator of the predictors.
     Calibrator* _calibrator;
-
-    // The predictor of the primary value.
-    Predictor* _primaryPredictor;
-
-    // The predictor of the secondary value.
-    Predictor* _secondaryPredictor;
-
-    // The prediction done for the primary value for the chosen configuration.
-    double _primaryPrediction;
-
-    // The prediction done for the secondary value for the chosen configuration.
-    double _secondaryPrediction;
 
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
@@ -336,48 +269,14 @@ private:
     bool isContractViolated() const;
 
     /**
-     * Checks if a specific primary value respects the required contract.
-     * @param value The value to be checked.
-     * @param tolerance The percentage of tolerance allowed for the check
-     */
-    bool isFeasiblePrimaryValue(double value, double tolerance = 0) const;
-
-    /**
-     * Returns the voltage at a specific combinations of knobs values.
-     * @param values The combination.
-     * @return The voltage at that combination.
-     */
-    double getVoltage(const KnobsValues& values) const;
-
-    /**
-     * Checks if x is a best suboptimal monitored value than y.
-     * @param x The first monitored value.
-     * @param y The second monitored value.
-     * @return True if x is a best suboptimal monitored value than y,
-     *         false otherwise.
-     */
-    bool isBestSuboptimalValue(double x, double y) const;
-    /**
-     * Returns true if x is a best secondary value than y, false otherwise.
-     */
-    bool isBestSecondaryValue(double x, double y) const;
-
-    /**
-     * Computes the best relative knobs values for the farm.
-     * @return The best relative knobs values.
-     */
-    KnobsValues getBestKnobsValues();
-
-    /**
      * Checks if the application terminated.
      */
     bool terminated();
 
     /**
      * Changes the knobs.
-     * @param values The new knobs values.
      */
-    void changeKnobs(KnobsValues values);
+    void changeKnobs();
 
     /**
      * Send data to observer.
@@ -408,11 +307,6 @@ private:
      * configuration.
      */
     bool persist() const;
-
-    /**
-     * Initializes the calibrator.
-     */
-    void initCalibrator();
 
     /**
      * Initializes the predictors
