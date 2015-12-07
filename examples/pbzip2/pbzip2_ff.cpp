@@ -154,7 +154,7 @@
 #include <mammut/energy/energy.hpp>
 #include <mammut/cpufreq/cpufreq.hpp>
 #include <mammut/utils.hpp>
-#include "../../src/manager.cpp"
+#include "../../src/manager.hpp"
 
 /* ------------------ FastFlow specific ---------------- */
 
@@ -2541,7 +2541,7 @@ int main(int argc, char* argv[])
 					adpff::Observer obs;
 				    adpff::Parameters ap("parameters.xml", "archdata.xml");
 				    ap.observer = &obs;
-				    adpff::ManagerFarm amf(&farm, ap);
+				    adpff::ManagerFarm<> amf(&farm, ap);
                     amf.start();
                     amf.join();
 #if 0
@@ -2599,7 +2599,7 @@ int main(int argc, char* argv[])
 				adpff::Observer obs;
 				adpff::Parameters ap("parameters.xml", "archdata.xml");
 				ap.observer = &obs;
-				adpff::ManagerFarm amf(&farm, ap);
+				adpff::ManagerFarm<> amf(&farm, ap);
 				amf.start();
 				amf.join();
 #if 0

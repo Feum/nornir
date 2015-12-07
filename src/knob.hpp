@@ -229,6 +229,94 @@ private:
     const KnobMapping& _knobMapping;
 };
 
+typedef enum{
+    KNOB_TYPE_WORKERS = 0,
+    KNOB_TYPE_MAPPING,
+    KNOB_TYPE_FREQUENCY,
+    KNOB_TYPE_NUM // <---- This must always be the last value
+}KnobType;
+
+typedef enum{
+    KNOB_VALUE_UNDEF = 0,
+    KNOB_VALUE_REAL,
+    KNOB_VALUE_RELATIVE
+}KnobValueType;
+
+class KnobsValues{
+private:
+    KnobValueType _type;
+    double _values[KNOB_TYPE_NUM];
+public:
+    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){;}
+
+    inline bool areRelative() const{return _type == KNOB_VALUE_RELATIVE;}
+
+    inline bool areReal() const{return _type == KNOB_VALUE_REAL;}
+
+    inline double& operator[](KnobType idx){
+        return _values[idx];
+    }
+
+    inline double operator[](KnobType idx) const{
+        return _values[idx];
+    }
+};
+
+
+inline std::ostream& operator<<(std::ostream& os, const KnobsValues& obj){
+    os << "[";
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        os << obj[(KnobType) i] << ", ";
+    }
+    os << "]";
+    return os;
+}
+
+inline bool operator==(const KnobsValues& lhs,
+                       const KnobsValues& rhs){
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        if(lhs[(KnobType) i] !=
+           rhs[(KnobType) i]){
+            return false;
+        }
+    }
+    return true;
+}
+
+inline bool operator!=(const KnobsValues& lhs,
+                       const KnobsValues& rhs){
+    return !operator==(lhs,rhs);
+}
+
+inline bool operator<(const KnobsValues& lhs,
+                      const KnobsValues& rhs){
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        if(lhs[(KnobType) i] <
+           rhs[(KnobType) i]){
+            return true;
+        }else if(lhs[(KnobType) i] >
+                 rhs[(KnobType) i]){
+            return false;
+        }
+    }
+    return false;
+}
+
+inline bool operator>(const KnobsValues& lhs,
+                      const KnobsValues& rhs){
+    return operator< (rhs,lhs);
+}
+
+inline bool operator<=(const KnobsValues& lhs,
+                       const KnobsValues& rhs){
+    return !operator> (lhs,rhs);
+}
+
+inline bool operator>=(const KnobsValues& lhs,
+                       const KnobsValues& rhs){
+    return !operator< (lhs,rhs);
+}
+
 }
 
 #endif /* SRC_KNOB_HPP_ */

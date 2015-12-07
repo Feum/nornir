@@ -70,54 +70,13 @@ using namespace mammut::utils;
 
 struct MonitoredSample;
 
-typedef enum{
-    KNOB_TYPE_WORKERS = 0,
-    KNOB_TYPE_MAPPING,
-    KNOB_TYPE_FREQUENCY,
-    KNOB_TYPE_NUM // <---- This must always be the last value
-}KnobType;
-
-typedef enum{
-    KNOB_VALUE_UNDEF = 0,
-    KNOB_VALUE_REAL,
-    KNOB_VALUE_RELATIVE
-}KnobValueType;
-
-class KnobsValues{
-private:
-    KnobValueType _type;
-    double _values[KNOB_TYPE_NUM];
-public:
-    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){;}
-
-    inline bool areRelative() const{return _type == KNOB_VALUE_RELATIVE;}
-
-    inline bool areReal() const{return _type == KNOB_VALUE_REAL;}
-
-    inline double& operator[](KnobType idx){
-        return _values[idx];
-    }
-
-    inline double operator[](KnobType idx) const{
-        return _values[idx];
-    }
-};
-
-static std::vector<AdaptiveNode*> convertWorkers(svector<ff_node*> w){
-    std::vector<AdaptiveNode*> r;
-    for(size_t i = 0; i < w.size(); i++){
-        r.push_back(dynamic_cast<AdaptiveNode*>(w[i]));
-    }
-    return r;
-}
-
 /*!
  * \class ManagerFarm
  * \brief This class manages the adaptivity in farm based computations.
  *
  * This class manages the adaptivity in farm based computations.
  */
-template <typename lb_t, typename gt_t>
+template <typename lb_t = ff::ff_loadbalancer, typename gt_t = ff::ff_gatherer>
 class ManagerFarm: public Thread{
     friend class PredictorSimple;
     friend class PredictorLinearRegression;
@@ -166,18 +125,6 @@ private:
     // The topology module.
     Topology* _topology;
 
-    // Number of CPUs
-    uint _numCpus;
-
-    // Number of physical cores.
-    uint _numPhysicalCores;
-
-    // Number of physical cores per CPU.
-    uint _numPhysicalCoresPerCpu;
-
-    // Number of virtual cores per physical core.
-    uint _numVirtualCoresPerPhysicalCore;
-
     // The emitter (if present).
     AdaptiveNode* _emitter;
 
@@ -220,19 +167,6 @@ private:
      */
     void setDomainToHighestFrequency(const Domain* domain);
 
-
-    /**
-     * Returns the maximum primary prediction error.
-     * @return The maximum primary prediction error.
-     */
-    double getMaxPredictionErrorPrimary() const;
-
-    /**
-     * Returns the maximum secondary prediction error.
-     * @return The maximum secondary prediction error.
-     */
-    double getMaxPredictionErrorSecondary() const;
-
     /**
      * Returns the primary value of a sample according to
      * the required contract.
@@ -261,12 +195,6 @@ private:
      * @return The secondary value according to the required contract.
      */
     double getSecondaryValue() const;
-
-    /**
-     * Checks if the contract is violated.
-     * @return true if the contract has been violated, false otherwise.
-     */
-    bool isContractViolated() const;
 
     /**
      * Checks if the application terminated.
@@ -329,253 +257,8 @@ private:
     void cleanNodes();
 };
 
-/*!
- * This class can be used to obtain statistics about reconfigurations
- * performed by the manager.
- * It can be extended by a user defined class to customize action to take
- * for each observed statistic.
- */
-class Observer{
-    friend class ManagerFarm;
-private:
-    ofstream _statsFile;
-    ofstream _calibrationFile;
-    ofstream _summaryFile;
-    unsigned int _startMonitoringMs;
-    double _totalWatts;
-    double _totalBw;
-    unsigned long _numSamples;
-
-    double calibrationDurationToPerc(const CalibrationStats& cs,
-                                     uint durationMs);
-public:
-    Observer(string statsFile = "stats.csv",
-             string calibrationFile = "calibration.csv",
-             string summaryFile = "summary.csv");
-
-    virtual ~Observer();
-
-    virtual void observe(unsigned int timeStamp,
-                         size_t workers,
-                         Frequency frequency,
-                         const VirtualCore* emitterVirtualCore,
-                         const vector<VirtualCore*>& workersVirtualCore,
-                         const VirtualCore* collectorVirtualCore,
-                         double currentBandwidth,
-                         double smoothedBandwidth,
-                         double coeffVarBandwidth,
-                         double smoothedUtilization,
-                         Joules smoothedWatts);
-
-    virtual void calibrationStats(const vector<CalibrationStats>&
-                                  calibrationStats,
-                                  uint durationMs);
-
-    virtual void summaryStats(const vector<CalibrationStats>&
-                              calibrationStats,
-                              uint durationMs);
-};
-
-inline ostream& operator<<(ostream& os, const KnobsValues& obj){
-    os << "[";
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        os << obj[(KnobType) i] << ", ";
-    }
-    os << "]";
-    return os;
 }
 
-inline bool operator==(const KnobsValues& lhs,
-                       const KnobsValues& rhs){
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        if(lhs[(KnobType) i] !=
-           rhs[(KnobType) i]){
-            return false;
-        }
-    }
-    return true;
-}
-
-inline bool operator!=(const KnobsValues& lhs,
-                       const KnobsValues& rhs){
-    return !operator==(lhs,rhs);
-}
-
-inline bool operator<(const KnobsValues& lhs,
-                      const KnobsValues& rhs){
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        if(lhs[(KnobType) i] <
-           rhs[(KnobType) i]){
-            return true;
-        }else if(lhs[(KnobType) i] >
-                 rhs[(KnobType) i]){
-            return false;
-        }
-    }
-    return false;
-}
-
-inline bool operator>(const KnobsValues& lhs,
-                      const KnobsValues& rhs){
-    return operator< (rhs,lhs);
-}
-
-inline bool operator<=(const KnobsValues& lhs,
-                       const KnobsValues& rhs){
-    return !operator> (lhs,rhs);
-}
-
-inline bool operator>=(const KnobsValues& lhs,
-                       const KnobsValues& rhs){
-    return !operator< (lhs,rhs);
-}
-
-typedef struct MonitoredSample{
-    Joules watts; ///< Consumed watts.
-    double bandwidth; ///< Bandwidth of the entire farm.
-    double utilization; ///< Utilization of the entire farm.
-    double latency; ///< Average latency of a worker (nanoseconds).
-
-    MonitoredSample():watts(0),bandwidth(0), utilization(0), latency(0){;}
-
-    void swap(MonitoredSample& x){
-        using std::swap;
-
-        swap(watts, x.watts);
-        swap(bandwidth, x.bandwidth);
-        swap(utilization, x.utilization);
-        swap(latency, x.latency);
-    }
-
-    MonitoredSample& operator=(MonitoredSample rhs){
-        swap(rhs);
-        return *this;
-    }
-
-    MonitoredSample& operator+=(const MonitoredSample& rhs){
-        watts += rhs.watts;
-        bandwidth += rhs.bandwidth;
-        utilization += rhs.utilization;
-        latency += rhs.latency;
-        return *this;
-    }
-
-    MonitoredSample& operator-=(const MonitoredSample& rhs){
-        watts -= rhs.watts;
-        bandwidth -= rhs.bandwidth;
-        utilization -= rhs.utilization;
-        latency -= rhs.latency;
-        return *this;
-    }
-
-    MonitoredSample& operator*=(const MonitoredSample& rhs){
-        watts *= rhs.watts;
-        bandwidth *= rhs.bandwidth;
-        utilization *= rhs.utilization;
-        latency *= rhs.latency;
-        return *this;
-    }
-
-    MonitoredSample& operator/=(const MonitoredSample& rhs){
-        watts /= rhs.watts;
-        bandwidth /= rhs.bandwidth;
-        utilization /= rhs.utilization;
-        latency /= rhs.latency;
-        return *this;
-    }
-
-    MonitoredSample operator/=(double x){
-        watts /= x;
-        bandwidth /= x;
-        utilization /= x;
-        latency /= x;
-        return *this;
-    }
-
-    MonitoredSample operator*=(double x){
-        watts *= x;
-        bandwidth *= x;
-        utilization *= x;
-        latency *= x;
-        return *this;
-    }
-}MonitoredSample;
-
-inline MonitoredSample operator+(const MonitoredSample& lhs,
-                                 const MonitoredSample& rhs){
-    MonitoredSample r = lhs;
-    r += rhs;
-    return r;
-}
-
-inline MonitoredSample operator-(const MonitoredSample& lhs,
-                                 const MonitoredSample& rhs){
-    MonitoredSample r = lhs;
-    r -= rhs;
-    return r;
-}
-
-inline MonitoredSample operator*(const MonitoredSample& lhs,
-                                 const MonitoredSample& rhs){
-    MonitoredSample r = lhs;
-    r *= rhs;
-    return r;
-}
-
-inline MonitoredSample operator/(const MonitoredSample& lhs,
-                                 const MonitoredSample& rhs){
-    MonitoredSample r = lhs;
-    r /= rhs;
-    return r;
-}
-
-inline MonitoredSample operator/(const MonitoredSample& lhs, double x){
-    MonitoredSample r = lhs;
-    r /= x;
-    return r;
-}
-
-inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
-    MonitoredSample r = lhs;
-    r *= x;
-    return r;
-}
-
-inline ostream& operator<<(ostream& os, const MonitoredSample& obj){
-    os << "[";
-    os << "Watts: " << obj.watts << " ";
-    os << "Bandwidth: " << obj.bandwidth << " ";
-    os << "Utilization: " << obj.utilization << " ";
-    os << "Latency: " << obj.latency << " ";
-    os << "]";
-    return os;
-}
-
-inline ofstream& operator<<(ofstream& os, const MonitoredSample& obj){
-    os << obj.watts << "\t";
-    os << obj.bandwidth << "\t";
-    os << obj.utilization << "\t";
-    os << obj.latency << "\t";
-    return os;
-}
-
-inline MonitoredSample squareRoot(const MonitoredSample& x){
-    MonitoredSample r;
-    r.watts = x.watts?sqrt(x.watts):0;
-    r.bandwidth = x.bandwidth?sqrt(x.bandwidth):0;
-    r.utilization = x.utilization?sqrt(x.utilization):0;
-    r.latency = x.latency?sqrt(x.latency):0;
-    return r;
-}
-
-
-inline void regularize(MonitoredSample& x){
-    if(x.watts < 0){x.watts = 0;}
-    if(x.bandwidth < 0){x.bandwidth = 0;}
-    if(x.utilization < 0){x.utilization = 0;}
-    if(x.latency < 0){x.latency = 0;}
-}
-
-}
+#include "manager.cpp"
 
 #endif /* ADAPTIVE_FASTFLOW_FARM_HPP_ */

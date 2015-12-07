@@ -39,6 +39,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <string>
 
 #undef DEBUG
 #undef DEBUGB
@@ -54,7 +55,6 @@
 namespace adpff{
 
 class Parameters;
-class ManagerFarm;
 
 using namespace std;
 using namespace ff;
@@ -75,26 +75,6 @@ void ManagerFarm<lb_t, gt_t>::setDomainToHighestFrequency(const Domain* domain){
                                 "sensitivity parameters.");
         }
     }
-}
-
-template <typename lb_t, typename gt_t>
-double ManagerFarm<lb_t, gt_t>::getMaxPredictionErrorPrimary() const{
-    double r = _p.maxPrimaryPredictionError;
-    if(_p.strategyPredictionErrorPrimary ==
-       STRATEGY_PREDICTION_ERROR_COEFFVAR){
-        r = max(r, getPrimaryValue(_samples->coefficientVariation()));
-    }
-    return r;
-}
-
-template <typename lb_t, typename gt_t>
-double ManagerFarm<lb_t, gt_t>::getMaxPredictionErrorSecondary() const{
-    double r = _p.maxSecondaryPredictionError;
-    if(_p.strategyPredictionErrorSecondary ==
-       STRATEGY_PREDICTION_ERROR_COEFFVAR){
-        r = max(r, getSecondaryValue(_samples->coefficientVariation()));
-    }
-    return r;
 }
 
 template <typename lb_t, typename gt_t>
@@ -144,29 +124,6 @@ double ManagerFarm<lb_t, gt_t>::getSecondaryValue() const{
 }
 
 template <typename lb_t, typename gt_t>
-bool ManagerFarm<lb_t, gt_t>::isContractViolated() const{
-    double tolerance = 0;
-    double maxError = getMaxPredictionErrorPrimary();
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            tolerance = ((_p.overloadThresholdFarm -
-                          _p.underloadThresholdFarm) * maxError) / 100.0;
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            tolerance = (_p.requiredBandwidth * maxError) / 100.0;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            tolerance = (_p.powerBudget * maxError) / 100.0;
-        }break;
-        default:{
-            return false;
-        }break;
-    }
-    return !isFeasiblePrimaryValue(getPrimaryValue(), tolerance);
-}
-
-template <typename lb_t, typename gt_t>
 bool ManagerFarm<lb_t, gt_t>::terminated(){
     /**
      * We do not need to wait if the emitter is terminated.
@@ -194,7 +151,9 @@ bool ManagerFarm<lb_t, gt_t>::terminated(){
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::changeKnobs(){
-    KnobsValues values = _calibrator->getNextKnobsValues();
+    KnobsValues values = _calibrator->getNextKnobsValues(getPrimaryValue(),
+                                                         getSecondaryValue(),
+                                                         _remainingTasks);
     if(values != _configuration.getRealValues()){
         _configuration.setValues(values);
         _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
@@ -320,19 +279,26 @@ bool ManagerFarm<lb_t, gt_t>::persist() const{
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::initPredictors(){
     if(_p.strategyCalibration == STRATEGY_CALIBRATION_RANDOM){
-        ; //CREARE
+        ; //CREARE TODO: Ci deve sempre essere un calibratore
     }else{
-        _calibrator = new CalibratorLowDiscrepancy(p, *this);
+        _calibrator = new CalibratorLowDiscrepancy(_p, _configuration, _samples);
     }
 }
 
-#include <string>
-Parameters& validate(Parameters& p){
+static Parameters& validate(Parameters& p){
     ParametersValidation apv = p.validate();
     if(apv != VALIDATION_OK){
         throw runtime_error("Invalid adaptivity parameters: " + std::to_string(apv));
     }
     return p;
+}
+
+static std::vector<AdaptiveNode*> convertWorkers(svector<ff_node*> w){
+    std::vector<AdaptiveNode*> r;
+    for(size_t i = 0; i < w.size(); i++){
+        r.push_back(dynamic_cast<AdaptiveNode*>(w[i]));
+    }
+    return r;
 }
 
 template <typename lb_t, typename gt_t>
@@ -344,26 +310,16 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
         _counter(_p.mammut.getInstanceEnergy()->getCounter()),
         _task(_p.mammut.getInstanceTask()),
         _topology(_p.mammut.getInstanceTopology()),
-        _numCpus(_topology->getCpus().size()),
-        _numPhysicalCores(_topology->getPhysicalCores().size()),
-        _numPhysicalCoresPerCpu(_topology->getCpu(0)->getPhysicalCores().
-                                size()),
-        _numVirtualCoresPerPhysicalCore(_topology->getPhysicalCore(0)->
-                                        getVirtualCores().size()),
-        _emitter(dynamic_cast<AdaptiveNode*>(farm->getEmitter())),
-        _collector(dynamic_cast<AdaptiveNode*>(farm->getCollector())),
-        _activeWorkers(convertWorkers(farm->getWorkers())),
-        _configuration<lb_t, gt_t>(_p, *farm),
+        _emitter(dynamic_cast<AdaptiveNode*>(_farm->getEmitter())),
+        _collector(dynamic_cast<AdaptiveNode*>(_farm->getCollector())),
+        _activeWorkers(convertWorkers(_farm->getWorkers())),
+        _configuration(_p, _emitter, _collector, _farm->getgt(), _activeWorkers),
         _samples(NULL),
         _totalTasks(0),
         _remainingTasks(0),
         _deadline(0),
         _lastStoredSampleMs(0),
-        _calibrator(NULL),
-        _primaryPredictor(NULL),
-        _secondaryPredictor(NULL),
-        _primaryPrediction(0),
-        _secondaryPrediction(0){
+        _calibrator(NULL){
 
     _samples = NULL;
     switch(_p.strategySmoothing){
@@ -381,12 +337,6 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
 template <typename lb_t, typename gt_t>
 ManagerFarm<lb_t, gt_t>::~ManagerFarm(){
     delete _samples;
-    if(_primaryPredictor){
-        delete _primaryPredictor;
-    }
-    if(_secondaryPredictor){
-        delete _secondaryPredictor;
-    }
     if(_calibrator){
         delete _calibrator;
     }
@@ -511,127 +461,6 @@ void ManagerFarm<lb_t, gt_t>::run(){
     }
 
     cleanNodes();
-}
-
-double Observer::calibrationDurationToPerc(const CalibrationStats& cs,
-                                 uint durationMs){
-    return ((double)cs.duration /
-            (double)durationMs) * 100.0;
-}
-
-Observer::Observer(string statsFile, string calibrationFile, string summaryFile):
-        _startMonitoringMs(0),
-        _totalWatts(0),
-        _totalBw(0),
-        _numSamples(0){
-    _statsFile.open(statsFile.c_str());
-    _calibrationFile.open(calibrationFile.c_str());
-    _summaryFile.open(summaryFile.c_str());
-    if(!_statsFile.is_open() ||
-       !_calibrationFile.is_open() ||
-       !_summaryFile.is_open()){
-        throw runtime_error("Observer: Impossible to open file.");
-    }
-    _statsFile << "TimestampMillisecs" << "\t";
-    _statsFile << "[[EmitterVc][WorkersVc][CollectorVc]]" << "\t";
-    _statsFile << "Workers" << "\t";
-    _statsFile << "Frequency" << "\t";
-    _statsFile << "CurrentBandwidth" << "\t";
-    _statsFile << "SmoothedBandwidth" << "\t";
-    _statsFile << "CoeffVarBandwidth" << "\t";
-    _statsFile << "SmoothedUtilization" << "\t";
-    _statsFile << "SmoothedWatts" << "\t";
-    _statsFile << endl;
-
-    _calibrationFile << "NumSteps" << "\t";
-    _calibrationFile << "Duration" << "\t";
-    _calibrationFile << "Time%" << "\t";
-    _calibrationFile << endl;
-
-    _summaryFile << "Watts" << "\t";
-    _summaryFile << "Bandwidth" << "\t";
-    _summaryFile << "CompletionTime" << "\t";
-    _summaryFile << "Calibration%" << "\t";
-    _summaryFile << endl;
-}
-
-Observer::~Observer(){
-    _statsFile.close();
-    _calibrationFile.close();
-    _summaryFile.close();
-}
-
-void Observer::observe(unsigned int timeStamp,
-                     size_t workers,
-                     Frequency frequency,
-                     const VirtualCore* emitterVirtualCore,
-                     const vector<VirtualCore*>& workersVirtualCore,
-                     const VirtualCore* collectorVirtualCore,
-                     double currentBandwidth,
-                     double smoothedBandwidth,
-                     double coeffVarBandwidth,
-                     double smoothedUtilization,
-                     Joules smoothedWatts){
-    _statsFile << timeStamp - _startMonitoringMs << "\t";
-    _statsFile << "[";
-    if(emitterVirtualCore){
-        _statsFile << "[" << emitterVirtualCore->getVirtualCoreId() << "]";
-    }
-
-    _statsFile << "[";
-    for(size_t i = 0; i < workersVirtualCore.size(); i++){
-        _statsFile << workersVirtualCore.at(i)->getVirtualCoreId() << ",";
-    }
-    _statsFile << "]";
-
-    if(collectorVirtualCore){
-        _statsFile << "[" << collectorVirtualCore->getVirtualCoreId() << "]";
-    }
-    _statsFile << "]" << "\t";
-
-    _statsFile << workers << "\t";
-    _statsFile << frequency << "\t";
-    _statsFile << currentBandwidth << "\t";
-    _statsFile << smoothedBandwidth << "\t";
-    _statsFile << coeffVarBandwidth << "\t";
-    _statsFile << smoothedUtilization << "\t";
-
-    _statsFile << smoothedWatts << "\t";
-
-    _statsFile << endl;
-
-    _totalWatts += smoothedWatts;
-    _totalBw += currentBandwidth;
-    _numSamples++;
-}
-
-void Observer::calibrationStats(const vector<CalibrationStats>&
-                              calibrationStats,
-                              uint durationMs){
-
-    for(size_t i = 0; i < calibrationStats.size(); i++){
-        const CalibrationStats& cs = calibrationStats.at(i);
-        _calibrationFile << cs.numSteps << "\t";
-        _calibrationFile << cs.duration << "\t";
-        _calibrationFile << calibrationDurationToPerc(cs, durationMs) << "\t";
-        _calibrationFile << endl;
-    }
-}
-
-void Observer::summaryStats(const vector<CalibrationStats>&
-                          calibrationStats,
-                          uint durationMs){
-    double totalCalibrationPerc = 0.0;
-    for(size_t i = 0; i < calibrationStats.size(); i++){
-        const CalibrationStats& cs = calibrationStats.at(i);
-        totalCalibrationPerc += calibrationDurationToPerc(cs, durationMs);
-    }
-
-    _summaryFile << _totalWatts / (double) _numSamples << "\t";
-    _summaryFile << _totalBw / (double) _numSamples << "\t";
-    _summaryFile << (double) durationMs / 1000.0 << "\t";
-    _summaryFile << totalCalibrationPerc << "\t";
-    _summaryFile << endl;
 }
 
 }

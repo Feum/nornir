@@ -52,14 +52,31 @@ namespace adpff{
 using namespace mammut::cpufreq;
 using namespace mammut::utils;
 
-void RegressionData::init(){init(_manager._configuration.getRealValues());}
+static double getVoltage(VoltageTable table, const KnobsValues& values){
+    VoltageTableKey key(values[KNOB_TYPE_WORKERS], values[KNOB_TYPE_FREQUENCY]);
+    VoltageTableIterator it = table.find(key);
+    if(it != table.end()){
+        return it->second;
+    }else{
+        throw runtime_error("Frequency and/or number of virtual cores "
+                                 "not found in voltage table.");
+    }
+}
+
+RegressionData::RegressionData(const Parameters& p,
+                               const FarmConfiguration& configuration,
+                               const Smoother<MonitoredSample>* samples):
+        _p(p), _configuration(configuration), _samples(samples){
+    ;
+}
+
+void RegressionData::init(){init(_configuration.getRealValues());}
 
 void RegressionDataServiceTime::init(const KnobsValues& values){
     _numPredictors = 0;
-    double physicalCores = std::min((uint) values[KNOB_TYPE_WORKERS],
-                                    _manager._numPhysicalCores);
+    double physicalCores = std::min((uint) values[KNOB_TYPE_WORKERS], _phyCores);
 
-    if(_manager._p.knobFrequencies == KNOB_FREQUENCY_YES){
+    if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
         double frequency = values[KNOB_TYPE_FREQUENCY];
         _invScalFactorFreq = (double)_minFrequency /
                              frequency;
@@ -71,20 +88,17 @@ void RegressionDataServiceTime::init(const KnobsValues& values){
     }
 }
 
-RegressionDataServiceTime::RegressionDataServiceTime(const ManagerFarm& manager):
-        RegressionData(manager),
+RegressionDataServiceTime::RegressionDataServiceTime(const Parameters& p,
+                                                     const FarmConfiguration& configuration,
+                                                     const Smoother<MonitoredSample>* samples):
+        RegressionData(p, configuration, samples),
         _invScalFactorFreq(0),
         _invScalFactorFreqAndCores(0),
         _numPredictors(0){
-    _minFrequency = _manager._cpufreq->getDomains().at(0)->
-                             getAvailableFrequencies().at(0);
-    init(manager._configuration.getRealValues());
-}
-
-RegressionDataServiceTime::RegressionDataServiceTime(const ManagerFarm& manager,
-                                                     const KnobsValues& values):
-        RegressionData(manager){
-    init(values);
+    _phyCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
+    _minFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->
+                                                    getAvailableFrequencies().at(0);
+    init(_configuration.getRealValues());
 }
 
 uint RegressionDataServiceTime::getNumPredictors() const{
@@ -93,7 +107,7 @@ uint RegressionDataServiceTime::getNumPredictors() const{
 
 void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) const{
     size_t rowId = 0;
-    if(_manager._p.knobFrequencies == KNOB_FREQUENCY_YES){
+    if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
         matrix(rowId++, columnId) = _invScalFactorFreq;
         matrix(rowId++, columnId) = _invScalFactorFreqAndCores;
     }
@@ -103,26 +117,26 @@ void RegressionDataPower::init(const KnobsValues& values){
     _numPredictors = 0;
     uint numWorkers = values[KNOB_TYPE_WORKERS];
     Frequency frequency = values[KNOB_TYPE_FREQUENCY];
-    double usedPhysicalCores = std::min(numWorkers, _manager._numPhysicalCores);
+    double usedPhysicalCores = std::min(numWorkers, _phyCores);
 
-    if(_manager._p.knobFrequencies == KNOB_FREQUENCY_YES){
-        double voltage = _manager.getVoltage(values);
+    if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
+        double voltage = getVoltage(_p.archData.voltageTable, values);
         uint usedCpus = 0;
-        if(_manager._p.knobMapping == KNOB_MAPPING_LINEAR){
-            switch(_manager._p.knobHyperthreading){
+        if(_p.knobMapping == KNOB_MAPPING_LINEAR){
+            switch(_p.knobHyperthreading){
                 case KNOB_HT_AUTO:{
                     throw std::runtime_error("This should never happen.");
                 }
                 case KNOB_HT_NO:{
                     usedCpus = std::ceil((double) numWorkers /
-                                         (double) _manager._numPhysicalCoresPerCpu);
+                                         (double) _phyCoresPerCpu);
                 }break;
                 case KNOB_HT_LATER:{
                     usedCpus = std::ceil((double) numWorkers /
-                                         (double) _manager._numPhysicalCoresPerCpu);
-                    if(numWorkers > _manager._numPhysicalCores){
-                        _additionalContextes = numWorkers - _manager._numPhysicalCores;
-                        _additionalContextes = std::min(_additionalContextes, _manager._numVirtualCoresPerPhysicalCore*_manager._numPhysicalCores);
+                                         (double) _phyCoresPerCpu);
+                    if(numWorkers > _phyCores){
+                        _additionalContextes = numWorkers - _phyCores;
+                        _additionalContextes = std::min(_additionalContextes, _virtCoresPerPhyCores*_phyCores);
                     }else{
                         _additionalContextes = 0;
                     }
@@ -130,19 +144,19 @@ void RegressionDataPower::init(const KnobsValues& values){
                 }break;
                 case KNOB_HT_SOONER:{
                     usedCpus = std::ceil((double) numWorkers /
-                                         ((double) _manager._numPhysicalCoresPerCpu * (double) _manager._numVirtualCoresPerPhysicalCore));
+                                         ((double) _phyCoresPerCpu * (double) _virtCoresPerPhyCores));
                 }break;
             }
         }else{
             ; //TODO
         }
-        usedCpus = std::min(usedCpus, _manager._numCpus);
-        uint unusedCpus = _manager._numCpus - usedCpus;
+        usedCpus = std::min(usedCpus, _cpus);
+        uint unusedCpus = _cpus - usedCpus;
 
         _voltagePerUsedSockets = voltage * (double) usedCpus;
         ++_numPredictors;
 
-        if(_manager._numCpus > 1){
+        if(_cpus > 1){
             _voltagePerUnusedSockets = voltage * (double) unusedCpus;
             ++_numPredictors;
         }
@@ -155,17 +169,18 @@ void RegressionDataPower::init(const KnobsValues& values){
     }
 }
 
-RegressionDataPower::RegressionDataPower(const ManagerFarm& manager):
-        RegressionData(manager), _dynamicPowerModel(0),
+RegressionDataPower::RegressionDataPower(const Parameters& p,
+                                         const FarmConfiguration& configuration,
+                                         const Smoother<MonitoredSample>* samples):
+        RegressionData(p, configuration, samples), _dynamicPowerModel(0),
         _voltagePerUsedSockets(0), _voltagePerUnusedSockets(0),
         _additionalContextes(0), _numPredictors(0){
-    init(_manager._configuration.getRealValues());
-}
-
-RegressionDataPower::RegressionDataPower(const ManagerFarm& manager,
-                                         const KnobsValues& values):
-        RegressionData(manager){
-    init(values);
+    Topology* t = _p.mammut.getInstanceTopology();
+    _cpus = t->getCpus().size();
+    _phyCores = t->getPhysicalCores().size();
+    _phyCoresPerCpu = t->getCpu(0)->getPhysicalCores().size();
+    _virtCoresPerPhyCores = t->getPhysicalCore(0)->getVirtualCores().size();
+    init(_configuration.getRealValues());
 }
 
 uint RegressionDataPower::getNumPredictors() const{
@@ -175,26 +190,41 @@ uint RegressionDataPower::getNumPredictors() const{
 void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
     size_t rowId = 0;
     matrix(rowId++, columnId) = _dynamicPowerModel;
-    if(_manager._p.knobFrequencies == KNOB_FREQUENCY_YES){
+    if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
         matrix(rowId++, columnId) = _voltagePerUsedSockets;
-        if(_manager._numCpus > 1){
+        if(_cpus > 1){
             matrix(rowId++, columnId) = _voltagePerUnusedSockets;
         }
     }
-    if(_manager._p.knobHyperthreading != KNOB_HT_NO){
+    if(_p.knobHyperthreading != KNOB_HT_NO){
         matrix(rowId++, columnId) = _additionalContextes;
     }
 }
 
+Predictor::Predictor(PredictorType type,
+                     const Parameters& p,
+                     const FarmConfiguration& configuration,
+                     const Smoother<MonitoredSample>* samples):
+        _type(type), _p(p), _configuration(configuration),
+        _samples(samples){
+    ;
+}
+
+Predictor::~Predictor(){
+    ;
+}
+
 PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
-                                                     const ManagerFarm& manager):
-                                                    _type(type), _manager(manager){
+                                                     const Parameters& p,
+                                                     const FarmConfiguration& configuration,
+                                                     const Smoother<MonitoredSample>* samples):
+        Predictor(type, p, configuration, samples){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            _predictionInput = new RegressionDataServiceTime(_manager);
+            _predictionInput = new RegressionDataServiceTime(p, configuration, samples);
         }break;
         case PREDICTION_POWER:{
-            _predictionInput = new RegressionDataPower(_manager);
+            _predictionInput = new RegressionDataPower(p, configuration, samples);
         }break;
     }
 }
@@ -214,7 +244,7 @@ void PredictorLinearRegression::clear(){
 }
 
 uint PredictorLinearRegression::getMinimumPointsNeeded(){
-    _predictionInput->init(_manager._configuration.getRealValues());
+    _predictionInput->init(_configuration.getRealValues());
     return std::max<uint>(_predictionInput->getNumPredictors(), 2);
 }
 
@@ -222,17 +252,17 @@ double PredictorLinearRegression::getCurrentResponse() const{
     double r = 0.0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            r = 1.0 / _manager._samples->average().bandwidth;
+            r = 1.0 / _samples->average().bandwidth;
         }break;
         case PREDICTION_POWER:{
-            r = _manager._samples->average().watts;
+            r = _samples->average().watts;
         }break;
     }
     return r;
 }
 
 void PredictorLinearRegression::refine(){
-    const KnobsValues& currentValues = _manager._configuration.getRealValues();
+    const KnobsValues& currentValues = _configuration.getRealValues();
     obs_it lb = _observations.lower_bound(currentValues);
 
     if(lb != _observations.end() &&
@@ -246,10 +276,10 @@ void PredictorLinearRegression::refine(){
         Observation o;
         switch(_type){
             case PREDICTION_BANDWIDTH:{
-                o.data = new RegressionDataServiceTime(_manager);
+                o.data = new RegressionDataServiceTime(_p, _configuration, _samples);
             }break;
             case PREDICTION_POWER:{
-                o.data = new RegressionDataPower(_manager);
+                o.data = new RegressionDataPower(_p, _configuration, _samples);
             }break;
         }
         o.response = getCurrentResponse();
@@ -305,19 +335,21 @@ double PredictorLinearRegression::predict(const KnobsValues& values){
 /**************** PredictorSimple ****************/
 
 PredictorSimple::PredictorSimple(PredictorType type,
-                                 const ManagerFarm& manager):
-    _type(type), _manager(manager){
+                                 const Parameters& p,
+                                 const FarmConfiguration& configuration,
+                                 const Smoother<MonitoredSample>* samples):
+            Predictor(type, p, configuration, samples) {
     ;
 }
 
 double PredictorSimple::getScalingFactor(const KnobsValues& values){
     return (double)(values[KNOB_TYPE_FREQUENCY] * values[KNOB_TYPE_WORKERS]) /
-           (double)(_manager._configuration.getRealValue(KNOB_TYPE_FREQUENCY) *
-                    _manager._configuration.getRealValue(KNOB_TYPE_WORKERS));
+           (double)(_configuration.getRealValue(KNOB_TYPE_FREQUENCY) *
+                    _configuration.getRealValue(KNOB_TYPE_WORKERS));
 }
 
 double PredictorSimple::getPowerPrediction(const KnobsValues& values){
-    Voltage v = _manager.getVoltage(values);
+    Voltage v = getVoltage(_p.archData.voltageTable, values);
     return values[KNOB_TYPE_WORKERS]*values[KNOB_TYPE_FREQUENCY]*v*v;
 }
 
@@ -328,7 +360,7 @@ void PredictorSimple::prepareForPredictions(){
 double PredictorSimple::predict(const KnobsValues& values){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            return _manager._samples->average().bandwidth *
+            return _samples->average().bandwidth *
                    getScalingFactor(values);
         }break;
         case PREDICTION_POWER:{
@@ -339,18 +371,15 @@ double PredictorSimple::predict(const KnobsValues& values){
 }
 
 Calibrator::Calibrator(const Parameters& p,
-                       const FarmConfiguration& configuration):
+                       const FarmConfiguration& configuration,
+                       const Smoother<MonitoredSample>* samples):
         _p(p),
         _configuration(configuration),
+        _samples(samples),
         _state(CALIBRATION_SEEDS),
         _numCalibrationPoints(0), _calibrationStartMs(0),
         _firstPointGenerated(false), _primaryPrediction(0),
         _secondaryPrediction(0){
-
-    /** If voltage table file is specified, then load the table. **/
-    if(_p.archData.voltageTableFile.compare("")){
-        loadVoltageTable(_voltageTable, _p.archData.voltageTableFile);
-    }
 
     PredictorType primary, secondary;
     switch(p.contractType){
@@ -371,17 +400,18 @@ Calibrator::Calibrator(const Parameters& p,
 
     switch(p.strategyPrediction){
         case STRATEGY_PREDICTION_SIMPLE:{
-            _primaryPredictor = new PredictorSimple(primary, *this);
-            _secondaryPredictor = new PredictorSimple(secondary, *this);
+            _primaryPredictor = new PredictorSimple(primary, _p, _configuration, _samples);
+            _secondaryPredictor = new PredictorSimple(secondary, _p, _configuration, _samples);
         }break;
         case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
-            _primaryPredictor = new PredictorLinearRegression(primary, *this);
-            _secondaryPredictor = new PredictorLinearRegression(secondary, *this);
+            _primaryPredictor = new PredictorLinearRegression(primary, _p, _configuration, _samples);
+            _secondaryPredictor = new PredictorLinearRegression(secondary, _p, _configuration, _samples);
         }break;
         default:{
             ;
         }break;
     }
+
     _minNumPoints = std::max(_primaryPredictor->getMinimumPointsNeeded(),
                              _secondaryPredictor->getMinimumPointsNeeded());
     DEBUG("Minimum number of points required for calibration: " << _minNumPoints);
@@ -411,23 +441,12 @@ bool Calibrator::highError(double primaryValue, double secondaryValue) const{
     }else{
         secondaryError = 0.0;
     }
-    DEBUG("Primary prediction: " << _manager._primaryPrediction << " " <<
-          "Secondary prediction: " << _manager._secondaryPrediction);
+    DEBUG("Primary prediction: " << _primaryPrediction << " " <<
+          "Secondary prediction: " << _secondaryPrediction);
     DEBUG("Primary error: " << primaryError << " " <<
           "Secondary error: " << secondaryError);
     return primaryError > _p.maxPrimaryPredictionError ||
            secondaryError > _p.maxSecondaryPredictionError;
-}
-
-double Calibrator::getVoltage(const KnobsValues& values) const{
-    VoltageTableKey key(values[KNOB_TYPE_WORKERS], values[KNOB_TYPE_FREQUENCY]);
-    VoltageTableIterator it = _voltageTable.find(key);
-    if(it != _voltageTable.end()){
-        return it->second;
-    }else{
-        throw runtime_error("Frequency and/or number of virtual cores "
-                                 "not found in voltage table.");
-    }
 }
 
 bool Calibrator::isBestSuboptimalValue(double x, double y) const{
@@ -501,7 +520,9 @@ bool Calibrator::isFeasiblePrimaryValue(double value, double tolerance) const{
     return false;
 }
 
-KnobsValues Calibrator::getBestKnobsValues(double primaryValue, double secondaryValue){
+KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
+                                           double secondaryValue,
+                                           u_int64_t remainingTasks){
     KnobsValues bestValues(KNOB_VALUE_REAL);
     KnobsValues bestSuboptimalValues = _configuration.getRealValues();
 
@@ -540,11 +561,10 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue, double secondary
         primaryPrediction = _primaryPredictor->predict(currentValues);
         switch(_p.contractType){
             case CONTRACT_PERF_COMPLETION_TIME:{
-                remainingTime = (double) _remainingTasks / primaryPrediction;
+                remainingTime = (double) remainingTasks / primaryPrediction;
             }break;
             case CONTRACT_PERF_UTILIZATION:{
-                primaryPrediction = (_samples->average().bandwidth /
-                                     primaryPrediction) *
+                primaryPrediction = (_samples->average().bandwidth / primaryPrediction) *
                                      _samples->average().utilization;
             }break;
             default:{
@@ -586,9 +606,31 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue, double secondary
     }
 }
 
-KnobsValues Calibrator::getNextKnobsValues(bool isContractViolated,
-                                           double primaryValue,
-                                           double secondaryValue){
+bool Calibrator::isContractViolated(double primaryValue) const{
+    double tolerance = 0;
+    double maxError = _p.maxPrimaryPredictionError;
+    switch(_p.contractType){
+        case CONTRACT_PERF_UTILIZATION:{
+            tolerance = ((_p.overloadThresholdFarm -
+                          _p.underloadThresholdFarm) * maxError) / 100.0;
+        }break;
+        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_COMPLETION_TIME:{
+            tolerance = (_p.requiredBandwidth * maxError) / 100.0;
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            tolerance = (_p.powerBudget * maxError) / 100.0;
+        }break;
+        default:{
+            return false;
+        }break;
+    }
+    return !isFeasiblePrimaryValue(primaryValue, tolerance);
+}
+
+KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
+                                           double secondaryValue,
+                                           u_int64_t remainingTasks){
     KnobsValues kv;
 
     if(_numCalibrationPoints == 0){
@@ -606,7 +648,7 @@ KnobsValues Calibrator::getNextKnobsValues(bool isContractViolated,
      * been real executed.
      **/
     if(_firstPointGenerated){
-        refine(isContractViolated);
+        refine(isContractViolated(primaryValue));
     }else{
         _firstPointGenerated = true;
     }
@@ -620,7 +662,8 @@ KnobsValues Calibrator::getNextKnobsValues(bool isContractViolated,
             }
         }break;
         case CALIBRATION_TRY_PREDICT:{
-            kv = getBestKnobsValues(primaryValue, secondaryValue);
+            kv = getBestKnobsValues(primaryValue, secondaryValue,
+                                    remainingTasks);
             _state = CALIBRATION_EXTRA_POINT;
             DEBUG("[Calibrator]: Moving to extra");
         }break;
@@ -630,13 +673,15 @@ KnobsValues Calibrator::getNextKnobsValues(bool isContractViolated,
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: High error");
                 DEBUG("[Calibrator]: Moving to predict");
-            }else if(isContractViolated){
+            }else if(isContractViolated(primaryValue)){
                 DEBUG("[Calibrator]: Contract violated");
-                kv = getBestKnobsValues(primaryValue, secondaryValue);
+                kv = getBestKnobsValues(primaryValue, secondaryValue,
+                                        remainingTasks);
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: Moving to predict");
             }else{
-                kv = getBestKnobsValues(primaryValue, secondaryValue);
+                kv = getBestKnobsValues(primaryValue, secondaryValue,
+                                        remainingTasks);
                 _state = CALIBRATION_FINISHED;
                 _primaryPredictor->clear();
                 _secondaryPredictor->clear();
@@ -660,7 +705,7 @@ KnobsValues Calibrator::getNextKnobsValues(bool isContractViolated,
                 _state = CALIBRATION_SEEDS;
                 DEBUG("========Moving to seeds");
             }else*/
-            if(isContractViolated){
+            if(isContractViolated(primaryValue)){
                 reset();
                 kv = generateRelativeKnobsValues();
                 _numCalibrationPoints = 1;
@@ -684,8 +729,10 @@ std::vector<CalibrationStats> Calibrator::getCalibrationsStats() const{
     return _calibrationStats;
 }
 
-CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(const Parameters& p, const FarmConfiguration& configuration):
-        Calibrator(p, configuration), _p(p), _configuration(configuration){
+CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(const Parameters& p,
+                                                   const FarmConfiguration& configuration,
+                                                   const Smoother<MonitoredSample>* samples):
+        Calibrator(p, configuration, samples){
     uint d = 0;
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         if(_configuration.getKnob((KnobType) i)->autoFind()){

@@ -555,7 +555,7 @@ int main(int argc, char** argv) {
     time(&t1);
     printf("Start: \t%s", ctime(&t1));
 
-    adpff::ManagerFarm amf(&farm, ap);
+    adpff::ManagerFarm<> amf(&farm, ap);
     amf.start();
     amf.join();  
 

@@ -139,16 +139,6 @@ typedef enum{
     STRATEGY_PREDICTION_SIMPLE
 }StrategyPrediction;
 
-/// Possible ways to detect if the model has an high error.
-typedef enum{
-    // Constant prediction error, set by the user.
-    STRATEGY_PREDICTION_ERROR_CONSTANT = 0,
-
-    // Prediction error set equal to the maximum between
-    // coefficient of variation and maximum specified error.
-    STRATEGY_PREDICTION_ERROR_COEFFVAR
-}StrategyPredictionError;
-
 /// Service nodes (emitter or collector) mapping knob.
 typedef enum{
     // The service node is not explicitly mapped.
@@ -386,6 +376,8 @@ typedef struct ArchData{
     // strategyFrequencies is STRATEGY_FREQUENCY_YES.
     std::string voltageTableFile;
 
+    mammut::cpufreq::VoltageTable voltageTable;
+
     ArchData():ticksPerNs(0),
                monitoringCost(0),
                voltageTableFile(""){;}
@@ -534,14 +526,6 @@ public:
     // Strategy to be used to predict power and performance values
     // [default = STRATEGY_PREDICTION_REGRESSION_LINEAR].
     StrategyPrediction strategyPrediction;
-
-    // Strategy to be used for toleration of prediction
-    // errors on primary value [default = STRATEGY_PREDICTION_ERROR_CONSTANT].
-    StrategyPredictionError strategyPredictionErrorPrimary;
-
-    // Strategy to be used for toleration of prediction
-    // errors on secondary value [default = STRATEGY_PREDICTION_ERROR_CONSTANT].
-    StrategyPredictionError strategyPredictionErrorSecondary;
 
     // Smoothing strategy [default = STRATEGY_SMOOTHING_EXPONENTIAL].
     StrategySmoothing strategySmoothing;

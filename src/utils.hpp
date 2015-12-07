@@ -33,7 +33,10 @@
 #ifndef UTILS_HPP_
 #define UTILS_HPP_
 
+#include <mammut/mammut.hpp>
+
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <stdexcept>
 #include <vector>
@@ -41,6 +44,205 @@
 #define NSECS_IN_SECS 1000000000.0
 
 namespace adpff{
+
+typedef struct{
+    uint numSteps;
+    uint duration;
+}CalibrationStats;
+
+/*!
+ * This class can be used to obtain statistics about reconfigurations
+ * performed by the manager.
+ * It can be extended by a user defined class to customize action to take
+ * for each observed statistic.
+ */
+class Observer{
+    template <typename L, typename G>
+    friend class ManagerFarm;
+private:
+    std::ofstream _statsFile;
+    std::ofstream _calibrationFile;
+    std::ofstream _summaryFile;
+    unsigned int _startMonitoringMs;
+    double _totalWatts;
+    double _totalBw;
+    unsigned long _numSamples;
+
+    double calibrationDurationToPerc(const CalibrationStats& cs,
+                                     uint durationMs);
+public:
+    Observer(std::string statsFile = "stats.csv",
+             std::string calibrationFile = "calibration.csv",
+             std::string summaryFile = "summary.csv");
+
+    virtual ~Observer();
+
+    virtual void observe(unsigned int timeStamp,
+                         size_t workers,
+                         mammut::cpufreq::Frequency frequency,
+                         const mammut::topology::VirtualCore* emitterVirtualCore,
+                         const std::vector<mammut::topology::VirtualCore*>& workersVirtualCore,
+                         const mammut::topology::VirtualCore* collectorVirtualCore,
+                         double currentBandwidth,
+                         double smoothedBandwidth,
+                         double coeffVarBandwidth,
+                         double smoothedUtilization,
+                         mammut::energy::Joules smoothedWatts);
+
+    virtual void calibrationStats(const std::vector<CalibrationStats>&
+                                  calibrationStats,
+                                  uint durationMs);
+
+    virtual void summaryStats(const std::vector<CalibrationStats>&
+                              calibrationStats,
+                              uint durationMs);
+};
+
+typedef struct MonitoredSample{
+    mammut::energy::Joules watts; ///< Consumed watts.
+    double bandwidth; ///< Bandwidth of the entire farm.
+    double utilization; ///< Utilization of the entire farm.
+    double latency; ///< Average latency of a worker (nanoseconds).
+
+    MonitoredSample():watts(0),bandwidth(0), utilization(0), latency(0){;}
+
+    void swap(MonitoredSample& x){
+        using std::swap;
+
+        swap(watts, x.watts);
+        swap(bandwidth, x.bandwidth);
+        swap(utilization, x.utilization);
+        swap(latency, x.latency);
+    }
+
+    MonitoredSample& operator=(MonitoredSample rhs){
+        swap(rhs);
+        return *this;
+    }
+
+    MonitoredSample& operator+=(const MonitoredSample& rhs){
+        watts += rhs.watts;
+        bandwidth += rhs.bandwidth;
+        utilization += rhs.utilization;
+        latency += rhs.latency;
+        return *this;
+    }
+
+    MonitoredSample& operator-=(const MonitoredSample& rhs){
+        watts -= rhs.watts;
+        bandwidth -= rhs.bandwidth;
+        utilization -= rhs.utilization;
+        latency -= rhs.latency;
+        return *this;
+    }
+
+    MonitoredSample& operator*=(const MonitoredSample& rhs){
+        watts *= rhs.watts;
+        bandwidth *= rhs.bandwidth;
+        utilization *= rhs.utilization;
+        latency *= rhs.latency;
+        return *this;
+    }
+
+    MonitoredSample& operator/=(const MonitoredSample& rhs){
+        watts /= rhs.watts;
+        bandwidth /= rhs.bandwidth;
+        utilization /= rhs.utilization;
+        latency /= rhs.latency;
+        return *this;
+    }
+
+    MonitoredSample operator/=(double x){
+        watts /= x;
+        bandwidth /= x;
+        utilization /= x;
+        latency /= x;
+        return *this;
+    }
+
+    MonitoredSample operator*=(double x){
+        watts *= x;
+        bandwidth *= x;
+        utilization *= x;
+        latency *= x;
+        return *this;
+    }
+}MonitoredSample;
+
+inline MonitoredSample operator+(const MonitoredSample& lhs,
+                                 const MonitoredSample& rhs){
+    MonitoredSample r = lhs;
+    r += rhs;
+    return r;
+}
+
+inline MonitoredSample operator-(const MonitoredSample& lhs,
+                                 const MonitoredSample& rhs){
+    MonitoredSample r = lhs;
+    r -= rhs;
+    return r;
+}
+
+inline MonitoredSample operator*(const MonitoredSample& lhs,
+                                 const MonitoredSample& rhs){
+    MonitoredSample r = lhs;
+    r *= rhs;
+    return r;
+}
+
+inline MonitoredSample operator/(const MonitoredSample& lhs,
+                                 const MonitoredSample& rhs){
+    MonitoredSample r = lhs;
+    r /= rhs;
+    return r;
+}
+
+inline MonitoredSample operator/(const MonitoredSample& lhs, double x){
+    MonitoredSample r = lhs;
+    r /= x;
+    return r;
+}
+
+inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
+    MonitoredSample r = lhs;
+    r *= x;
+    return r;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
+    os << "[";
+    os << "Watts: " << obj.watts << " ";
+    os << "Bandwidth: " << obj.bandwidth << " ";
+    os << "Utilization: " << obj.utilization << " ";
+    os << "Latency: " << obj.latency << " ";
+    os << "]";
+    return os;
+}
+
+inline std::ofstream& operator<<(std::ofstream& os, const MonitoredSample& obj){
+    os << obj.watts << "\t";
+    os << obj.bandwidth << "\t";
+    os << obj.utilization << "\t";
+    os << obj.latency << "\t";
+    return os;
+}
+
+inline MonitoredSample squareRoot(const MonitoredSample& x){
+    MonitoredSample r;
+    r.watts = x.watts?sqrt(x.watts):0;
+    r.bandwidth = x.bandwidth?sqrt(x.bandwidth):0;
+    r.utilization = x.utilization?sqrt(x.utilization):0;
+    r.latency = x.latency?sqrt(x.latency):0;
+    return r;
+}
+
+
+inline void regularize(MonitoredSample& x){
+    if(x.watts < 0){x.watts = 0;}
+    if(x.bandwidth < 0){x.bandwidth = 0;}
+    if(x.utilization < 0){x.utilization = 0;}
+    if(x.latency < 0){x.latency = 0;}
+}
 
 /**
  * Represents a smoothing technique.

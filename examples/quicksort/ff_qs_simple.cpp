@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
-    adpff::ManagerFarm amf(&farm, ap);
+    adpff::ManagerFarm<> amf(&farm, ap);
     std::cout << "Starting manager. " << std::endl;
     amf.start();
     std::cout << "Manager started. " << std::endl;

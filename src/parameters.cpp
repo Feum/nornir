@@ -136,8 +136,6 @@ void Parameters::setDefault(){
     knobHyperthreading = KNOB_HT_AUTO;
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
     strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
-    strategyPredictionErrorPrimary = STRATEGY_PREDICTION_ERROR_CONSTANT;
-    strategyPredictionErrorSecondary = STRATEGY_PREDICTION_ERROR_CONSTANT;
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyCalibration = STRATEGY_CALIBRATION_SOBOL;
     strategyPolling = STRATEGY_POLLING_SLEEP_LATENCY;
@@ -289,11 +287,15 @@ ParametersValidation Parameters::validateKnobFrequencies(){
                 return VALIDATION_NO_CONSTANT_TSC;
             }
         }
-    }else if(knobMapping == KNOB_MAPPING_NO){
-        return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
+    }else{
+        if(knobMapping == KNOB_MAPPING_NO){
+            return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
+        }
         if(archData.voltageTableFile.empty() ||
            !existsFile(archData.voltageTableFile)){
             return VALIDATION_VOLTAGE_FILE_NEEDED;
+        }else{
+            loadVoltageTable(archData.voltageTable, archData.voltageTableFile);
         }
     }
 
@@ -424,11 +426,6 @@ template<> char const* enumStrings<StrategyPrediction>::data[] = {
     "REGRESSION_LINEAR"
 };
 
-template<> char const* enumStrings<StrategyPredictionError>::data[] = {
-    "CONSTANT",
-    "COEFFVAR"
-};
-
 template<> char const* enumStrings<KnobConfSNodeMapping>::data[] = {
     "NO",
     "AUTO",
@@ -476,8 +473,6 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, knobFrequencies);
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
     SETVALUE(xt, Enum, strategyPrediction);
-    SETVALUE(xt, Enum, strategyPredictionErrorPrimary);
-    SETVALUE(xt, Enum, strategyPredictionErrorSecondary);
     SETVALUE(xt, Enum, strategySmoothing);
     SETVALUE(xt, Enum, strategyCalibration);
     SETVALUE(xt, Enum, strategyPolling);

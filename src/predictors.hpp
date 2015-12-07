@@ -56,11 +56,14 @@ class KnobsValues;
  * Represents a sample to be used in the regression.
  */
 class RegressionData{
+protected:
+    const Parameters& _p;
+    const FarmConfiguration& _configuration;
+    const Smoother<MonitoredSample>* _samples;
 public:
-    RegressionData(const ManagerFarm& manager):
-        _manager(manager){
-        ;
-    }
+    RegressionData(const Parameters& p,
+                   const FarmConfiguration& configuration,
+                   const Smoother<MonitoredSample>* samples);
 
     /**
      * Initializes the regression data with the current configuration.
@@ -94,6 +97,7 @@ public:
  */
 class RegressionDataServiceTime: public RegressionData{
 private:
+    uint _phyCores;
     mammut::cpufreq::Frequency _minFrequency;
     double _invScalFactorFreq;
     double _invScalFactorFreqAndCores;
@@ -102,10 +106,9 @@ private:
 public:
     void init(const KnobsValues& values);
 
-    RegressionDataServiceTime(const ManagerFarm& manager);
-
-    RegressionDataServiceTime(const ManagerFarm& manager,
-                              const KnobsValues& values);
+    RegressionDataServiceTime(const Parameters& p,
+                              const FarmConfiguration& configuration,
+                              const Smoother<MonitoredSample>* samples);
 
     uint getNumPredictors() const;
 
@@ -118,6 +121,11 @@ public:
  */
 class RegressionDataPower: public RegressionData{
 private:
+    uint _cpus;
+    uint _phyCores;
+    uint _phyCoresPerCpu;
+    uint _virtCoresPerPhyCores;
+
     double _dynamicPowerModel;
     double _voltagePerUsedSockets;
     double _voltagePerUnusedSockets;
@@ -127,10 +135,9 @@ private:
 public:
     void init(const KnobsValues& values);
 
-    RegressionDataPower(const ManagerFarm& manager);
-
-    RegressionDataPower(const ManagerFarm& manager,
-                        const KnobsValues& values);
+    RegressionDataPower(const Parameters& p,
+                        const FarmConfiguration& configuration,
+                        const Smoother<MonitoredSample>* samples);
 
     uint getNumPredictors() const;
 
@@ -150,8 +157,18 @@ typedef enum PredictorType{
  * Represents a generic predictor.
  */
 class Predictor{
+protected:
+    PredictorType _type;
+    const Parameters& _p;
+    const FarmConfiguration& _configuration;
+    const Smoother<MonitoredSample>* _samples;
 public:
-    virtual ~Predictor(){;}
+    Predictor(PredictorType type,
+              const Parameters& p,
+              const FarmConfiguration& configuration,
+              const Smoother<MonitoredSample>* samples);
+
+    virtual ~Predictor();
 
     /**
      * Gets the number of minimum points needed.
@@ -197,7 +214,6 @@ typedef struct{
  */
 class PredictorLinearRegression: public Predictor{
 private:
-    PredictorType _type;
     LinearRegression _lr;
 
     typedef std::map<KnobsValues, Observation> Observations;
@@ -209,7 +225,10 @@ private:
 
     double getCurrentResponse() const;
 public:
-    PredictorLinearRegression(PredictorType type, const ManagerFarm& manager);
+    PredictorLinearRegression(PredictorType type,
+                              const Parameters& p,
+                              const FarmConfiguration& configuration,
+                              const Smoother<MonitoredSample>* samples);
 
     ~PredictorLinearRegression();
 
@@ -233,17 +252,18 @@ public:
  */
 class PredictorSimple: public Predictor{
 private:
-    PredictorType _type;
-
     double getScalingFactor(const KnobsValues& values);
 
     double getPowerPrediction(const KnobsValues& values);
 public:
-    PredictorSimple(PredictorType type, const ManagerFarm& manager);
+    PredictorSimple(PredictorType type,
+                    const Parameters& p,
+                    const FarmConfiguration& configuration,
+                    const Smoother<MonitoredSample>* samples);
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& configuration);
+    double predict(const KnobsValues& values);
 };
 
 /**
@@ -257,25 +277,21 @@ typedef enum{
     CALIBRATION_FINISHED
 }CalibrationState;
 
-typedef struct{
-    uint numSteps;
-    uint duration;
-}CalibrationStats;
-
 /**
  * Used to obtain calibration points.
  */
 class Calibrator{
-private:
+protected:
     const Parameters& _p;
     const FarmConfiguration& _configuration;
+    const Smoother<MonitoredSample>* _samples;
+private:
     CalibrationState _state;
     std::vector<CalibrationStats> _calibrationStats;
     size_t _minNumPoints;
     size_t _numCalibrationPoints;
     uint _calibrationStartMs;
     bool _firstPointGenerated;
-    mammut::cpufreq::VoltageTable _voltageTable;
 
     // The predictor of the primary value.
     Predictor* _primaryPredictor;
@@ -291,13 +307,6 @@ private:
 
     bool highError(double primaryValue, double secondaryValue) const;
     void refine(bool isContractViolated);
-
-    /**
-     * Returns the voltage at a specific combinations of knobs values.
-     * @param values The combination.
-     * @return The voltage at that combination.
-     */
-    double getVoltage(const KnobsValues& values) const;
 
     /**
      * Checks if x is a best suboptimal monitored value than y.
@@ -322,9 +331,21 @@ private:
 
     /**
      * Computes the best relative knobs values for the farm.
+     * @param primaryValue The primary value.
+     * @param secondaryValue The secondary value.
+     * @param remainingTasks The remaining tasks.
      * @return The best relative knobs values.
      */
-    KnobsValues getBestKnobsValues(double primaryValue, double secondaryValue);
+    KnobsValues getBestKnobsValues(double primaryValue, double secondaryValue,
+                                   u_int64_t remainingTasks);
+
+
+    /**
+     * Checks if the contract is violated.
+     * @param primaryValue The primary value.
+     * @return true if the contract has been violated, false otherwise.
+     */
+    bool isContractViolated(double primaryValue) const;
 protected:
     /**
      *  Override this method to provide custom ways to generate
@@ -334,21 +355,23 @@ protected:
     virtual KnobsValues generateRelativeKnobsValues() const = 0;
     virtual void reset(){;}
 public:
-    Calibrator(const Parameters& p, const FarmConfiguration& configuration);
+    Calibrator(const Parameters& p,
+               const FarmConfiguration& configuration,
+               const Smoother<MonitoredSample>* samples);
 
     virtual ~Calibrator(){;}
 
     /**
      * Returns the next values to be set for the knobs.
-     * @param isContractViolated True if the contract has been violated,
-     *        false otherwise.
      * @param primaryValue The primary value.
      * @param secondaryValue The secondary value.
+     * @param remainingTasks The remaining tasks.
      *
      * @return The next values to be set for the knobs.
      */
-    KnobsValues getNextKnobsValues(bool isContractViolated,
-                                   double primaryValue, double secondaryValue);
+    KnobsValues getNextKnobsValues(double primaryValue,
+                                   double secondaryValue,
+                                   u_int64_t remainingTasks);
 
     std::vector<CalibrationStats> getCalibrationsStats() const;
 };
@@ -359,8 +382,6 @@ public:
  */
 class CalibratorLowDiscrepancy: public Calibrator{
 private:
-    const Parameters& _p;
-    const FarmConfiguration& _configuration;
     gsl_qrng* _generator;
     double* _normalizedPoint;
 protected:
@@ -368,7 +389,8 @@ protected:
     void reset();
 public:
     CalibratorLowDiscrepancy(const Parameters& p,
-                             const FarmConfiguration& configuration);
+                             const FarmConfiguration& configuration,
+                             const Smoother<MonitoredSample>* samples);
     ~CalibratorLowDiscrepancy();
 };
 

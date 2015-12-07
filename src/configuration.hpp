@@ -46,36 +46,9 @@ private:
     void setRelativeValues(const KnobsValues& values);
     void setRealValues(const KnobsValues& values);
 public:
-    template <typename lb_t, typename gt_t>
-    FarmConfiguration(const Parameters& p, ff::ff_farm<lb_t, gt_t>& farm):_p(p){
-        AdaptiveNode* emitter = dynamic_cast<AdaptiveNode*>(farm.getEmitter());
-        AdaptiveNode* collector = dynamic_cast<AdaptiveNode*>(farm.getCollector());
-        std::vector<AdaptiveNode*> w = convertWorkers(farm.getWorkers());
-        ff::ff_gatherer* gt = farm.getgt();
-
-        _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p.knobWorkers, emitter,
-                                                    collector, gt, w);
-        _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p.knobMapping,
-                                                    p.knobMappingEmitter,
-                                                    p.knobMappingCollector,
-                                                    p.knobHyperthreading,
-                                                    p.mammut,
-                                                    emitter,
-                                                    collector,
-                                                    *((KnobWorkers*)_knobs[KNOB_TYPE_WORKERS]));
-        _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p.knobFrequencies,
-                                                        p.mammut,
-                                                        p.turboBoost,
-                                                        p.strategyUnusedVirtualCores,
-                                                        *((KnobMapping*)_knobs[KNOB_TYPE_MAPPING]));
-
-        std::vector<std::vector<double>> values;
-        std::vector<double> accum;
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            values.push_back(_knobs[i]->getAllowedValues());
-        }
-        combinations(values, 0, accum);
-    }
+    FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
+            AdaptiveNode* collector, ff::ff_gatherer* gt,
+            std::vector<AdaptiveNode*> workers);
 
 
     ~FarmConfiguration();

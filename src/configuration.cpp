@@ -27,7 +27,43 @@
 
 #include "configuration.hpp"
 
+#ifdef DEBUG_CONFIGURATION
+#define DEBUG(x) do { cerr << "[Configuration] " << x << endl; } while (0)
+#define DEBUGB(x) do {x;} while(0)
+#else
+#define DEBUG(x)
+#define DEBUGB(x)
+#endif
+
 namespace adpff{
+
+FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
+        AdaptiveNode* collector, ff::ff_gatherer* gt,
+        std::vector<AdaptiveNode*> workers):
+        _p(p){
+    _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p.knobWorkers, emitter,
+                                                collector, gt, workers);
+    _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p.knobMapping,
+                                                p.knobMappingEmitter,
+                                                p.knobMappingCollector,
+                                                p.knobHyperthreading,
+                                                p.mammut,
+                                                emitter,
+                                                collector,
+                                                *((KnobWorkers*)_knobs[KNOB_TYPE_WORKERS]));
+    _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p.knobFrequencies,
+                                                    p.mammut,
+                                                    p.turboBoost,
+                                                    p.strategyUnusedVirtualCores,
+                                                    *((KnobMapping*)_knobs[KNOB_TYPE_MAPPING]));
+
+    std::vector<std::vector<double>> values;
+    std::vector<double> accum;
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        values.push_back(_knobs[i]->getAllowedValues());
+    }
+    combinations(values, 0, accum);
+}
 
 FarmConfiguration::~FarmConfiguration(){
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){

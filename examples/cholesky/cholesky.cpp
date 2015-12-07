@@ -44,7 +44,7 @@
 #include "../../src/manager.cpp"
 
 // generic worker
-class Worker: public adpff::adp_ff_node {
+class Worker: public adpff::AdaptiveNode {
 public:
     void *adp_svc(void *task) {
 		comp_t *a = ((ff_task_t *) task)->a;
@@ -100,7 +100,7 @@ public:
 
 
 // the load-balancer filter
-class Emitter: public adpff::adp_ff_node
+class Emitter: public adpff::AdaptiveNode
 {
 private:
     int ntask;

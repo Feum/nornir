@@ -31,3 +31,133 @@
  **/
 
 #include "utils.hpp"
+
+namespace adpff{
+
+using namespace std;
+using namespace mammut;
+using namespace mammut::cpufreq;
+using namespace mammut::energy;
+using namespace mammut::topology;
+
+double Observer::calibrationDurationToPerc(const CalibrationStats& cs,
+                                           uint durationMs){
+    return ((double)cs.duration / (double)durationMs) * 100.0;
+}
+
+Observer::Observer(string statsFile, string calibrationFile, string summaryFile):
+        _startMonitoringMs(0),
+        _totalWatts(0),
+        _totalBw(0),
+        _numSamples(0){
+    _statsFile.open(statsFile.c_str());
+    _calibrationFile.open(calibrationFile.c_str());
+    _summaryFile.open(summaryFile.c_str());
+    if(!_statsFile.is_open() ||
+       !_calibrationFile.is_open() ||
+       !_summaryFile.is_open()){
+        throw runtime_error("Observer: Impossible to open file.");
+    }
+    _statsFile << "TimestampMillisecs" << "\t";
+    _statsFile << "[[EmitterVc][WorkersVc][CollectorVc]]" << "\t";
+    _statsFile << "Workers" << "\t";
+    _statsFile << "Frequency" << "\t";
+    _statsFile << "CurrentBandwidth" << "\t";
+    _statsFile << "SmoothedBandwidth" << "\t";
+    _statsFile << "CoeffVarBandwidth" << "\t";
+    _statsFile << "SmoothedUtilization" << "\t";
+    _statsFile << "SmoothedWatts" << "\t";
+    _statsFile << endl;
+
+    _calibrationFile << "NumSteps" << "\t";
+    _calibrationFile << "Duration" << "\t";
+    _calibrationFile << "Time%" << "\t";
+    _calibrationFile << endl;
+
+    _summaryFile << "Watts" << "\t";
+    _summaryFile << "Bandwidth" << "\t";
+    _summaryFile << "CompletionTime" << "\t";
+    _summaryFile << "Calibration%" << "\t";
+    _summaryFile << endl;
+}
+
+Observer::~Observer(){
+    _statsFile.close();
+    _calibrationFile.close();
+    _summaryFile.close();
+}
+
+void Observer::observe(unsigned int timeStamp,
+                     size_t workers,
+                     Frequency frequency,
+                     const VirtualCore* emitterVirtualCore,
+                     const vector<VirtualCore*>& workersVirtualCore,
+                     const VirtualCore* collectorVirtualCore,
+                     double currentBandwidth,
+                     double smoothedBandwidth,
+                     double coeffVarBandwidth,
+                     double smoothedUtilization,
+                     Joules smoothedWatts){
+    _statsFile << timeStamp - _startMonitoringMs << "\t";
+    _statsFile << "[";
+    if(emitterVirtualCore){
+        _statsFile << "[" << emitterVirtualCore->getVirtualCoreId() << "]";
+    }
+
+    _statsFile << "[";
+    for(size_t i = 0; i < workersVirtualCore.size(); i++){
+        _statsFile << workersVirtualCore.at(i)->getVirtualCoreId() << ",";
+    }
+    _statsFile << "]";
+
+    if(collectorVirtualCore){
+        _statsFile << "[" << collectorVirtualCore->getVirtualCoreId() << "]";
+    }
+    _statsFile << "]" << "\t";
+
+    _statsFile << workers << "\t";
+    _statsFile << frequency << "\t";
+    _statsFile << currentBandwidth << "\t";
+    _statsFile << smoothedBandwidth << "\t";
+    _statsFile << coeffVarBandwidth << "\t";
+    _statsFile << smoothedUtilization << "\t";
+
+    _statsFile << smoothedWatts << "\t";
+
+    _statsFile << endl;
+
+    _totalWatts += smoothedWatts;
+    _totalBw += currentBandwidth;
+    _numSamples++;
+}
+
+void Observer::calibrationStats(const vector<CalibrationStats>&
+                              calibrationStats,
+                              uint durationMs){
+
+    for(size_t i = 0; i < calibrationStats.size(); i++){
+        const CalibrationStats& cs = calibrationStats.at(i);
+        _calibrationFile << cs.numSteps << "\t";
+        _calibrationFile << cs.duration << "\t";
+        _calibrationFile << calibrationDurationToPerc(cs, durationMs) << "\t";
+        _calibrationFile << endl;
+    }
+}
+
+void Observer::summaryStats(const vector<CalibrationStats>&
+                          calibrationStats,
+                          uint durationMs){
+    double totalCalibrationPerc = 0.0;
+    for(size_t i = 0; i < calibrationStats.size(); i++){
+        const CalibrationStats& cs = calibrationStats.at(i);
+        totalCalibrationPerc += calibrationDurationToPerc(cs, durationMs);
+    }
+
+    _summaryFile << _totalWatts / (double) _numSamples << "\t";
+    _summaryFile << _totalBw / (double) _numSamples << "\t";
+    _summaryFile << (double) durationMs / 1000.0 << "\t";
+    _summaryFile << totalCalibrationPerc << "\t";
+    _summaryFile << endl;
+}
+
+}
