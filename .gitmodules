@@ -1,0 +1,3 @@
+[submodule "src/external/Mammut"]
+	path = src/external/Mammut
+	url = https://github.com/DanieleDeSensi/Mammut.git

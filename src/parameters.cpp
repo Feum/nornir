@@ -505,8 +505,8 @@ Parameters::Parameters(Communicator* const communicator):
 }
 
 Parameters::Parameters(const string& paramFileName,
-                     const string& archFileName,
-                     Communicator* const communicator):
+                       const string& archFileName,
+                       Communicator* const communicator):
       mammut(communicator){
     setDefault();
     archData.loadXml(archFileName);

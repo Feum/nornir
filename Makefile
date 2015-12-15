@@ -1,4 +1,4 @@
-MAMMUT_ROOT                 = $(HOME)/Code/Mammut
+MAMMUT_ROOT                 = $(realpath ./src/external/Mammut)
 
 export GRAPE_PATH           = /usr/local
 export GRAPE_PATH_LIB       = $(GRAPE_PATH)/lib
@@ -16,6 +16,7 @@ export LDFLAGS               = -L$(MAMMUT_ROOT)/mammut -L$(realpath .)/src
 .PHONY: all clean cleanall install uninstall
 
 all:
+	git submodule update --init --recursive
 	$(MAKE) -C src
 	$(MAKE) -C demo
 	$(MAKE) -C examples
