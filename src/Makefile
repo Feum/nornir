@@ -14,6 +14,7 @@ cleanall:
 lib: $(TARGET)
 	ar rc libgrape.a $(TARGET)
 	ranlib libgrape.a
+	ar -M < buildlib.ar
 install:
 	mkdir -p $(GRAPE_PATH_INCLUDE)
 	find . -name '*.hpp' -exec cp --parents \{\} $(GRAPE_PATH_INCLUDE) \;

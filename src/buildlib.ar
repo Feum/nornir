@@ -1,0 +1,4 @@
+OPEN libgrape.a
+ADDLIB external/Mammut/mammut/libmammut.a
+SAVE
+END

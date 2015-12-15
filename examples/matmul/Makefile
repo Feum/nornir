@@ -34,8 +34,6 @@ OMP_FLAGS 	     = -fopenmp #-openmp
 CXXFLAGS             = -std=c++11 -DNO_CMAKE_CONFIG -Wall #-DALLOCATOR_STATS #-DTRACE_FASTFLOW
 CFLAGS               =
 LDFLAGS              = 
-#INCS                 = -I../../ -I/home/desensi/include -I/home/desensi/Mammut -I/home/desensi/adaptivefastflow
-#LIBS                 = -lpthread -L/home/desensi/Mammut/mammut -lmammut -L/home/desensi/lib -lprotobuf-lite -lrt
 
 INCLUDES             = -I. $(INCS)
 TBB_INCLUDES         = -I /opt/local/include/tbb/
