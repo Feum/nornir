@@ -53,9 +53,9 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
     _statsFile.open(statsFile.c_str());
     _calibrationFile.open(calibrationFile.c_str());
     _summaryFile.open(summaryFile.c_str());
-    if(!_statsFile.is_open() ||
-       !_calibrationFile.is_open() ||
-       !_summaryFile.is_open()){
+    if(!_statsFile ||
+       !_calibrationFile ||
+       !_summaryFile){
         throw runtime_error("Observer: Impossible to open file.");
     }
     _statsFile << "TimestampMillisecs" << "\t";

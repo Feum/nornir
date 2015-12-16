@@ -40,7 +40,7 @@ using mammut::utils::enumStrings;
 XmlTree::XmlTree(const string& fileName, const string& rootName){
     rapidxml::xml_document<> xmlContent;
     ifstream file(fileName.c_str());
-    if(!file.is_open()){
+    if(!file){
         throw runtime_error("Impossible to read xml file " + fileName);
     }
 
