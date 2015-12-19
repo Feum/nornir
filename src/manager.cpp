@@ -161,7 +161,9 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
         /****************** Clean state ******************/
         _lastStoredSampleMs = getMillisecondsTime();
         _samples->reset();
-        _counter->reset();
+        if(_counter){
+            _counter->reset();
+        }
         _totalTasks = 0;
     }
 }
@@ -226,13 +228,15 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
         }
     }
 
-    switch(_counter->getType()){
-        case COUNTER_CPUS:{
-            joules = ((CounterCpus*) _counter)->getJoulesCoresAll();
-        }break;
-        default:{
-            joules = _counter->getJoules();
-        }break;
+    if(_counter){
+        switch(_counter->getType()){
+            case COUNTER_CPUS:{
+                joules = ((CounterCpus*) _counter)->getJoulesCoresAll();
+            }break;
+            default:{
+                joules = _counter->getJoules();
+            }break;
+        }
     }
 
     double now = getMillisecondsTime();
@@ -250,7 +254,9 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     sample.bandwidth = ws.bandwidthTotal;
     sample.latency = ws.latency;
 
-    _counter->reset();
+    if(_counter){
+        _counter->reset();
+    }
     _samples->add(sample);
 
     DEBUGB(samplesFile << *_samples << "\n");
@@ -390,7 +396,9 @@ void ManagerFarm<lb_t, gt_t>::run(){
     _configuration.maxAllKnobs();
 
     _startTimeMs = getMillisecondsTime();
-    _counter->reset();
+    if(_counter){
+        _counter->reset();
+    }
     _lastStoredSampleMs = _startTimeMs;
     if(_p.observer){
         _p.observer->_startMonitoringMs = _lastStoredSampleMs;

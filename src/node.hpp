@@ -234,6 +234,14 @@ private:
     void callbackIn(void *p) CX11_KEYWORD(final);
 
     /**
+     * The callback that will be executed by the ff_node after
+     * pushing a task to a queue.
+     * @param p Is the lb_t or gt_t in case of emitter or collector.
+     */
+    void callbackOut(void *p) CX11_KEYWORD(final);
+
+
+    /**
      * Notify the end of stream.
      */
     void eosnotify(ssize_t) CX11_KEYWORD(final);

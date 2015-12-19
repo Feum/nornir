@@ -236,6 +236,10 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
     }
 }
 
+void AdaptiveNode::callbackOut(void *p) CX11_KEYWORD(final){
+    callbackIn(p);
+}
+
 void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
     if(!_goingToFreeze){
         _terminated = true;
