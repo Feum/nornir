@@ -136,7 +136,7 @@ private:
     AdaptiveNode* _emitter;
     AdaptiveNode* _collector;
     ff::ff_gatherer* _gt;
-    const std::vector<AdaptiveNode*>& _allWorkers;
+    const std::vector<AdaptiveNode*> _allWorkers;
     std::vector<AdaptiveNode*> _activeWorkers;
     std::vector<double> _knobValues;
 };
