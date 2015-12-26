@@ -214,7 +214,7 @@ template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     MonitoredSample sample;
     WorkerSample ws;
-    Joules joules;
+    Joules joules = 0.0;
 
     askForWorkersSamples();
     getWorkersSamples(ws);

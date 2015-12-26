@@ -185,6 +185,10 @@ void AdaptiveNode::storeSample(){
     int* dummyPtr = &dummy;
     ticks now = getticks();
     ticks totalTicks = now - _startTicks;
+
+    _ticksTot = tickstot; tickstot = 0;
+    _tasksCount = taskcnt; taskcnt = 0;
+
     _sampleResponse.loadPercentage = ((double) (_ticksTot) /
                                       (double) totalTicks) * 100.0;
     _sampleResponse.tasksCount = _tasksCount;

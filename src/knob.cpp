@@ -257,6 +257,7 @@ void KnobMapping::changeValueReal(double v){
     }
 
     /** Updates unused virtual cores. **/
+    _unusedVirtualCores.clear();
     for(size_t i = 0; i < _vcOrder.size(); i++){
         VirtualCore* vc = _vcOrder.at(i);
         if(vc != _emitterVirtualCore && vc != _collectorVirtualCore &&
