@@ -306,7 +306,7 @@ private:
     double _secondaryPrediction;
 
     bool highError(double primaryValue, double secondaryValue) const;
-    void refine(bool isContractViolated);
+    void refine();
 
     /**
      * Checks if x is a best suboptimal monitored value than y.
@@ -330,23 +330,22 @@ private:
     bool isFeasiblePrimaryValue(double value, double tolerance = 0) const;
 
     /**
-     * Computes the best relative knobs values for the farm.
-     * @param primaryValue The primary value.
-     * @param secondaryValue The secondary value.
-     * @param remainingTasks The remaining tasks.
-     * @return The best relative knobs values.
-     */
-    KnobsValues getBestKnobsValues(double primaryValue, double secondaryValue,
-                                   u_int64_t remainingTasks);
-
-
-    /**
      * Checks if the contract is violated.
      * @param primaryValue The primary value.
      * @return true if the contract has been violated, false otherwise.
      */
     bool isContractViolated(double primaryValue) const;
 protected:
+    /**
+     * Computes the best relative knobs values for the farm.
+     * @param primaryValue The primary value.
+     * @param remainingTasks The remaining tasks.
+     * @return The best relative knobs values.
+     */
+    KnobsValues getBestKnobsValues(double primaryValue,
+                                   u_int64_t remainingTasks);
+
+
     /**
      *  Override this method to provide custom ways to generate
      *  relative knobs values for calibration.
@@ -369,11 +368,34 @@ public:
      *
      * @return The next values to be set for the knobs.
      */
+    virtual KnobsValues getNextKnobsValues(double primaryValue,
+                                           double secondaryValue,
+                                           u_int64_t remainingTasks);
+
+    std::vector<CalibrationStats> getCalibrationsStats() const;
+};
+
+/**
+ * This calibrator doesn't calibrate. It always tries to make
+ * predictions. This should only be used with predictors
+ * that do not need to be calibrated (e.g. simple predictor).
+ */
+class CalibratorDummy: public Calibrator{
+public:
+    CalibratorDummy(const Parameters& p,
+                    const FarmConfiguration& configuration,
+                    const Smoother<MonitoredSample>* samples):
+                        Calibrator(p, configuration, samples){;}
+protected:
+    KnobsValues generateRelativeKnobsValues() const{
+        KnobsValues kv;
+        return kv;
+    }
+    void reset(){;}
+public:
     KnobsValues getNextKnobsValues(double primaryValue,
                                    double secondaryValue,
                                    u_int64_t remainingTasks);
-
-    std::vector<CalibrationStats> getCalibrationsStats() const;
 };
 
 /**

@@ -59,7 +59,7 @@ static double getVoltage(VoltageTable table, const KnobsValues& values){
         return it->second;
     }else{
         throw runtime_error("Frequency and/or number of virtual cores "
-                                 "not found in voltage table.");
+                            "not found in voltage table.");
     }
 }
 
@@ -360,8 +360,7 @@ void PredictorSimple::prepareForPredictions(){
 double PredictorSimple::predict(const KnobsValues& values){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            return _samples->average().bandwidth *
-                   getScalingFactor(values);
+            return _samples->average().bandwidth * getScalingFactor(values);
         }break;
         case PREDICTION_POWER:{
             return getPowerPrediction(values);
@@ -418,11 +417,7 @@ Calibrator::Calibrator(const Parameters& p,
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
 }
 
-void Calibrator::refine(bool isContractViolated){
-    // We have to refine only if a new configuration will be generated.
-    if(_state == CALIBRATION_FINISHED && isContractViolated){
-        return;
-    }
+void Calibrator::refine(){
     _primaryPredictor->refine();
     _secondaryPredictor->refine();
 }
@@ -521,7 +516,6 @@ bool Calibrator::isFeasiblePrimaryValue(double value, double tolerance) const{
 }
 
 KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
-                                           double secondaryValue,
                                            u_int64_t remainingTasks){
     KnobsValues bestValues(KNOB_VALUE_REAL);
     KnobsValues bestSuboptimalValues = _configuration.getRealValues();
@@ -632,6 +626,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                                            double secondaryValue,
                                            u_int64_t remainingTasks){
     KnobsValues kv;
+    bool contractViolated = isContractViolated(primaryValue);
 
     if(_numCalibrationPoints == 0){
         _calibrationStartMs = getMillisecondsTime();
@@ -648,7 +643,16 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
      * been real executed.
      **/
     if(_firstPointGenerated){
-        refine(isContractViolated(primaryValue));
+        /**
+         * When we are in the final state and the contract is not violated
+         * (so we remain in the same configuration), we do not still have to
+         * refine the predictions.
+         */
+        if(_state == CALIBRATION_FINISHED && !contractViolated){
+            ;
+        }else{
+            refine();
+        }
     }else{
         _firstPointGenerated = true;
     }
@@ -662,8 +666,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             }
         }break;
         case CALIBRATION_TRY_PREDICT:{
-            kv = getBestKnobsValues(primaryValue, secondaryValue,
-                                    remainingTasks);
+            kv = getBestKnobsValues(primaryValue, remainingTasks);
             _state = CALIBRATION_EXTRA_POINT;
             DEBUG("[Calibrator]: Moving to extra");
         }break;
@@ -673,15 +676,13 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: High error");
                 DEBUG("[Calibrator]: Moving to predict");
-            }else if(isContractViolated(primaryValue)){
+            }else if(contractViolated){
                 DEBUG("[Calibrator]: Contract violated");
-                kv = getBestKnobsValues(primaryValue, secondaryValue,
-                                        remainingTasks);
+                kv = getBestKnobsValues(primaryValue, remainingTasks);
                 _state = CALIBRATION_TRY_PREDICT;
                 DEBUG("[Calibrator]: Moving to predict");
             }else{
-                kv = getBestKnobsValues(primaryValue, secondaryValue,
-                                        remainingTasks);
+                kv = getBestKnobsValues(primaryValue, remainingTasks);
                 _state = CALIBRATION_FINISHED;
                 _primaryPredictor->clear();
                 _secondaryPredictor->clear();
@@ -698,14 +699,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             }
         }break;
         case CALIBRATION_FINISHED:{
-            /*
-            if(highError()){
-                fc = _seeds.at(0);
-                _nextSeed = 1;
-                _state = CALIBRATION_SEEDS;
-                DEBUG("========Moving to seeds");
-            }else*/
-            if(isContractViolated(primaryValue)){
+            if(contractViolated){
                 reset();
                 kv = generateRelativeKnobsValues();
                 _numCalibrationPoints = 1;
@@ -728,6 +722,13 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
 std::vector<CalibrationStats> Calibrator::getCalibrationsStats() const{
     return _calibrationStats;
 }
+
+KnobsValues CalibratorDummy::getNextKnobsValues(double primaryValue,
+                                                double secondaryValue,
+                                                u_int64_t remainingTasks){
+    return getBestKnobsValues(primaryValue, remainingTasks);
+}
+
 
 CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(const Parameters& p,
                                                    const FarmConfiguration& configuration,

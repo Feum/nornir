@@ -39,6 +39,10 @@
 #ifndef ADAPTIVE_FASTFLOW_FARM_HPP_
 #define ADAPTIVE_FASTFLOW_FARM_HPP_
 
+#if !defined(TRACE_FASTFLOW) || !defined(FF_TASK_CALLBACK)
+#error "TRACE_FASTFLOW and FF_TASK_CALLBACK macros need to be defined."
+#endif
+
 #include "configuration.hpp"
 #include "knob.hpp"
 #include "parameters.hpp"

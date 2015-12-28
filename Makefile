@@ -16,7 +16,7 @@ export LDFLAGS               = -L$(MAMMUT_ROOT)/mammut -L$(realpath .)/src
 .PHONY: all clean cleanall install uninstall
 
 all:
-	git submodule update --init --recursive
+	python submodules_init.py
 	git submodule foreach git pull -q origin master
 	$(MAKE) -C src
 	$(MAKE) -C demo

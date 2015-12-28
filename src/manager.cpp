@@ -287,7 +287,14 @@ void ManagerFarm<lb_t, gt_t>::initPredictors(){
     if(_p.strategyCalibration == STRATEGY_CALIBRATION_RANDOM){
         ; //CREARE TODO: Ci deve sempre essere un calibratore
     }else{
-        _calibrator = new CalibratorLowDiscrepancy(_p, _configuration, _samples);
+        switch(_p.strategyPrediction){
+            case STRATEGY_PREDICTION_SIMPLE:{
+                _calibrator = new CalibratorDummy(_p, _configuration, _samples);
+            }break;
+            case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
+                _calibrator = new CalibratorLowDiscrepancy(_p, _configuration, _samples);
+            }break;
+        }
     }
 }
 
@@ -438,7 +445,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
             DEBUG("New sample stored.");
 
             if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-                uint now = getMillisecondsTime()/1000.0;
+                double now = getMillisecondsTime()/1000.0;
                 if(now >= _deadline){
                     _p.requiredBandwidth = numeric_limits<double>::max();
                 }else{
