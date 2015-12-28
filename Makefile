@@ -13,16 +13,15 @@ export LDLIBS                =  -lgrape -pthread -lrt -lm -lmlpack -llapack -lbl
 export INCS                  = -I$(realpath ./src/external/fastflow) -I$(MAMMUT_ROOT) -I/usr/include/libxml2
 export LDFLAGS               = -L$(MAMMUT_ROOT)/mammut -L$(realpath .)/src
 
-.PHONY: all clean cleanall install uninstall
+.PHONY: all demo clean cleanall install uninstall
 
 all:
 	python submodules_init.py
 	git submodule foreach git pull -q origin master
 	$(MAKE) -C src
-	$(MAKE) -C demo
-	$(MAKE) -C examples
 clean: 
 	$(MAKE) -C src clean
+demo:
 	$(MAKE) -C demo clean
 	$(MAKE) -C examples clean
 cleanall:
