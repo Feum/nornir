@@ -22,8 +22,8 @@ all:
 clean: 
 	$(MAKE) -C src clean
 demo:
-	$(MAKE) -C demo clean
-	$(MAKE) -C examples clean
+	$(MAKE) -C demo 
+	$(MAKE) -C examples
 cleanall:
 	$(MAKE) -C src cleanall
 	$(MAKE) -C demo cleanall
