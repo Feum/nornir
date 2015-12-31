@@ -395,6 +395,8 @@ void ManagerFarm<lb_t, gt_t>::cleanNodes() {
     }
 }
 
+#define PAR_BEGIN_ENV "__PAR_BEGIN"
+
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::run(){
     initNodesPreRun();
@@ -404,6 +406,16 @@ void ManagerFarm<lb_t, gt_t>::run(){
     if(_p.contractType != CONTRACT_NONE){
         _configuration.maxAllKnobs();
     }
+
+    /** Creates the parallel section begin file. **/
+    char* default_in_roi = (char*) malloc(sizeof(char)*256);
+    default_in_roi[0]='\0';
+    default_in_roi = strcat(default_in_roi, getenv("HOME"));
+    default_in_roi = strcat(default_in_roi, "/roi_in");
+    setenv(PAR_BEGIN_ENV, default_in_roi, 0);
+    free(default_in_roi);
+    FILE* in_roi = fopen(getenv(PAR_BEGIN_ENV), "w");
+    fclose(in_roi);
 
     _startTimeMs = getMillisecondsTime();
     if(_counter){
@@ -468,6 +480,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
     }
 
     double duration = getMillisecondsTime() - _startTimeMs;
+    unlink(getenv(PAR_BEGIN_ENV));
     if(_p.observer){
         vector<CalibrationStats> cs;
         if(_calibrator){
