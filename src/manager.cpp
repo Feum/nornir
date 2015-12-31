@@ -406,6 +406,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
     }
 
     _startTimeMs = getMillisecondsTime();
+    std::cout << "Starttime: " << _startTimeMs << std::endl;
     if(_counter){
         _counter->reset();
     }
@@ -422,8 +423,6 @@ void ManagerFarm<lb_t, gt_t>::run(){
     initPredictors();
 
     double microsecsSleep = 0;
-    double startSample = getMillisecondsTime();
-
     if(_p.contractType == CONTRACT_NONE){
         _farm->wait();
         storeNewSample();
@@ -432,6 +431,8 @@ void ManagerFarm<lb_t, gt_t>::run(){
         /* Force the first calibration point. **/
         assert(_calibrator);
         changeKnobs();
+
+        double startSample = getMillisecondsTime();
 
         while(!terminated()){
             double overheadMs = getMillisecondsTime() - startSample;
@@ -468,6 +469,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
     }
 
     uint duration = getMillisecondsTime() - _startTimeMs;
+    std::cout << "Duration: " << duration << std::endl;
     if(_p.observer){
         vector<CalibrationStats> cs;
         if(_calibrator){
