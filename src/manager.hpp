@@ -39,11 +39,6 @@
 #ifndef ADAPTIVE_FASTFLOW_FARM_HPP_
 #define ADAPTIVE_FASTFLOW_FARM_HPP_
 
-#ifdef FF_FARM_HPP
-#error "ERROR: farm.hpp has been included somewhere. To succesfully use this " \
-       "library you only need to include manager.hpp."
-#endif
-
 //#if !defined(TRACE_FASTFLOW) || !defined(FF_TASK_CALLBACK)
 //#error "TRACE_FASTFLOW and FF_TASK_CALLBACK macros need to be defined."
 //#endif
