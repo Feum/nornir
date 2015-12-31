@@ -37,8 +37,6 @@
 
 #include <mammut/mammut.hpp>
 
-#include <ff/farm.hpp>
-
 #include <mlpack/core.hpp>
 #include <mlpack/methods/linear_regression/linear_regression.hpp>
 
