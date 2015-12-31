@@ -519,6 +519,9 @@ Parameters::~Parameters(){
 
 ParametersValidation Parameters::validate(){
     ParametersValidation r = VALIDATION_OK;
+    if(contractType == CONTRACT_NONE){
+        return VALIDATION_OK;
+    }
     setDefaultPost();
 
     /** Validate frequency knob. **/
