@@ -422,6 +422,8 @@ void ManagerFarm<lb_t, gt_t>::run(){
     initPredictors();
 
     double microsecsSleep = 0;
+    double startSample = getMillisecondsTime();
+
     if(_p.contractType == CONTRACT_NONE){
         _farm->wait();
         storeNewSample();
@@ -430,8 +432,6 @@ void ManagerFarm<lb_t, gt_t>::run(){
         /* Force the first calibration point. **/
         assert(_calibrator);
         changeKnobs();
-
-        double startSample = getMillisecondsTime();
 
         while(!terminated()){
             double overheadMs = getMillisecondsTime() - startSample;
