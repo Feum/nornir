@@ -400,7 +400,10 @@ void ManagerFarm<lb_t, gt_t>::run(){
     initNodesPreRun();
     _farm->run_then_freeze();
     initNodesPostRun();
-    _configuration.maxAllKnobs();
+
+    if(_p.contractType != CONTRACT_NONE){
+        _configuration.maxAllKnobs();
+    }
 
     _startTimeMs = getMillisecondsTime();
     if(_counter){
@@ -413,8 +416,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
 
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
         _remainingTasks = _p.expectedTasksNumber;
-        _deadline = getMillisecondsTime()/1000.0 +
-                    _p.requiredCompletionTime;
+        _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
     }
 
     initPredictors();
