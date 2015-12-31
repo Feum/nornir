@@ -406,7 +406,6 @@ void ManagerFarm<lb_t, gt_t>::run(){
     }
 
     _startTimeMs = getMillisecondsTime();
-    std::cout << "Starttime: " << _startTimeMs << std::endl;
     if(_counter){
         _counter->reset();
     }
@@ -468,8 +467,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
         DEBUG("Terminated.");
     }
 
-    uint duration = getMillisecondsTime() - _startTimeMs;
-    std::cout << "Duration: " << duration << std::endl;
+    double duration = getMillisecondsTime() - _startTimeMs;
     if(_p.observer){
         vector<CalibrationStats> cs;
         if(_calibrator){
