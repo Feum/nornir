@@ -41,7 +41,8 @@ FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
         AdaptiveNode* collector, ff::ff_gatherer* gt,
         std::vector<AdaptiveNode*> workers,
         Smoother<MonitoredSample> const* samples):
-        _p(p){
+        _p(p),
+        _knobsChangeNeeded(false){
     /************************************************************/
     /*                           KNOBS                          */
     /************************************************************/
@@ -65,6 +66,9 @@ FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
     std::vector<double> accum;
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         values.push_back(_knobs[i]->getAllowedValues());
+        if(_knobs[i]->needsCalibration()){
+            _knobsChangeNeeded = true;
+        }
     }
     combinations(values, 0, accum);
 
@@ -73,7 +77,8 @@ FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
     /************************************************************/
     _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
                                                               p.thresholdQBlocking,
-                                                              samples);
+                                                              samples,
+                                                              emitter);
 }
 
 FarmConfiguration::~FarmConfiguration(){
@@ -100,6 +105,10 @@ void FarmConfiguration::combinations(std::vector<std::vector<double> > array, si
     }
 }
 
+bool FarmConfiguration::knobsChangeNeeded() const{
+    return _knobsChangeNeeded;
+}
+
 const std::vector<KnobsValues>& FarmConfiguration::getAllRealCombinations() const{
     return _combinations;
 }
@@ -115,6 +124,9 @@ const Knob* FarmConfiguration::getKnob(KnobType t) const{
 }
 
 void FarmConfiguration::maxAllKnobs(){
+    if(!_knobsChangeNeeded){
+        return;
+    }
     DEBUG("Maxing all the knobs.");
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         _knobs[(KnobType) i]->setToMax();

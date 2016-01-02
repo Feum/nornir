@@ -43,6 +43,8 @@ private:
     Trigger* _triggers[TRIGGER_TYPE_NUM];
     const Parameters& _p;
     std::vector<KnobsValues> _combinations;
+    bool _knobsChangeNeeded;
+
     void combinations(std::vector<std::vector<double> > array, size_t i,
                       std::vector<double> accum);
     void setRelativeValues(const KnobsValues& values);
@@ -55,6 +57,12 @@ public:
 
 
     ~FarmConfiguration();
+
+    /**
+     * Returns true if the knobs values need to be changed, false otherwise.
+     * @return True if the knobs values need to be changed, false otherwise.
+     */
+    bool knobsChangeNeeded() const;
 
     /**
      * Gets all the possible combinations of knobs values.

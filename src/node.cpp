@@ -138,6 +138,24 @@ void AdaptiveNode::askForSample(){
     DEBUG("ASKFORSAMPLE");
 }
 
+void AdaptiveNode::setQBlocking(){
+    _managementRequest.type = MGMT_REQ_SWITCH_BLOCKING;
+    _managementRequest.mark = (void*) FF_BLK;
+    // The value pushed in the queue will not be read, it could be
+    // anything except NULL.
+    while(!_managementQ.push(&_managementRequest));
+    DEBUG("Queues switched to blocking.");
+}
+
+void AdaptiveNode::setQNonblocking(){
+    _managementRequest.type = MGMT_REQ_SWITCH_BLOCKING;
+    _managementRequest.mark = (void*) FF_NBLK;
+    // The value pushed in the queue will not be read, it could be
+    // anything except NULL.
+    while(!_managementQ.push(&_managementRequest));
+    DEBUG("Queues switched to nonblocking.");
+}
+
 void AdaptiveNode::freezeAll(void* mark){
     _managementRequest.type = MGMT_REQ_FREEZE;
     _managementRequest.mark = mark;
@@ -212,15 +230,13 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
 
     if(!_managementQ.empty()){
         _managementQ.inc();
-        if(_nodeType == NODE_TYPE_EMITTER){
-            DEBUG("Popped something");
-        }
         switch(_managementRequest.type){
             case MGMT_REQ_GET_AND_RESET_SAMPLE:{
                 DEBUG("Get and reset received");
                 storeSample();
             }break;
             case MGMT_REQ_FREEZE:{
+                assert(_nodeType == NODE_TYPE_EMITTER);
                 DEBUG("Freeze request received");
                 ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
                 lb->broadcast_task(_managementRequest.mark);
@@ -231,6 +247,13 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
                 _managementQ.inc();
                 DEBUGB(assert(_managementRequest.type == MGMT_REQ_THAW));
                 lb->thawWorkers(true, _managementRequest.numWorkers);
+            }break;
+            case MGMT_REQ_SWITCH_BLOCKING:{
+                assert(_nodeType == NODE_TYPE_EMITTER);
+                DEBUG("Block/Nonblock request received");
+                ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
+                lb->broadcast_task(_managementRequest.mark);
+                DEBUG("Broadcasted");
             }break;
             default:{
                 throw runtime_error("Unexpected mgmt request.");

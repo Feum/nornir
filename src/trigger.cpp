@@ -31,10 +31,12 @@ namespace adpff{
 
 TriggerQBlocking::TriggerQBlocking(TriggerConfQBlocking confQBlocking,
                                    double thresholdQBlocking,
-                                   Smoother<MonitoredSample> const* samples):
+                                   Smoother<MonitoredSample> const* samples,
+                                   AdaptiveNode* emitter):
         _confQBlocking(confQBlocking),
         _thresholdQBlocking(thresholdQBlocking),
         _samples(samples),
+        _emitter(emitter),
         _blocking(false){
     if(_confQBlocking == TRIGGER_Q_BLOCKING_NO){
         _blocking = false;
@@ -71,11 +73,14 @@ bool TriggerQBlocking::trigger(){
     }
 
     double idleTime = getIdleTime();
+    std::cout << "IDLETIME: " << idleTime << std::endl;
     if(idleTime > _thresholdQBlocking && !_blocking){
-        // TODO: NB -> B
+        _emitter->setQBlocking();
+        _blocking = true;
         return true;
     }else if(idleTime < _thresholdQBlocking && _blocking){
-        // TODO: B -> NB
+        _emitter->setQNonblocking();
+        _blocking = false;
         return true;
     }else{
         return false;

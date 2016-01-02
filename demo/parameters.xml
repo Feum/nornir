@@ -2,5 +2,10 @@
 <adaptivityParameters>
     <samplingInterval>1000</samplingInterval>
     <contractType>POWER_BUDGET</contractType>
-    <powerBudget>30</powerBudget> 
+    <powerBudget>30</powerBudget>
+    <knobWorkers>NO</knobWorkers>
+    <knobFrequencies>NO</knobFrequencies>
+    <knobMapping>NO</knobMapping>
+    <triggerQBlocking>AUTO</triggerQBlocking>
+    <thresholdQBlocking>100000</thresholdQBlocking>  
 </adaptivityParameters>

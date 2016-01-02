@@ -485,6 +485,7 @@ void Parameters::loadXml(const string& paramFileName){
     XmlTree xt(paramFileName, "adaptivityParameters");
 
     SETVALUE(xt, Enum, contractType);
+    SETVALUE(xt, Enum, knobWorkers);
     SETVALUE(xt, Enum, knobMapping);
     SETVALUE(xt, Enum, knobHyperthreading);
     SETVALUE(xt, Enum, knobFrequencies);
@@ -496,6 +497,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, strategyPersistence);
     SETVALUE(xt, Enum, knobMappingEmitter);
     SETVALUE(xt, Enum, knobMappingCollector);
+    SETVALUE(xt, Enum, triggerQBlocking);
 
     SETVALUE(xt, Bool, turboBoost);
     SETVALUE(xt, Bool, fastReconfiguration);

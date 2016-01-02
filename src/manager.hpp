@@ -138,11 +138,11 @@ private:
     // The vector of active workers.
     std::vector<AdaptiveNode*> _activeWorkers;
 
-    // The current configuration of the farm.
-    FarmConfiguration _configuration;
-
     // Monitored samples;
     Smoother<MonitoredSample>* _samples;
+
+    // The current configuration of the farm.
+    FarmConfiguration _configuration;
 
     // The number of tasks processed since the last reconfiguration.
     double _totalTasks;
@@ -259,6 +259,12 @@ private:
      * Cleans the adaptive nodes.
      */
     void cleanNodes();
+
+    /**
+     * Initializes the samples.
+     * return A samples smoother with no recorded samples.
+     */
+    Smoother<MonitoredSample>* initSamples() const;
 };
 
 }

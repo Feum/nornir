@@ -96,7 +96,10 @@ typedef enum{
     MGMT_REQ_FREEZE,
 
     // Thaws the farm.
-    MGMT_REQ_THAW
+    MGMT_REQ_THAW,
+
+    // Switch to blocking/nonblocking
+    MGMT_REQ_SWITCH_BLOCKING,
 }ManagementRequestType;
 
 /**
@@ -120,6 +123,7 @@ private:
     friend class ManagerFarm;
     friend class KnobWorkers;
     friend class KnobMapping;
+    friend class TriggerQBlocking;
 
     volatile bool _started;
     volatile bool _terminated;
@@ -193,14 +197,29 @@ private:
     void askForSample();
 
     /**
+     * Sets the queues to blocking.
+     * ATTENTION: Can only be called on emitter.
+     */
+    void setQBlocking();
+
+    /**
+     * Sets the queues to nonblocking.
+     * ATTENTION: Can only be called on emitter.
+     */
+    void setQNonblocking();
+
+    /**
      * Tells the node to freeze the farm.
+     * ATTENTION: Can only be called on emitter.
      */
     void freezeAll(void* mark);
 
     /**
      * Thaws the farm.
+     * ATTENTION: Can only be called on emitter.
      */
     void thawAll(size_t numWorkers);
+
     /**
      * Called on the node before starting it.
      * It must be called when the node is running.

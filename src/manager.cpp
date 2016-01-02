@@ -151,6 +151,10 @@ bool ManagerFarm<lb_t, gt_t>::terminated(){
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::changeKnobs(){
+    if(!_configuration.knobsChangeNeeded()){
+        return;
+    }
+
     KnobsValues values = _calibrator->getNextKnobsValues(getPrimaryValue(),
                                                          getSecondaryValue(),
                                                          _remainingTasks);
@@ -326,25 +330,14 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
         _emitter(dynamic_cast<AdaptiveNode*>(_farm->getEmitter())),
         _collector(dynamic_cast<AdaptiveNode*>(_farm->getCollector())),
         _activeWorkers(convertWorkers(_farm->getWorkers())),
-        _samples(NULL),
+        _samples(initSamples()),
+        _configuration(_p, _emitter, _collector, _farm->getgt(), _activeWorkers,
+                       _samples),
         _totalTasks(0),
         _remainingTasks(0),
         _deadline(0),
         _lastStoredSampleMs(0),
         _calibrator(NULL){
-
-    _samples = NULL;
-    switch(_p.strategySmoothing){
-    case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
-        _samples = new MovingAverageSimple<MonitoredSample>(_p.smoothingFactor);
-    }break;
-    case STRATEGY_SMOOTHING_EXPONENTIAL:{
-        _samples = new MovingAverageExponential<MonitoredSample>(_p.smoothingFactor);
-    }break;
-    }
-
-    _configuration(_p, _emitter, _collector, _farm->getgt(), _activeWorkers,
-                   _samples);
     DEBUGB(samplesFile.open("samples.csv"));
 }
 
@@ -355,6 +348,21 @@ ManagerFarm<lb_t, gt_t>::~ManagerFarm(){
         delete _calibrator;
     }
     DEBUGB(samplesFile.close());
+}
+
+template <typename lb_t, typename gt_t>
+Smoother<MonitoredSample>* ManagerFarm<lb_t, gt_t>::initSamples() const{
+    switch(_p.strategySmoothing){
+        case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
+            return new MovingAverageSimple<MonitoredSample>(_p.smoothingFactor);
+        }break;
+        case STRATEGY_SMOOTHING_EXPONENTIAL:{
+            return new MovingAverageExponential<MonitoredSample>(_p.smoothingFactor);
+        }break;
+        default:{
+            return NULL;
+        }
+    }
 }
 
 template <typename lb_t, typename gt_t>
@@ -474,6 +482,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
             if(!persist()){
                 assert(_calibrator);
                 changeKnobs();
+                _configuration.trigger();
                 startSample = getMillisecondsTime();
             }
         }
