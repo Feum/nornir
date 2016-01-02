@@ -82,10 +82,6 @@ double Knob::getRealValue() const{
     return _realValue;
 }
 
-bool Knob::autoFind() const{
-    return getAllowedValues().size() > 1;
-}
-
 #ifdef DEBUG_KNOB
 std::ostream& operator<< (std::ostream& out, const std::vector<AdaptiveNode*>& v){
     out << "[";
@@ -112,6 +108,10 @@ KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
         _knobValues.push_back(_allWorkers.size());
     }
     _activeWorkers = _allWorkers;
+}
+
+bool KnobWorkers::needsCalibration() const{
+    return _confWorkers == KNOB_WORKERS_YES;
 }
 
 void KnobWorkers::changeValueReal(double v){
@@ -230,6 +230,10 @@ KnobMapping::KnobMapping(KnobConfMapping confMapping,
                              _knobWorkers(knobWorkers),
                              _topologyHandler(mammut.getInstanceTopology()){
     computeVcOrderLinear();
+}
+
+bool KnobMapping::needsCalibration() const{
+    return _confMapping == KNOB_MAPPING_AUTO;
 }
 
 #ifdef DEBUG_KNOB
@@ -470,6 +474,10 @@ KnobFrequency::KnobFrequency(KnobConfFrequencies confFrequency,
         }
         DEBUG("[Frequency] Setting userspace governor. Scalable domains: " << scalableDomains);
     }
+}
+
+bool KnobFrequency::needsCalibration() const{
+    return _confFrequency == KNOB_FREQUENCY_YES;
 }
 
 void KnobFrequency::changeValueReal(double v){

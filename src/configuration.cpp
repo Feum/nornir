@@ -39,8 +39,12 @@ namespace adpff{
 
 FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
         AdaptiveNode* collector, ff::ff_gatherer* gt,
-        std::vector<AdaptiveNode*> workers):
+        std::vector<AdaptiveNode*> workers,
+        Smoother<MonitoredSample> const* samples):
         _p(p){
+    /************************************************************/
+    /*                           KNOBS                          */
+    /************************************************************/
     _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p.knobWorkers, emitter,
                                                 collector, gt, workers);
     _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p.knobMapping,
@@ -63,6 +67,13 @@ FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
         values.push_back(_knobs[i]->getAllowedValues());
     }
     combinations(values, 0, accum);
+
+    /************************************************************/
+    /*                         TRIGGERS                         */
+    /************************************************************/
+    _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
+                                                              p.thresholdQBlocking,
+                                                              samples);
 }
 
 FarmConfiguration::~FarmConfiguration(){
@@ -151,6 +162,12 @@ void FarmConfiguration::setValues(const KnobsValues& values){
         setRelativeValues(values);
     }else{
         throw std::runtime_error("KnobsValues with undefined type.");
+    }
+}
+
+void FarmConfiguration::trigger(){
+    for(size_t i = 0; i < TRIGGER_TYPE_NUM; i++){
+        _triggers[i]->trigger();
     }
 }
 

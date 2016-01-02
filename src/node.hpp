@@ -130,7 +130,7 @@ private:
     WorkerSample _sampleResponse;
     double _ticksPerNs;
     ticks _startTicks;
-    ticks _ticksTot;
+    ticks _ticksWork;
     ticks _tasksCount;
     NodeType _nodeType;
 

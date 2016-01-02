@@ -29,10 +29,16 @@
 #define SRC_KNOB_HPP_
 
 #include "node.hpp"
-
 #include <ff/farm.hpp>
 
 namespace adpff{
+
+typedef enum{
+    KNOB_TYPE_WORKERS = 0,
+    KNOB_TYPE_MAPPING,
+    KNOB_TYPE_FREQUENCY,
+    KNOB_TYPE_NUM // <---- This must always be the last value
+}KnobType;
 
 class Knob: public mammut::utils::NonCopyable{
 public:
@@ -69,12 +75,10 @@ public:
     double getRealValue() const;
 
     /**
-     * Returns true if the best value for this knob needs to be automatically
-     * found.
-     * @return True if the best value for this knob needs to be automatically
-     * found.
+     * Returns true if this knob needs to be calibrated.
+     * @return True if this knob needs to be calibrated.
      */
-    bool autoFind() const;
+    virtual bool needsCalibration() const = 0;
 
     /**
      * Returns a vector of allowed values for this knob.
@@ -99,6 +103,7 @@ public:
                 AdaptiveNode* collector, ff::ff_gatherer* gt,
                 const std::vector<AdaptiveNode*> workers);
 
+    bool needsCalibration() const;
     void changeValueReal(double v);
     std::vector<double> getAllowedValues() const;
     uint getNumActiveWorkers() const;
@@ -151,6 +156,7 @@ public:
                 AdaptiveNode* emitter,
                 AdaptiveNode* collector,
                 const KnobWorkers& knobWorkers);
+    bool needsCalibration() const;
     void changeValueReal(double v);
     std::vector<double> getAllowedValues() const;
 
@@ -213,6 +219,7 @@ public:
                   bool useTurboBoost,
                   StrategyUnusedVirtualCores unusedVc,
                   const KnobMapping& knobMapping);
+    bool needsCalibration() const;
     void changeValueReal(double v);
     std::vector<double> getAllowedValues() const;
 private:
@@ -228,13 +235,6 @@ private:
     StrategyUnusedVirtualCores _unusedVc;
     const KnobMapping& _knobMapping;
 };
-
-typedef enum{
-    KNOB_TYPE_WORKERS = 0,
-    KNOB_TYPE_MAPPING,
-    KNOB_TYPE_FREQUENCY,
-    KNOB_TYPE_NUM // <---- This must always be the last value
-}KnobType;
 
 typedef enum{
     KNOB_VALUE_UNDEF = 0,

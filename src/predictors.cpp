@@ -571,16 +571,14 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
             if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
                 secondaryPrediction *= remainingTime;
             }
-            if(isBestSecondaryValue(secondaryPrediction,
-                                    bestSecondaryPrediction)){
+            if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
                 feasibleSolutionFound = true;
                 bestPrimaryPrediction = primaryPrediction;
                 bestSecondaryPrediction = secondaryPrediction;
             }
         }else if(!feasibleSolutionFound &&
-                 isBestSuboptimalValue(primaryPrediction,
-                                       bestSuboptimalValue)){
+                 isBestSuboptimalValue(primaryPrediction, bestSuboptimalValue)){
             bestSuboptimalValue = primaryPrediction;
             bestSuboptimalValues = currentValues;
         }
@@ -736,7 +734,7 @@ CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(const Parameters& p,
         Calibrator(p, configuration, samples){
     uint d = 0;
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        if(_configuration.getKnob((KnobType) i)->autoFind()){
+        if(_configuration.getKnob((KnobType) i)->needsCalibration()){
             ++d;
         }
     }
@@ -776,7 +774,7 @@ KnobsValues CalibratorLowDiscrepancy::generateRelativeKnobsValues() const{
     gsl_qrng_get(_generator, _normalizedPoint);
     size_t nextCoordinate = 0;
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        if(_configuration.getKnob((KnobType) i)->autoFind()){
+        if(_configuration.getKnob((KnobType) i)->needsCalibration()){
             r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
             ++nextCoordinate;
         }else{

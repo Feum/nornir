@@ -173,7 +173,7 @@ void AdaptiveNode::prepareToRun(){
     _startTicks = getticks();
     _goingToFreeze = false;
     _tasksCount = 0;
-    _ticksTot = 0;
+    _ticksWork = 0;
 }
 
 bool AdaptiveNode::isTerminated() const{
@@ -184,25 +184,24 @@ void AdaptiveNode::storeSample(){
     int dummy;
     int* dummyPtr = &dummy;
     ticks now = getticks();
-    ticks totalTicks = now - _startTicks;
+    ticks totalTicks = now - _startTicks; // Including idle periods
 
-    _ticksTot = tickstot; tickstot = 0;
+    _ticksWork = tickstot; tickstot = 0;
     _tasksCount = taskcnt; taskcnt = 0;
 
-    _sampleResponse.loadPercentage = ((double) (_ticksTot) /
-                                      (double) totalTicks) * 100.0;
+    _sampleResponse.loadPercentage = ((double) (_ticksWork) / (double) totalTicks)
+                                     * 100.0;
     _sampleResponse.tasksCount = _tasksCount;
     if(_tasksCount){
-        _sampleResponse.latency = ((double)_ticksTot / (double)_tasksCount) /
+        _sampleResponse.latency = ((double)_ticksWork / (double)_tasksCount) /
                                   _ticksPerNs;
     }else{
         _sampleResponse.latency = 0.0;
     }
-    _sampleResponse.bandwidthTotal = (double) _tasksCount /
-                                     ticksToSeconds(totalTicks);
+    _sampleResponse.bandwidthTotal = (double) _tasksCount / ticksToSeconds(totalTicks);
 
     _tasksCount = 0;
-    _ticksTot = 0;
+    _ticksWork = 0;
     _startTicks = now;
 
     assert(_responseQ.push(dummyPtr));
@@ -259,7 +258,7 @@ AdaptiveNode::AdaptiveNode():
         _goingToFreeze(false),
         _tasksManager(NULL),
         _thread(NULL),
-        _ticksTot(0),
+        _ticksWork(0),
         _tasksCount(0),
         _managementQ(1),
         _responseQ(2){

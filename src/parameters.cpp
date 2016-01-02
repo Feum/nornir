@@ -134,6 +134,7 @@ void Parameters::setDefault(){
     knobMappingEmitter = KNOB_SNODE_MAPPING_AUTO;
     knobMappingCollector = KNOB_SNODE_MAPPING_AUTO;
     knobHyperthreading = KNOB_HT_AUTO;
+    triggerQBlocking = TRIGGER_Q_BLOCKING_NO;
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
     strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
@@ -157,6 +158,7 @@ void Parameters::setDefault(){
     maxPrimaryPredictionError = 5.0;
     maxSecondaryPredictionError = 5.0;
     maxMonitoringOverhead = 1.0;
+    thresholdQBlocking = -1;
     observer = NULL;
 }
 
@@ -339,6 +341,14 @@ ParametersValidation Parameters::validateKnobHt(){
     return VALIDATION_OK;
 }
 
+ParametersValidation Parameters::validateTriggers(){
+    if(triggerQBlocking == TRIGGER_Q_BLOCKING_NO &&
+       thresholdQBlocking == -1){
+        return VALIDATION_NO_BLOCKING_THRESHOLD;
+    }
+    return VALIDATION_OK;
+}
+
 ParametersValidation Parameters::validateContract(){
     switch(contractType){
         case CONTRACT_PERF_UTILIZATION:{
@@ -406,6 +416,13 @@ template<> char const* enumStrings<KnobConfMapping>::data[] = {
     "LINEAR",
     "CACHE_EFFICIENT"
 };
+
+template<> char const* enumStrings<TriggerConfQBlocking>::data[] = {
+    "NO",
+    "YES",
+    "AUTO"
+};
+
 
 template<> char const* enumStrings<KnobConfHyperthreading>::data[] = {
     "NO",
@@ -497,6 +514,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Double, maxPrimaryPredictionError);
     SETVALUE(xt, Double, maxSecondaryPredictionError);
     SETVALUE(xt, Double, maxMonitoringOverhead);
+    SETVALUE(xt, Double, thresholdQBlocking);
 }
 
 Parameters::Parameters(Communicator* const communicator):
@@ -538,6 +556,10 @@ ParametersValidation Parameters::validate(){
 
     /** Validate hyperthreading knob. **/
     r = validateKnobHt();
+    if(r != VALIDATION_OK){return r;}
+
+    /** Validate triggers. **/
+    r = validateTriggers();
     if(r != VALIDATION_OK){return r;}
 
     /** Validate unused cores strategy. **/

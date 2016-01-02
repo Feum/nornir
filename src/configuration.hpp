@@ -31,6 +31,7 @@
 #include "knob.hpp"
 #include "node.hpp"
 #include "parameters.hpp"
+#include "trigger.hpp"
 
 #include <mammut/utils.hpp>
 
@@ -39,6 +40,7 @@ namespace adpff{
 class FarmConfiguration: public mammut::utils::NonCopyable {
 private:
     Knob* _knobs[KNOB_TYPE_NUM];
+    Trigger* _triggers[TRIGGER_TYPE_NUM];
     const Parameters& _p;
     std::vector<KnobsValues> _combinations;
     void combinations(std::vector<std::vector<double> > array, size_t i,
@@ -48,7 +50,8 @@ private:
 public:
     FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
             AdaptiveNode* collector, ff::ff_gatherer* gt,
-            std::vector<AdaptiveNode*> workers);
+            std::vector<AdaptiveNode*> workers,
+            Smoother<MonitoredSample> const* samples);
 
 
     ~FarmConfiguration();
@@ -96,6 +99,10 @@ public:
      */
     void setValues(const KnobsValues& values);
 
+    /**
+     * Triggers the triggers.
+     */
+    void trigger();
 };
 
 }

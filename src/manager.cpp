@@ -326,7 +326,6 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
         _emitter(dynamic_cast<AdaptiveNode*>(_farm->getEmitter())),
         _collector(dynamic_cast<AdaptiveNode*>(_farm->getCollector())),
         _activeWorkers(convertWorkers(_farm->getWorkers())),
-        _configuration(_p, _emitter, _collector, _farm->getgt(), _activeWorkers),
         _samples(NULL),
         _totalTasks(0),
         _remainingTasks(0),
@@ -344,6 +343,8 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
     }break;
     }
 
+    _configuration(_p, _emitter, _collector, _farm->getgt(), _activeWorkers,
+                   _samples);
     DEBUGB(samplesFile.open("samples.csv"));
 }
 

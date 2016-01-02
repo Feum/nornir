@@ -112,6 +112,18 @@ typedef enum{
     KNOB_HT_LATER
 }KnobConfHyperthreading;
 
+/// Communication queues blocking/nonblocking.
+typedef enum{
+    // Non blocking queue.
+    TRIGGER_Q_BLOCKING_NO = 0,
+
+    // Blocking queue.
+    TRIGGER_Q_BLOCKING_YES,
+
+    // Automatically choose between blocking and nonblocking.
+    TRIGGER_Q_BLOCKING_AUTO
+}TriggerConfQBlocking;
+
 /// Possible strategies to apply for unused virtual cores.
 typedef enum{
     // Automatically choose one of the other strategies.
@@ -270,6 +282,9 @@ typedef enum{
 
     // Fast reconfiguration not available.
     VALIDATION_NO_FAST_RECONF,
+
+    // Blocking threshold needs to be specified.
+    VALIDATION_NO_BLOCKING_THRESHOLD
 }ParametersValidation;
 
 /**
@@ -477,6 +492,12 @@ private:
     ParametersValidation validateKnobHt();
 
     /**
+     * Validates the triggers.
+     * @return The result of the validation.
+     */
+    ParametersValidation validateTriggers();
+
+    /**
      * Validates the required contract.
      * @return The result of the validation.
      */
@@ -516,6 +537,9 @@ public:
 
     // Collector mapping knob [default = KNOB_SNODE_MAPPING_AUTO].
     KnobConfSNodeMapping knobMappingCollector;
+
+    // The Q blocking knob [default = KNOB_Q_BLOCKING_NO].
+    TriggerConfQBlocking triggerQBlocking;
 
     // The hyperthreading knob [default = KNOB_HT_AUTO].
     KnobConfHyperthreading knobHyperthreading;
@@ -615,6 +639,14 @@ public:
     // The maximum percentage of monitoring overhead, in the range (0, 100).
     // [default = 1.0].
     double maxMonitoringOverhead;
+
+    // Idle threshold (in microseconds) to switch from non blocking to blocking
+    // runtime support. If the current idle time goes above this value,
+    // and if the runtime has been configured to do so, it will switch
+    // from non blocking to blocking support (and viceversa). If -1.0,
+    // the runtime will never switch [default = -1.0].
+    double thresholdQBlocking;
+
 
     // The observer object. It will be called every samplingInterval
     // milliseconds to monitor the adaptivity behaviour [default = NULL].
