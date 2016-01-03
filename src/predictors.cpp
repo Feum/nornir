@@ -74,9 +74,9 @@ static void getPowerProportions(VoltageTable table, uint physicalCores,
     double voltage = 0;
     staticPower = 0;
     dynamicPower = 0;
-    int currentCores = 0;
+    uint currentCores = 0;
     while(numCores > 0){
-        currentCores = (numCores < coresPerDomain)?numCores:coresPerDomain;
+        currentCores = (numCores < (int) coresPerDomain)?(uint)numCores:coresPerDomain;
         voltage = getVoltage(table, currentCores, frequency);
 
         staticPower += voltage;
@@ -176,8 +176,8 @@ void RegressionDataPower::init(const KnobsValues& values){
         uint unusedCpus = _cpus - usedCpus;
 
         double staticPowerProp = 0, dynamicPowerProp = 0;
-        getPowerProportions(_p.archData.voltageTable, values[KNOB_TYPE_WORKERS],
-                values[KNOB_TYPE_FREQUENCY], _phyCoresPerCpu,
+        getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
+                frequency, _phyCoresPerCpu,
                 staticPowerProp, dynamicPowerProp);
         _voltagePerUsedSockets = staticPowerProp;
         ++_numPredictors;
@@ -192,7 +192,7 @@ void RegressionDataPower::init(const KnobsValues& values){
                  * should be modified as future work.
                  */
                 default:{
-                    frequencyUnused = values[KNOB_TYPE_FREQUENCY];
+                    frequencyUnused = frequency;
                 }
             }
             double voltage = getVoltage(_p.archData.voltageTable, 0, frequencyUnused);
