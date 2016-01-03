@@ -52,14 +52,37 @@ namespace adpff{
 using namespace mammut::cpufreq;
 using namespace mammut::utils;
 
-static double getVoltage(VoltageTable table, const KnobsValues& values){
-    VoltageTableKey key(values[KNOB_TYPE_WORKERS], values[KNOB_TYPE_FREQUENCY]);
+static double getVoltage(VoltageTable table, uint workers, Frequency frequency){
+    VoltageTableKey key(workers, frequency);
     VoltageTableIterator it = table.find(key);
     if(it != table.end()){
         return it->second;
     }else{
         throw runtime_error("Frequency and/or number of virtual cores "
                             "not found in voltage table.");
+    }
+}
+
+/**
+ * Computes a proportional value for power consumption of a configuration.
+ * ATTENTION: Assumes linear mapping of the workers on the cores.
+ */
+static void getPowerProportions(VoltageTable table, uint physicalCores,
+                                Frequency frequency, uint coresPerDomain,
+                                double& staticPower, double& dynamicPower){
+    int numCores = physicalCores;
+    double voltage = 0;
+    staticPower = 0;
+    dynamicPower = 0;
+    int currentCores = 0;
+    while(numCores > 0){
+        currentCores = (numCores < coresPerDomain)?numCores:coresPerDomain;
+        voltage = getVoltage(table, currentCores, frequency);
+
+        staticPower += voltage;
+        dynamicPower += currentCores*frequency*voltage*voltage;
+
+        numCores -= coresPerDomain;
     }
 }
 
@@ -120,7 +143,6 @@ void RegressionDataPower::init(const KnobsValues& values){
     double usedPhysicalCores = std::min(numWorkers, _phyCores);
 
     if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
-        double voltage = getVoltage(_p.archData.voltageTable, values);
         uint usedCpus = 0;
         if(_p.knobMapping == KNOB_MAPPING_LINEAR){
             switch(_p.knobHyperthreading){
@@ -153,17 +175,35 @@ void RegressionDataPower::init(const KnobsValues& values){
         usedCpus = std::min(usedCpus, _cpus);
         uint unusedCpus = _cpus - usedCpus;
 
-        _voltagePerUsedSockets = voltage * (double) usedCpus;
+        double staticPowerProp = 0, dynamicPowerProp = 0;
+        getPowerProportions(_p.archData.voltageTable, values[KNOB_TYPE_WORKERS],
+                values[KNOB_TYPE_FREQUENCY], _phyCoresPerCpu,
+                staticPowerProp, dynamicPowerProp);
+        _voltagePerUsedSockets = staticPowerProp;
         ++_numPredictors;
 
         if(_cpus > 1){
-            _voltagePerUnusedSockets = voltage * (double) unusedCpus;
+            Frequency frequencyUnused;
+            switch(_strategyUnused){
+                /**
+                 * TODO:
+                 * For simplicity we assume that the frequency of the unused
+                 * sockets is equal to the frequency of the used sockets. This
+                 * should be modified as future work.
+                 */
+                default:{
+                    frequencyUnused = values[KNOB_TYPE_FREQUENCY];
+                }
+            }
+            double voltage = getVoltage(_p.archData.voltageTable, 0, frequencyUnused);
+            _voltagePerUnusedSockets = voltage * unusedCpus;
             ++_numPredictors;
         }
 
-        _dynamicPowerModel = (usedPhysicalCores*frequency*voltage*voltage);
+        _dynamicPowerModel = dynamicPowerProp;
         ++_numPredictors;
     }else{
+        //TODO: No, moltiplicare comunque per frequenza corrente e v^2, se possibile
         _dynamicPowerModel = usedPhysicalCores;
         ++_numPredictors;
     }
@@ -180,6 +220,7 @@ RegressionDataPower::RegressionDataPower(const Parameters& p,
     _phyCores = t->getPhysicalCores().size();
     _phyCoresPerCpu = t->getCpu(0)->getPhysicalCores().size();
     _virtCoresPerPhyCores = t->getPhysicalCore(0)->getVirtualCores().size();
+    _strategyUnused = _p.strategyUnusedVirtualCores;
     init(_configuration.getRealValues());
 }
 
@@ -339,7 +380,9 @@ PredictorSimple::PredictorSimple(PredictorType type,
                                  const FarmConfiguration& configuration,
                                  const Smoother<MonitoredSample>* samples):
             Predictor(type, p, configuration, samples) {
-    ;
+    Topology* t = _p.mammut.getInstanceTopology();
+    _phyCores = t->getPhysicalCores().size();
+    _phyCoresPerCpu = t->getCpu(0)->getPhysicalCores().size();
 }
 
 double PredictorSimple::getScalingFactor(const KnobsValues& values){
@@ -349,8 +392,12 @@ double PredictorSimple::getScalingFactor(const KnobsValues& values){
 }
 
 double PredictorSimple::getPowerPrediction(const KnobsValues& values){
-    Voltage v = getVoltage(_p.archData.voltageTable, values);
-    return values[KNOB_TYPE_WORKERS]*values[KNOB_TYPE_FREQUENCY]*v*v;
+    double staticPower = 0, dynamicPower = 0;
+    double usedPhysicalCores = std::min((uint) values[KNOB_TYPE_WORKERS], _phyCores);
+    getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
+                        values[KNOB_TYPE_FREQUENCY], _phyCoresPerCpu,
+                        staticPower, dynamicPower);
+    return dynamicPower;
 }
 
 void PredictorSimple::prepareForPredictions(){

@@ -123,6 +123,7 @@ private:
     uint _phyCores;
     uint _phyCoresPerCpu;
     uint _virtCoresPerPhyCores;
+    StrategyUnusedVirtualCores _strategyUnused;
 
     double _dynamicPowerModel;
     double _voltagePerUsedSockets;
@@ -250,8 +251,10 @@ public:
  */
 class PredictorSimple: public Predictor{
 private:
-    double getScalingFactor(const KnobsValues& values);
+    uint _phyCores;
+    uint _phyCoresPerCpu;
 
+    double getScalingFactor(const KnobsValues& values);
     double getPowerPrediction(const KnobsValues& values);
 public:
     PredictorSimple(PredictorType type,
