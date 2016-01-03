@@ -342,7 +342,7 @@ ParametersValidation Parameters::validateKnobHt(){
 }
 
 ParametersValidation Parameters::validateTriggers(){
-    if(triggerQBlocking == TRIGGER_Q_BLOCKING_NO &&
+    if(triggerQBlocking == TRIGGER_Q_BLOCKING_AUTO &&
        thresholdQBlocking == -1){
         return VALIDATION_NO_BLOCKING_THRESHOLD;
     }
