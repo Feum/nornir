@@ -176,6 +176,7 @@ template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::observe(){
     if(_p.observer){
         const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration.getKnob(KNOB_TYPE_MAPPING));
+        MonitoredSample ms = _samples->average();
         _p.observer->observe(_lastStoredSampleMs,
                              _configuration.getRealValue(KNOB_TYPE_WORKERS),
                              _configuration.getRealValue(KNOB_TYPE_FREQUENCY),
@@ -183,10 +184,11 @@ void ManagerFarm<lb_t, gt_t>::observe(){
                              kMapping->getWorkersVirtualCore(),
                              kMapping->getCollectorVirtualCore(),
                              _samples->getLastSample().bandwidth,
-                             _samples->average().bandwidth,
+                             ms.bandwidth,
                              _samples->coefficientVariation().bandwidth,
-                             _samples->average().utilization,
-                             _samples->average().watts);
+                             ms.latency,
+                             ms.utilization,
+                             ms.watts);
     }
 }
 

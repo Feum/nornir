@@ -86,6 +86,7 @@ public:
                          double currentBandwidth,
                          double smoothedBandwidth,
                          double coeffVarBandwidth,
+                         double smoothedLatency,
                          double smoothedUtilization,
                          mammut::energy::Joules smoothedWatts);
 

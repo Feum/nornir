@@ -65,6 +65,7 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
     _statsFile << "CurrentBandwidth" << "\t";
     _statsFile << "SmoothedBandwidth" << "\t";
     _statsFile << "CoeffVarBandwidth" << "\t";
+    _statsFile << "SmoothedLatency" << "\t";
     _statsFile << "SmoothedUtilization" << "\t";
     _statsFile << "SmoothedWatts" << "\t";
     _statsFile << endl;
@@ -96,6 +97,7 @@ void Observer::observe(unsigned int timeStamp,
                      double currentBandwidth,
                      double smoothedBandwidth,
                      double coeffVarBandwidth,
+                     double smoothedLatency,
                      double smoothedUtilization,
                      Joules smoothedWatts){
     _statsFile << timeStamp - _startMonitoringMs << "\t";
@@ -120,6 +122,7 @@ void Observer::observe(unsigned int timeStamp,
     _statsFile << currentBandwidth << "\t";
     _statsFile << smoothedBandwidth << "\t";
     _statsFile << coeffVarBandwidth << "\t";
+    _statsFile << smoothedLatency << "\t";
     _statsFile << smoothedUtilization << "\t";
 
     _statsFile << smoothedWatts << "\t";
