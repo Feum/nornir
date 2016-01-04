@@ -124,7 +124,7 @@ const Knob* FarmConfiguration::getKnob(KnobType t) const{
 }
 
 void FarmConfiguration::maxAllKnobs(){
-    if(!_knobsChangeNeeded){
+    if(_p.contractType == CONTRACT_NONE || !_knobsChangeNeeded){
         return;
     }
     DEBUG("Maxing all the knobs.");

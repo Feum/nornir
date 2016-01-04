@@ -151,7 +151,7 @@ bool ManagerFarm<lb_t, gt_t>::terminated(){
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::changeKnobs(){
-    if(!_configuration.knobsChangeNeeded()){
+    if(_p.contractType == CONTRACT_NONE || !_configuration.knobsChangeNeeded()){
         return;
     }
 
@@ -268,6 +268,10 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
 
 template <typename lb_t, typename gt_t>
 bool ManagerFarm<lb_t, gt_t>::persist() const{
+    if(_p.contractType == CONTRACT_NONE){
+        // In this case we never change the configuration.
+        return true;
+    }
     bool r = false;
     switch(_p.strategyPersistence){
         case STRATEGY_PERSISTENCE_SAMPLES:{
@@ -412,9 +416,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
     _farm->run_then_freeze();
     initNodesPostRun();
 
-    if(_p.contractType != CONTRACT_NONE){
-        _configuration.maxAllKnobs();
-    }
+    _configuration.maxAllKnobs();
 
     /** Creates the parallel section begin file. **/
     char* default_in_roi = (char*) malloc(sizeof(char)*256);
@@ -442,52 +444,49 @@ void ManagerFarm<lb_t, gt_t>::run(){
 
     initPredictors();
 
+
+
+    /* Force the first calibration point. **/
+    assert(_calibrator);
+    changeKnobs();
+
     double microsecsSleep = 0;
-    if(_p.contractType == CONTRACT_NONE){
-        _farm->wait();
+    double startSample = getMillisecondsTime();
+    double overheadMs;
+
+    while(!terminated()){
+        overheadMs = getMillisecondsTime() - startSample;
+        microsecsSleep = ((double)_p.samplingInterval - overheadMs)*
+                          (double)MAMMUT_MICROSECS_IN_MILLISEC;
+        if(microsecsSleep < 0){
+            microsecsSleep = 0;
+        }
+        usleep(microsecsSleep);
+
+        startSample = getMillisecondsTime();
         storeNewSample();
-        observe();
-    }else{
-        /* Force the first calibration point. **/
-        assert(_calibrator);
-        changeKnobs();
+        DEBUG("New sample stored.");
 
-        double startSample = getMillisecondsTime();
-
-        while(!terminated()){
-            double overheadMs = getMillisecondsTime() - startSample;
-            microsecsSleep = ((double)_p.samplingInterval - overheadMs)*
-                              (double)MAMMUT_MICROSECS_IN_MILLISEC;
-            if(microsecsSleep < 0){
-                microsecsSleep = 0;
-            }
-            usleep(microsecsSleep);
-            startSample = getMillisecondsTime();
-
-            storeNewSample();
-            DEBUG("New sample stored.");
-
-            if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-                double now = getMillisecondsTime()/1000.0;
-                if(now >= _deadline){
-                    _p.requiredBandwidth = numeric_limits<double>::max();
-                }else{
-                    _p.requiredBandwidth = _remainingTasks /
-                                           (_deadline - now);
-                }
-            }
-
-            observe();
-
-            if(!persist()){
-                assert(_calibrator);
-                changeKnobs();
-                _configuration.trigger();
-                startSample = getMillisecondsTime();
+        if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+            double now = getMillisecondsTime()/1000.0;
+            if(now >= _deadline){
+                _p.requiredBandwidth = numeric_limits<double>::max();
+            }else{
+                _p.requiredBandwidth = _remainingTasks /
+                                       (_deadline - now);
             }
         }
-        DEBUG("Terminated.");
+
+        observe();
+
+        if(!persist()){
+            assert(_calibrator);
+            changeKnobs();
+            _configuration.trigger();
+            startSample = getMillisecondsTime();
+        }
     }
+    DEBUG("Terminated.");
 
     double duration = getMillisecondsTime() - _startTimeMs;
     unlink(getenv(PAR_BEGIN_ENV));
