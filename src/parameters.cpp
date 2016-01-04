@@ -540,6 +540,12 @@ Parameters::~Parameters(){
 ParametersValidation Parameters::validate(){
     ParametersValidation r = VALIDATION_OK;
 
+    if(contractType == CONTRACT_NONE){
+        knobWorkers = KNOB_WORKERS_NO;
+        knobFrequencies = KNOB_FREQUENCY_NO;
+        knobMapping = KNOB_MAPPING_NO;
+    }
+
     setDefaultPost();
 
     /** Validate frequency knob. **/
