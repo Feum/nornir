@@ -270,10 +270,6 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
 
 template <typename lb_t, typename gt_t>
 bool ManagerFarm<lb_t, gt_t>::persist() const{
-    if(_p.contractType == CONTRACT_NONE){
-        // In this case we never change the configuration.
-        return true;
-    }
     bool r = false;
     switch(_p.strategyPersistence){
         case STRATEGY_PERSISTENCE_SAMPLES:{
@@ -283,8 +279,7 @@ bool ManagerFarm<lb_t, gt_t>::persist() const{
             r = _totalTasks < _p.persistenceValue;
         }break;
         case STRATEGY_PERSISTENCE_VARIATION:{
-            const MonitoredSample& variation =
-                    _samples->coefficientVariation();
+            const MonitoredSample& variation = _samples->coefficientVariation();
             r = getPrimaryValue(variation) < _p.persistenceValue &&
                 getSecondaryValue(variation) < _p.persistenceValue;
         }break;
@@ -445,8 +440,6 @@ void ManagerFarm<lb_t, gt_t>::run(){
     }
 
     initPredictors();
-
-
 
     /* Force the first calibration point. **/
     assert(_calibrator);

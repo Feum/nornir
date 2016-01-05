@@ -73,7 +73,6 @@ bool TriggerQBlocking::trigger(){
     }
 
     double idleTime = getIdleTime();
-    std::cout << "IDLETIME: " << idleTime << std::endl;
     if(idleTime > _thresholdQBlocking && !_blocking){
         _emitter->setQBlocking();
         _blocking = true;
