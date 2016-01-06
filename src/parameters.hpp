@@ -647,7 +647,6 @@ public:
     // the runtime will never switch [default = -1.0].
     double thresholdQBlocking;
 
-
     // The observer object. It will be called every samplingInterval
     // milliseconds to monitor the adaptivity behaviour [default = NULL].
     Observer* observer;

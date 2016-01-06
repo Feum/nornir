@@ -38,11 +38,7 @@ TriggerQBlocking::TriggerQBlocking(TriggerConfQBlocking confQBlocking,
         _samples(samples),
         _emitter(emitter),
         _blocking(false){
-    if(_confQBlocking == TRIGGER_Q_BLOCKING_NO){
-        _blocking = false;
-    }else if(_confQBlocking == TRIGGER_Q_BLOCKING_YES){
-        _blocking = true;
-    }
+    ;
 }
 
 double TriggerQBlocking::getIdleTime() const{
@@ -67,22 +63,41 @@ double TriggerQBlocking::getIdleTime() const{
     return latencyMicroSec/utilization - latencyMicroSec;
 }
 
-bool TriggerQBlocking::trigger(){
-    if(_confQBlocking != TRIGGER_Q_BLOCKING_AUTO){
-        return false;
-    }
-
-    double idleTime = getIdleTime();
-    if(idleTime > _thresholdQBlocking && !_blocking){
+void TriggerQBlocking::setBlocking(){
+    if(!_blocking){
         _emitter->setQBlocking();
         _blocking = true;
-        return true;
-    }else if(idleTime < _thresholdQBlocking && _blocking){
+    }
+}
+
+void TriggerQBlocking::setNonBlocking(){
+    if(_blocking){
         _emitter->setQNonblocking();
         _blocking = false;
-        return true;
-    }else{
-        return false;
     }
+}
+
+bool TriggerQBlocking::trigger(){
+    switch(_confQBlocking){
+        case TRIGGER_Q_BLOCKING_YES:{
+            setBlocking();
+            return true;
+        }break;
+        case TRIGGER_Q_BLOCKING_NO:{
+            setNonBlocking();
+            return true;
+        }break;
+        case TRIGGER_Q_BLOCKING_AUTO:{
+            double idleTime = getIdleTime();
+            if(idleTime > _thresholdQBlocking){
+                setBlocking();
+                return true;
+            }else if(idleTime < _thresholdQBlocking){
+                setNonBlocking();
+                return true;
+            }
+        }break;
+    }
+    return false;
 }
 }
