@@ -67,8 +67,8 @@ public:
     bool trigger();
 private:
     double getIdleTime() const;
-    void setBlocking();
-    void setNonBlocking();
+    bool setBlocking();
+    bool setNonBlocking();
 
     TriggerConfQBlocking _confQBlocking;
     const double _thresholdQBlocking;

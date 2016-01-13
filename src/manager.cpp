@@ -467,8 +467,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
             if(now >= _deadline){
                 _p.requiredBandwidth = numeric_limits<double>::max();
             }else{
-                _p.requiredBandwidth = _remainingTasks /
-                                       (_deadline - now);
+                _p.requiredBandwidth = _remainingTasks / (_deadline - now);
             }
         }
 

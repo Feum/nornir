@@ -63,38 +63,38 @@ double TriggerQBlocking::getIdleTime() const{
     return latencyMicroSec/utilization - latencyMicroSec;
 }
 
-void TriggerQBlocking::setBlocking(){
+bool TriggerQBlocking::setBlocking(){
     if(!_blocking){
         _emitter->setQBlocking();
         _blocking = true;
+        return true;
     }
+    return false;
 }
 
-void TriggerQBlocking::setNonBlocking(){
+bool TriggerQBlocking::setNonBlocking(){
     if(_blocking){
         _emitter->setQNonblocking();
         _blocking = false;
+        return true;
     }
+    return false;
 }
 
 bool TriggerQBlocking::trigger(){
     switch(_confQBlocking){
         case TRIGGER_Q_BLOCKING_YES:{
-            setBlocking();
-            return true;
+            return setBlocking();
         }break;
         case TRIGGER_Q_BLOCKING_NO:{
-            setNonBlocking();
-            return true;
+            return setNonBlocking();
         }break;
         case TRIGGER_Q_BLOCKING_AUTO:{
             double idleTime = getIdleTime();
             if(idleTime > _thresholdQBlocking){
-                setBlocking();
-                return true;
+                return setBlocking();
             }else if(idleTime < _thresholdQBlocking){
-                setNonBlocking();
-                return true;
+                return setNonBlocking();
             }
         }break;
     }

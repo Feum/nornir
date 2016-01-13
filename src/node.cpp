@@ -269,8 +269,16 @@ void AdaptiveNode::callbackOut(void *p) CX11_KEYWORD(final){
 void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
     if(!_goingToFreeze){
         _terminated = true;
-        if(_nodeType == NODE_TYPE_WORKER){
-            storeSample();
+        switch(_nodeType){
+            case NODE_TYPE_WORKER:{
+                storeSample();
+            }break;
+            case NODE_TYPE_EMITTER:{
+                while(!_managementQ.empty()){
+                    DEBUG("Clearing management Q.");
+                    _managementQ.inc();
+                }
+            }break;
         }
     }
 }
