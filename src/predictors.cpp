@@ -424,8 +424,8 @@ Calibrator::Calibrator(const Parameters& p,
         _samples(samples),
         _state(CALIBRATION_SEEDS),
         _numCalibrationPoints(0), _calibrationStartMs(0),
-        _firstPointGenerated(false), _primaryPrediction(0),
-        _secondaryPrediction(0){
+        _firstPointGenerated(false), _forceSeed(false),
+        _primaryPrediction(0), _secondaryPrediction(0){
 
     PredictorType primary, secondary;
     switch(p.contractType){
@@ -704,30 +704,25 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
 
     switch(_state){
         case CALIBRATION_SEEDS:{
-            kv = generateRelativeKnobsValues();
-            if(_numCalibrationPoints + 1 >= _minNumPoints){
-                _state = CALIBRATION_TRY_PREDICT;
-                DEBUG("[Calibrator]: Moving to predict");
-            }
-        }break;
-        case CALIBRATION_TRY_PREDICT:{
-            kv = getBestKnobsValues(primaryValue, remainingTasks);
-            _state = CALIBRATION_EXTRA_POINT;
-            DEBUG("[Calibrator]: Moving to extra");
-        }break;
-        case CALIBRATION_EXTRA_POINT:{
-            if(highError(primaryValue, secondaryValue)){
+            // Stays in SEEDS until we do not have a sufficiently high number
+            // of points or we have an high error in the interpolation.
+            if(_numCalibrationPoints < _minNumPoints || highError(primaryValue, secondaryValue) ||
+               _forceSeed){
                 kv = generateRelativeKnobsValues();
-                _state = CALIBRATION_TRY_PREDICT;
-                DEBUG("[Calibrator]: High error");
-                DEBUG("[Calibrator]: Moving to predict");
-            }else if(contractViolated){
-                DEBUG("[Calibrator]: Contract violated");
-                kv = getBestKnobsValues(primaryValue, remainingTasks);
-                _state = CALIBRATION_TRY_PREDICT;
-                DEBUG("[Calibrator]: Moving to predict");
+                _forceSeed = false;
             }else{
                 kv = getBestKnobsValues(primaryValue, remainingTasks);
+                _state = CALIBRATION_VALIDATE_PREDICTION;
+                DEBUG("[Calibrator]: Moving to validate prediction.");
+            }
+        }break;
+        case CALIBRATION_VALIDATE_PREDICTION:{
+            if(contractViolated){
+                kv = generateRelativeKnobsValues();
+                _state = CALIBRATION_SEEDS;
+                _forceSeed = true;
+                DEBUG("[Calibrator]: Contract violated. Returning to seeds.");
+            }else{
                 _state = CALIBRATION_FINISHED;
                 _primaryPredictor->clear();
                 _secondaryPredictor->clear();

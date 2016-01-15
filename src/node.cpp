@@ -279,6 +279,9 @@ void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
                     _managementQ.inc();
                 }
             }break;
+            default:{
+                ;
+            }
         }
     }
 }

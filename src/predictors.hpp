@@ -273,8 +273,7 @@ public:
  */
 typedef enum{
     CALIBRATION_SEEDS = 0,
-    CALIBRATION_TRY_PREDICT,
-    CALIBRATION_EXTRA_POINT,
+    CALIBRATION_VALIDATE_PREDICTION,
     CALIBRATION_FINISHED
 }CalibrationState;
 
@@ -293,6 +292,7 @@ private:
     size_t _numCalibrationPoints;
     uint _calibrationStartMs;
     bool _firstPointGenerated;
+    bool _forceSeed;
 
     // The predictor of the primary value.
     Predictor* _primaryPredictor;
