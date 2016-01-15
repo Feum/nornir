@@ -707,18 +707,29 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             if(_numCalibrationPoints < _minNumPoints){
                 kv = generateRelativeKnobsValues();
             }else{
-                kv = getBestKnobsValues(primaryValue, remainingTasks);
-                _state = CALIBRATION_VALIDATE_PREDICTION;
-                DEBUG("[Calibrator]: Moving to validate prediction.");
+                // Predict the values in current configuration.
+                _primaryPredictor->prepareForPredictions();
+                _secondaryPredictor->prepareForPredictions();
+                _primaryPrediction = _primaryPredictor->predict(_configuration.getRealValues());
+                _secondaryPrediction = _secondaryPredictor->predict(_configuration.getRealValues());
+
+                if(highError(primaryValue, secondaryValue)){
+                    kv = generateRelativeKnobsValues();
+                }else{
+                    kv = getBestKnobsValues(primaryValue, remainingTasks);
+                    _state = CALIBRATION_VALIDATE_PREDICTION;
+                    DEBUG("[Calibrator]: Moving to validate prediction.");
+                }
             }
         }break;
         case CALIBRATION_VALIDATE_PREDICTION:{
             if(_forcePrediction){
                 kv = getBestKnobsValues(primaryValue, remainingTasks);
                 _forcePrediction = false;
-                DEBUG("[Calibrator]: Precition forced.");
+                DEBUG("[Calibrator]: Prediction forced.");
             }else{
-                if(highError(primaryValue, secondaryValue)){
+                if(highError(primaryValue, secondaryValue) ||
+                   contractViolated){
                     kv = generateRelativeKnobsValues();
                     _forcePrediction = true;
                     DEBUG("[Calibrator]: High prediction error. Adding new seed.");
