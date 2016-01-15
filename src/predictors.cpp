@@ -717,24 +717,27 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 kv = getBestKnobsValues(primaryValue, remainingTasks);
                 _forcePrediction = false;
                 DEBUG("[Calibrator]: Precition forced.");
-            }else if(highError(primaryValue, secondaryValue)){
-                kv = generateRelativeKnobsValues();
-                _forcePrediction = true;
-                DEBUG("[Calibrator]: High prediction error. Adding new seed.");
             }else{
-                _state = CALIBRATION_FINISHED;
-                _primaryPredictor->clear();
-                _secondaryPredictor->clear();
+                if(highError(primaryValue, secondaryValue)){
+                    kv = generateRelativeKnobsValues();
+                    _forcePrediction = true;
+                    DEBUG("[Calibrator]: High prediction error. Adding new seed.");
+                }else{
+                    kv = _configuration.getRealValues();
+                    _state = CALIBRATION_FINISHED;
+                    _primaryPredictor->clear();
+                    _secondaryPredictor->clear();
 
-                CalibrationStats cs;
-                // We do -1 because we counted the current point and now we
-                // discovered it isn't a calibration point.
-                cs.numSteps = _numCalibrationPoints - 1;
-                cs.duration = (getMillisecondsTime() - _calibrationStartMs);
-                _calibrationStats.push_back(cs);
-                DEBUG("[Calibrator]: Moving to finished");
-                DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints - 1 <<
-                      " steps with configuration " << kv);
+                    CalibrationStats cs;
+                    // We do -1 because we counted the current point and now we
+                    // discovered it isn't a calibration point.
+                    cs.numSteps = _numCalibrationPoints - 1;
+                    cs.duration = (getMillisecondsTime() - _calibrationStartMs);
+                    _calibrationStats.push_back(cs);
+                    DEBUG("[Calibrator]: Moving to finished");
+                    DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints - 1 <<
+                          " steps with configuration " << kv);
+                }
             }
         }break;
         case CALIBRATION_FINISHED:{
