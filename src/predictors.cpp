@@ -302,16 +302,19 @@ double PredictorLinearRegression::getCurrentResponse() const{
     return r;
 }
 
-void PredictorLinearRegression::refine(){
+bool PredictorLinearRegression::refine(){
     const KnobsValues& currentValues = _configuration.getRealValues();
     obs_it lb = _observations.lower_bound(currentValues);
 
+    DEBUG("Refining with configuration " << currentValues << ": "
+                                         << getCurrentResponse());
     if(lb != _observations.end() &&
        !(_observations.key_comp()(currentValues, lb->first))){
         // Key already exists
         DEBUG("Replacing " << currentValues);
         lb->second.data->init();
         lb->second.response = getCurrentResponse();
+        return false;
     }else{
         // The key does not exist in the map
         Observation o;
@@ -325,10 +328,8 @@ void PredictorLinearRegression::refine(){
         }
         o.response = getCurrentResponse();
         _observations.insert(lb, Observations::value_type(currentValues, o));
+        return true;
     }
-
-    DEBUG("Refining with configuration " << currentValues << ": "
-                                         << getCurrentResponse());
 }
 
 void PredictorLinearRegression::prepareForPredictions(){
@@ -464,9 +465,10 @@ Calibrator::Calibrator(const Parameters& p,
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
 }
 
-void Calibrator::refine(){
-    _primaryPredictor->refine();
-    _secondaryPredictor->refine();
+bool Calibrator::refine(){
+    bool p = _primaryPredictor->refine();
+    bool s = _secondaryPredictor->refine();
+    return p & s;
 }
 
 bool Calibrator::highError(double primaryValue, double secondaryValue) const{
@@ -673,10 +675,6 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
     KnobsValues kv;
     bool contractViolated = isContractViolated(primaryValue);
 
-    if(_numCalibrationPoints == 0){
-        _calibrationStartMs = getMillisecondsTime();
-    }
-
     /**
      * The first point is generated as soon as the application starts.
      * Accordingly, we do not executed tasks in the original configuration
@@ -696,16 +694,21 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
         if(_state == CALIBRATION_FINISHED && !contractViolated){
             ;
         }else{
-            refine();
+            bool newPoint = refine();
+            if(newPoint){
+                ++_numCalibrationPoints;
+            }
         }
     }else{
         _firstPointGenerated = true;
+        _calibrationStartMs = getMillisecondsTime();
     }
 
     switch(_state){
         case CALIBRATION_SEEDS:{
             if(_numCalibrationPoints < _minNumPoints){
                 kv = generateRelativeKnobsValues();
+                DEBUG("[Calibrator]: NumPoints: " << _numCalibrationPoints << " MinNumPoints: " << _minNumPoints);
             }else{
                 // Predict the values in current configuration.
                 _primaryPredictor->prepareForPredictions();
@@ -755,7 +758,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             if(contractViolated){
                 reset();
                 kv = generateRelativeKnobsValues();
-                _numCalibrationPoints = 1;
+                _numCalibrationPoints = 0;
                 _state = CALIBRATION_SEEDS;
                 _calibrationStartMs = getMillisecondsTime();
                 DEBUG("[Calibrator]: Moving to seeds");
@@ -763,10 +766,6 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 kv = _configuration.getRealValues();
             }
         }break;
-    }
-
-    if(_state != CALIBRATION_FINISHED){
-        ++_numCalibrationPoints;
     }
 
     return kv;

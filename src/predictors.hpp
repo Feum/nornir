@@ -186,8 +186,10 @@ public:
     /**
      * If possible, refines the model with the information
      * obtained on the current configuration.
+     * @return True if the current configuration is a new configuration,
+     * false if it was already present (existing information will be udpdated).
      */
-    virtual void refine(){;}
+    virtual bool refine(){;}
 
     /**
      * Prepare the predictor to accept a set of prediction requests.
@@ -235,7 +237,7 @@ public:
 
     uint getMinimumPointsNeeded();
 
-    void refine();
+    bool refine();
 
     void prepareForPredictions();
 
@@ -307,7 +309,7 @@ private:
     double _secondaryPrediction;
 
     bool highError(double primaryValue, double secondaryValue) const;
-    void refine();
+    bool refine();
 
     /**
      * Checks if x is a best suboptimal monitored value than y.
