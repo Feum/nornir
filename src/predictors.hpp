@@ -292,7 +292,7 @@ private:
     size_t _numCalibrationPoints;
     uint _calibrationStartMs;
     bool _firstPointGenerated;
-    bool _forceSeed;
+    bool _forcePrediction;
 
     // The predictor of the primary value.
     Predictor* _primaryPredictor;

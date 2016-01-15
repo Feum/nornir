@@ -424,7 +424,7 @@ Calibrator::Calibrator(const Parameters& p,
         _samples(samples),
         _state(CALIBRATION_SEEDS),
         _numCalibrationPoints(0), _calibrationStartMs(0),
-        _firstPointGenerated(false), _forceSeed(false),
+        _firstPointGenerated(false), _forcePrediction(false),
         _primaryPrediction(0), _secondaryPrediction(0){
 
     PredictorType primary, secondary;
@@ -704,12 +704,8 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
 
     switch(_state){
         case CALIBRATION_SEEDS:{
-            // Stays in SEEDS until we do not have a sufficiently high number
-            // of points or we have an high error in the interpolation.
-            if(_numCalibrationPoints < _minNumPoints || highError(primaryValue, secondaryValue) ||
-               _forceSeed){
+            if(_numCalibrationPoints < _minNumPoints){
                 kv = generateRelativeKnobsValues();
-                _forceSeed = false;
             }else{
                 kv = getBestKnobsValues(primaryValue, remainingTasks);
                 _state = CALIBRATION_VALIDATE_PREDICTION;
@@ -717,11 +713,14 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             }
         }break;
         case CALIBRATION_VALIDATE_PREDICTION:{
-            if(contractViolated){
+            if(_forcePrediction){
+                kv = getBestKnobsValues(primaryValue, remainingTasks);
+                _forcePrediction = false;
+                DEBUG("[Calibrator]: Precition forced.");
+            }else if(highError(primaryValue, secondaryValue)){
                 kv = generateRelativeKnobsValues();
-                _state = CALIBRATION_SEEDS;
-                _forceSeed = true;
-                DEBUG("[Calibrator]: Contract violated. Returning to seeds.");
+                _forcePrediction = true;
+                DEBUG("[Calibrator]: High prediction error. Adding new seed.");
             }else{
                 _state = CALIBRATION_FINISHED;
                 _primaryPredictor->clear();
