@@ -267,7 +267,9 @@ void AdaptiveNode::callbackOut(void *p) CX11_KEYWORD(final){
 }
 
 void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
+    DEBUG("EOS received.");
     if(!_goingToFreeze){
+        DEBUG("Doing cleanup.");
         _terminated = true;
         switch(_nodeType){
             case NODE_TYPE_WORKER:{
@@ -291,7 +293,7 @@ AdaptiveNode::AdaptiveNode():
         _thread(NULL),
         _ticksWork(0),
         _tasksCount(0),
-        _managementQ(1),
+        _managementQ(2),
         _responseQ(2){
     _managementQ.init();
     _responseQ.init();
