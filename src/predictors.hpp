@@ -187,9 +187,9 @@ public:
      * If possible, refines the model with the information
      * obtained on the current configuration.
      * @return True if the current configuration is a new configuration,
-     * false if it was already present (existing information will be udpdated).
+     * false if it was already present (existing information will be updated).
      */
-    virtual bool refine(){;}
+    virtual bool refine(){return false;}
 
     /**
      * Prepare the predictor to accept a set of prediction requests.

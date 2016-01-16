@@ -169,6 +169,7 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
             _counter->reset();
         }
         _totalTasks = 0;
+        discardSample();
     }
 }
 
@@ -214,6 +215,13 @@ void ManagerFarm<lb_t, gt_t>::getWorkersSamples(WorkerSample& sample){
     }
     sample.loadPercentage /= numActiveWorkers;
     sample.latency /= numActiveWorkers;
+}
+
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::discardSample(){
+    WorkerSample ws;
+    askForWorkersSamples();
+    getWorkersSamples(ws);
 }
 
 template <typename lb_t, typename gt_t>
@@ -447,7 +455,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
 
     double microsecsSleep = 0;
     double startSample = getMillisecondsTime();
-    double overheadMs;
+    double overheadMs = 0;
 
     while(!terminated()){
         overheadMs = getMillisecondsTime() - startSample;
@@ -455,8 +463,9 @@ void ManagerFarm<lb_t, gt_t>::run(){
                           (double)MAMMUT_MICROSECS_IN_MILLISEC;
         if(microsecsSleep < 0){
             microsecsSleep = 0;
+        }else{
+            usleep(microsecsSleep);
         }
-        usleep(microsecsSleep);
 
         startSample = getMillisecondsTime();
         storeNewSample();

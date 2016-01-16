@@ -1,4 +1,4 @@
-APPS                 = quicksort nqueens pbzip2  #cholesky #matmul pbzip2
+APPS                 = qt-mandelbrot quicksort nqueens pbzip2
 
 .PHONY: all clean cleanall
 

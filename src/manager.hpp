@@ -228,6 +228,11 @@ private:
     void getWorkersSamples(WorkerSample& sample);
 
     /**
+     * Gets a sample from the workers and discards it.
+     */
+    void discardSample();
+
+    /**
      * Store a new sample.
      **/
     void storeNewSample();
