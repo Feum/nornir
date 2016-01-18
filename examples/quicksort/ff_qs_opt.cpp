@@ -35,6 +35,10 @@
 #include <ff/farm.hpp>
 #include <algorithm>  // it is needed to use std::sort
 
+#include "../../src/manager.hpp"
+
+using namespace adpff;
+
 using namespace ff;
 
 //FastFlow task type
@@ -151,7 +155,7 @@ private:
 };
 
 
-class Worker: public ff_node {
+class Worker: public AdaptiveNode {
 public:
     // int svc_init() {
     //     printf("Worker %d  is on core %d\n", get_my_id(), ff_getMyCpu());
@@ -182,9 +186,14 @@ public:
     }
 };
 
-class Emitter: public ff_node {
+class Emitter: public AdaptiveNode {
 public:
     Emitter(int nworkers, my_loadbalancer * const lb):streamlen(0),nworkers(nworkers),load(nworkers,0),lb(lb) {};
+
+    void notifyWorkersChange(size_t oldNumWorkers,
+                             size_t newNumWorkers){
+        nworkers = newNumWorkers;
+    }
 
     // int svc_init() {
     //     printf("Emitter is on core %d\n", ff_getMyCpu());
@@ -297,12 +306,24 @@ int main(int argc, char *argv[]) {
     for(int i=0;i<nworkers;++i) w.push_back(new Worker);
     farm.add_workers(w);
     farm.wrap_around();
+
+    adpff::Observer obs;
+    adpff::Parameters ap("parameters.xml", "archdata.xml");
+    ap.observer = &obs;
+    adpff::ManagerFarm<my_loadbalancer> amf(&farm, ap);
+    std::cout << "Starting manager. " << std::endl;
+    amf.start();
+    std::cout << "Manager started. " << std::endl;
+    amf.join();
+    std::cout << "Manager joined. " << std::endl;
     
+#if 0
     printf("starting....\n");
     if (farm.run_and_wait_end()<0) {
         error("running farm\n");
         return -1;
     }
+#endif
     printf("Time: %g (ms)\n", farm.ffTime());
     
     if (0) print_array();

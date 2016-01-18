@@ -5,4 +5,5 @@
     <contractType>POWER_BUDGET</contractType>
     <powerBudget>50</powerBudget>
     <alphaExpAverage>0.2</alphaExpAverage>
+    <strategyCalibration>HALTON</strategyCalibration>
 </adaptivityParameters>

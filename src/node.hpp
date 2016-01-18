@@ -89,8 +89,11 @@ inline WorkerSample operator+(WorkerSample lhs, const WorkerSample& rhs){
  * \brief Possible request types that a manager can make.
  */
 typedef enum{
+    // Reset the current sample.
+    MGMT_REQ_RESET_SAMPLE = 0,
+  
     // Get the current sample and reset it.
-    MGMT_REQ_GET_AND_RESET_SAMPLE = 0,
+    MGMT_REQ_GET_AND_RESET_SAMPLE,
 
     // Freezes the farm.
     MGMT_REQ_FREEZE,
@@ -127,7 +130,6 @@ private:
 
     volatile bool _started;
     volatile bool _terminated;
-    volatile bool _goingToFreeze;
     mammut::task::TasksManager* _tasksManager;
     mammut::task::ThreadHandler* _thread;
     ManagementRequest _managementRequest;
@@ -188,12 +190,16 @@ private:
     void getSampleResponse(WorkerSample& sample,
                            StrategyPolling strategyPolling,
                            double avgLatency);
+    /**
+     * Asks the node to reset the current sample.
+     **/
+    void resetSample();
 
     /**
-    * Ask the node for a sample of the statistics computed since the last
-    * time this method has been called.
-    * The result can be retrieved with getSampleResponse call.
-    */
+     * Asks the node for a sample of the statistics computed since the last
+     * time this method has been called.
+     * The result can be retrieved with getSampleResponse call.
+     */
     void askForSample();
 
     /**
@@ -239,6 +245,11 @@ private:
      * false otherwise.
      */
     bool isTerminated() const;
+
+    /**
+     * Resets the current sample.
+     */
+    void reset();
 
     /**
      * Stores a sample.

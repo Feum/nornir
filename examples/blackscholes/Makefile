@@ -29,7 +29,7 @@ ifdef version
     MT        = -DENABLE_TBB
   endif
   ifeq "$(version)" "ff"
-    CXXFLAGS += --std=c++11
+    CXXFLAGS += --std=c++11 -O3
     MT        = -DENABLE_FF
     LDLIBS      += -pthread
   endif

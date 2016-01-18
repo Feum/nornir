@@ -288,7 +288,7 @@ typedef struct{
 
 #define CHUNKSIZE 1000
 
-class Emitter: ff_node_t<fftask_t> {
+class Emitter: adpff::AdaptiveNode {
 private:
     int currentIteration;
     int currentOption;
@@ -297,9 +297,12 @@ public:
         ;
     }
 
-    fftask_t *svc(fftask_t *t){
+    void *svc(void *task){
+      fftask_t* t = (fftask_t*) task;
         while(true){
             if(currentIteration >= NUM_RUNS){
+                printf("Generating end of stream.");
+		fflush(stdout);
                 return EOS;
             }
 
@@ -327,9 +330,10 @@ public:
     }
 };
 
-class Worker: ff_node_t<fftask_t> {
+class Worker: adpff::AdaptiveNode {
 public:
-    fftask_t *svc(fftask_t *t) {
+    void* svc(void* task) {
+      fftask_t* t = (fftask_t*) task;
         uint j = 0;
         for(uint i = 0; i < t->numElems; i++){
             fptype price;

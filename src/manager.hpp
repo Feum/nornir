@@ -228,9 +228,9 @@ private:
     void getWorkersSamples(WorkerSample& sample);
 
     /**
-     * Gets a sample from the workers and discards it.
+     * Resets the workers samples.
      */
-    void discardSample();
+    void resetSample();
 
     /**
      * Store a new sample.

@@ -111,6 +111,7 @@ void AdaptiveNode::getSampleResponse(WorkerSample& sample,
                        StrategyPolling strategyPolling,
                        double avgLatency){
     while(_responseQ.empty()){
+        if(_terminated){return;}
         switch(strategyPolling){
             case STRATEGY_POLLING_SPINNING:{
                 continue;
@@ -129,6 +130,15 @@ void AdaptiveNode::getSampleResponse(WorkerSample& sample,
     _responseQ.inc();
     sample = _sampleResponse;
 }
+
+void AdaptiveNode::resetSample(){
+    _managementRequest.type = MGMT_REQ_RESET_SAMPLE;
+    // The value pushed in the queue will not be read,
+    // it could be anything except NULL.
+    while(!_managementQ.push(&_managementRequest));
+    DEBUG("RESETSAMPLE");
+  }
+
 
 void AdaptiveNode::askForSample(){
     _managementRequest.type = MGMT_REQ_GET_AND_RESET_SAMPLE;
@@ -180,7 +190,7 @@ void AdaptiveNode::thawAll(size_t numWorkers){
 }
 
 void AdaptiveNode::prepareToFreeze(){
-    _goingToFreeze = true;
+    ;
 }
 
 void AdaptiveNode::prepareToRun(){
@@ -188,24 +198,28 @@ void AdaptiveNode::prepareToRun(){
         DEBUG("Clearing response Q.");
         _responseQ.inc();
     }
-    _startTicks = getticks();
-    _goingToFreeze = false;
-    _tasksCount = 0;
-    _ticksWork = 0;
+    reset();
+    _terminated = false;
 }
 
 bool AdaptiveNode::isTerminated() const{
     return _terminated;
 }
 
+void AdaptiveNode::reset(){
+    tickstot = 0;
+    taskcnt = 0;
+    _tasksCount = 0;
+    _ticksWork = 0;
+    _startTicks = getticks();
+}
 void AdaptiveNode::storeSample(){
     int dummy;
     int* dummyPtr = &dummy;
-    ticks now = getticks();
-    ticks totalTicks = now - _startTicks; // Including idle periods
+    ticks totalTicks = getticks() - _startTicks; // Including idle periods
 
-    _ticksWork = tickstot; tickstot = 0;
-    _tasksCount = taskcnt; taskcnt = 0;
+    _ticksWork = tickstot;
+    _tasksCount = taskcnt;
 
     _sampleResponse.loadPercentage = ((double) (_ticksWork) / (double) totalTicks)
                                      * 100.0;
@@ -218,9 +232,7 @@ void AdaptiveNode::storeSample(){
     }
     _sampleResponse.bandwidthTotal = (double) _tasksCount / ticksToSeconds(totalTicks);
 
-    _tasksCount = 0;
-    _ticksWork = 0;
-    _startTicks = now;
+    reset();
 
     assert(_responseQ.push(dummyPtr));
 }
@@ -234,6 +246,10 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
             case MGMT_REQ_GET_AND_RESET_SAMPLE:{
                 DEBUG("Get and reset received");
                 storeSample();
+            }break;
+            case MGMT_REQ_RESET_SAMPLE:{
+                DEBUG("Reset received");
+                reset();
             }break;
             case MGMT_REQ_FREEZE:{
                 assert(_nodeType == NODE_TYPE_EMITTER);
@@ -268,22 +284,19 @@ void AdaptiveNode::callbackOut(void *p) CX11_KEYWORD(final){
 
 void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
     DEBUG("EOS received.");
-    if(!_goingToFreeze){
-        DEBUG("Doing cleanup.");
-        _terminated = true;
-        switch(_nodeType){
-            case NODE_TYPE_WORKER:{
-                storeSample();
-            }break;
-            case NODE_TYPE_EMITTER:{
-                while(!_managementQ.empty()){
-                    DEBUG("Clearing management Q.");
-                    _managementQ.inc();
-                }
-            }break;
-            default:{
-                ;
+    _terminated = true;
+    switch(_nodeType){
+        case NODE_TYPE_WORKER:{
+            storeSample();
+        }break;
+        case NODE_TYPE_EMITTER:{
+            while(!_managementQ.empty()){
+                DEBUG("Clearing management Q.");
+                _managementQ.inc();
             }
+        }break;
+        default:{
+            ;
         }
     }
 }
@@ -291,7 +304,6 @@ void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
 AdaptiveNode::AdaptiveNode():
         _started(false),
         _terminated(false),
-        _goingToFreeze(false),
         _tasksManager(NULL),
         _thread(NULL),
         _ticksWork(0),

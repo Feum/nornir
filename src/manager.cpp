@@ -169,7 +169,7 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
             _counter->reset();
         }
         _totalTasks = 0;
-        discardSample();
+        resetSample();
     }
 }
 
@@ -218,10 +218,10 @@ void ManagerFarm<lb_t, gt_t>::getWorkersSamples(WorkerSample& sample){
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::discardSample(){
-    WorkerSample ws;
-    askForWorkersSamples();
-    getWorkersSamples(ws);
+void ManagerFarm<lb_t, gt_t>::resetSample(){
+    for(size_t i = 0; i < _activeWorkers.size(); i++){
+        _activeWorkers.at(i)->resetSample();
+    }
 }
 
 template <typename lb_t, typename gt_t>

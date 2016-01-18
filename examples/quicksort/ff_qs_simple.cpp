@@ -242,7 +242,13 @@ int main(int argc, char *argv[]) {
     
     initArray();
     
-    ff::ff_farm<> farm;
+    //ff::ff_farm<> farm;
+    ff::ff_farm<> farm(false,
+                       1024,
+                       1024,
+                       false, 
+                       DEF_MAX_NUM_WORKERS,
+                       true);
 
     Emitter E;
     farm.add_emitter(&E);
