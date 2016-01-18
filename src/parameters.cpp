@@ -138,7 +138,7 @@ void Parameters::setDefault(){
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
     strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
-    strategyCalibration = STRATEGY_CALIBRATION_SOBOL;
+    strategyCalibration = STRATEGY_CALIBRATION_HALTON;
     strategyPolling = STRATEGY_POLLING_SLEEP_LATENCY;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
     turboBoost = false;

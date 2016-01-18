@@ -554,7 +554,7 @@ public:
     // Smoothing strategy [default = STRATEGY_SMOOTHING_EXPONENTIAL].
     StrategySmoothing strategySmoothing;
 
-    // Calibration strategy [default = STRATEGY_CALIBRATION_SOBOL].
+    // Calibration strategy [default = STRATEGY_CALIBRATION_HALTON].
     StrategyCalibration strategyCalibration;
 
     // Polling strategy [default = STRATEGY_POLLING_SLEEP_LATENCY].
