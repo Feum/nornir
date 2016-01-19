@@ -934,7 +934,7 @@ public:
      *
      * \return A pointer of the FastFlow node which is actually the emitter.
      */
-    ff_node* getEmitter() const   { return emitter;}
+    virtual ff_node* getEmitter() const   { return emitter;}
 
     /**
      * \brief Gets Collector
@@ -943,7 +943,7 @@ public:
      *
      * \return A pointer to collector node if exists, otherwise a \p NULL
      */
-    ff_node* getCollector() const { 
+    virtual ff_node* getCollector() const {
         if (collector == (ff_node*)gt) return NULL;
         return collector;
     }
@@ -1396,7 +1396,10 @@ private:
      */
     class ofarmE: public ff_node {
         static inline bool ff_send_out_ofarmE(void * task,unsigned long retry,unsigned long ticks, void *obj) {
-            return ((ofarmE *)obj)->ff_send_out(task, retry, ticks);
+            ff_loadbalancer *lb = ((ofarmE*)obj)->getlb();
+            if (!lb->ff_send_out_emitter(task, retry, ticks, lb)) return false;
+            ((ofarmE*)obj)->updatenextone();
+            return true;           
         }
     public:
         
@@ -1421,6 +1424,13 @@ private:
             E_f = f;
             if (f) f->registerCallback(ff_send_out_ofarmE, this);
         }
+
+        void updatenextone() {
+            nextone = (nextone+1) % lb->getnworkers();
+            lb->set_victim(nextone);
+        }
+
+        ofarm_lb *getlb() { return lb; }
 
         /**
          * \brief \p svc_init method
@@ -1451,10 +1461,9 @@ private:
          */
         void * svc(void * task) {
             if (E_f) task = E_f->svc(task);
-            if (task == (void*)FF_EOS) return task;
+            if (task == EOS || task == GO_ON) return task;
             ff_send_out(task);
-            nextone = (nextone+1) % lb->getnworkers();
-            lb->set_victim(nextone);
+            updatenextone();
             return GO_ON;
         }
 
@@ -1656,6 +1665,10 @@ public:
      */
     void setCollectorF(ff_node* f) { C_f = f; }
     
+    ff_node* getEmitter() const   { return E_f;}
+    ff_node* getCollector() const   { return C_f;}
+
+
     /**
      * \brief run
      *
@@ -1839,6 +1852,8 @@ public:
 
     void setEmitterF(ff_node &f)   { ff_ofarm::setEmitterF(&f); }
     void setCollectorF(ff_node &f) { ff_ofarm::setCollectorF(&f); }
+    ff_node* getEmitter() const   { return ff_ofarm::getEmitter();}
+    ff_node* getCollector() const   { return ff_ofarm::getCollector();}
 
     int add_workers(std::vector<ff_node *> & w) = delete;
     int add_emitter(ff_node * e) = delete;
