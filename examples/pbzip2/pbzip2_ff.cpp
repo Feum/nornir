@@ -2170,7 +2170,7 @@ int main(int argc, char* argv[])
 	#endif
 	
 	/* ----- define FastFlow farm ----- */
-	ff::ff_farm<> farm(false, 0, numCPU*20); 
+	ff::ff_farm<> farm(false, 0, numCPU*10, false, 128, true); 
 	farm.set_scheduling_ondemand(); // set on-demand scheduling policy
 	std::vector<ff::ff_node *> w;
 	Producer * P = new Producer;
@@ -2538,9 +2538,10 @@ int main(int argc, char* argv[])
 					
 					if (FW) FW->set_input_data(OutFilename);
 					
-					adpff::Observer obs;
+                                        adpff::Observer obs;
 				    adpff::Parameters ap("parameters.xml", "archdata.xml");
 				    ap.observer = &obs;
+                                    ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
 				    adpff::ManagerFarm<> amf(&farm, ap);
                     amf.start();
                     amf.join();
@@ -2599,9 +2600,11 @@ int main(int argc, char* argv[])
 				adpff::Observer obs;
 				adpff::Parameters ap("parameters.xml", "archdata.xml");
 				ap.observer = &obs;
+                                ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
 				adpff::ManagerFarm<> amf(&farm, ap);
 				amf.start();
 				amf.join();
+
 #if 0
 				if (farm.run_then_freeze()<0) {
 					fprintf(stderr, "pbzip2_ff: *ERROR: starting farm\n");
