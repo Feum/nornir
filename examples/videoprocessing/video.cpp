@@ -41,18 +41,13 @@ using namespace cv;
 
 // reads frame and sends them to the next stage
 struct Source : adpff::AdaptiveNode {
-    const std::string filename;
-    Source(const std::string filename):filename(filename) {}
+    VideoCapture& _cap;
+    Source(VideoCapture cap):_cap(cap){}
   
     void* svc(void*) {
-        VideoCapture cap(filename.c_str());
-        if(!cap.isOpened())  {
-            std::cout << "Error opening input file" << std::endl;
-            return EOS;
-        }
         for(;;) {
             Mat * frame = new Mat();
-            if(cap.read(*frame))  ff_send_out(frame);
+            if(_cap.read(*frame))  ff_send_out(frame);
             else break;
         }
 
@@ -77,24 +72,30 @@ struct Stage1 : adpff::AdaptiveNode {
 
 // this stage shows the output
 struct Drain: adpff::AdaptiveNode {
-    Drain(bool ovf):outvideo(ovf) {}
-
-    int svc_init() {
-	if(outvideo) namedWindow("edges",1);
-	return 0; 
+    Drain(uint out, cv::VideoWriter& outputFile):_out(out), _outputFile(outputFile){
+        ;
     }
 
     void *svc (void* task) {
         cv::Mat * frame = (cv::Mat*) task;
-        if(outvideo) {
-            imshow("edges", *frame);
-            waitKey(30);
+        switch(_out){
+        case 0:{
+            ;
+        }break;
+        case 1:{
+            cv::imshow("edges", *frame);
+            if(waitKey(30) >= 0) break;
+        }break;
+        case 2:{
+            _outputFile.write(*frame);
+        }break;
         }
         delete frame;
         return GO_ON;
     }
 protected:
-    const bool outvideo; 
+    const uint _out;
+    cv::VideoWriter& _outputFile;
 }; 
 
 int main(int argc, char *argv[]) {
@@ -108,9 +109,26 @@ int main(int argc, char *argv[]) {
       return(0); 
     }
     
+
+    VideoCapture cap(argv[1]);
+    if(!cap.isOpened())  {
+        std::cout << "Error opening input file" << std::endl;
+        return -1;
+    }
+
+    cv::VideoWriter outputFile;
     // output 
-    bool outvideo = false; 
-    if(atoi(argv[2]) == 1) outvideo = true; 
+    switch(atoi(argv[2])){
+    case 0:{
+        ;
+    }break;
+    case 1:{
+        namedWindow("edges",1);
+    }break;
+    case 2:{
+        outputFile.open("output.mp4", cap.get(CV_CAP_PROP_FOURCC), cap.get(CV_CAP_PROP_FPS), cvSize((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT)), true);
+    }break;
+    }
     
     // pardegree 
     size_t nw1 = 1;
@@ -127,10 +145,10 @@ int main(int argc, char *argv[]) {
             return W;
             
         } ());
-    
-    Source source(argv[1]);
+
+    Source source(cap);
     ofarm.setEmitterF(source);
-    Drain  drain(outvideo);
+    Drain  drain(atoi(argv[2]), outputFile);
     ofarm.setCollectorF(drain);
     
     adpff::Observer obs;

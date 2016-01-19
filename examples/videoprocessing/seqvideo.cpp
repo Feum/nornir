@@ -52,8 +52,10 @@ int main(int argc, char *argv[]) {
         
     // input file
     //VideoCapture cap(1); // open the default camera
-    VideoCapture cap(argv[1]); 
-    
+    VideoCapture cap(argv[1]);
+
+    cv::VideoWriter outputFile;
+
     if(!cap.isOpened())  {  // check if we succeeded
         std::cerr << "Error opening input file" << std::endl;
         return -1;
@@ -76,13 +78,20 @@ int main(int argc, char *argv[]) {
     }
     
     
-    // output 
-    bool outvideo = false; 
-    if(atoi(argv[3]) == 1) outvideo = true; 
-    
     Mat edges;
-    if(outvideo) 
-	namedWindow("edges",1);
+    // output 
+    switch(atoi(argv[3])){
+    case 0:{
+        ;
+    }break;
+    case 1:{
+        namedWindow("edges",1);
+    }break;
+    case 2:{
+        outputFile.open("output.mp4", cap.get(CV_CAP_PROP_FOURCC), cap.get(CV_CAP_PROP_FPS), cvSize((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT)), true);
+    }break;
+    }
+
     
     ff::ffTime(ff::START_TIME);
     int frames = 0; 
@@ -121,19 +130,25 @@ int main(int argc, char *argv[]) {
             std::cout << "Filter2 " << TIME(t0) << std::endl; 
 #endif
         }
-        
-        if(outvideo) {
+
 #ifdef SHOWTIMES
-            t0 = ff::getusec();
+        t0 = ff::getusec();
 #endif
+        switch(atoi(argv[3])){
+        case 0:{
+            ;
+        }break;
+        case 1:{
             imshow("edges", frame);
             if(waitKey(30) >= 0) break;
-            
-#ifdef SHOWTIMES
-            std::cout << "Show " << TIME(t0) << std::endl; 
-#endif
+        }break;
+        case 2:{
+            outputFile.write(frame);
+        }break;
         }
-
+#ifdef SHOWTIMES
+        std::cout << "Show " << TIME(t0) << std::endl;
+#endif
     }
     ff::ffTime(ff::STOP_TIME);
     std::cout << "Elapsed time is " << ff::ffTime(ff::GET_TIME) << " ms\n";
