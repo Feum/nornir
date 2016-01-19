@@ -582,7 +582,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
         case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
-            // We have to minimize the power/energy.
+            // We have to minimize the power.
             bestSecondaryPrediction = numeric_limits<double>::max();
         }break;
         case CONTRACT_POWER_BUDGET:{
@@ -597,15 +597,11 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
     _primaryPredictor->prepareForPredictions();
     _secondaryPredictor->prepareForPredictions();
 
-    unsigned int remainingTime = 0;
     vector<KnobsValues> combinations = _configuration.getAllRealCombinations();
     for(size_t i = 0; i < combinations.size(); i++){
         KnobsValues currentValues = combinations.at(i);
         primaryPrediction = _primaryPredictor->predict(currentValues);
         switch(_p.contractType){
-            case CONTRACT_PERF_COMPLETION_TIME:{
-                remainingTime = (double) remainingTasks / primaryPrediction;
-            }break;
             case CONTRACT_PERF_UTILIZATION:{
                 primaryPrediction = (_samples->average().bandwidth / primaryPrediction) *
                                      _samples->average().utilization;
@@ -617,9 +613,6 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
 
         if(isFeasiblePrimaryValue(primaryPrediction)){
             secondaryPrediction = _secondaryPredictor->predict(currentValues);
-            if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-                secondaryPrediction *= remainingTime;
-            }
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
                 feasibleSolutionFound = true;
@@ -634,10 +627,14 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
     }
 
     if(feasibleSolutionFound){
+        DEBUG("Best solution found " << bestValues);
         _primaryPrediction = bestPrimaryPrediction;
         _secondaryPrediction = bestSecondaryPrediction;
+        DEBUG("Primary prediction: " << _primaryPrediction);
+        DEBUG("Secondary prediction: " << _secondaryPrediction);
         return bestValues;
     }else{
+        DEBUG("Suboptimal solution found.");
         _primaryPrediction = bestSuboptimalValue;
         // TODO: This check now works because both service time and power are always  > 0
         // In the future we must find another way to indicate that secondary prediction
