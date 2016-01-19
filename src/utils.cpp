@@ -99,6 +99,7 @@ void Observer::observe(unsigned int timeStamp,
                      double coeffVarBandwidth,
                      double smoothedLatency,
                      double smoothedUtilization,
+                     Joules currentWatts,
                      Joules smoothedWatts){
     _statsFile << timeStamp - _startMonitoringMs << "\t";
     _statsFile << "[";
@@ -129,7 +130,7 @@ void Observer::observe(unsigned int timeStamp,
 
     _statsFile << endl;
 
-    _totalWatts += smoothedWatts;
+    _totalWatts += currentWatts;
     _totalBw += currentBandwidth;
     _numSamples++;
 }

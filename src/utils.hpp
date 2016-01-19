@@ -88,6 +88,7 @@ public:
                          double coeffVarBandwidth,
                          double smoothedLatency,
                          double smoothedUtilization,
+                         mammut::energy::Joules currentWatts,
                          mammut::energy::Joules smoothedWatts);
 
     virtual void calibrationStats(const std::vector<CalibrationStats>&

@@ -189,6 +189,7 @@ void ManagerFarm<lb_t, gt_t>::observe(){
                              _samples->coefficientVariation().bandwidth,
                              ms.latency,
                              ms.utilization,
+                             _samples->getLastSample().watts,
                              ms.watts);
     }
 }
