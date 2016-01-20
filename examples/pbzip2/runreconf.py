@@ -30,8 +30,7 @@ powerRange = powerMax - powerMin
 print "TimeMin: " + str(timeMin) + " TimeMax: " + str(timeMax)
 print "PowerMin: " + str(powerMin) + " PowerMax: " + str(powerMax)
 
-#fractions = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-fractions = [0.9, 1.0]
+fractions = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
 def getLastLine(fileName):
     fh = open(fileName, "r")
