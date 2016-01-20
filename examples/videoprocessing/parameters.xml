@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptivityParameters>
+  <qSize>4</qSize>
+  <samplingInterval>1000</samplingInterval>
+  <strategyPersistence>SAMPLES</strategyPersistence>
+  <persistenceValue>4</persistenceValue>
+  <contractType>POWER_BUDGET</contractType>
+  <powerBudget>100</powerBudget>
+  <strategyPolling>SLEEP_SMALL</strategyPolling>
+</adaptivityParameters>

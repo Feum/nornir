@@ -567,11 +567,12 @@ int main (int argc, char **argv)
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
+    ap.expectedTasksNumber = numOptions * NUM_RUNS / CHUNKSIZE;
     adpff::ManagerFarm<> amf(&farm, ap);
     amf.start();
     amf.join();
 
-    farm.ffStats(std::cout);
+    //farm.ffStats(std::cout);
 #else //ENABLE_FF
     //serial version
     int tid=0;

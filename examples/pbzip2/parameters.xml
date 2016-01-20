@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <adaptivityParameters>
-    <samplingInterval>0</samplingInterval>
-    <numSamples>6</numSamples>    
-    <contractType>POWER_BUDGET</contractType>
-    <powerBudget>100</powerBudget>
-    <strategyPolling>SLEEP_SMALL</strategyPolling>
+<qSize>4</qSize>
+<samplingInterval>500</samplingInterval>
+<persistenceValue>3</persistenceValue>
+<strategySmoothing>MOVING_AVERAGE</strategySmoothing>
+<contractType>POWER_BUDGET</contractType>
+<powerBudget>102.06602</powerBudget>
+<strategyPolling>SLEEP_SMALL</strategyPolling>
 </adaptivityParameters>

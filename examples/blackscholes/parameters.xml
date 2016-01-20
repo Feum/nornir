@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adaptivityParameters>
+<samplingInterval>1000</samplingInterval>
+<contractType>NONE</contractType>
+<strategyPolling>SLEEP_SMALL</strategyPolling>
+</adaptivityParameters>
