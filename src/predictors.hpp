@@ -354,7 +354,10 @@ protected:
      *  relative knobs values for calibration.
      *  @return The relative knobs values.
      **/
-    virtual KnobsValues generateRelativeKnobsValues() const = 0;
+    virtual KnobsValues generateRelativeKnobsValues() const{
+        KnobsValues kv;
+        return kv;
+    }
     virtual void reset(){;}
 public:
     Calibrator(const Parameters& p,
@@ -389,16 +392,22 @@ public:
                     const FarmConfiguration& configuration,
                     const Smoother<MonitoredSample>* samples):
                         Calibrator(p, configuration, samples){;}
-protected:
-    KnobsValues generateRelativeKnobsValues() const{
-        KnobsValues kv;
-        return kv;
-    }
-    void reset(){;}
 public:
     KnobsValues getNextKnobsValues(double primaryValue,
                                    double secondaryValue,
                                    u_int64_t remainingTasks);
+};
+
+/**
+ * This calibrator generates random calibration points.
+ */
+class CalibratorRandom: public Calibrator{
+public:
+    CalibratorRandom(const Parameters& p,
+                    const FarmConfiguration& configuration,
+                    const Smoother<MonitoredSample>* samples);
+protected:
+    KnobsValues generateRelativeKnobsValues() const;
 };
 
 /**

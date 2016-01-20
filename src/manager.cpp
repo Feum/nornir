@@ -158,7 +158,8 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
     KnobsValues values = _calibrator->getNextKnobsValues(getPrimaryValue(),
                                                          getSecondaryValue(),
                                                          _remainingTasks);
-    if(values != _configuration.getRealValues()){
+    if((values.areReal() && (values != _configuration.getRealValues())) ||
+       (values.areRelative() && (values != _configuration.getRelativeValues()))){
         _configuration.setValues(values);
         _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
 
@@ -298,17 +299,23 @@ bool ManagerFarm<lb_t, gt_t>::persist() const{
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::initPredictors(){
-    if(_p.strategyCalibration == STRATEGY_CALIBRATION_RANDOM){
-        ; //CREARE TODO: Ci deve sempre essere un calibratore
-    }else{
-        switch(_p.strategyPrediction){
-            case STRATEGY_PREDICTION_SIMPLE:{
-                _calibrator = new CalibratorDummy(_p, _configuration, _samples);
-            }break;
-            case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
-                _calibrator = new CalibratorLowDiscrepancy(_p, _configuration, _samples);
-            }break;
-        }
+    switch(_p.strategyPrediction){
+        case STRATEGY_PREDICTION_SIMPLE:{
+            _calibrator = new CalibratorDummy(_p, _configuration, _samples);
+        }break;
+        case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
+            switch(_p.strategyCalibration){
+                case STRATEGY_CALIBRATION_RANDOM:{
+                    _calibrator = new CalibratorRandom(_p, _configuration, _samples);
+                }
+                case STRATEGY_CALIBRATION_HALTON:
+                case STRATEGY_CALIBRATION_HALTON_REVERSE:
+                case STRATEGY_CALIBRATION_NIEDERREITER:
+                case STRATEGY_CALIBRATION_SOBOL:{
+                    _calibrator = new CalibratorLowDiscrepancy(_p, _configuration, _samples);
+                }break;
+            }
+        }break;
     }
 }
 

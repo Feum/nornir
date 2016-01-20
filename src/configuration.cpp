@@ -137,10 +137,22 @@ double FarmConfiguration::getRealValue(KnobType t) const{
     return _knobs[t]->getRealValue();
 }
 
+double FarmConfiguration::getRelativeValue(KnobType t) const{
+    return _knobs[t]->getRelativeValue();
+}
+
 KnobsValues FarmConfiguration::getRealValues() const{
     KnobsValues kv(KNOB_VALUE_REAL);
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         kv[(KnobType) i] = getRealValue((KnobType) i);
+    }
+    return kv;
+}
+
+KnobsValues FarmConfiguration::getRelativeValues() const{
+    KnobsValues kv(KNOB_VALUE_RELATIVE);
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        kv[(KnobType) i] = getRelativeValue((KnobType) i);
     }
     return kv;
 }

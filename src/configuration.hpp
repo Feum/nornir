@@ -96,10 +96,23 @@ public:
     double getRealValue(KnobType t) const;
 
     /**
+     * Returns the relative value of a specific knob.
+     * @param t The type of the knob.
+     * @return The relative value of the specified knob.
+     */
+    double getRelativeValue(KnobType t) const;
+
+    /**
      * Returns the real values for all the knobs.
      * @return The real values for all the knobs.
      */
     KnobsValues getRealValues() const;
+
+    /**
+     * Returns the relative values for all the knobs.
+     * @return The relative values for all the knobs.
+     */
+    KnobsValues getRelativeValues() const;
 
     /**
      * Sets values for the knobs (may be relative or real).

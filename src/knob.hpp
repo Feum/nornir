@@ -236,6 +236,12 @@ private:
     const KnobMapping& _knobMapping;
 };
 
+
+/**
+ * Knobs values can be:
+ *  - Real: e.g. for workers it will get value between 1 and the maximum number of cores.
+ *  - Relative: They will always assume values in the range [0.0, 100.0]
+ */
 typedef enum{
     KNOB_VALUE_UNDEF = 0,
     KNOB_VALUE_REAL,

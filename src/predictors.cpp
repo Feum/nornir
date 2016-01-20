@@ -779,6 +779,31 @@ KnobsValues CalibratorDummy::getNextKnobsValues(double primaryValue,
 }
 
 
+CalibratorRandom::CalibratorRandom(const Parameters& p,
+                    const FarmConfiguration& configuration,
+                    const Smoother<MonitoredSample>* samples):
+                        Calibrator(p, configuration, samples){
+    srand(time(NULL));
+}
+
+KnobsValues CalibratorRandom::generateRelativeKnobsValues() const{
+    KnobsValues r(KNOB_VALUE_RELATIVE);
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        if(_configuration.getKnob((KnobType) i)->needsCalibration()){
+            r[(KnobType)i] = rand() % 100;
+        }else{
+            /**
+             * If we do not need to automatically find the value for this knob,
+             * then it has only 0 or 1 possible value. Accordingly, we can set
+             * it to any value. Here we set it to 100.0 for readability.
+             */
+            r[(KnobType)i] = 100.0;
+        }
+    }
+    return r;
+}
+
+
 CalibratorLowDiscrepancy::CalibratorLowDiscrepancy(const Parameters& p,
                                                    const FarmConfiguration& configuration,
                                                    const Smoother<MonitoredSample>* samples):
