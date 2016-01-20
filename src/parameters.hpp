@@ -647,6 +647,10 @@ public:
     // the runtime will never switch [default = -1.0].
     double thresholdQBlocking;
 
+    // Maximum size for the internal queues of the farm.
+    // If 0, nothing will be modified [default = 0].
+    unsigned long qSize;
+
     // The observer object. It will be called every samplingInterval
     // milliseconds to monitor the adaptivity behaviour [default = NULL].
     Observer* observer;

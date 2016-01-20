@@ -157,10 +157,6 @@ int main(int argc, char *argv[]) {
     Drain  drain(atoi(argv[2]), outputFile);
     ofarm.setCollectorF(drain);
 
-    ofarm.setFixedSize(true);
-    ofarm.setInputQueueLength(4*nw1);
-    ofarm.setOutputQueueLength(4*nw1);
-    
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;

@@ -159,6 +159,7 @@ void Parameters::setDefault(){
     maxSecondaryPredictionError = 5.0;
     maxMonitoringOverhead = 1.0;
     thresholdQBlocking = -1;
+    qSize = 0;
     observer = NULL;
 }
 
@@ -517,6 +518,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Double, maxSecondaryPredictionError);
     SETVALUE(xt, Double, maxMonitoringOverhead);
     SETVALUE(xt, Double, thresholdQBlocking);
+    SETVALUE(xt, Ulong, qSize);
 }
 
 Parameters::Parameters(Communicator* const communicator):

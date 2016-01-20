@@ -421,12 +421,23 @@ void ManagerFarm<lb_t, gt_t>::cleanNodes() {
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::run(){
+    if(_p.qSize){
+        _farm->setFixedSize(true);
+        // We need to multiply for the number of workers since FastFlow
+        // will divide the size for the number of workers.
+        _farm->setInputQueueLength(_p.qSize * _activeWorkers.size());
+        _farm->setOutputQueueLength(_p.qSize * _activeWorkers.size());
+    }
+
     DEBUG("Init pre run");
     initNodesPreRun();
+
     DEBUG("Going to run");
     _farm->run_then_freeze();
+
     DEBUG("Init post run");
     initNodesPostRun();
+
     DEBUG("Farm started.");
 
     _configuration.maxAllKnobs();

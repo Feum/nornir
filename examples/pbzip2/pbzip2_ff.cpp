@@ -2170,7 +2170,7 @@ int main(int argc, char* argv[])
 	#endif
 	
 	/* ----- define FastFlow farm ----- */
-	ff::ff_farm<> farm(false, 0, numCPU*4, false, 128, true); 
+	ff::ff_farm<> farm;
 	farm.set_scheduling_ondemand(); // set on-demand scheduling policy
 	std::vector<ff::ff_node *> w;
 	Producer * P = new Producer;
