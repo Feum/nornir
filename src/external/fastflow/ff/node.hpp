@@ -1006,7 +1006,13 @@ public:
     virtual bool ff_send_out(void * task, 
                              unsigned long retry=((unsigned long)-1),
                              unsigned long ticks=(TICKS2WAIT)) { 
-        if (callback) return  callback(task,retry,ticks,callback_arg);
+        if (callback){
+            bool r = callback(task,retry,ticks,callback_arg);
+#if defined(FF_TASK_CALLBACK)
+            if (r) callbackOut();
+#endif
+            return r;
+        }
         bool r =Push(task,retry,ticks);
         if (task == BLK || task == NBLK) {
             blocking_out = (task == BLK);

@@ -108,6 +108,7 @@ KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
         _knobValues.push_back(_allWorkers.size());
     }
     _activeWorkers = _allWorkers;
+    DEBUG("Knob workers created.");
 }
 
 bool KnobWorkers::needsCalibration() const{

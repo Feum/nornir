@@ -395,10 +395,13 @@ void ManagerFarm<lb_t, gt_t>::initNodesPostRun() {
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
         _activeWorkers.at(i)->initPostRun();
     }
+    DEBUG("initNodesPostRun: Workers done.");
     _emitter->initPostRun();
+    DEBUG("initNodesPostRun: Emitter done.");
     if (_collector) {
         _collector->initPostRun();
     }
+    DEBUG("initNodesPostRun: Collector done.");
 }
 
 template <typename lb_t, typename gt_t>
@@ -418,11 +421,16 @@ void ManagerFarm<lb_t, gt_t>::cleanNodes() {
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::run(){
+    DEBUG("Init pre run");
     initNodesPreRun();
+    DEBUG("Going to run");
     _farm->run_then_freeze();
+    DEBUG("Init post run");
     initNodesPostRun();
+    DEBUG("Farm started.");
 
     _configuration.maxAllKnobs();
+    DEBUG("All knobs maxed.");
 
     /** Creates the parallel section begin file. **/
     char* default_in_roi = (char*) malloc(sizeof(char)*256);

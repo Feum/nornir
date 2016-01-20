@@ -13,9 +13,7 @@ powerMin = 24.9002
 powerMax = 110.6
 powerRange = powerMax - powerMin
 
-#fractions = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-
-fractions = [0.1]
+fractions = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
 def getLastLine(fileName):
     fh = open(fileName, "r")
@@ -30,8 +28,9 @@ def run(contractType, fieldName, fieldValue, fraction):
     parametersFile = open("parameters.xml", "w")
     parametersFile.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
     parametersFile.write("<adaptivityParameters>\n")
-    parametersFile.write("<samplingInterval>1000</samplingInterval>\n")
-    parametersFile.write("<persistenceValue>6</persistenceValue>\n")
+    parametersFile.write("<samplingInterval>500</samplingInterval>\n")
+    parametersFile.write("<persistenceValue>3</persistenceValue>\n")
+    parametersFile.write("<strategySmoothing>MOVING_AVERAGE</strategySmoothing>\n")
     parametersFile.write("<contractType>" + contractType + "</contractType>\n")
     parametersFile.write("<" + fieldName + ">" + str(fieldValue) + "</" + fieldName + ">\n")
     parametersFile.write("<strategyPolling>SLEEP_SMALL</strategyPolling>\n")
@@ -93,21 +92,21 @@ os.makedirs('POWER_BUDGET')
 
 perfFile = open("PERF_COMPLETION_TIME/results.csv", "w")
 powerFile = open("POWER_BUDGET/results.csv", "w")
-perfFile.write("#Fraction\tSolution\tLoss")
-powerFile.write("#Fraction\tSolution\tLoss")
+perfFile.write("#Fraction\tSolution\tLoss\n")
+powerFile.write("#Fraction\tSolution\tLoss\n")
 
 for f in fractions:
     targetTime = timeMin + timeRange*f
     ct, watts = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, f)
     opt = getOptimalTimeBound(ct)
     loss = ((watts - opt) / opt) * 100.0
-    perfFile.write(str(f) + str(watts) + str(loss) + "\n")
+    perfFile.write(str(f) + "\t" + str(watts) + "\t" + str(loss) + "\n")
 
     targetPower = powerMin + powerRange*f
     ct, watts = run("POWER_BUDGET", "powerBudget", targetPower, f)
     opt = getOptimalPowerBound(watts)
     loss = ((ct - opt) / opt) * 100.0
-    powerFile.write(str(f) + str(ct) + str(loss) + "\n")
+    powerFile.write(str(f) + "\t" + str(ct) + "\t" + str(loss) + "\n")
 
 perfFile.close()
 powerFile.close()

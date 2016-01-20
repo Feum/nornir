@@ -87,7 +87,9 @@ void AdaptiveNode::initPreRun(Mammut& mammut, double ticksPerNs, NodeType nodeTy
 }
 
 void AdaptiveNode::initPostRun(){
+    DEBUG("Waiting for start.");
     while(!_started){;}
+    DEBUG("Started.");
     size_t tid = getOSThreadId();
     assert(tid != 0);
     _thread = _tasksManager->getThreadHandler(getpid(), tid);

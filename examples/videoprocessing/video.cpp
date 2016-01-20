@@ -42,16 +42,22 @@ using namespace cv;
 // reads frame and sends them to the next stage
 struct Source : adpff::AdaptiveNode {
     VideoCapture& _cap;
-    Source(VideoCapture cap):_cap(cap){}
+    uint _numTasks;
+    Source(VideoCapture& cap):_cap(cap), _numTasks(0){}
   
     void* svc(void*) {
         for(;;) {
             Mat * frame = new Mat();
-            if(_cap.read(*frame))  ff_send_out(frame);
-            else break;
+            if(_cap.read(*frame)){
+                ++_numTasks;
+                ff_send_out(frame);
+            }else{
+                break;
+            }
         }
 
         std::cout << "End of stream in input" << std::endl;
+        std::cout << _numTasks << " frames sent." << std::endl;
         return EOS;
     }
 }; 
@@ -150,6 +156,10 @@ int main(int argc, char *argv[]) {
     ofarm.setEmitterF(source);
     Drain  drain(atoi(argv[2]), outputFile);
     ofarm.setCollectorF(drain);
+
+    ofarm.setFixedSize(true);
+    ofarm.setInputQueueLength(4*nw1);
+    ofarm.setOutputQueueLength(4*nw1);
     
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
