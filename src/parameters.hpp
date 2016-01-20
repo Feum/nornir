@@ -144,11 +144,16 @@ typedef enum{
 
 /// Possible strategies to use to predict power and performance values.
 typedef enum{
-    // Applies multivariate linear regression.
-    STRATEGY_PREDICTION_REGRESSION_LINEAR = 0,
-
     // Applies a simple analytical model.
-    STRATEGY_PREDICTION_SIMPLE
+    STRATEGY_PREDICTION_SIMPLE = 0,
+
+    // Applies multivariate linear regression.
+    STRATEGY_PREDICTION_REGRESSION_LINEAR,
+
+    // Applies the selection strategy described in:
+    // "Dynamic Power-Performance Adaptation of Parallel Computation
+    // on Chip Multiprocessors" - Jian Li and Jose F. Martınez
+    STRATEGY_PREDICTION_LIMARTINEZ,
 }StrategyPrediction;
 
 /// Service nodes (emitter or collector) mapping knob.
@@ -649,7 +654,7 @@ public:
 
     // Maximum size for the internal queues of the farm.
     // If 0, nothing will be modified [default = 0].
-    unsigned long qSize;
+    ulong qSize;
 
     // The observer object. It will be called every samplingInterval
     // milliseconds to monitor the adaptivity behaviour [default = NULL].

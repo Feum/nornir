@@ -331,14 +331,14 @@ private:
      * @param tolerance The percentage of tolerance allowed for the check
      */
     bool isFeasiblePrimaryValue(double value, double tolerance = 0) const;
-
+protected:
     /**
      * Checks if the contract is violated.
      * @param primaryValue The primary value.
      * @return true if the contract has been violated, false otherwise.
      */
     bool isContractViolated(double primaryValue) const;
-protected:
+
     /**
      * Computes the best relative knobs values for the farm.
      * @param primaryValue The primary value.
@@ -426,6 +426,27 @@ public:
                              const FarmConfiguration& configuration,
                              const Smoother<MonitoredSample>* samples);
     ~CalibratorLowDiscrepancy();
+};
+
+/**
+ * It chooses the optimal point using the technique described
+ * in the paper by Li and Martinez.
+ */
+class CalibratorLiMartinez: public Calibrator{
+private:
+    bool _firstPointGenerated;
+    int _lastCoresDirection; // -1 for decreased, + 1 for increased
+    std::vector<mammut::cpufreq::Frequency> _availableFrequencies;
+    size_t _currentFrequencyId;
+public:
+    CalibratorLiMartinez(const Parameters& p,
+                         const FarmConfiguration& configuration,
+                         const Smoother<MonitoredSample>* samples);
+    ~CalibratorLiMartinez();
+
+    KnobsValues getNextKnobsValues(double primaryValue,
+                                   double secondaryValue,
+                                   u_int64_t remainingTasks);
 };
 
 }

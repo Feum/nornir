@@ -316,6 +316,9 @@ void ManagerFarm<lb_t, gt_t>::initPredictors(){
                 }break;
             }
         }break;
+        case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
+            _calibrator = new CalibratorLiMartinez(_p, _configuration, _samples);
+        }break;
     }
 }
 

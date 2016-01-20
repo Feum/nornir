@@ -707,19 +707,9 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 kv = generateRelativeKnobsValues();
                 DEBUG("[Calibrator]: NumPoints: " << _numCalibrationPoints << " MinNumPoints: " << _minNumPoints);
             }else{
-                // Predict the values in current configuration.
-                _primaryPredictor->prepareForPredictions();
-                _secondaryPredictor->prepareForPredictions();
-                _primaryPrediction = _primaryPredictor->predict(_configuration.getRealValues());
-                _secondaryPrediction = _secondaryPredictor->predict(_configuration.getRealValues());
-
-                if(highError(primaryValue, secondaryValue)){
-                    kv = generateRelativeKnobsValues();
-                }else{
-                    kv = getBestKnobsValues(primaryValue, remainingTasks);
-                    _state = CALIBRATION_VALIDATE_PREDICTION;
-                    DEBUG("[Calibrator]: Moving to validate prediction.");
-                }
+                kv = getBestKnobsValues(primaryValue, remainingTasks);
+                _state = CALIBRATION_VALIDATE_PREDICTION;
+                DEBUG("[Calibrator]: Moving to validate prediction.");
             }
         }break;
         case CALIBRATION_VALIDATE_PREDICTION:{
@@ -867,6 +857,44 @@ KnobsValues CalibratorLowDiscrepancy::generateRelativeKnobsValues() const{
 
 void CalibratorLowDiscrepancy::reset(){
     gsl_qrng_init(_generator);
+}
+
+CalibratorLiMartinez::CalibratorLiMartinez(const Parameters& p,
+                                           const FarmConfiguration& configuration,
+                                           const Smoother<MonitoredSample>* samples):
+    Calibrator(p, configuration, samples),
+    _firstPointGenerated(false),
+    _lastCoresDirection(-1),
+    _availableFrequencies(_p.mammut.getInstanceCpuFreq()->getDomains().back()->getAvailableFrequencies()),
+    _currentFrequencyId(_availableFrequencies.size() - 1){
+    ;
+}
+
+CalibratorLiMartinez::~CalibratorLiMartinez(){
+    ;
+}
+
+KnobsValues CalibratorLiMartinez::getNextKnobsValues(double primaryValue,
+                                                     double secondaryValue,
+                                                     u_int64_t remainingTasks){
+    KnobsValues kv(KNOB_VALUE_REAL);
+
+    if(!_firstPointGenerated){
+        _firstPointGenerated = true;
+        kv[KNOB_TYPE_WORKERS] = _configuration.getKnob(KNOB_TYPE_WORKERS)->getRealValue() / 2;
+        kv[KNOB_TYPE_FREQUENCY] = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
+    }else{
+        if(!isContractViolated(primaryValue) && _currentFrequencyId){
+            // We should keep decreasing the frequency
+            kv[KNOB_TYPE_WORKERS] = _configuration.getKnob(KNOB_TYPE_WORKERS)->getRealValue();
+            --_currentFrequencyId;
+            kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies[_currentFrequencyId];
+        }else{
+            // We should save the last frequency and change number of workers.
+            ;
+        }
+    }
+    return kv;
 }
 
 }
