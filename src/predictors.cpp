@@ -455,13 +455,16 @@ Calibrator::Calibrator(const Parameters& p,
             _secondaryPredictor = new PredictorLinearRegression(secondary, _p, _configuration, _samples);
         }break;
         default:{
-            ;
+            _primaryPredictor = NULL;
+            _secondaryPredictor = NULL;
         }break;
     }
 
-    _minNumPoints = std::max(_primaryPredictor->getMinimumPointsNeeded(),
-                             _secondaryPredictor->getMinimumPointsNeeded());
-    DEBUG("Minimum number of points required for calibration: " << _minNumPoints);
+    if(_primaryPredictor && _secondaryPredictor){
+        _minNumPoints = std::max(_primaryPredictor->getMinimumPointsNeeded(),
+                                 _secondaryPredictor->getMinimumPointsNeeded());
+        DEBUG("Minimum number of points required for calibration: " << _minNumPoints);
+    }
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
 }
 
@@ -859,14 +862,45 @@ void CalibratorLowDiscrepancy::reset(){
     gsl_qrng_init(_generator);
 }
 
+Frequency CalibratorLiMartinez::findNearestFrequency(Frequency f) const{
+    Frequency bestDistance = _availableFrequencies.back();
+    Frequency bestFrequency = _availableFrequencies.back();
+    for(size_t i = 0; i < _availableFrequencies.size(); i++){
+        Frequency distance = std::abs(_availableFrequencies.at(i) - f);
+        if(distance < bestDistance){
+            bestDistance = distance;
+            bestFrequency = _availableFrequencies.at(i);
+        }
+    }
+    return bestFrequency;
+}
+
+void CalibratorLiMartinez::goRight(){
+    _low1 = _low2;
+    _high1 = _mid2 - 1;
+    _low2 = _mid2 + 1;
+    _mid1 = (_low1 + _high1) / 2.0;
+    _mid2 = (_low2 + _high2) / 2.0;
+}
+
+void CalibratorLiMartinez::goLeft(){
+    _high1 = _mid1 - 1;
+    _low2 = _mid1 + 1;
+    _high2 = _high1;
+    _mid1 = (_low1 + _high1) / 2.0;
+    _mid2 = (_low2 + _high2) / 2.0;
+}
+
 CalibratorLiMartinez::CalibratorLiMartinez(const Parameters& p,
                                            const FarmConfiguration& configuration,
                                            const Smoother<MonitoredSample>* samples):
     Calibrator(p, configuration, samples),
-    _firstPointGenerated(false),
-    _lastCoresDirection(-1),
+    _firstPointGenerated(false), _low1(0), _mid1(0), _high1(0),
+    _low2(0), _mid2(0), _high2(0), _midId(1),
     _availableFrequencies(_p.mammut.getInstanceCpuFreq()->getDomains().back()->getAvailableFrequencies()),
-    _currentFrequencyId(_availableFrequencies.size() - 1){
+    _currentWatts(DBL_MAX), _optimalWatts(DBL_MAX),
+    _optimalFrequency(_availableFrequencies.back()), _optimalWorkers(1),
+    _currentBw(0),_leftBw(0), _rightBw(0), _optimalFound(false), _improved(false){
     ;
 }
 
@@ -878,20 +912,102 @@ KnobsValues CalibratorLiMartinez::getNextKnobsValues(double primaryValue,
                                                      double secondaryValue,
                                                      u_int64_t remainingTasks){
     KnobsValues kv(KNOB_VALUE_REAL);
+    kv[KNOB_TYPE_MAPPING] = KNOB_MAPPING_LINEAR;
 
     if(!_firstPointGenerated){
         _firstPointGenerated = true;
-        kv[KNOB_TYPE_WORKERS] = _configuration.getKnob(KNOB_TYPE_WORKERS)->getRealValue() / 2;
-        kv[KNOB_TYPE_FREQUENCY] = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
+        uint maxWorkers = _configuration.getKnob(KNOB_TYPE_WORKERS)->getRealValue();
+        _low2 = 1;
+        _mid2 = maxWorkers / 2.0;
+        _high2 = maxWorkers;
+
+        kv[KNOB_TYPE_WORKERS] = _mid2;
+        kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies.back();
+        _midId = 2;
+
+        DEBUG("Generating first point: " << kv);
     }else{
-        if(!isContractViolated(primaryValue) && _currentFrequencyId){
+        if(_optimalFound){
+            return _optimalKv;
+        }else if(!isContractViolated(primaryValue)){
+            _currentWatts = secondaryValue;
+
+            if(_currentWatts < _optimalWatts){
+                _improved = true;
+                DEBUG("Found a new optimal watts: " << _currentWatts << " vs. " << _optimalWatts);
+                _optimalWatts = _currentWatts;
+                _optimalFrequency = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
+                _optimalWorkers = _configuration.getKnob(KNOB_TYPE_WORKERS)->getRealValue();
+                DEBUG("Optimal: " << _optimalWorkers << ", " << _optimalFrequency);
+            }
+
             // We should keep decreasing the frequency
+            Frequency currentFrequency = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
             kv[KNOB_TYPE_WORKERS] = _configuration.getKnob(KNOB_TYPE_WORKERS)->getRealValue();
-            --_currentFrequencyId;
-            kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies[_currentFrequencyId];
+
+            Frequency nextFrequency = currentFrequency * (_p.requiredBandwidth / primaryValue);
+            nextFrequency = findNearestFrequency(nextFrequency);
+            DEBUG("Required BW: " << _p.requiredBandwidth << " Current BW: " << primaryValue << " Best frequency: " << nextFrequency);
+            if(nextFrequency == currentFrequency){
+                goto changeworkers;
+            }else{
+                kv[KNOB_TYPE_FREQUENCY] = nextFrequency;
+                DEBUG("Keeping going down on frequencies. We move to: " << kv);
+            }
         }else{
-            // We should save the last frequency and change number of workers.
-            ;
+changeworkers:
+            // I have to change the number of workers
+            kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies.back();
+
+            if(_optimalWatts == DBL_MAX){
+                // Still I have not found a number of workers that satisfied
+                // the time requirement. I increase workers. (Go right).
+                kv[KNOB_TYPE_WORKERS] = _mid2;
+                goRight();
+                _midId = 2;
+            }else if(_currentWatts > _optimalWatts || !_improved){
+                DEBUG("This number of workers is worst than the best we found "
+                      "up to now.");
+                // This number of workers is not ok
+                if(_midId == 1){
+                    kv[KNOB_TYPE_WORKERS] = _mid2;
+                    _midId = 2;
+                    DEBUG("Trying with the right side. We move to " << kv);
+                }else{
+                    // Both explored and both are not ok, finished
+                    kv[KNOB_TYPE_WORKERS] = _optimalWorkers;
+                    kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
+                    _optimalFound = true;
+                    _optimalKv = kv;
+                    DEBUG("Both side are worst. Terminated with: " << kv);
+                }
+            }else{
+                _improved = false;
+                if(_midId == 1){
+                    goLeft();
+                }else{
+                    goRight();
+                }
+
+                DEBUG("New interval 1: [" << _low1 << "," << _mid1 << "," << _high1 << "]");
+                DEBUG("New interval 2: [" << _low2 << "," << _mid2 << "," << _high2 << "]");
+
+                if(_low1 <= _high1){
+                    _midId = 1;
+                    kv[KNOB_TYPE_WORKERS] = _mid1;
+                    DEBUG("We move to " << kv);
+                }else if(_low2 <= _high2){
+                    _midId = 2;
+                    kv[KNOB_TYPE_WORKERS] = _mid2;
+                    DEBUG("We move to " << kv);
+                }else{
+                    kv[KNOB_TYPE_WORKERS] = _optimalWorkers;
+                    kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
+                    _optimalFound = true;
+                    _optimalKv = kv;
+                    DEBUG("Exploration finished with: " << kv);
+                }
+            }
         }
     }
     return kv;

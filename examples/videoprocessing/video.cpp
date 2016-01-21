@@ -58,7 +58,7 @@ struct Source : adpff::AdaptiveNode {
 
         std::cout << "End of stream in input" << std::endl;
         std::cout << _numTasks << " frames sent." << std::endl;
-        return EOS;
+        TERMINATE_APPLICATION;
     }
 }; 
 

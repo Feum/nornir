@@ -58,12 +58,22 @@ using namespace ff;
 
 using namespace std;
 
-void Knob::setRelativeValue(double v){
+bool Knob::getRealFromRelative(double relative, double& real) const{
     // Maps from the range [0, 100] to the real range.
     vector<double> values = getAllowedValues();
     if(values.size()){
-        uint index = round((double)(values.size() - 1) * (v / 100.0));
-        setRealValue(values.at(index));
+        uint index = round((double)(values.size() - 1) * (relative / 100.0));
+        real = values.at(index);
+        return true;
+    }else{
+        return false;
+    }
+}
+
+void Knob::setRelativeValue(double v){
+    double real;
+    if(getRealFromRelative(v, real)){
+        setRealValue(real);
     }
 }
 
@@ -121,14 +131,16 @@ void KnobWorkers::changeValueReal(double v){
         prepareToFreeze();
         freeze();
 
-        _activeWorkers = vector<AdaptiveNode*>(_allWorkers.begin(),
-                                               _allWorkers.begin() + v);
+        if(!_emitter->isTerminated()){
+            _activeWorkers = vector<AdaptiveNode*>(_allWorkers.begin(),
+                                                   _allWorkers.begin() + v);
 
-        notifyNewConfiguration(v);
+            notifyNewConfiguration(v);
 
-        prepareToRun(v);
-        run(v);
-        DEBUG("[Workers] Active Workers: " << _activeWorkers);
+            prepareToRun(v);
+            run(v);
+            DEBUG("[Workers] Active Workers: " << _activeWorkers);
+        }
     }
 }
 

@@ -45,6 +45,16 @@ public:
     Knob():_realValue(-1){;}
 
     /**
+     * Computes the real value corresponding to a specific
+     * relative value.
+     * @param relative The relative value.
+     * @param real The real value.
+     * @return True if there is a real value, false otherwise (e.g. because this
+     * knob has no possible values to be set).
+     */
+    bool getRealFromRelative(double relative, double& real) const;
+
+    /**
      * Changes the value of this knob.
      * @param v Is a value in the range [0, 100], representing the value to be
      *          set for the knob.
@@ -61,12 +71,6 @@ public:
      * Sets this knob to its maximum.
      */
     void setToMax();
-
-    /**
-     * Returns the current relative value [0, 100] of this knob.
-     * @return The current relative value [0, 100] of this knob.
-     */
-    double getRelativeValue() const;
 
     /**
      * Returns the current real value of this knob.

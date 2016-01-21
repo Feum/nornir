@@ -59,6 +59,14 @@ public:
     ~FarmConfiguration();
 
     /**
+     * Returns true if the values of this configuration are equal to those
+     * passed as parameters, false otherwise.
+     * @return true if the values of this configuration are equal to those
+     * passed as parameters, false otherwise.
+     */
+    bool equal(KnobsValues values) const;
+
+    /**
      * Returns true if the knobs values need to be changed, false otherwise.
      * @return True if the knobs values need to be changed, false otherwise.
      */
@@ -96,23 +104,10 @@ public:
     double getRealValue(KnobType t) const;
 
     /**
-     * Returns the relative value of a specific knob.
-     * @param t The type of the knob.
-     * @return The relative value of the specified knob.
-     */
-    double getRelativeValue(KnobType t) const;
-
-    /**
      * Returns the real values for all the knobs.
      * @return The real values for all the knobs.
      */
     KnobsValues getRealValues() const;
-
-    /**
-     * Returns the relative values for all the knobs.
-     * @return The relative values for all the knobs.
-     */
-    KnobsValues getRelativeValues() const;
 
     /**
      * Sets values for the knobs (may be relative or real).

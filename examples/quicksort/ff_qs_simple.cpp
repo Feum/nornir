@@ -190,7 +190,7 @@ public:
         if (k==-1) {
             if (streamlen == 0) {
                 delete task;
-                return NULL;
+                TERMINATE_APPLICATION;
             }
             delete task;
             return GO_ON;

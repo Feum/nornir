@@ -435,9 +435,27 @@ public:
 class CalibratorLiMartinez: public Calibrator{
 private:
     bool _firstPointGenerated;
-    int _lastCoresDirection; // -1 for decreased, + 1 for increased
+    uint _low1, _mid1, _high1;
+    uint _low2, _mid2, _high2;
+    uint _midId;
+
     std::vector<mammut::cpufreq::Frequency> _availableFrequencies;
-    size_t _currentFrequencyId;
+    double _currentWatts;
+
+    double _optimalWatts;
+    mammut::cpufreq::Frequency _optimalFrequency;
+    uint _optimalWorkers;
+
+    double _currentBw, _leftBw, _rightBw;
+
+    bool _optimalFound;
+    KnobsValues _optimalKv;
+
+    bool _improved;
+
+    mammut::cpufreq::Frequency findNearestFrequency(mammut::cpufreq::Frequency f) const;
+    void goRight();
+    void goLeft();
 public:
     CalibratorLiMartinez(const Parameters& p,
                          const FarmConfiguration& configuration,

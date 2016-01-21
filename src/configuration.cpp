@@ -105,6 +105,21 @@ void FarmConfiguration::combinations(std::vector<std::vector<double> > array, si
     }
 }
 
+bool FarmConfiguration::equal(KnobsValues values) const{
+    if(values.areReal()){
+        return values == getRealValues();
+    }else{
+        double real;
+        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            if(_knobs[(KnobType) i]->getRealFromRelative(values[(KnobType) i], real) &&
+               real != getRealValue((KnobType) i)){
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
 bool FarmConfiguration::knobsChangeNeeded() const{
     return _knobsChangeNeeded;
 }
@@ -137,22 +152,10 @@ double FarmConfiguration::getRealValue(KnobType t) const{
     return _knobs[t]->getRealValue();
 }
 
-double FarmConfiguration::getRelativeValue(KnobType t) const{
-    return _knobs[t]->getRelativeValue();
-}
-
 KnobsValues FarmConfiguration::getRealValues() const{
     KnobsValues kv(KNOB_VALUE_REAL);
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         kv[(KnobType) i] = getRealValue((KnobType) i);
-    }
-    return kv;
-}
-
-KnobsValues FarmConfiguration::getRelativeValues() const{
-    KnobsValues kv(KNOB_VALUE_RELATIVE);
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        kv[(KnobType) i] = getRelativeValue((KnobType) i);
     }
     return kv;
 }

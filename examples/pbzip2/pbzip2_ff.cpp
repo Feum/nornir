@@ -1280,7 +1280,8 @@ public:
 			errLevel = producer(hInfile,blockSize);
 		else 
 			errLevel = producer_decompress_phase2();
-		return NULL; // exit
+		TERMINATE_APPLICATION;
+		//return NULL; // exit
 	}
 	
 	int getErrLevel() const { return errLevel;}

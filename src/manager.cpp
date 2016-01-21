@@ -125,28 +125,7 @@ double ManagerFarm<lb_t, gt_t>::getSecondaryValue() const{
 
 template <typename lb_t, typename gt_t>
 bool ManagerFarm<lb_t, gt_t>::terminated(){
-    /**
-     * We do not need to wait if the emitter is terminated.
-     * Indeed, if the workers terminated, the emitter surely terminated
-     * too.
-     */
-
-    for(size_t i = 0; i < _activeWorkers.size(); i++){
-        if(!_activeWorkers.at(i)->isTerminated()){
-            return false;
-        }else{
-            DEBUG("Worker " << i << " terminated.");
-        }
-    }
-
-    if(_collector &&
-       !_collector->isTerminated()){
-        return false;
-    }else{
-        DEBUG("Collector terminated.");
-    }
-
-    return true;
+    return _emitter->isTerminated();
 }
 
 template <typename lb_t, typename gt_t>
@@ -158,8 +137,7 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
     KnobsValues values = _calibrator->getNextKnobsValues(getPrimaryValue(),
                                                          getSecondaryValue(),
                                                          _remainingTasks);
-    if((values.areReal() && (values != _configuration.getRealValues())) ||
-       (values.areRelative() && (values != _configuration.getRelativeValues()))){
+    if(!_configuration.equal(values)){
         _configuration.setValues(values);
         _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
 
@@ -316,7 +294,7 @@ void ManagerFarm<lb_t, gt_t>::initPredictors(){
                 }break;
             }
         }break;
-        case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
+        case STRATEGY_PREDICTION_LIMARTINEZ:{
             _calibrator = new CalibratorLiMartinez(_p, _configuration, _samples);
         }break;
     }

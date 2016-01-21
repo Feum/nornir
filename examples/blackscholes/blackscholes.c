@@ -302,8 +302,8 @@ public:
         while(true){
             if(currentIteration >= NUM_RUNS){
                 printf("Generating end of stream.");
-		fflush(stdout);
-                return EOS;
+                fflush(stdout);
+                TERMINATE_APPLICATION;
             }
 
             fftask_t* outTask = new fftask_t;

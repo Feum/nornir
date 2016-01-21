@@ -36,6 +36,7 @@
 #undef DEBUG
 #undef DEBUGB
 
+#define TERMINATE_APPLICATION do{ terminate(); return (void*) ff::FF_EOS;} while(0)
 
 namespace adpff{
 
@@ -286,6 +287,11 @@ public:
      * Destroyes this adaptive node.
      */
     ~AdaptiveNode();
+
+    /**
+     * To be called inside svc() before sending EOS.
+     */
+    void terminate();
 
     /**
      * This method can be implemented by the nodes to be aware of a change
