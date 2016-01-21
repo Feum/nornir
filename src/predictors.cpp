@@ -669,6 +669,19 @@ bool Calibrator::isContractViolated(double primaryValue) const{
     return !isFeasiblePrimaryValue(primaryValue, tolerance);
 }
 
+void Calibrator::startCalibrationStat(){
+    _calibrationStartMs = getMillisecondsTime();
+}
+
+void Calibrator::stopCalibrationStat(){
+    CalibrationStats cs;
+    // We do -1 because we counted the current point and now we
+    // discovered it isn't a calibration point.
+    cs.numSteps = _numCalibrationPoints;
+    cs.duration = (getMillisecondsTime() - _calibrationStartMs);
+    _calibrationStats.push_back(cs);
+}
+
 KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                                            double secondaryValue,
                                            u_int64_t remainingTasks){
@@ -701,7 +714,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
         }
     }else{
         _firstPointGenerated = true;
-        _calibrationStartMs = getMillisecondsTime();
+        startCalibrationStat();
     }
 
     switch(_state){
@@ -732,14 +745,11 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                     _primaryPredictor->clear();
                     _secondaryPredictor->clear();
 
-                    CalibrationStats cs;
-                    // We do -1 because we counted the current point and now we
-                    // discovered it isn't a calibration point.
-                    cs.numSteps = _numCalibrationPoints - 1;
-                    cs.duration = (getMillisecondsTime() - _calibrationStartMs);
-                    _calibrationStats.push_back(cs);
+                    --_numCalibrationPoints;
+
+                    stopCalibrationStat();
                     DEBUG("[Calibrator]: Moving to finished");
-                    DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints - 1 <<
+                    DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints <<
                           " steps with configuration " << kv);
                 }
             }
@@ -750,7 +760,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 kv = generateRelativeKnobsValues();
                 _numCalibrationPoints = 0;
                 _state = CALIBRATION_SEEDS;
-                _calibrationStartMs = getMillisecondsTime();
+                startCalibrationStat();
                 DEBUG("[Calibrator]: Moving to seeds");
             }else{
                 kv = _configuration.getRealValues();
@@ -925,6 +935,8 @@ KnobsValues CalibratorLiMartinez::getNextKnobsValues(double primaryValue,
         kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies.back();
         _midId = 2;
 
+        startCalibrationStat();
+
         DEBUG("Generating first point: " << kv);
     }else{
         if(_optimalFound){
@@ -979,6 +991,7 @@ changeworkers:
                     kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
                     _optimalFound = true;
                     _optimalKv = kv;
+                    stopCalibrationStat();
                     DEBUG("Both side are worst. Terminated with: " << kv);
                 }
             }else{
@@ -1005,6 +1018,7 @@ changeworkers:
                     kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
                     _optimalFound = true;
                     _optimalKv = kv;
+                    stopCalibrationStat();
                     DEBUG("Exploration finished with: " << kv);
                 }
             }

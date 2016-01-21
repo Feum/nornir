@@ -348,6 +348,15 @@ protected:
     KnobsValues getBestKnobsValues(double primaryValue,
                                    u_int64_t remainingTasks);
 
+    /**
+     * Starts the recording of calibration stats.
+     */
+    void startCalibrationStat();
+
+    /**
+     * Stops the recording of calibration stats.
+     */
+    void stopCalibrationStat();
 
     /**
      *  Override this method to provide custom ways to generate
