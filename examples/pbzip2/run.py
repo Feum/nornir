@@ -20,7 +20,7 @@ parametersFile.close()
 outfile = open("results.csv", "w")
 outfile.write("#Workers\tFrequency\tTime\tWatts\n")
 
-for c in xrange(2, 25):
+for c in xrange(1, 25):
     for f in [1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 1900000, 2000000, 2100000, 2200000, 2300000, 2400000]:
         run = "cpupower frequency-set -f " + str(f)
         process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)

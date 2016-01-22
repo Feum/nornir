@@ -2439,8 +2439,8 @@ int main(int argc, char* argv[])
 		if (decompress == 1)
 		{
 			numBlocks = 0;
-			// Do not use threads if we only have 1 CPU or small files
-			if ((numCPU == 1) || (fileSize < 1000000))
+			// Do not use threads if we only have 0 CPU or small files
+			if ((numCPU == 0) || (fileSize < 1000000))
 				noThreads = 1;
 			else
 				noThreads = 0;
@@ -2455,8 +2455,8 @@ int main(int argc, char* argv[])
 				// calculate the # of blocks of data
 				numBlocks = (fileSize + blockSize - 1) / blockSize;
 				// Do not use threads for small files where we only have 1 block to process
-				// or if we only have 1 CPU
-				if ((numBlocks == 1) || (numCPU == 1))
+				// or if we only have 0 CPU
+				if ((numBlocks == 1) || (numCPU == 0))
 					noThreads = 1;
 				else
 					noThreads = 0;
