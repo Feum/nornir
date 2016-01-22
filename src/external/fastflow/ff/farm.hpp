@@ -1460,7 +1460,16 @@ private:
          *
          */
         void * svc(void * task) {
-            if (E_f) task = E_f->svc(task);
+            if (E_f){
+
+#if defined(FF_TASK_CALLBACK)
+                E_f->callbackIn(lb);
+#endif
+                task = E_f->svc(task);
+#if defined(FF_TASK_CALLBACK)
+                E_f->callbackOut(lb);
+#endif
+            }
             if (task == EOS || task == GO_ON) return task;
             ff_send_out(task);
             updatenextone();
@@ -1536,7 +1545,16 @@ private:
          * \return \p GO_ON is always returned.
          */
         void * svc(void * task) {
-            if (C_f) task = C_f->svc(task);
+            if (C_f){
+
+#if defined(FF_TASK_CALLBACK)
+            C_f->callbackIn(gt);
+#endif
+            task = C_f->svc(task);
+#if defined(FF_TASK_CALLBACK)
+            C_f->callbackOut(gt);
+#endif
+            }
             if (ff_node::get_out_buffer()) ff_send_out(task);
             do nextone = (nextone+1) % gt->getrunning();
             while(!gt->set_victim(nextone));

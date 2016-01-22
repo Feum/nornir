@@ -476,6 +476,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
         }
 
         startSample = getMillisecondsTime();
+        DEBUG("Storing new sample.");
         storeNewSample();
         DEBUG("New sample stored.");
 
@@ -492,11 +493,13 @@ void ManagerFarm<lb_t, gt_t>::run(){
 
         if(!persist()){
             assert(_calibrator);
+            DEBUG("Changing knobs.");
             changeKnobs();
             _configuration.trigger();
             startSample = getMillisecondsTime();
         }
     }
+    _farm->wait();
     DEBUG("Terminated.");
 
     double duration = getMillisecondsTime() - _startTimeMs;

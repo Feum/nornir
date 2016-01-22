@@ -879,7 +879,7 @@ public:
      * The returned id is valid (>0) only if the node is an active node (i.e. the thread has been created).
      *
      */
-    inline size_t getOSThreadId() const { return thread->getOSThreadId(); }
+    inline size_t getOSThreadId() const { if(thread){return thread->getOSThreadId();}else{return 0;} }
 
 
 #if defined(FF_TASK_CALLBACK)
@@ -1007,11 +1007,7 @@ public:
                              unsigned long retry=((unsigned long)-1),
                              unsigned long ticks=(TICKS2WAIT)) { 
         if (callback){
-            bool r = callback(task,retry,ticks,callback_arg);
-#if defined(FF_TASK_CALLBACK)
-            if (r) callbackOut();
-#endif
-            return r;
+            return callback(task,retry,ticks,callback_arg);
         }
         bool r =Push(task,retry,ticks);
         if (task == BLK || task == NBLK) {
