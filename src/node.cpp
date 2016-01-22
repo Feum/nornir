@@ -91,10 +91,8 @@ void AdaptiveNode::initPostRun(){
     while(!_started){;}
     DEBUG("Started.");
     size_t tid = getOSThreadId();
-    assert(tid != 0);
-    _thread = _tasksManager->getThreadHandler(getpid(), tid);
-    if(_nodeType == NODE_TYPE_EMITTER){
-        DEBUG("EMITTERTID: " << tid);
+    if(tid){
+      _thread = _tasksManager->getThreadHandler(getpid(), tid);
     }
 }
 
@@ -106,7 +104,9 @@ void AdaptiveNode::clean(){
 }
 
 void AdaptiveNode::move(VirtualCore* vc){
-    _thread->move(vc);
+    if(_thread){
+        _thread->move(vc);
+    }
 }
 
 void AdaptiveNode::getSampleResponse(WorkerSample& sample,
