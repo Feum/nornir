@@ -287,11 +287,11 @@ protected:
     const Parameters& _p;
     const FarmConfiguration& _configuration;
     const Smoother<MonitoredSample>* _samples;
+    size_t _numCalibrationPoints;
 private:
     CalibrationState _state;
     std::vector<CalibrationStats> _calibrationStats;
     size_t _minNumPoints;
-    size_t _numCalibrationPoints;
     uint _calibrationStartMs;
     bool _firstPointGenerated;
     bool _forcePrediction;

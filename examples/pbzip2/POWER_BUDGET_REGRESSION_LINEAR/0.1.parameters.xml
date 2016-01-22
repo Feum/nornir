@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adaptivityParameters>
+<qSize>4</qSize>
+<samplingInterval>500</samplingInterval>
+<strategyPrediction>REGRESSION_LINEAR</strategyPrediction>
+<strategyPersistence>TASKS</strategyPersistence>
+<persistenceValue>3</persistenceValue>
+<strategySmoothing>MOVING_AVERAGE</strategySmoothing>
+<contractType>POWER_BUDGET</contractType>
+<powerBudget>33.39618</powerBudget>
+<strategyPolling>SLEEP_SMALL</strategyPolling>
+</adaptivityParameters>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adaptivityParameters>
+<qSize>4</qSize>
+<samplingInterval>500</samplingInterval>
+<strategyPersistence>TASKS</strategyPersistence>
+<persistenceValue>1000</persistenceValue>
+<strategySmoothing>MOVING_AVERAGE</strategySmoothing>
+<contractType>PERF_COMPLETION_TIME</contractType>
+<requiredCompletionTime>27.1105</requiredCompletionTime>
+<strategyPolling>SLEEP_SMALL</strategyPolling>
+</adaptivityParameters>

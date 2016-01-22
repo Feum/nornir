@@ -3,7 +3,8 @@ import subprocess
 import shlex
 import socket
 import os
-import shutil 
+import shutil
+import argparse 
 from subprocess import Popen, PIPE, STDOUT
 
 RESULTS_FILE = 'REPARA_results.csv'
@@ -47,26 +48,33 @@ def run(contractType, fieldName, fieldValue, fraction):
     parametersFile.write("<adaptivityParameters>\n")
     parametersFile.write("<qSize>4</qSize>\n")
     parametersFile.write("<samplingInterval>500</samplingInterval>\n")
+
+    parametersFile.write("<strategyPrediction>" + args.prediction + "</strategyPrediction>\n")
+
+    parametersFile.write("<strategyPersistence>TASKS</strategyPersistence>\n")
     parametersFile.write("<persistenceValue>3</persistenceValue>\n")
     parametersFile.write("<strategySmoothing>MOVING_AVERAGE</strategySmoothing>\n")
+
     parametersFile.write("<contractType>" + contractType + "</contractType>\n")
     parametersFile.write("<" + fieldName + ">" + str(fieldValue) + "</" + fieldName + ">\n")
     parametersFile.write("<strategyPolling>SLEEP_SMALL</strategyPolling>\n")
     parametersFile.write("</adaptivityParameters>\n")
     parametersFile.close()
 
-    run = "./pbzip2_ff -f -k -p24 /home/desensi/enwiki-20151201-abstract.xml"
+    run = "./pbzip2_ff -f -k -p22 /home/desensi/enwiki-20151201-abstract.xml"
     process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     out, err = process.communicate()
 
-    print out 
-    print err
-
     result = getLastLine("summary.csv")
 
-    dir_results = contractType
+    dir_results = "nodir"
+    if contractType == 'PERF_COMPLETION_TIME':
+        dir_results = perfdir
+    elif contractType == 'POWER_BUDGET':
+        dir_results = powerdir
+
     for outfile in ["calibration.csv", "stats.csv", "summary.csv", "parameters.xml"]:
-        os.rename(outfile, contractType + "/" + str(fraction) + "." + outfile)
+        os.rename(outfile, dir_results + "/" + str(fraction) + "." + outfile)
 
     # Returns completion time and watts
     return float(result.split('\t')[2]), float(result.split('\t')[0])
@@ -87,12 +95,11 @@ def getOptimalTimeBound(time):
     return bestPower
 
 def getOptimalPowerBound(power):
-    fh = open("REPARA_results.csv", "r")
+    fh = open(RESULTS_FILE, "r")
     bestTime = 9999999999
     for line in fh:
         #Workers Frequency Time Watts
         if line[0] != '#':
-            print line
             fields = line.split("\t")
             curtime = float(fields[2])
             curpower = float(fields[3])
@@ -103,28 +110,44 @@ def getOptimalPowerBound(power):
 
 ############################################################################################################
 
-shutil.rmtree('PERF_COMPLETION_TIME', ignore_errors=True)
-shutil.rmtree('POWER_BUDGET', ignore_errors=True)
-os.makedirs('PERF_COMPLETION_TIME')
-os.makedirs('POWER_BUDGET')
+parser = argparse.ArgumentParser(description='Runs the application to check the accuracy of the reconfiguration.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('-p', '--prediction', help='Prediction strategy.', required=True)
+parser.add_argument('-c', '--contract', help='Contract type.', required=True)
+args = parser.parse_args()
 
-perfFile = open("PERF_COMPLETION_TIME/results.csv", "w")
-powerFile = open("POWER_BUDGET/results.csv", "w")
-perfFile.write("#Fraction\tPrimaryRequired\tPrimaryFound\tSecondaryOptimal\tSecondaryFound\tLoss\n")
-powerFile.write("#Fraction\tPrimaryRequired\tPrimaryFound\tSecondaryOptimal\tSecondaryFound\tLoss\n")
+if args.contract == "PERF_COMPLETION_TIME":
+    perfdir = 'PERF_COMPLETION_TIME_' + args.prediction
+    shutil.rmtree(perfdir, ignore_errors=True)
+    os.makedirs(perfdir)
+    perfFile = open(perfdir + "/results.csv", "w")
+    perfFile.write("#Fraction\tPrimaryRequired\tPrimaryFound\tSecondaryOptimal\tSecondaryFound\tLoss\n")
+elif args.contract == "POWER_BUDGET":
+    powerdir = 'POWER_BUDGET_' + args.prediction
+    shutil.rmtree(powerdir, ignore_errors=True)
+    os.makedirs(powerdir)
+    powerFile = open(powerdir + "/results.csv", "w")
+    powerFile.write("#Fraction\tPrimaryRequired\tPrimaryFound\tSecondaryOptimal\tSecondaryFound\tLoss\n")
 
 for f in fractions:
-    targetTime = timeMin + timeRange*f
-    ct, watts = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, f)
-    opt = getOptimalTimeBound(targetTime)
-    loss = ((watts - opt) / opt) * 100.0
-    perfFile.write(str(f) + "\t" + str(targetTime) + "\t" + str(ct)  + "\t" + str(opt) + "\t" + str(watts) + "\t" + str(loss) + "\n")
+    if args.contract == "PERF_COMPLETION_TIME":
+        targetTime = timeMin + timeRange*f
+        ct, watts = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, f)
+        opt = getOptimalTimeBound(targetTime)
+        loss = ((watts - opt) / opt) * 100.0
+        perfFile.write(str(f) + "\t" + str(targetTime) + "\t" + str(ct)  + "\t" + str(opt) + "\t" + str(watts) + "\t" + str(loss) + "\n")
+        perfFile.flush()
+        os.fsync(perfFile.fileno())
+    elif args.contract == "POWER_BUDGET":
+        targetPower = powerMin + powerRange*f
+        ct, watts = run("POWER_BUDGET", "powerBudget", targetPower, f)
+        opt = getOptimalPowerBound(targetPower)
+        loss = ((ct - opt) / opt) * 100.0
+        powerFile.write(str(f) + "\t" + str(targetPower) + "\t" + str(watts) + "\t" + str(opt) + "\t" + str(ct) + "\t" + str(loss) + "\n")
+        powerFile.flush()
+        os.fsync(powerFile.fileno())
 
-    targetPower = powerMin + powerRange*f
-    ct, watts = run("POWER_BUDGET", "powerBudget", targetPower, f)
-    opt = getOptimalPowerBound(targetPower)
-    loss = ((ct - opt) / opt) * 100.0
-    powerFile.write(str(f) + "\t" + str(targetPower) + "\t" + str(watts) + "\t" + str(opt) + "\t" + str(ct) + "\t" + str(loss) + "\n")
 
-perfFile.close()
-powerFile.close()
+if args.contract == "PERF_COMPLETION_TIME":
+    perfFile.close()
+elif args.contract == "POWER_BUDGET":
+    powerFile.close()

@@ -423,8 +423,9 @@ Calibrator::Calibrator(const Parameters& p,
         _p(p),
         _configuration(configuration),
         _samples(samples),
+        _numCalibrationPoints(0),
         _state(CALIBRATION_SEEDS),
-        _numCalibrationPoints(0), _calibrationStartMs(0),
+        _calibrationStartMs(0),
         _firstPointGenerated(false), _forcePrediction(false),
         _primaryPrediction(0), _secondaryPrediction(0){
 
@@ -938,10 +939,12 @@ KnobsValues CalibratorLiMartinez::getNextKnobsValues(double primaryValue,
         startCalibrationStat();
 
         DEBUG("Generating first point: " << kv);
+        ++_numCalibrationPoints;
     }else{
         if(_optimalFound){
             return _optimalKv;
         }else if(!isContractViolated(primaryValue)){
+            ++_numCalibrationPoints;
             _currentWatts = secondaryValue;
 
             if(_currentWatts < _optimalWatts){
@@ -961,6 +964,7 @@ KnobsValues CalibratorLiMartinez::getNextKnobsValues(double primaryValue,
             nextFrequency = findNearestFrequency(nextFrequency);
             DEBUG("Required BW: " << _p.requiredBandwidth << " Current BW: " << primaryValue << " Best frequency: " << nextFrequency);
             if(nextFrequency == currentFrequency){
+                --_numCalibrationPoints;
                 goto changeworkers;
             }else{
                 kv[KNOB_TYPE_FREQUENCY] = nextFrequency;
@@ -968,6 +972,7 @@ KnobsValues CalibratorLiMartinez::getNextKnobsValues(double primaryValue,
             }
         }else{
 changeworkers:
+            ++_numCalibrationPoints;
             // I have to change the number of workers
             kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies.back();
 
