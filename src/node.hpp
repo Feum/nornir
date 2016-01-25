@@ -130,7 +130,7 @@ private:
     friend class TriggerQBlocking;
 
     volatile bool _started;
-    volatile bool _terminated;
+    volatile bool* _terminated;
     mammut::task::TasksManager* _tasksManager;
     mammut::task::ThreadHandler* _thread;
     ManagementRequest _managementRequest;
@@ -161,8 +161,10 @@ private:
      * @param mammut A Mammut handle.
      * @param ticksPerNs The number of ticks in a nanosecond.
      * @param nodeType The type of the node.
+     * @param terminated A pointer to the termination flag.
      */
-    void initPreRun(mammut::Mammut& mammut, double ticksPerNs, NodeType nodeType);
+    void initPreRun(mammut::Mammut& mammut, double ticksPerNs,
+                    NodeType nodeType, volatile bool* terminated);
 
 
     /**
@@ -238,14 +240,6 @@ private:
      * It must be called when the node is frozen.
      */
     void prepareToRun();
-
-    /**
-     * Returns true if the farm has been terminated by the application,
-     * false otherwise.
-     * @return true if the farm has been terminated by the application,
-     * false otherwise.
-     */
-    bool isTerminated() const;
 
     /**
      * Resets the current sample.

@@ -105,9 +105,10 @@ std::ostream& operator<< (std::ostream& out, const std::vector<AdaptiveNode*>& v
 
 KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
                          AdaptiveNode* collector, ff::ff_gatherer* gt,
-                         const std::vector<AdaptiveNode*> workers):
+                         const std::vector<AdaptiveNode*> workers,
+                         const volatile bool* terminated):
         _confWorkers(confWorkers), _emitter(emitter), _collector(collector),
-        _gt(gt), _allWorkers(workers){
+        _gt(gt), _allWorkers(workers), _terminated(terminated){
     _realValue = _allWorkers.size();
 
     if(confWorkers == KNOB_WORKERS_YES){
@@ -131,7 +132,7 @@ void KnobWorkers::changeValueReal(double v){
         prepareToFreeze();
         freeze();
 
-        if(!_emitter->isTerminated()){
+        if(!*_terminated){
             _activeWorkers = vector<AdaptiveNode*>(_allWorkers.begin(),
                                                    _allWorkers.begin() + v);
 

@@ -105,7 +105,8 @@ class KnobWorkers: public Knob{
 public:
     KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
                 AdaptiveNode* collector, ff::ff_gatherer* gt,
-                const std::vector<AdaptiveNode*> workers);
+                const std::vector<AdaptiveNode*> workers,
+                const volatile bool* terminated);
 
     bool needsCalibration() const;
     void changeValueReal(double v);
@@ -148,6 +149,7 @@ private:
     const std::vector<AdaptiveNode*> _allWorkers;
     std::vector<AdaptiveNode*> _activeWorkers;
     std::vector<double> _knobValues;
+    const volatile bool* _terminated;
 };
 
 class KnobMapping: public Knob{

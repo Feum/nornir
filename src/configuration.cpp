@@ -40,14 +40,16 @@ namespace adpff{
 FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
         AdaptiveNode* collector, ff::ff_gatherer* gt,
         std::vector<AdaptiveNode*> workers,
-        Smoother<MonitoredSample> const* samples):
+        Smoother<MonitoredSample> const* samples,
+        volatile bool* terminated):
         _p(p),
         _knobsChangeNeeded(false){
     /************************************************************/
     /*                           KNOBS                          */
     /************************************************************/
     _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p.knobWorkers, emitter,
-                                                collector, gt, workers);
+                                                collector, gt, workers,
+                                                terminated);
     _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p.knobMapping,
                                                 p.knobMappingEmitter,
                                                 p.knobMappingCollector,

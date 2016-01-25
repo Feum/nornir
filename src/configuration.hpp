@@ -53,7 +53,8 @@ public:
     FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
             AdaptiveNode* collector, ff::ff_gatherer* gt,
             std::vector<AdaptiveNode*> workers,
-            Smoother<MonitoredSample> const* samples);
+            Smoother<MonitoredSample> const* samples,
+            volatile bool* terminated);
 
 
     ~FarmConfiguration();

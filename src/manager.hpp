@@ -111,6 +111,9 @@ private:
     // The managed farm.
     ff_farm<lb_t, gt_t>* _farm;
 
+    // Flag for checking farm termination.
+    volatile bool _terminated;
+
     // The parameters used to take management decisions.
     Parameters _p;
 
@@ -199,11 +202,6 @@ private:
      * @return The secondary value according to the required contract.
      */
     double getSecondaryValue() const;
-
-    /**
-     * Checks if the application terminated.
-     */
-    bool terminated();
 
     /**
      * Changes the knobs.

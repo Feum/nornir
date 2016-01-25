@@ -124,11 +124,6 @@ double ManagerFarm<lb_t, gt_t>::getSecondaryValue() const{
 }
 
 template <typename lb_t, typename gt_t>
-bool ManagerFarm<lb_t, gt_t>::terminated(){
-    return _emitter->isTerminated();
-}
-
-template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::changeKnobs(){
     if(_p.contractType == CONTRACT_NONE || !_configuration.knobsChangeNeeded()){
         return;
@@ -319,6 +314,7 @@ static std::vector<AdaptiveNode*> convertWorkers(svector<ff_node*> w){
 template <typename lb_t, typename gt_t>
 ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters parameters):
         _farm(farm),
+        _terminated(false),
         _p(validate(parameters)),
         _startTimeMs(0),
         _cpufreq(_p.mammut.getInstanceCpuFreq()),
@@ -330,7 +326,7 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
         _activeWorkers(convertWorkers(_farm->getWorkers())),
         _samples(initSamples()),
         _configuration(_p, _emitter, _collector, _farm->getgt(), _activeWorkers,
-                       _samples),
+                       _samples, &_terminated),
         _totalTasks(0),
         _remainingTasks(0),
         _deadline(0),
@@ -366,15 +362,18 @@ Smoother<MonitoredSample>* ManagerFarm<lb_t, gt_t>::initSamples() const{
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::initNodesPreRun() {
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
-        _activeWorkers.at(i)->initPreRun(_p.mammut, _p.archData.ticksPerNs, NODE_TYPE_WORKER);
+        _activeWorkers.at(i)->initPreRun(_p.mammut, _p.archData.ticksPerNs,
+                                         NODE_TYPE_WORKER, &_terminated);
     }
     if (_emitter) {
-        _emitter->initPreRun(_p.mammut, _p.archData.ticksPerNs, NODE_TYPE_EMITTER);
+        _emitter->initPreRun(_p.mammut, _p.archData.ticksPerNs,
+                             NODE_TYPE_EMITTER, &_terminated);
     } else {
         throw runtime_error("Emitter is needed to use the manager.");
     }
     if (_collector) {
-        _collector->initPreRun(_p.mammut, _p.archData.ticksPerNs, NODE_TYPE_COLLECTOR);
+        _collector->initPreRun(_p.mammut, _p.archData.ticksPerNs,
+                               NODE_TYPE_COLLECTOR, &_terminated);
     }
 }
 
@@ -465,7 +464,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
     double startSample = getMillisecondsTime();
     double overheadMs = 0;
 
-    while(!terminated()){
+    while(!_terminated){
         overheadMs = getMillisecondsTime() - startSample;
         microsecsSleep = ((double)_p.samplingInterval - overheadMs)*
                           (double)MAMMUT_MICROSECS_IN_MILLISEC;

@@ -76,7 +76,8 @@ double AdaptiveNode::ticksToSeconds(double ticks) const{
     return (ticks/_ticksPerNs)/NSECS_IN_SECS;
 }
 
-void AdaptiveNode::initPreRun(Mammut& mammut, double ticksPerNs, NodeType nodeType){
+void AdaptiveNode::initPreRun(Mammut& mammut, double ticksPerNs,
+                              NodeType nodeType, volatile bool* terminated){
     _tasksManager = mammut.getInstanceTask();
     if(!_tasksManager){
         throw runtime_error("Node init(): impossible to "
@@ -84,6 +85,7 @@ void AdaptiveNode::initPreRun(Mammut& mammut, double ticksPerNs, NodeType nodeTy
     }
     _ticksPerNs = ticksPerNs;
     _nodeType = nodeType;
+    _terminated = terminated;
 }
 
 void AdaptiveNode::initPostRun(){
@@ -113,7 +115,7 @@ void AdaptiveNode::getSampleResponse(WorkerSample& sample,
                        StrategyPolling strategyPolling,
                        double avgLatency){
     while(_responseQ.empty()){
-        if(_terminated){return;}
+        if(*_terminated){return;}
         switch(strategyPolling){
             case STRATEGY_POLLING_SPINNING:{
                 continue;
@@ -201,11 +203,6 @@ void AdaptiveNode::prepareToRun(){
         _responseQ.inc();
     }
     reset();
-    _terminated = false;
-}
-
-bool AdaptiveNode::isTerminated() const{
-    return _terminated;
 }
 
 void AdaptiveNode::reset(){
@@ -286,16 +283,9 @@ void AdaptiveNode::callbackOut(void *p) CX11_KEYWORD(final){
 
 void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
     DEBUG("EOS received.");
-    _terminated = true;
     switch(_nodeType){
         case NODE_TYPE_WORKER:{
             storeSample();
-        }break;
-        case NODE_TYPE_EMITTER:{
-            while(!_managementQ.empty()){
-                DEBUG("Clearing management Q.");
-                _managementQ.inc();
-            }
         }break;
         default:{
             ;
@@ -305,7 +295,7 @@ void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
 
 AdaptiveNode::AdaptiveNode():
         _started(false),
-        _terminated(false),
+        _terminated(NULL),
         _tasksManager(NULL),
         _thread(NULL),
         _ticksWork(0),
@@ -322,7 +312,7 @@ AdaptiveNode::~AdaptiveNode(){
 }
 
 void AdaptiveNode::terminate(){
-    _terminated = true;
+    *_terminated = true;
 }
 
 void AdaptiveNode::notifyWorkersChange(size_t oldNumWorkers,
