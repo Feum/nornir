@@ -46,14 +46,10 @@ struct Source : adpff::AdaptiveNode {
     Source(VideoCapture& cap):_cap(cap), _numTasks(0){}
   
     void* svc(void*) {
-        for(;;) {
-            Mat * frame = new Mat();
-            if(_cap.read(*frame)){
-                ++_numTasks;
-                ff_send_out(frame);
-            }else{
-                break;
-            }
+        Mat * frame = new Mat();
+        if(_cap.read(*frame)){
+            ++_numTasks;
+            return (void*) frame;
         }
 
         std::cout << "End of stream in input" << std::endl;
@@ -65,15 +61,16 @@ struct Source : adpff::AdaptiveNode {
 // this stage applys all the filters:  the GaussianBlur filter and the Sobel one, 
 // and it then sends the result to the next stage
 struct Stage1 : adpff::AdaptiveNode {
+    Stage1():nframe(0){;}
     void * svc(void* task) {
         cv::Mat *frame = (cv::Mat*) task;
         Mat frame1;
         cv::GaussianBlur(*frame, frame1, cv::Size(0, 0), 3);
         cv::addWeighted(*frame, 1.5, frame1, -0.5, 0, *frame);
         cv::Sobel(*frame,*frame,-1,1,0,3);
-        return frame;
+        return (void*) frame;
     }
-    long nframe=0;
+    long nframe;
 }; 
 
 // this stage shows the output

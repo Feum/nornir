@@ -791,7 +791,7 @@ std::vector<CalibrationStats> Calibrator::getCalibrationsStats() const{
 }
 
 bool Calibrator::isCalibrating() const{
-    return _state == CALIBRATION_FINISHED;
+    return _state != CALIBRATION_FINISHED;
 }
 
 KnobsValues CalibratorDummy::getNextKnobsValues(double primaryValue,
