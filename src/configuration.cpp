@@ -79,6 +79,10 @@ FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
                                                               p.thresholdQBlocking,
                                                               samples,
                                                               emitter);
+
+    _numServiceNodes = 0;
+    if(emitter){++_numServiceNodes;}
+    if(collector){++_numServiceNodes;}
 }
 
 FarmConfiguration::~FarmConfiguration(){

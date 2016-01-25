@@ -257,7 +257,30 @@ private:
     KnobValueType _type;
     double _values[KNOB_TYPE_NUM];
 public:
-    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){;}
+    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){
+        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            _values[i] = 0;
+        }
+    }
+
+    void swap(KnobsValues& x){
+        using std::swap;
+
+        swap(_type, x._type);
+        swap(_values, x._values);
+    }
+
+    inline KnobsValues(const KnobsValues& other){
+        _type = other._type;
+        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            _values[i] = other._values[i];
+        }
+    }
+
+    inline KnobsValues& operator=(KnobsValues other){
+        swap(other);
+        return *this;
+    }
 
     inline bool areRelative() const{return _type == KNOB_VALUE_RELATIVE;}
 

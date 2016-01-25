@@ -58,6 +58,13 @@ protected:
     const Parameters& _p;
     const FarmConfiguration& _configuration;
     const Smoother<MonitoredSample>* _samples;
+    mammut::topology::Topology* _topology;
+    uint _cpus;
+    uint _phyCores;
+    uint _phyCoresPerCpu;
+    uint _virtCoresPerPhyCores;
+
+    double getUsedPhysicalCores(double numWorkers, bool includeServiceNodes);
 public:
     RegressionData(const Parameters& p,
                    const FarmConfiguration& configuration,
@@ -119,10 +126,6 @@ public:
  */
 class RegressionDataPower: public RegressionData{
 private:
-    uint _cpus;
-    uint _phyCores;
-    uint _phyCoresPerCpu;
-    uint _virtCoresPerPhyCores;
     StrategyUnusedVirtualCores _strategyUnused;
 
     double _dynamicPowerModel;
@@ -328,9 +331,10 @@ private:
     /**
      * Checks if a specific primary value respects the required contract.
      * @param value The value to be checked.
-     * @param tolerance The percentage of tolerance allowed for the check
+     * @param precise If true it does a precise error check. If false it also
+     * consider the prediction error.
      */
-    bool isFeasiblePrimaryValue(double value, double tolerance = 0) const;
+    bool isFeasiblePrimaryValue(double value, bool precise) const;
 protected:
     /**
      * Checks if the contract is violated.

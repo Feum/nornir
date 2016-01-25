@@ -44,6 +44,7 @@ private:
     const Parameters& _p;
     std::vector<KnobsValues> _combinations;
     bool _knobsChangeNeeded;
+    uint _numServiceNodes;
 
     void combinations(std::vector<std::vector<double> > array, size_t i,
                       std::vector<double> accum);
@@ -119,6 +120,11 @@ public:
      * Triggers the triggers.
      */
     void trigger();
+
+    /**
+     * Returns the number of service nodes.
+     **/
+    uint getNumServiceNodes() const{return _numServiceNodes;}
 };
 
 }
