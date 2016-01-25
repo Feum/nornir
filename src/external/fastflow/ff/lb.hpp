@@ -670,6 +670,7 @@ public:
      * It sends the same task to all workers.   
      */
    inline void broadcast_task(void * task) {
+
        std::vector<size_t> retry;
        if (blocking_out) {
            for(ssize_t i=0;i<running;++i) {
@@ -697,12 +698,16 @@ public:
            return;
        }
        for(ssize_t i=0;i<running;++i) {
-           if(!workers[i]->put(task))
+           if(!workers[i]->put(task)){
                retry.push_back(i);
+           }
+
        }
+
        while(retry.size()) {
-           if(workers[retry.back()]->put(task))
+           if(workers[retry.back()]->put(task)){
                retry.pop_back();
+           }
            else losetime_out();
        }       
 #if defined(FF_TASK_CALLBACK)

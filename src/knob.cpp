@@ -183,7 +183,7 @@ void KnobWorkers::freeze(){
         DEBUG("Worker " << i << " frozen:");
     }
     if(_collector){
-        _collector->wait_freezing();
+        _gt->wait_freezing();
     }
 }
 

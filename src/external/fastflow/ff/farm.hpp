@@ -1375,6 +1375,13 @@ public:
     inline void revive() {
         for(size_t i=0;i<dead.size();++i) dead[i]=false;
     }
+
+    inline bool allFrozen() {
+        for(ssize_t i=0;i<running;++i){
+            if(!dead[i]) return false;
+        }
+        return true;
+    }
 private:
     size_t victim;
     svector<bool> dead;
@@ -1470,8 +1477,10 @@ private:
                 E_f->callbackOut(lb);
 #endif
             }
-            if (task == EOS || task == GO_ON) return task;
-            ff_send_out(task);
+            if (task == EOS || task == GO_ON){
+                return task;
+            }
+            while(!ff_send_out(task));
             updatenextone();
             return GO_ON;
         }
@@ -1568,15 +1577,17 @@ private:
          * \It notifies the EOS.
          *
          */
-        void eosnotify(ssize_t id=-1) { 
+        void eosnotify(ssize_t id=-1) {
             gt->set_dead(id);
             if (nextone == (size_t)id) {
                 // NOTE: here we need the number of activated workers (running) cause 
                 // the management of "dead" workers is internal.
                 // gt->getnworkers() already takes into account the "dead" ones therefore
                 // is not suitable
-                nextone= (nextone+1) % gt->getrunning();
-                gt->set_victim(nextone);
+                //nextone= (nextone+1) % gt->getrunning();
+                //gt->set_victim(nextone);
+                do nextone = (nextone+1) % gt->getrunning();
+                while(!gt->set_victim(nextone) && !gt->allFrozen());
             }
         }
 

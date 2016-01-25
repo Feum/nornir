@@ -145,6 +145,7 @@ private:
     ticks _ticksWork;
     ticks _tasksCount;
     NodeType _nodeType;
+    ff::ff_thread* _ffThread;
 
     // Queue used by the manager to notify that a request is present.
     ff::SWSR_Ptr_Buffer _managementQ;
@@ -168,7 +169,8 @@ private:
      * @param terminated A pointer to the termination flag.
      */
     void initPreRun(mammut::Mammut& mammut, double ticksPerNs,
-                    NodeType nodeType, volatile bool* terminated);
+                    NodeType nodeType, volatile bool* terminated,
+                    ff::ff_thread* ffThread = NULL);
 
 
     /**

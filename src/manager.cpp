@@ -367,13 +367,15 @@ void ManagerFarm<lb_t, gt_t>::initNodesPreRun() {
     }
     if (_emitter) {
         _emitter->initPreRun(_p.mammut, _p.archData.ticksPerNs,
-                             NODE_TYPE_EMITTER, &_terminated);
+                             NODE_TYPE_EMITTER, &_terminated,
+                             _farm->getlb());
     } else {
         throw runtime_error("Emitter is needed to use the manager.");
     }
     if (_collector) {
         _collector->initPreRun(_p.mammut, _p.archData.ticksPerNs,
-                               NODE_TYPE_COLLECTOR, &_terminated);
+                               NODE_TYPE_COLLECTOR, &_terminated,
+                               _farm->getgt());
     }
 }
 

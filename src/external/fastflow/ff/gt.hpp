@@ -728,8 +728,10 @@ public:
     }
 #endif
 
-private:
+protected:
     ssize_t           running;       /// Number of workers running
+private:
+
     size_t            max_nworkers;
     ssize_t           nextr;
 

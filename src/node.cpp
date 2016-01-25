@@ -77,7 +77,8 @@ double AdaptiveNode::ticksToSeconds(double ticks) const{
 }
 
 void AdaptiveNode::initPreRun(Mammut& mammut, double ticksPerNs,
-                              NodeType nodeType, volatile bool* terminated){
+                              NodeType nodeType, volatile bool* terminated,
+                              ff::ff_thread* ffThread){
     _tasksManager = mammut.getInstanceTask();
     if(!_tasksManager){
         throw runtime_error("Node init(): impossible to "
@@ -86,16 +87,22 @@ void AdaptiveNode::initPreRun(Mammut& mammut, double ticksPerNs,
     _ticksPerNs = ticksPerNs;
     _nodeType = nodeType;
     _terminated = terminated;
+    _ffThread = ffThread;
 }
 
 void AdaptiveNode::initPostRun(){
     DEBUG("Waiting for start.");
     while(!_started){;}
     DEBUG("Started.");
-    size_t tid = getOSThreadId();
-    if(tid){
-      _thread = _tasksManager->getThreadHandler(getpid(), tid);
+    size_t tid;
+    if(_ffThread){
+        tid = _ffThread->getOSThreadId();
+    }else{
+        tid = getOSThreadId();
     }
+    assert(tid);
+
+    _thread = _tasksManager->getThreadHandler(getpid(), tid);
 }
 
 void AdaptiveNode::clean(){
