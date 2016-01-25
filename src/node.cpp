@@ -136,47 +136,50 @@ void AdaptiveNode::getSampleResponse(WorkerSample& sample,
 }
 
 void AdaptiveNode::resetSample(){
-    _managementRequest.type = MGMT_REQ_RESET_SAMPLE;
-    // The value pushed in the queue will not be read,
-    // it could be anything except NULL.
-    while(!_managementQ.push(&_managementRequest));
+    ManagementRequest* request = &_managementRequests[MGMT_REQ_RESET_SAMPLE];
+    request->type = MGMT_REQ_RESET_SAMPLE;
+    while(!_managementQ.push(request));
     DEBUG("RESETSAMPLE");
   }
 
 
 void AdaptiveNode::askForSample(){
-    _managementRequest.type = MGMT_REQ_GET_AND_RESET_SAMPLE;
+    ManagementRequest* request = &_managementRequests[MGMT_REQ_GET_AND_RESET_SAMPLE];
+    request->type = MGMT_REQ_GET_AND_RESET_SAMPLE;
     // The value pushed in the queue will not be read,
     // it could be anything except NULL.
-    while(!_managementQ.push(&_managementRequest));
+    while(!_managementQ.push(request));
     DEBUG("ASKFORSAMPLE");
 }
 
 void AdaptiveNode::setQBlocking(){
-    _managementRequest.type = MGMT_REQ_SWITCH_BLOCKING;
-    _managementRequest.mark = (void*) FF_BLK;
+    ManagementRequest* request = &_managementRequests[MGMT_REQ_SWITCH_BLOCKING];
+    request->type = MGMT_REQ_SWITCH_BLOCKING;
+    request->mark = (void*) FF_BLK;
     // The value pushed in the queue will not be read, it could be
     // anything except NULL.
-    while(!_managementQ.push(&_managementRequest));
+    while(!_managementQ.push(request));
     DEBUG("Queues switched to blocking.");
 }
 
 void AdaptiveNode::setQNonblocking(){
-    _managementRequest.type = MGMT_REQ_SWITCH_BLOCKING;
-    _managementRequest.mark = (void*) FF_NBLK;
+    ManagementRequest* request = &_managementRequests[MGMT_REQ_SWITCH_BLOCKING];
+    request->type = MGMT_REQ_SWITCH_BLOCKING;
+    request->mark = (void*) FF_NBLK;
     // The value pushed in the queue will not be read, it could be
     // anything except NULL.
-    while(!_managementQ.push(&_managementRequest));
+    while(!_managementQ.push(request));
     DEBUG("Queues switched to nonblocking.");
 }
 
 void AdaptiveNode::freezeAll(void* mark){
-    _managementRequest.type = MGMT_REQ_FREEZE;
-    _managementRequest.mark = mark;
+    ManagementRequest* request = &_managementRequests[MGMT_REQ_FREEZE];
+    request->type = MGMT_REQ_FREEZE;
+    request->mark = mark;
     // The value pushed in the queue will not be read, it could be
     // anything except NULL.
     DEBUG("FREEZEALLBEF");
-    while(!_managementQ.push(&_managementRequest));
+    while(!_managementQ.push(request));
     DEBUG("FREEZEALLAFT");
     if(_nodeType == NODE_TYPE_EMITTER){
         DEBUG("Pushed freeze req");
@@ -184,12 +187,13 @@ void AdaptiveNode::freezeAll(void* mark){
 }
 
 void AdaptiveNode::thawAll(size_t numWorkers){
-    _managementRequest.type = MGMT_REQ_THAW;
-    _managementRequest.numWorkers = numWorkers;
+    ManagementRequest* request = &_managementRequests[MGMT_REQ_THAW];
+    request->type = MGMT_REQ_THAW;
+    request->numWorkers = numWorkers;
     // The value pushed in the queue will not be read, it could be
     // anything except NULL.
     DEBUG("THAWALLBEF");
-    while(!_managementQ.push(&_managementRequest));
+    while(!_managementQ.push(request));
     DEBUG("THAWALLAFT");
 }
 
@@ -198,10 +202,6 @@ void AdaptiveNode::prepareToFreeze(){
 }
 
 void AdaptiveNode::prepareToRun(){
-    while(!_responseQ.empty()){
-        DEBUG("Clearing response Q.");
-        _responseQ.inc();
-    }
     reset();
 }
 
@@ -213,6 +213,7 @@ void AdaptiveNode::reset(){
     _startTicks = getticks();
 }
 void AdaptiveNode::storeSample(){
+    DEBUG("Storing sample");
     int dummy;
     int* dummyPtr = &dummy;
     ticks totalTicks = getticks() - _startTicks; // Including idle periods
@@ -239,9 +240,10 @@ void AdaptiveNode::storeSample(){
 void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
     _started = true;
 
-    if(!_managementQ.empty()){
-        _managementQ.inc();
-        switch(_managementRequest.type){
+    ManagementRequest* request;
+
+    if(_managementQ.pop((void**) &request)){
+        switch(request->type){
             case MGMT_REQ_GET_AND_RESET_SAMPLE:{
                 DEBUG("Get and reset received");
                 storeSample();
@@ -254,20 +256,19 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
                 assert(_nodeType == NODE_TYPE_EMITTER);
                 DEBUG("Freeze request received");
                 ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
-                lb->broadcast_task(_managementRequest.mark);
+                lb->broadcast_task(request->mark);
                 DEBUG("Broadcasted");
 
                 /** Waits for restart request from manager. **/
-                while(_managementQ.empty());
-                _managementQ.inc();
-                DEBUGB(assert(_managementRequest.type == MGMT_REQ_THAW));
-                lb->thawWorkers(true, _managementRequest.numWorkers);
+                while(!_managementQ.pop((void**) &request));
+                DEBUGB(assert(request->type == MGMT_REQ_THAW));
+                lb->thawWorkers(true, request->numWorkers);
             }break;
             case MGMT_REQ_SWITCH_BLOCKING:{
                 assert(_nodeType == NODE_TYPE_EMITTER);
                 DEBUG("Block/Nonblock request received");
                 ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
-                lb->broadcast_task(_managementRequest.mark);
+                lb->broadcast_task(request->mark);
                 DEBUG("Broadcasted");
             }break;
             default:{
@@ -281,17 +282,6 @@ void AdaptiveNode::callbackOut(void *p) CX11_KEYWORD(final){
     callbackIn(p);
 }
 
-void AdaptiveNode::eosnotify(ssize_t) CX11_KEYWORD(final){
-    DEBUG("EOS received.");
-    switch(_nodeType){
-        case NODE_TYPE_WORKER:{
-            storeSample();
-        }break;
-        default:{
-            ;
-        }
-    }
-}
 
 AdaptiveNode::AdaptiveNode():
         _started(false),
@@ -300,8 +290,13 @@ AdaptiveNode::AdaptiveNode():
         _thread(NULL),
         _ticksWork(0),
         _tasksCount(0),
-        _managementQ(2),
-        _responseQ(2){
+        // Some messages are without an answer (e.g. SWITCH_BLOCKING or
+        // RESET_SAMPLE). For this reason, we could enqueue more request before
+        // the node reads any of them. For example, we could enqueue a
+        // SWITCH_BLOCKING, a RESET_SAMPLE and a GET_AND_RESET_SAMPLE.
+        // For this reason, the size of the managementQ is greater than 1.
+        _managementQ(4),
+        _responseQ(1){
     _managementQ.init();
     _responseQ.init();
     prepareToRun();

@@ -146,7 +146,8 @@ void Parameters::setDefault(){
     migrateCollector = false;
     smoothingFactor = 0;
     persistenceValue = 0;
-    samplingInterval = 0;
+    samplingIntervalCalibration = 0;
+    samplingIntervalSteady = 0;
     underloadThresholdFarm = 80.0;
     overloadThresholdFarm = 90.0;
     underloadThresholdWorker = 80.0;
@@ -163,20 +164,31 @@ void Parameters::setDefault(){
     observer = NULL;
 }
 
+uint Parameters::getLowOverheadSamplingInterval() const{
+    //TODO Se questo sampling interval è molto minore della latenza
+    // media di un task potrei settare il sampling interval alla
+    // latenza media di un task.
+
+    // We are setting the sampling interval such that the latency
+    // due to the communication between manager and node is the
+    // maxMonitoringOverhead% of the interval.
+    double msMonitoringCost = (archData.monitoringCost/
+                               archData.ticksPerNs*
+                               0.000001);
+    return ceil(msMonitoringCost*(100.0 - maxMonitoringOverhead));
+}
+
 /**
  * Sets the default values for parameters that depends
  * from others.
  */
 void Parameters::setDefaultPost(){
-    if(!samplingInterval){
-        //TODO Se questo sampling interval è molto minore della latenza
-        // media di un task potrei settare il sampling interval alla
-        // latenza media di un task.
-        double msMonitoringCost = (archData.monitoringCost/
-                                   archData.ticksPerNs*
-                                   0.000001);
-        samplingInterval = ceil(msMonitoringCost*
-                                    (100.0 - maxMonitoringOverhead));
+    if(!samplingIntervalCalibration){
+        samplingIntervalCalibration = getLowOverheadSamplingInterval();
+    }
+
+    if(!samplingIntervalSteady){
+        samplingIntervalSteady = getLowOverheadSamplingInterval();
     }
 
     if(!smoothingFactor){
@@ -505,7 +517,8 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, fastReconfiguration);
     SETVALUE(xt, Double, smoothingFactor);
     SETVALUE(xt, Double, persistenceValue);
-    SETVALUE(xt, Uint, samplingInterval);
+    SETVALUE(xt, Uint, samplingIntervalCalibration);
+    SETVALUE(xt, Uint, samplingIntervalSteady);
     SETVALUE(xt, Double, underloadThresholdFarm);
     SETVALUE(xt, Double, overloadThresholdFarm);
     SETVALUE(xt, Double, underloadThresholdWorker);

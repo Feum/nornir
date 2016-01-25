@@ -419,6 +419,13 @@ private:
     void setDefault();
 
     /**
+     * Computes the sampling interval such to have a low
+     * performance overhead.
+     * @return The sampling interval.
+     */
+    uint getLowOverheadSamplingInterval() const;
+
+    /**
      * Sets the default values for parameters that depends
      * from others.
      */
@@ -591,10 +598,16 @@ public:
     // [default = 10 for samples, 1000 for tasks, 5 for variation].
     double persistenceValue;
 
+
     // The length of the sampling interval (in milliseconds) for the data
-    // reading. If 0, it will be automatically computed such to have a low
-    // overhead [default = 0].
-    uint32_t samplingInterval;
+    // reading during calibration phase. If 0, it will be automatically computed
+    // such to have a low performance overhead [default = 0].
+    uint32_t samplingIntervalCalibration;
+
+    // The length of the sampling interval (in milliseconds) for the data
+    // reading during steady phase. If 0, it will be automatically computed
+    // such to have a low performance overhead [default = 0].
+    uint32_t samplingIntervalSteady;
 
     // The underload threshold for the entire farm. It is valid only if
     // contractType is CONTRACT_UTILIZATION [default = 80.0].

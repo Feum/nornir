@@ -391,7 +391,19 @@ public:
                                            double secondaryValue,
                                            u_int64_t remainingTasks);
 
+    /**
+     * Returns the calibration statistics.
+     * @return A vector containing the calibration statistics.
+     */
     std::vector<CalibrationStats> getCalibrationsStats() const;
+
+    /**
+     * Returns true if the calibrator is in the calibration phase,
+     * false otherwise.
+     * @return true if the calibrator is in the calibration phase,
+     * false otherwise.
+     */
+    virtual bool isCalibrating() const;
 };
 
 /**
@@ -409,6 +421,8 @@ public:
     KnobsValues getNextKnobsValues(double primaryValue,
                                    double secondaryValue,
                                    u_int64_t remainingTasks);
+
+    virtual bool isCalibrating() const{return false;}
 };
 
 /**
@@ -451,19 +465,14 @@ private:
     uint _low1, _mid1, _high1;
     uint _low2, _mid2, _high2;
     uint _midId;
-
     std::vector<mammut::cpufreq::Frequency> _availableFrequencies;
     double _currentWatts;
-
     double _optimalWatts;
     mammut::cpufreq::Frequency _optimalFrequency;
     uint _optimalWorkers;
-
     double _currentBw, _leftBw, _rightBw;
-
     bool _optimalFound;
     KnobsValues _optimalKv;
-
     bool _improved;
 
     mammut::cpufreq::Frequency findNearestFrequency(mammut::cpufreq::Frequency f) const;
@@ -478,6 +487,8 @@ public:
     KnobsValues getNextKnobsValues(double primaryValue,
                                    double secondaryValue,
                                    u_int64_t remainingTasks);
+
+    virtual bool isCalibrating() const{return !_optimalFound;}
 };
 
 }

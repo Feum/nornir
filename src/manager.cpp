@@ -464,9 +464,16 @@ void ManagerFarm<lb_t, gt_t>::run(){
     double startSample = getMillisecondsTime();
     double overheadMs = 0;
 
+    uint samplingInterval;
+
     while(!_terminated){
         overheadMs = getMillisecondsTime() - startSample;
-        microsecsSleep = ((double)_p.samplingInterval - overheadMs)*
+        if(_calibrator->isCalibrating()){
+            samplingInterval = _p.samplingIntervalCalibration;
+        }else{
+            samplingInterval = _p.samplingIntervalSteady;
+        }
+        microsecsSleep = ((double)samplingInterval - overheadMs)*
                           (double)MAMMUT_MICROSECS_IN_MILLISEC;
         if(microsecsSleep < 0){
             microsecsSleep = 0;

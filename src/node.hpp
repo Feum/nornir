@@ -104,6 +104,9 @@ typedef enum{
 
     // Switch to blocking/nonblocking
     MGMT_REQ_SWITCH_BLOCKING,
+
+    // ATTENTION: This must always be the last
+    MGMT_REQ_NUM
 }ManagementRequestType;
 
 /**
@@ -133,7 +136,9 @@ private:
     volatile bool* _terminated;
     mammut::task::TasksManager* _tasksManager;
     mammut::task::ThreadHandler* _thread;
-    ManagementRequest _managementRequest;
+    // We push the pointer to a position in the _managementRequests array.
+    // In our case is always _managementRequests[i].type == i
+    ManagementRequest _managementRequests[MGMT_REQ_NUM];
     WorkerSample _sampleResponse;
     double _ticksPerNs;
     ticks _startTicks;
@@ -141,8 +146,7 @@ private:
     ticks _tasksCount;
     NodeType _nodeType;
 
-    // Queue used by the manager to notify that a request is present
-    // on _managementRequest.
+    // Queue used by the manager to notify that a request is present.
     ff::SWSR_Ptr_Buffer _managementQ;
 
     // Queue used by the node to notify that a response is present
@@ -264,12 +268,6 @@ private:
      * @param p Is the lb_t or gt_t in case of emitter or collector.
      */
     void callbackOut(void *p) CX11_KEYWORD(final);
-
-
-    /**
-     * Notify the end of stream.
-     */
-    void eosnotify(ssize_t) CX11_KEYWORD(final);
 
 public:
     /**

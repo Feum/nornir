@@ -790,6 +790,10 @@ std::vector<CalibrationStats> Calibrator::getCalibrationsStats() const{
     return _calibrationStats;
 }
 
+bool Calibrator::isCalibrating() const{
+    return _state == CALIBRATION_FINISHED;
+}
+
 KnobsValues CalibratorDummy::getNextKnobsValues(double primaryValue,
                                                 double secondaryValue,
                                                 u_int64_t remainingTasks){
