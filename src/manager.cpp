@@ -410,6 +410,9 @@ void ManagerFarm<lb_t, gt_t>::cleanNodes() {
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::run(){
+    ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
+    thisThread->move((VirtualCoreId) 0);
+
     if(_p.qSize){
         _farm->setFixedSize(true);
         // We need to multiply for the number of workers since FastFlow

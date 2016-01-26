@@ -47,9 +47,10 @@ double Observer::calibrationDurationToPerc(const CalibrationStats& cs,
 
 Observer::Observer(string statsFile, string calibrationFile, string summaryFile):
         _startMonitoringMs(0),
-        _totalWatts(0),
+        _totalJoules(0),
         _totalBw(0),
-        _numSamples(0){
+        _numSamples(0),
+        _lastTimestamp(0){
     _statsFile.open(statsFile.c_str());
     _calibrationFile.open(calibrationFile.c_str());
     _summaryFile.open(summaryFile.c_str());
@@ -102,6 +103,12 @@ void Observer::observe(unsigned int timeStamp,
                      double smoothedUtilization,
                      Joules currentWatts,
                      Joules smoothedWatts){
+    unsigned int interval;
+    if(_lastTimestamp == 0){
+        _lastTimestamp = _startMonitoringMs;
+    }
+    interval = timeStamp - _lastTimestamp;
+    _lastTimestamp = timeStamp;
     _statsFile << timeStamp - _startMonitoringMs << "\t";
     _statsFile << "[";
     if(emitterVirtualCore){
@@ -132,7 +139,7 @@ void Observer::observe(unsigned int timeStamp,
 
     _statsFile << endl;
 
-    _totalWatts += currentWatts;
+    _totalJoules += currentWatts * (interval / 1000.0);
     _totalBw += currentBandwidth;
     _numSamples++;
 }
@@ -159,7 +166,7 @@ void Observer::summaryStats(const vector<CalibrationStats>&
         totalCalibrationPerc += calibrationDurationToPerc(cs, durationMs);
     }
 
-    _summaryFile << _totalWatts / (double) _numSamples << "\t";
+    _summaryFile << _totalJoules / (double) (durationMs / 1000.0) << "\t";
     _summaryFile << _totalBw / (double) _numSamples << "\t";
     _summaryFile << (double) durationMs / 1000.0 << "\t";
     _summaryFile << totalCalibrationPerc << "\t";

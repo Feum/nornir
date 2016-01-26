@@ -644,10 +644,10 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
             }
         }
 
-        std::cout << currentValues << " " << primaryPrediction << " ";
-        if(isFeasiblePrimaryValue(primaryPrediction, false)){
+        //std::cout << currentValues << " " << primaryPrediction << " ";
+        if(isFeasiblePrimaryValue(primaryPrediction, true)){
             secondaryPrediction = _secondaryPredictor->predict(currentValues);
-            std::cout << secondaryPrediction;
+            //std::cout << secondaryPrediction;
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
                 feasibleSolutionFound = true;
@@ -659,7 +659,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
             bestSuboptimalValue = primaryPrediction;
             bestSuboptimalValues = currentValues;
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
     }
 
     if(feasibleSolutionFound){

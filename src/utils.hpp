@@ -64,9 +64,10 @@ private:
     std::ofstream _calibrationFile;
     std::ofstream _summaryFile;
     unsigned int _startMonitoringMs;
-    double _totalWatts;
+    double _totalJoules;
     double _totalBw;
     unsigned long _numSamples;
+    unsigned int _lastTimestamp;
 
     double calibrationDurationToPerc(const CalibrationStats& cs,
                                      uint durationMs);

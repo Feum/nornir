@@ -11,6 +11,7 @@ import numpy as np
 RESULTS_FILE = 'REPARA_results.csv'
 powersList = []
 timesList = []
+iterations = 10
 
 def getLastLine(fileName):
     fh = open(fileName, "r")
@@ -25,18 +26,17 @@ def run(contractType, fieldName, fieldValue, percentile):
     parametersFile = open("parameters.xml", "w")
     parametersFile.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
     parametersFile.write("<adaptivityParameters>\n")
+
     parametersFile.write("<qSize>4</qSize>\n")
-    parametersFile.write("<samplingInterval>500</samplingInterval>\n")
-
-    parametersFile.write("<strategyPrediction>" + args.prediction + "</strategyPrediction>\n")
-
+    parametersFile.write("<samplingIntervalCalibration>500</samplingIntervalCalibration>\n")
+    parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
+    parametersFile.write("<smoothingFactor>0.1</smoothingFactor>\n")
     parametersFile.write("<strategyPersistence>TASKS</strategyPersistence>\n")
     parametersFile.write("<persistenceValue>3</persistenceValue>\n")
-    parametersFile.write("<smoothingFactor>0.2</smoothingFactor>\n")
-
+    parametersFile.write("<strategyPolling>SLEEP_LATENCY</strategyPolling>\n")
+    parametersFile.write("<strategyPrediction>" + args.prediction + "</strategyPrediction>\n")
     parametersFile.write("<contractType>" + contractType + "</contractType>\n")
     parametersFile.write("<" + fieldName + ">" + str(fieldValue) + "</" + fieldName + ">\n")
-    parametersFile.write("<strategyPolling>SLEEP_SMALL</strategyPolling>\n")
     parametersFile.write("</adaptivityParameters>\n")
     parametersFile.close()
 
@@ -46,10 +46,12 @@ def run(contractType, fieldName, fieldValue, percentile):
 
     time = -1
     watts = -1
+    calibration = -1
     try:
         result = getLastLine("summary.csv")
         time = float(result.split('\t')[2])
         watts = float(result.split('\t')[0])
+        calibration = float(result.split('\t')[3])
     except:
         print "nothing"
 
@@ -63,7 +65,7 @@ def run(contractType, fieldName, fieldValue, percentile):
         os.rename(outfile, dir_results + "/" + str(percentile) + "." + outfile)
 
     # Returns completion time and watts
-    return time, watts
+    return time, watts, calibration
 
 def loadPerfPowerData():
     fh = open(RESULTS_FILE, "r")
@@ -119,32 +121,68 @@ if args.contract == "PERF_COMPLETION_TIME":
     shutil.rmtree(perfdir, ignore_errors=True)
     os.makedirs(perfdir)
     perfFile = open(perfdir + "/results.csv", "w")
-    perfFile.write("#Fraction\tPrimaryRequired\tPrimaryFound\tSecondaryOptimal\tSecondaryFound\tLoss\n")
+    outFile = perfFile
 elif args.contract == "POWER_BUDGET":
     powerdir = 'POWER_BUDGET_' + args.prediction
     shutil.rmtree(powerdir, ignore_errors=True)
     os.makedirs(powerdir)
     powerFile = open(powerdir + "/results.csv", "w")
-    powerFile.write("#Fraction\tPrimaryRequired\tPrimaryFound\tSecondaryOptimal\tSecondaryFound\tLoss\n")
+    outFile = powerFile
+
+outFile.write("#Fraction\tPrimaryRequired\tPrimaryAvg\tPrimaryStddev\tSecondaryOptimal\tSecondaryAvg\tSecondaryStddev\tLossAvg\tLossStddev\tCalibrationAvg\tCalibrationStddev\n")
 
 for p in xrange(10, 110, 10):
-    if args.contract == "PERF_COMPLETION_TIME":
-        targetTime = np.percentile(np.array(timesList), p)
-        ct, watts = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p)
-        opt = getOptimalTimeBound(targetTime)
-        loss = ((watts - opt) / opt) * 100.0
-        perfFile.write(str(p) + "\t" + str(targetTime) + "\t" + str(ct)  + "\t" + str(opt) + "\t" + str(watts) + "\t" + str(loss) + "\n")
-        perfFile.flush()
-        os.fsync(perfFile.fileno())
-    elif args.contract == "POWER_BUDGET":
-        targetPower = np.percentile(np.array(powersList), p)
-        ct, watts = run("POWER_BUDGET", "powerBudget", targetPower, p)
-        opt = getOptimalPowerBound(targetPower)
-        loss = ((ct - opt) / opt) * 100.0
-        powerFile.write(str(p) + "\t" + str(targetPower) + "\t" + str(watts) + "\t" + str(opt) + "\t" + str(ct) + "\t" + str(loss) + "\n")
-        powerFile.flush()
-        os.fsync(powerFile.fileno())
+    cts = []
+    wattses = []
+    opts = []
+    calibrations = []
+    avgPrimary = 0
+    stddevPrimary = 0
+    avgSecondary = 0
+    stddevSecondary = 0
+    avgLoss = 0
+    stddevLoss = 0
+    avgCalibration = 0
+    stddevCalibration = 0
+    primaryReq = 0
 
+    for i in xrange(0, iterations):
+        if args.contract == "PERF_COMPLETION_TIME":
+            targetTime = np.percentile(np.array(timesList), p)
+            ct, watts, calibration = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p)
+            opt = getOptimalTimeBound(targetTime)
+            primaryReq = targetTime
+            loss = ((watts - opt) / opt) * 100.0
+        elif args.contract == "POWER_BUDGET":
+            targetPower = np.percentile(np.array(powersList), p)
+            ct, watts, calibration = run("POWER_BUDGET", "powerBudget", targetPower, p)
+            opt = getOptimalPowerBound(targetPower)
+            primaryReq = targetPower
+            loss = ((ct - opt) / opt) * 100.0
+        cts.append(ct)
+        wattses.append(watts)
+        opts.append(opt)
+        calibrations.append(calibration)
+
+    if args.contract == "PERF_COMPLETION_TIME":
+        avgPrimary = np.average(cts)
+        stddevPrimary = np.std(cts)
+        avgSecondary = np.average(wattses)
+        stddevSecondary = np.std(wattses)
+    elif args.contract == "POWER_BUDGET":    
+        avgPrimary = np.average(wattses)
+        stddevPrimary = np.std(wattses)
+        avgSecondary = np.average(cts)
+        stddevSecondary = np.std(cts)
+
+    avgLoss = np.average(losses)
+    stddevLoss = np.std(losses)
+    avgCalibration = np.average(calibrations)
+    stddevCalibration = np.std(calibrations)
+
+    outFile.write(str(p) + "\t" + str(avgPrimary) + "\t" + str(stddevPrimary) + "\t" + str(opt) + "\t" + str(avgSecondary) + "\t" + str(stddevSecondary) + "\t" + str(avgLoss) + "\t" + str(stddevLoss) + "\t" + str(avgCalibration) + "\t" + str(stddevCalibration) + "\n")
+    outFile.flush()
+    os.fsync(outFile.fileno())
 
 if args.contract == "PERF_COMPLETION_TIME":
     perfFile.close()
