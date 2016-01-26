@@ -34,6 +34,7 @@
 #include <opencv2/opencv.hpp>
 #include <mammut/utils.hpp>
 
+#define PEOPLE_DETECT
 
 // #define SHOWTIMES
 #ifdef SHOWTIMES
@@ -94,8 +95,16 @@ int main(int argc, char *argv[]) {
     }break;
     }
 
-    cv::HOGDescriptor hog;
-    hog.setSVMDetector(cv::HOGDescriptor::getDefaultPeopleDetector());
+    std::string faceCascadeName = "frontalface.xml";
+
+    //Create the classifiers
+    cv::CascadeClassifier faceCascade;
+
+    //Load the classifiers
+    if (!faceCascade.load( faceCascadeName )){
+        std::cerr << "Could not load face classifier" << std::endl;
+        return 2;
+    }
 
     
     ff::ffTime(ff::START_TIME);
@@ -115,54 +124,18 @@ int main(int argc, char *argv[]) {
         
         frames++; 
 
-        // start and end times
-        double start, end;
+        //This will contain the output of the face detector
+        std::vector<cv::Rect> faces;
 
-        // fps calculated using number of frames / seconds
-        double fps;
+        //Preprocess the image
+        cv::Mat frameGray;
+        cv::cvtColor( frame, frameGray, CV_BGR2GRAY );
+        cv::equalizeHist( frameGray, frameGray );
 
-        // frame counter
-        int counter = 0;
+        //Detect the face
+        faceCascade.detectMultiScale( frameGray, faces, 1.1, 2, CV_HAAR_SCALE_IMAGE, cv::Size(20,20), cv::Size(40,40));
 
-        // floating point seconds elapsed since start
-        double sec;
-
-        // start the clock
-        start = mammut::utils::getMillisecondsTime();
-        vector<Rect> found, found_filtered;
-        hog.detectMultiScale(frame, found, 0, Size(8,8), Size(32,32), 1.05, 2);
-        size_t i, j;
-        for (i=0; i<found.size(); i++)
-        {
-            Rect r = found[i];
-            for (j=0; j<found.size(); j++)
-                if (j!=i && (r & found[j]) == r)
-                    break;
-            if (j== found.size())
-                found_filtered.push_back(r);
-        }
-
-        for (i=0; i<found_filtered.size(); i++)
-        {
-            Rect r = found_filtered[i];
-            r.x += cvRound(r.width*0.1);
-            r.width = cvRound(r.width*0.8);
-            r.y += cvRound(r.height*0.07);
-            r.height = cvRound(r.height*0.8);
-            rectangle(frame, r.tl(), r.br(), Scalar(0,255,0), 3);
-        }
-
-        // see how much time has elapsed
-        end = mammut::utils::getMillisecondsTime();
-
-        // calculate current FPS
-        ++counter;
-        sec = (end - start) / 1000.0;
-
-        fps = counter / sec;
-
-        // will print out Inf until sec is greater than 0
-        printf("FPS = %.2f Sec = %.2f\n", fps, sec);
+        std::cout << "Number of detected faces: " << faces.size() << std::endl;
 
 #ifdef SHOWTIMES
         t0 = ff::getusec();

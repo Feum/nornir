@@ -30,8 +30,6 @@
  * Date:   September 2015
  * 
  */
-//  Version using only the ordered farm:
-//    ofarm(Stage1+Stage2)
 
 #include <opencv2/opencv.hpp>
 #include "../../src/manager.hpp"
@@ -61,16 +59,40 @@ struct Source : adpff::AdaptiveNode {
 // this stage applys all the filters:  the GaussianBlur filter and the Sobel one, 
 // and it then sends the result to the next stage
 struct Stage1 : adpff::AdaptiveNode {
-    Stage1():nframe(0){;}
+    Stage1():nframe(0){
+        hog.setSVMDetector(cv::HOGDescriptor::getDefaultPeopleDetector());
+    }
+
     void * svc(void* task) {
         cv::Mat *frame = (cv::Mat*) task;
-        Mat frame1;
-        cv::GaussianBlur(*frame, frame1, cv::Size(0, 0), 3);
-        cv::addWeighted(*frame, 1.5, frame1, -0.5, 0, *frame);
-        cv::Sobel(*frame,*frame,-1,1,0,3);
+        vector<Rect> found, found_filtered;
+
+        hog.detectMultiScale(*frame, found, 0, Size(8,8), Size(32,32), 1.05, 2);
+        size_t i, j;
+        for (i=0; i<found.size(); i++)
+        {
+            Rect r = found[i];
+            for (j=0; j<found.size(); j++)
+                if (j!=i && (r & found[j]) == r)
+                    break;
+            if (j== found.size())
+                found_filtered.push_back(r);
+        }
+
+        for (i=0; i<found_filtered.size(); i++)
+        {
+            Rect r = found_filtered[i];
+            r.x += cvRound(r.width*0.1);
+            r.width = cvRound(r.width*0.8);
+            r.y += cvRound(r.height*0.07);
+            r.height = cvRound(r.height*0.8);
+            rectangle(*frame, r.tl(), r.br(), Scalar(0,255,0), 3);
+        }
         return (void*) frame;
     }
     long nframe;
+    cv::HOGDescriptor hog;
+
 }; 
 
 // this stage shows the output
