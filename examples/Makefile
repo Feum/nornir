@@ -1,9 +1,8 @@
-APPS                 = videoprocessing #blackscholes #qt-mandelbrot quicksort nqueens pbzip2
+APPS                 = simple-mandelbrot blackscholes pbzip2 videoprocessing #blackscholes quicksort nqueens pbzip2
 
 .PHONY: all clean cleanall
 
 all:
-#	cd qt-mandelbrot && qmake
 	for APP in $(APPS) ; do \
 		$(MAKE) -C $$APP ; \
 	done

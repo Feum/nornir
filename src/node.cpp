@@ -219,6 +219,7 @@ void AdaptiveNode::reset(){
     _ticksWork = 0;
     _startTicks = getticks();
 }
+
 void AdaptiveNode::storeSample(){
     DEBUG("Storing sample");
     int dummy;
@@ -260,16 +261,31 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
                 reset();
             }break;
             case MGMT_REQ_FREEZE:{
-                assert(_nodeType == NODE_TYPE_EMITTER);
-                DEBUG("Freeze request received");
-                ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
-                lb->broadcast_task(request->mark);
-                DEBUG("Broadcasted");
+                /**
+                 * When the emitter returns the EOS, a broadcast will be executed.
+                 * The broadcast will call the callbacks, so we could pop
+                 * a freeze request while the farm is already terminated.
+                 * For this reason we must check the flag.
+                 *
+                 * TODO: This should be useless on the new ff support since the
+                 * callback should now be called only on real task and not
+                 * when marks are received (for the moment we still do the
+                 * check because this is not always true).
+                 */
+                if(!*_terminated){
+                    assert(_nodeType == NODE_TYPE_EMITTER);
+                    DEBUG("Freeze request received");
+                    ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
+                    lb->broadcast_task(request->mark);
+                    DEBUG("Broadcasted");
+                    svc_end();
 
-                /** Waits for restart request from manager. **/
-                while(!_managementQ.pop((void**) &request));
-                DEBUGB(assert(request->type == MGMT_REQ_THAW));
-                lb->thawWorkers(true, request->numWorkers);
+                    /** Waits for restart request from manager. **/
+                    while(!_managementQ.pop((void**) &request));
+                    DEBUGB(assert(request->type == MGMT_REQ_THAW));
+                    svc_init();
+                    lb->thawWorkers(true, request->numWorkers);
+                }
             }break;
             case MGMT_REQ_SWITCH_BLOCKING:{
                 assert(_nodeType == NODE_TYPE_EMITTER);

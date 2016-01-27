@@ -272,26 +272,30 @@ bool ManagerFarm<lb_t, gt_t>::persist() const{
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::initPredictors(){
-    switch(_p.strategyPrediction){
-        case STRATEGY_PREDICTION_SIMPLE:{
-            _calibrator = new CalibratorDummy(_p, _configuration, _samples);
-        }break;
-        case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
-            switch(_p.strategyCalibration){
-                case STRATEGY_CALIBRATION_RANDOM:{
-                    _calibrator = new CalibratorRandom(_p, _configuration, _samples);
+    if(_p.contractType == CONTRACT_NONE){
+        _calibrator = new CalibratorDummy(_p, _configuration, _samples);
+    }else{
+        switch(_p.strategyPrediction){
+            case STRATEGY_PREDICTION_SIMPLE:{
+                _calibrator = new CalibratorDummy(_p, _configuration, _samples);
+            }break;
+            case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
+                switch(_p.strategyCalibration){
+                    case STRATEGY_CALIBRATION_RANDOM:{
+                        _calibrator = new CalibratorRandom(_p, _configuration, _samples);
+                    }
+                    case STRATEGY_CALIBRATION_HALTON:
+                    case STRATEGY_CALIBRATION_HALTON_REVERSE:
+                    case STRATEGY_CALIBRATION_NIEDERREITER:
+                    case STRATEGY_CALIBRATION_SOBOL:{
+                        _calibrator = new CalibratorLowDiscrepancy(_p, _configuration, _samples);
+                    }break;
                 }
-                case STRATEGY_CALIBRATION_HALTON:
-                case STRATEGY_CALIBRATION_HALTON_REVERSE:
-                case STRATEGY_CALIBRATION_NIEDERREITER:
-                case STRATEGY_CALIBRATION_SOBOL:{
-                    _calibrator = new CalibratorLowDiscrepancy(_p, _configuration, _samples);
-                }break;
-            }
-        }break;
-        case STRATEGY_PREDICTION_LIMARTINEZ:{
-            _calibrator = new CalibratorLiMartinez(_p, _configuration, _samples);
-        }break;
+            }break;
+            case STRATEGY_PREDICTION_LIMARTINEZ:{
+                _calibrator = new CalibratorLiMartinez(_p, _configuration, _samples);
+            }break;
+    }
     }
 }
 
@@ -510,10 +514,12 @@ void ManagerFarm<lb_t, gt_t>::run(){
             startSample = getMillisecondsTime();
         }
     }
+    _farm->wait_freezing();
     _farm->wait();
     DEBUG("Terminated.");
 
-    double duration = getMillisecondsTime() - _startTimeMs;
+    double duration = _farm->ffTime();
+
     unlink(getenv(PAR_BEGIN_ENV));
     if(_p.observer){
         vector<CalibrationStats> cs;
@@ -524,7 +530,9 @@ void ManagerFarm<lb_t, gt_t>::run(){
         _p.observer->summaryStats(cs, duration);
     }
 
+    std::cout << "Cleaning nodes." << std::endl;
     cleanNodes();
+    std::cout << "Node cleaned." << std::endl;
 }
 
 }

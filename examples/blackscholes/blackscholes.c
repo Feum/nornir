@@ -570,7 +570,9 @@ int main (int argc, char **argv)
     ap.expectedTasksNumber = numOptions * NUM_RUNS / CHUNKSIZE;
     adpff::ManagerFarm<> amf(&farm, ap);
     amf.start();
+    std::cout << "amf started" << std::endl;
     amf.join();
+    std::cout << "amf joined" << std::endl;
 
     //farm.ffStats(std::cout);
 #else //ENABLE_FF
