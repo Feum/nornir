@@ -35,12 +35,15 @@
 #include <mammut/utils.hpp>
 
 
+
+
 // #define SHOWTIMES
 #ifdef SHOWTIMES
 /* times are in millisecond */
 #define TIME(t0)  ( (ff::getusec() - t0) /  1000 )
 #endif
 
+using namespace std;
 using namespace cv;
 
 int main(int argc, char *argv[]) {

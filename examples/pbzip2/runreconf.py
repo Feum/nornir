@@ -136,6 +136,7 @@ for p in xrange(10, 110, 10):
     wattses = []
     opts = []
     calibrations = []
+    losses = []
     avgPrimary = 0
     stddevPrimary = 0
     avgSecondary = 0
@@ -163,6 +164,7 @@ for p in xrange(10, 110, 10):
         wattses.append(watts)
         opts.append(opt)
         calibrations.append(calibration)
+        losses.append(loss)
 
     if args.contract == "PERF_COMPLETION_TIME":
         avgPrimary = np.average(cts)

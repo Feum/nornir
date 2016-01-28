@@ -36,6 +36,7 @@
 
 using namespace ff; 
 using namespace cv;
+using namespace std;
 
 // reads frame and sends them to the next stage
 struct Source : adpff::AdaptiveNode {
