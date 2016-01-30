@@ -1,4 +1,3 @@
-CSRC    = $(SRC)
 TARGET  = blackscholes
 M4_BASE = .
 MACROS  = c.m4.pthreads
@@ -12,8 +11,10 @@ else
 	SRC	= blackscholes.c
 endif
 
+CSRC    = $(SRC)
+
 version = ff
-chk_err = 1
+#chk_err = 1
 
 ifdef version
   ifeq "$(version)" "pthreads"
@@ -64,7 +65,7 @@ CXXFLAGS += $(MT) $(NCO) $(FUNC) $(ERR)
 
 all: $(TARGET)
 
-$(TARGET): clean $(CSRC)
+$(TARGET): $(CSRC)
 	$(CXX) $(CXXFLAGS) $(CSRC) $(INCS) $(LDFLAGS) $(LDLIBS) -o $(TARGET)
 	$(CXX) $(CXXFLAGS) inputgen.c $(INCS) $(LDFLAGS) $(LDLIBS)  -o inputgen
 

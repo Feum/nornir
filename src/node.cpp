@@ -250,7 +250,7 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
 
     ManagementRequest* request;
 
-    if(_managementQ.pop((void**) &request)){
+    while(_managementQ.pop((void**) &request)){
         switch(request->type){
             case MGMT_REQ_GET_AND_RESET_SAMPLE:{
                 DEBUG("Get and reset received");

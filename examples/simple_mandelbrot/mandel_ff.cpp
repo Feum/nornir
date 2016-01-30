@@ -232,7 +232,7 @@ int main(int argc, char ** argv) {
 
   for (r=0;r<retries;r++) {
 
-    ff_farm<> farm(false, dim);
+    ff_farm<> farm(false);
 	std::vector<ff_node *>w;
 	for (int k=0;k<workers;k++)
 	    w.push_back((ncores>=4)? ((ff_node*)new Worker) : ((ff_node*)new Worker2));
@@ -243,7 +243,7 @@ int main(int argc, char ** argv) {
 	farm.add_emitter(&E);
 	
 	Collector C;
-	if (ncores>=4)
+	if(ncores>=4)
 	    farm.add_collector(&C);
 
     adpff::Observer obs;
@@ -276,7 +276,7 @@ int main(int argc, char ** argv) {
   }
   var /= retries;
   std::cerr << "Average on " << retries << " experiments = " << avg << " (ms) Std. Dev. " << sqrt(var) << "\n\nPress a key\n" << std::endl;
-  getchar();
+  //getchar();
 	
 #if !defined(NO_DISPLAY)
   CloseXWindows();

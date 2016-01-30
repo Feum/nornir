@@ -283,6 +283,15 @@ typedef enum{
 }CalibrationState;
 
 /**
+ * Result of an accuracy check.
+ */
+typedef enum{
+    ACCURACY_OK = 0,
+    ACCURACY_NO,
+    ACCURACY_NO_FEASIBLE
+}AccuracyResult;
+
+/**
  * Used to obtain calibration points.
  */
 class Calibrator{
@@ -291,27 +300,22 @@ protected:
     const FarmConfiguration& _configuration;
     const Smoother<MonitoredSample>* _samples;
     size_t _numCalibrationPoints;
-private:
     CalibrationState _state;
+    Predictor* _primaryPredictor;
+    Predictor* _secondaryPredictor;
+private:
     std::vector<CalibrationStats> _calibrationStats;
     size_t _minNumPoints;
     uint _calibrationStartMs;
     bool _firstPointGenerated;
     bool _forcePrediction;
-
-    // The predictor of the primary value.
-    Predictor* _primaryPredictor;
-
-    // The predictor of the secondary value.
-    Predictor* _secondaryPredictor;
-
-    // The prediction done for the primary value for the chosen configuration.
     double _primaryPrediction;
-
-    // The prediction done for the secondary value for the chosen configuration.
     double _secondaryPrediction;
+    double _thisPrimary;
+    double _thisSecondary;
+    bool _noFeasible;
 
-    bool highError(double primaryValue, double secondaryValue) const;
+    AccuracyResult checkAccuracy(double primaryValue, double secondaryValue) const;
     bool refine();
 
     /**
@@ -343,6 +347,14 @@ protected:
      */
     bool isContractViolated(double primaryValue) const;
 
+    /** 
+     * Checks if the application phase changed.
+     * @param primaryValue The primary value.
+     * @param secondaryValue The secondary value.
+     * @return true if the phase changed, false otherwise.
+     */
+    bool phaseChanged(double primaryValue, double secondaryValue) const;
+
     /**
      * Computes the best relative knobs values for the farm.
      * @param primaryValue The primary value.
@@ -371,7 +383,7 @@ protected:
         KnobsValues kv;
         return kv;
     }
-    virtual void reset(){;}
+    virtual KnobsValues reset(){KnobsValues kv; return kv;}
 public:
     Calibrator(const Parameters& p,
                const FarmConfiguration& configuration,
@@ -447,7 +459,7 @@ private:
     double* _normalizedPoint;
 protected:
     KnobsValues generateRelativeKnobsValues() const;
-    void reset();
+    KnobsValues reset();
 public:
     CalibratorLowDiscrepancy(const Parameters& p,
                              const FarmConfiguration& configuration,

@@ -131,7 +131,7 @@ elif args.contract == "POWER_BUDGET":
 
 outFile.write("#Fraction\tPrimaryRequired\tPrimaryAvg\tPrimaryStddev\tSecondaryOptimal\tSecondaryAvg\tSecondaryStddev\tLossAvg\tLossStddev\tCalibrationAvg\tCalibrationStddev\n")
 
-for p in xrange(10, 110, 10):
+for p in xrange(10, 100, 10):
     cts = []
     wattses = []
     opts = []
@@ -146,16 +146,19 @@ for p in xrange(10, 110, 10):
     avgCalibration = 0
     stddevCalibration = 0
     primaryReq = 0
+    target = 0
 
     for i in xrange(0, iterations):
         if args.contract == "PERF_COMPLETION_TIME":
             targetTime = np.percentile(np.array(timesList), p)
+            target = targetTime
             ct, watts, calibration = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p)
             opt = getOptimalTimeBound(targetTime)
             primaryReq = targetTime
             loss = ((watts - opt) / opt) * 100.0
         elif args.contract == "POWER_BUDGET":
             targetPower = np.percentile(np.array(powersList), p)
+            target = targetPower
             ct, watts, calibration = run("POWER_BUDGET", "powerBudget", targetPower, p)
             opt = getOptimalPowerBound(targetPower)
             primaryReq = targetPower
@@ -182,7 +185,7 @@ for p in xrange(10, 110, 10):
     avgCalibration = np.average(calibrations)
     stddevCalibration = np.std(calibrations)
 
-    outFile.write(str(p) + "\t" + str(avgPrimary) + "\t" + str(stddevPrimary) + "\t" + str(opt) + "\t" + str(avgSecondary) + "\t" + str(stddevSecondary) + "\t" + str(avgLoss) + "\t" + str(stddevLoss) + "\t" + str(avgCalibration) + "\t" + str(stddevCalibration) + "\n")
+    outFile.write(str(p) + "\t" + str(target) + "\t" + str(avgPrimary) + "\t" + str(stddevPrimary) + "\t" + str(opt) + "\t" + str(avgSecondary) + "\t" + str(stddevSecondary) + "\t" + str(avgLoss) + "\t" + str(stddevLoss) + "\t" + str(avgCalibration) + "\t" + str(stddevCalibration) + "\n")
     outFile.flush()
     os.fsync(outFile.fileno())
 

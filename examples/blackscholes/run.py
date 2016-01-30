@@ -11,13 +11,14 @@ out, err = process.communicate()
 parametersFile = open("parameters.xml", "w")
 parametersFile.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 parametersFile.write("<adaptivityParameters>\n")
-parametersFile.write("<samplingInterval>1000</samplingInterval>\n")
+parametersFile.write("<qSize>4</qSize>\n")
+parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
 parametersFile.write("<contractType>NONE</contractType>\n")
 parametersFile.write("<strategyPolling>SLEEP_SMALL</strategyPolling>\n")
 parametersFile.write("</adaptivityParameters>\n")
 parametersFile.close()
 
-outfile = open("results.csv", "w")
+outfile = open("REPARA_results.csv", "w")
 outfile.write("#Workers\tFrequency\tTime\tWatts\n")
 
 for c in xrange(1, 24):

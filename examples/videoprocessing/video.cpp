@@ -30,98 +30,74 @@
  * Date:   September 2015
  * 
  */
+//  Version using only the ordered farm:
+//    ofarm(Stage1+Stage2)
 
 #include <opencv2/opencv.hpp>
-#include "../../src/manager.hpp"
+#include "../../manager.hpp"
 
 using namespace ff; 
 using namespace cv;
-using namespace std;
+using namespace adpff;
 
 // reads frame and sends them to the next stage
-struct Source : adpff::AdaptiveNode {
-    VideoCapture& _cap;
-    uint _numTasks;
-    Source(VideoCapture& cap):_cap(cap), _numTasks(0){}
+struct Source : AdaptiveNode {
+    const std::string filename;
+    VideoCapture cap;
+    
+    Source(const std::string filename):filename(filename) {
+        cap = VideoCapture(filename.c_str());
+        if(!cap.isOpened())  {
+            std::cout << "Error opening input file" << std::endl;
+            exit(-1);
+        }    
+    }
   
-    void* svc(void*) {
+    
+    void * svc(void *) {
         Mat * frame = new Mat();
-        if(_cap.read(*frame)){
-            ++_numTasks;
+        if(!cap.read(*frame)){
+            std::cout << "End of stream in input" << std::endl; 
+            TERMINATE_APPLICATION;
+        }else{
             return (void*) frame;
         }
-
-        std::cout << "End of stream in input" << std::endl;
-        std::cout << _numTasks << " frames sent." << std::endl;
-        TERMINATE_APPLICATION;
     }
 }; 
 
 // this stage applys all the filters:  the GaussianBlur filter and the Sobel one, 
 // and it then sends the result to the next stage
-struct Stage1 : adpff::AdaptiveNode {
-    Stage1():nframe(0){
-        hog.setSVMDetector(cv::HOGDescriptor::getDefaultPeopleDetector());
-    }
-
-    void * svc(void* task) {
-        cv::Mat *frame = (cv::Mat*) task;
-        vector<Rect> found, found_filtered;
-
-        hog.detectMultiScale(*frame, found, 0, Size(8,8), Size(32,32), 1.05, 2);
-        size_t i, j;
-        for (i=0; i<found.size(); i++)
-        {
-            Rect r = found[i];
-            for (j=0; j<found.size(); j++)
-                if (j!=i && (r & found[j]) == r)
-                    break;
-            if (j== found.size())
-                found_filtered.push_back(r);
-        }
-
-        for (i=0; i<found_filtered.size(); i++)
-        {
-            Rect r = found_filtered[i];
-            r.x += cvRound(r.width*0.1);
-            r.width = cvRound(r.width*0.8);
-            r.y += cvRound(r.height*0.07);
-            r.height = cvRound(r.height*0.8);
-            rectangle(*frame, r.tl(), r.br(), Scalar(0,255,0), 3);
-        }
+struct Stage1 : AdaptiveNode {
+    void * svc(void *task) {
+        Mat* frame = (Mat*) task;
+        Mat frame1;
+        //cv::GaussianBlur(*frame, frame1, cv::Size(0, 0), 3);
+        //cv::addWeighted(*frame, 1.5, frame1, -0.5, 0, *frame);
+        cv::Sobel(*frame,*frame,-1,1,0,3);
         return (void*) frame;
     }
-    long nframe;
-    cv::HOGDescriptor hog;
-
 }; 
 
 // this stage shows the output
-struct Drain: adpff::AdaptiveNode {
-    Drain(uint out, cv::VideoWriter& outputFile):_out(out), _outputFile(outputFile){
-        ;
+struct Drain: AdaptiveNode {
+    Drain(bool ovf):outvideo(ovf) {}
+
+    int svc_init() {
+	if(outvideo) namedWindow("edges",1);
+	return 0; 
     }
 
-    void *svc (void* task) {
-        cv::Mat * frame = (cv::Mat*) task;
-        switch(_out){
-        case 0:{
-            ;
-        }break;
-        case 1:{
-            cv::imshow("edges", *frame);
-            if(waitKey(30) >= 0) break;
-        }break;
-        case 2:{
-            _outputFile.write(*frame);
-        }break;
-        }
-        delete frame;
-        return GO_ON;
+    void *svc (void * task) {
+        Mat* frame = (Mat*) task;
+	if(outvideo) {
+	    imshow("edges", *frame);
+	    waitKey(30);    
+	} 
+	delete frame;
+	return (void*) GO_ON;
     }
 protected:
-    const uint _out;
-    cv::VideoWriter& _outputFile;
+    const bool outvideo; 
 }; 
 
 int main(int argc, char *argv[]) {
@@ -135,26 +111,9 @@ int main(int argc, char *argv[]) {
       return(0); 
     }
     
-
-    VideoCapture cap(argv[1]);
-    if(!cap.isOpened())  {
-        std::cout << "Error opening input file" << std::endl;
-        return -1;
-    }
-
-    cv::VideoWriter outputFile;
     // output 
-    switch(atoi(argv[2])){
-    case 0:{
-        ;
-    }break;
-    case 1:{
-        namedWindow("edges",1);
-    }break;
-    case 2:{
-        outputFile.open("output.mp4", cap.get(CV_CAP_PROP_FOURCC), cap.get(CV_CAP_PROP_FPS), cvSize((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT)), true);
-    }break;
-    }
+    bool outvideo = false; 
+    if(atoi(argv[2]) == 1) outvideo = true; 
     
     // pardegree 
     size_t nw1 = 1;
@@ -163,6 +122,7 @@ int main(int argc, char *argv[]) {
     }
 
     // creates an ordered farm
+#if 0
     ff_OFarm<cv::Mat> ofarm( [nw1]() {
             
             std::vector<std::unique_ptr<ff_node> > W; 
@@ -171,30 +131,26 @@ int main(int argc, char *argv[]) {
             return W;
             
         } ());
-
-    Source source(cap);
-    ofarm.setEmitterF(source);
-    Drain  drain(atoi(argv[2]), outputFile);
-    ofarm.setCollectorF(drain);
-
+#endif
+    ff_ofarm ofarm;
+    std::vector<ff_node*> W;
+    for(size_t i=0; i<nw1; i++)
+        W.push_back(new Stage1());
+    ofarm.add_workers(W);
+    
+    Source source(argv[1]);
+    ofarm.setEmitterF((ff_node*) &source);
+    Drain  drain(outvideo);
+    ofarm.setCollectorF((ff_node*) &drain);
+    
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     adpff::ManagerFarm<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
 
-    ffTime(START_TIME);
     amf.start();
     amf.join();
-#if 0
-    if (ofarm.run_and_wait_end()<0) {
-        error("running farm");
-        return -1;
-    }
-#endif
-    ffTime(STOP_TIME);
 
-    std::cout << "Elapsed (farm(" << nw1 << "): elapsed time =" ;     
-    std::cout << ffTime(GET_TIME) << " ms\n";    
     return 0;
 }
 

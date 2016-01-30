@@ -123,6 +123,32 @@ inline void QuickSort(int i, int j) {
 }
 
 
+
+#define znew (z=36969*(z&65535)+(z>>16))
+#define wnew (w=18000*(w&65535)+(w>>16))
+#define MWC ((znew<<16)+wnew )
+#define SHR3 (jsr^=(jsr<<17), jsr^=(jsr>>13), jsr^=(jsr<<5))
+#define CONG (jcong=69069*jcong+1234567)
+#define FIB ((b=a+b),(a=b-a))
+#define KISS ((MWC^CONG)+SHR3)
+#define LFIB4 (c++,t[c]=t[c]+t[UC(c+58)]+t[UC(c+119)]+t[UC(c+178)])
+#define SWB (c++,bro=(x<y),t[c]=(x=t[UC(c+34)])-(y=t[UC(c+19)]+bro))
+#define UNI (KISS*2.328306e-10)
+#define VNI ((long) KISS)*4.656613e-10
+#define UC (unsigned char) /*a cast operation*/
+typedef unsigned long UL;
+/* Global static variables: */
+static UL z=362436069, w=521288629, jsr=123456789, jcong=380116160;
+static UL a=224466889, b=7584631, t[256];
+/* Use random seeds to reset z,w,jsr,jcong,a,b, and the table
+   t[256]*/
+static UL x=0,y=0,bro; static unsigned char c=0;
+/* Example procedure to set the table, using KISS: */
+void settable(UL i1,UL i2,UL i3,UL i4,UL i5, UL i6)
+{ int i; z=i1;w=i2,jsr=i3; jcong=i4; a=i5; b=i6;
+    for(i=0;i<256;i=i+1) t[i]=KISS;
+}
+
 void initArray() {
     /* All of the elements are unique. */
     for (unsigned int i = 0; i < size; i++) A[i] = i;
@@ -130,8 +156,8 @@ void initArray() {
     /* Shuffle them randomly. */
     srandom(0);
     for (unsigned int i = 0; i < size; i++) 
-    swap(i, (random() % (size-i)) + i);
-    
+        //   swap(i, (random() % (size-i)) + i);
+        swap(i, (KISS % (size-i)) + i);
 }
 
 
@@ -161,10 +187,17 @@ public:
     }
 };
 
+class Collector: public AdaptiveNode {
+public:
+    void* svc(void* t){
+        return t;
+    }
+};
+
 class Emitter: public AdaptiveNode {
 public:
-    Emitter():streamlen(0) {};
-
+    Emitter():streamlen(0),sentTasks(0) {};
+    ~Emitter(){std::cout << "Real sent tasks: " << sentTasks << std::endl;}
     void * svc(void * t) {
         ff_task * task = (ff_task*)t;
         if (task == NULL) {
@@ -174,14 +207,13 @@ public:
             task = new ff_task;
             task->i=0; task->j=k-1;
             ff_send_out(task);
+            ++sentTasks;
       
             task = new ff_task;
             task->i=k; task->j=size-1;
-            ff_send_out(task);
-            
-            streamlen=2;
-            
-            return GO_ON;       
+            streamlen = 2;
+            ++sentTasks;
+            return task;
         }
         
         
@@ -198,17 +230,17 @@ public:
         
         task->i=i; task->j=k-1; task->k=-1;
         ff_send_out(task);
+        ++sentTasks;
         
         task = new ff_task;
         task->i=k; task->j=j; task->k=-1;
-        ff_send_out(task);
-        
-        streamlen +=2;
-        
-        return GO_ON;
+        streamlen += 2;
+        ++sentTasks;
+        return task;
     }
 private:
     unsigned int streamlen;
+    unsigned sentTasks;
 };
 
 
@@ -246,6 +278,8 @@ int main(int argc, char *argv[]) {
 
     Emitter E;
     farm.add_emitter(&E);
+    Collector C;
+    farm.add_collector(NULL);
     std::vector<ff_node *> w;
     for(int i=0;i<nworkers;++i) w.push_back(new Worker);
     farm.add_workers(w);
@@ -254,6 +288,14 @@ int main(int argc, char *argv[]) {
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
+
+
+    if(size == 1000000000){
+        ap.expectedTasksNumber = 400576;
+    }else{
+        std::cout << "I do not know the expected tasks number." << std::endl;
+    }
+    std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
     adpff::ManagerFarm<> amf(&farm, ap);
     std::cout << "Starting manager. " << std::endl;
     amf.start();

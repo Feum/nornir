@@ -137,12 +137,12 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
         _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
 
         /****************** Clean state ******************/
-        _lastStoredSampleMs = getMillisecondsTime();
         _samples->reset();
         if(_counter){
             _counter->reset();
         }
         _totalTasks = 0;
+        _lastStoredSampleMs = getMillisecondsTime();
         resetSample();
     }
 }
@@ -414,9 +414,6 @@ void ManagerFarm<lb_t, gt_t>::cleanNodes() {
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::run(){
-    ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
-    thisThread->move((VirtualCoreId) 0);
-
     if(_p.qSize){
         _farm->setFixedSize(true);
         // We need to multiply for the number of workers since FastFlow
@@ -468,6 +465,9 @@ void ManagerFarm<lb_t, gt_t>::run(){
     /* Force the first calibration point. **/
     assert(_calibrator);
     changeKnobs();
+
+    ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
+    thisThread->move((VirtualCoreId) 0);
 
     double microsecsSleep = 0;
     double startSample = getMillisecondsTime();

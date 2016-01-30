@@ -23,7 +23,7 @@
 #
 # ---------------------------------------------------------------------------
 
-TARGET               = qs ff_qs_simple ff_qs_opt 
+TARGET               = qs ff_qs_simple #ff_qs_opt 
 #ff_qs_mpmc_bk ff_qs_mpmc_nbk
 
 
