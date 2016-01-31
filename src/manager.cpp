@@ -134,6 +134,16 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
                                                          _remainingTasks);
     if(!_configuration.equal(values)){
         _configuration.setValues(values);
+        
+        /** 
+         * Since I stopped the workers after I asked for a sample, there
+         * may still be tasks that have been processed but I did not count.
+         * For this reason, I get them.
+         */
+        WorkerSample ws;
+        getWorkersSamples(ws);
+        updateTasksCount(ws);
+
         _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
 
         /****************** Clean state ******************/
@@ -200,6 +210,19 @@ void ManagerFarm<lb_t, gt_t>::resetSample(){
 }
 
 template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::updateTasksCount(WorkerSample& sample){
+    _totalTasks += sample.tasksCount;
+    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+        if(_remainingTasks > sample.tasksCount){
+            _remainingTasks -= sample.tasksCount;
+        }else{
+            _remainingTasks = 0;
+        }
+    }
+}
+
+
+template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     MonitoredSample sample;
     WorkerSample ws;
@@ -208,14 +231,7 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     askForWorkersSamples();
     getWorkersSamples(ws);
 
-    _totalTasks += ws.tasksCount;
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        if(_remainingTasks > ws.tasksCount){
-            _remainingTasks -= ws.tasksCount;
-        }else{
-            _remainingTasks = 0;
-        }
-    }
+    updateTasksCount(ws);
 
     if(_counter){
         switch(_counter->getType()){
@@ -496,11 +512,11 @@ void ManagerFarm<lb_t, gt_t>::run(){
         DEBUG("New sample stored.");
 
         if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-            double now = getMillisecondsTime()/1000.0;
-            if(now >= _deadline){
+            double now = getMillisecondsTime(); 
+            if(now/1000.0 >= _deadline){
                 _p.requiredBandwidth = numeric_limits<double>::max();
             }else{
-                _p.requiredBandwidth = _remainingTasks / (_deadline - now);
+                _p.requiredBandwidth = _remainingTasks / ((_deadline*1000.0 - now) / 1000.0);
             }
         }
 
@@ -530,9 +546,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
         _p.observer->summaryStats(cs, duration);
     }
 
-    std::cout << "Cleaning nodes." << std::endl;
     cleanNodes();
-    std::cout << "Node cleaned." << std::endl;
 }
 
 }

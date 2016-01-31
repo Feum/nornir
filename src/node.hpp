@@ -271,6 +271,8 @@ private:
      */
     void callbackOut(void *p) CX11_KEYWORD(final);
 
+    void eosnotify(ssize_t id) CX11_KEYWORD(final);
+
 public:
     /**
      * Builds an adaptive node.

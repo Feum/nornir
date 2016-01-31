@@ -515,6 +515,8 @@ AccuracyResult Calibrator::checkAccuracy(double primaryValue, double secondaryVa
             return ACCURACY_OK;
         }
     }else{
+        DEBUG("Primary prediction: " << _primaryPrediction);
+        DEBUG("Primary error: " << primaryError);
         // We never predicted the secondary value because
         // there are no feasible solutions.
         secondaryError = 0.0;
@@ -734,7 +736,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
          * (so we remain in the same configuration), we do not still have to
          * refine the predictions.
          */
-        if(_state == CALIBRATION_FINISHED && !contractViolated){
+        if(_state == CALIBRATION_FINISHED){
             ;
         }else{
             bool newPoint = refine();
@@ -764,8 +766,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 DEBUG("[Calibrator]: Prediction forced.");
             }else{
                 AccuracyResult ar = checkAccuracy(primaryValue, secondaryValue);
-                if(ar == ACCURACY_NO || 
-                   (contractViolated && !_noFeasible && ar != ACCURACY_NO_FEASIBLE)){
+                if(ar == ACCURACY_NO){
                     if(_numCalibrationPoints > 150){ //TODO Put this as parameter 
                         kv = reset();
                         DEBUG("Resetting.");
@@ -777,9 +778,15 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 }else if(ar == ACCURACY_OK || ar == ACCURACY_NO_FEASIBLE){
                     if(ar == ACCURACY_NO_FEASIBLE){
                         DEBUG("No feasible solutions found.");
-                            _noFeasible = true;
+                        _noFeasible = true;
                     }
-                    kv = _configuration.getRealValues();
+                    
+                    if((contractViolated && !_noFeasible && ar != ACCURACY_NO_FEASIBLE)){
+                        kv = getBestKnobsValues(primaryValue, remainingTasks);
+                        DEBUG("[Calibrator]: Low error but the contract is violated, adjusting.");
+                    }else{
+                        kv = _configuration.getRealValues();
+                    }
                     _state = CALIBRATION_FINISHED;
                     _thisPrimary = primaryValue;
                     _thisSecondary = secondaryValue;
@@ -797,6 +804,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             if((!_noFeasible && contractViolated) || 
                phaseChanged(primaryValue, secondaryValue)){
                 kv = reset();
+                refine();
             }else{
                 kv = _configuration.getRealValues();
             }

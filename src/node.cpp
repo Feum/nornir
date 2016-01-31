@@ -305,6 +305,13 @@ void AdaptiveNode::callbackOut(void *p) CX11_KEYWORD(final){
     callbackIn(p);
 }
 
+void AdaptiveNode::eosnotify(ssize_t id) CX11_KEYWORD(final){
+    if(_nodeType == NODE_TYPE_WORKER){
+        storeSample();
+    }
+}
+
+
 
 AdaptiveNode::AdaptiveNode():
         _started(false),
@@ -319,7 +326,7 @@ AdaptiveNode::AdaptiveNode():
         // SWITCH_BLOCKING, a RESET_SAMPLE and a GET_AND_RESET_SAMPLE.
         // For this reason, the size of the managementQ is greater than 1.
         _managementQ(4),
-        _responseQ(1){
+        _responseQ(2){
     _managementQ.init();
     _responseQ.init();
     prepareToRun();

@@ -236,6 +236,12 @@ private:
     void storeNewSample();
 
     /**
+     * Updates the tasks count.
+     * @param sample The workers sample to be used for the update.
+     */
+    void updateTasksCount(WorkerSample& sample);
+
+    /**
      * Returns true if the manager doesn't have still to check for a new
      * configuration.
      * @return True if the manager doesn't have still to check for a new
