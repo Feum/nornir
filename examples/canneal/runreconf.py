@@ -42,7 +42,7 @@ def run(contractType, fieldName, fieldValue, percentile, itnum):
     parametersFile.write("</adaptivityParameters>\n")
     parametersFile.close()
 
-    run = "./pbzip2_ff -f -k -p22 /home/desensi/enwiki-20151201-abstract.xml"
+    run = "./canneal 23 15000 2000 2500000.nets 6000"
     process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     out, err = process.communicate()
 

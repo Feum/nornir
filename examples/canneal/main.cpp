@@ -54,7 +54,7 @@ using namespace adpff;
 void* entry_pt(void*);
 
 typedef struct{
-    int workerId;
+    bool present;
     int accepted_good_moves;
     int accepted_bad_moves;
 }CTask;
@@ -64,19 +64,26 @@ static CTask* allTasks;
 
 class Emitter: public AdaptiveNode{
 private:
+    ff::ff_loadbalancer* _lb;
     int _temp_steps_completed;
     uint _activeWorkers;
-    uint _receivedTasks;
     int _number_temp_steps;
     bool _keep_going_global_flag;
 public:
-    Emitter(uint maxNumWorkers, int number_temp_steps):
+    Emitter(ff::ff_loadbalancer* lb, uint maxNumWorkers, int number_temp_steps):
+        _lb(lb),
         _temp_steps_completed(0),
         _activeWorkers(maxNumWorkers),
-        _receivedTasks(0),
         _number_temp_steps(number_temp_steps),
         _keep_going_global_flag(true){
         allTasks = new CTask[maxNumWorkers];
+        for(size_t i = 0; i < _activeWorkers; i++){
+            allTasks[i].present = false;
+        }
+    }
+
+    ~Emitter(){
+        std::cout << "Generated " << _temp_steps_completed << " tasks." << std::endl;
     }
 
     bool keep_going(int temp_steps_completed, int accepted_good_moves, int accepted_bad_moves)
@@ -101,27 +108,28 @@ public:
     }
 
     void* svc(void* task){
-        if(task == NULL){
-            for(size_t i = 0; i < _activeWorkers; i++){
-                ff_send_out((void*) &dummyTask);
-            }
-        }else{
-            if(++_receivedTasks < _activeWorkers){
-                return GO_ON;
+        _lb->broadcast_task((void*) &dummyTask);
+        while(true){
+            size_t numPresent = 0;
+            while(numPresent != _activeWorkers){
+                numPresent = 0;
+                for(size_t i = 0; i < _activeWorkers; i++){
+                    if(allTasks[i].present){
+                        ++numPresent;
+                    }
+                }
             }
 
             ++_temp_steps_completed;
 
             for(size_t i = 0; i < _activeWorkers; i++){
+                allTasks[i].present = false;
                 if(!keep_going(_temp_steps_completed, allTasks[i].accepted_good_moves, allTasks[i].accepted_bad_moves)){
                     TERMINATE_APPLICATION;
                 }
             }
-            _receivedTasks = 0;
 
-            for(size_t i = 0; i < _activeWorkers; i++){
-                ff_send_out((void*) &dummyTask);
-            }
+            _lb->broadcast_task((void*) &dummyTask);
         }
     }
 };
@@ -133,10 +141,10 @@ private:
     double _T;
     int _swapsPerTemp;
     int _movesPerThreadTemp;
-    long a_id;
-    long b_id;
-    netlist_elem* a;
-    netlist_elem* b;
+    long _a_id;
+    long _b_id;
+    netlist_elem* _a;
+    netlist_elem* _b;
 public:
     enum move_decision_t{
         move_decision_accepted_good,
@@ -178,9 +186,9 @@ public:
     Worker(netlist* netlist, double startTemp, int swapsPerTemp, int maxNumWorkers):
         _netlist(netlist), _T(startTemp), _swapsPerTemp(swapsPerTemp),
         _movesPerThreadTemp(swapsPerTemp/maxNumWorkers),
-        a_id(0), b_id(0){
-        a = _netlist->get_random_element(&a_id, NO_MATCHING_ELEMENT, &_rng);
-        b = _netlist->get_random_element(&b_id, NO_MATCHING_ELEMENT, &_rng);
+        _a_id(0), _b_id(0){
+        _a = _netlist->get_random_element(&_a_id, NO_MATCHING_ELEMENT, &_rng);
+        _b = _netlist->get_random_element(&_b_id, NO_MATCHING_ELEMENT, &_rng);
     }
 
     void notifyWorkersChange(size_t oldNumWorkers, size_t newNumWorkers){
@@ -194,28 +202,28 @@ public:
 
         for (int i = 0; i < _movesPerThreadTemp; i++){
             //get a new element. Only get one new element, so that reuse should help the cache
-            a = b;
-            a_id = b_id;
-            b = _netlist->get_random_element(&b_id, a_id, &_rng);
+            _a = _b;
+            _a_id = _b_id;
+            _b = _netlist->get_random_element(&_b_id, _a_id, &_rng);
 
-            routing_cost_t delta_cost = calculate_delta_routing_cost(a,b);
+            routing_cost_t delta_cost = calculate_delta_routing_cost(_a, _b);
             move_decision_t is_good_move = accept_move(delta_cost, _T, &_rng);
 
             //make the move, and update stats:
             if (is_good_move == move_decision_accepted_bad){
                 accepted_bad_moves++;
-                _netlist->swap_locations(a,b);
+                _netlist->swap_locations(_a,_b);
             } else if (is_good_move == move_decision_accepted_good){
                 accepted_good_moves++;
-                _netlist->swap_locations(a,b);
+                _netlist->swap_locations(_a,_b);
             } else if (is_good_move == move_decision_rejected){
                 //no need to do anything for a rejected move
             }
         }
-        allTasks[get_my_id()].workerId = get_my_id();
+        allTasks[get_my_id()].present = true;
         allTasks[get_my_id()].accepted_good_moves = accepted_good_moves;
         allTasks[get_my_id()].accepted_bad_moves = accepted_bad_moves;
-        return (void*)&dummyTask;
+        return GO_ON;
     }
 };
 
@@ -279,6 +287,7 @@ int main (int argc, char * const argv[]) {
 	__parsec_roi_begin();
 #endif
 
+#ifdef ENABLE_THREADS
 #ifdef ENABLE_FF
     std::vector<ff_node*> W;
     for(int i = 0; i < num_threads; i++){
@@ -286,22 +295,21 @@ int main (int argc, char * const argv[]) {
     }
 
     ff_farm<> farm(W);
-    farm.add_emitter((ff_node*)new Emitter(num_threads, number_temp_steps));
-    farm.wrap_around();
-    //farm.remove_collector();
+    Emitter e(farm.getlb(), num_threads, number_temp_steps);
+    farm.add_emitter(&e);
+    farm.remove_collector();
     //farm.set_scheduling_ondemand();
 
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
-    //ap.expectedTasksNumber = numOptions * NUM_RUNS / CHUNKSIZE;
+    ap.expectedTasksNumber = number_temp_steps;
     adpff::ManagerFarm<> amf(&farm, ap);
     amf.start();
     std::cout << "amf started" << std::endl;
     amf.join();
     std::cout << "amf joined" << std::endl;
-
-#elif ENABLE_THREADS
+#else
 	std::vector<pthread_t> threads(num_threads);
 	void* thread_in = static_cast<void*>(&a_thread);
 	for(int i=0; i<num_threads; i++){
@@ -310,6 +318,7 @@ int main (int argc, char * const argv[]) {
 	for (int i=0; i<num_threads; i++){
 		pthread_join(threads[i], NULL);
 	}
+#endif
 #else
 	a_thread.Run();
 #endif
@@ -318,6 +327,7 @@ int main (int argc, char * const argv[]) {
 #endif
 	
 	cout << "Final routing is: " << my_netlist.total_routing_cost() << endl;
+        cout << "Terminated" << endl;
 
 #ifdef ENABLE_PARSEC_HOOKS
 	__parsec_bench_end();

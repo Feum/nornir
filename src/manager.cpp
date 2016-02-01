@@ -134,17 +134,24 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
                                                          _remainingTasks);
     if(!_configuration.equal(values)){
         _configuration.setValues(values);
-        
-        /** 
-         * Since I stopped the workers after I asked for a sample, there
-         * may still be tasks that have been processed but I did not count.
-         * For this reason, I get them.
-         */
-        WorkerSample ws;
-        getWorkersSamples(ws);
-        updateTasksCount(ws);
 
-        _activeWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();
+        std::vector<AdaptiveNode*> newWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();        
+        WorkerSample ws;
+
+        if(_activeWorkers.size() != newWorkers.size()){
+            /** 
+             * Since I stopped the workers after I asked for a sample, there
+             * may still be tasks that have been processed but I did not count.
+             * For this reason, I get them.
+             * I do not need to ask since the node put it in the Q when it 
+             * terminated.
+             */
+            DEBUG("Getting spurious..");
+            getWorkersSamples(ws);
+            DEBUG("Spurious got.");
+        }
+
+        _activeWorkers = newWorkers;
 
         /****************** Clean state ******************/
         _samples->reset();
@@ -152,8 +159,11 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
             _counter->reset();
         }
         _totalTasks = 0;
+        DEBUG("Resetting sample.");
         _lastStoredSampleMs = getMillisecondsTime();
-        resetSample();
+        askForWorkersSamples();
+        getWorkersSamples(ws);
+        //resetSample();
     }
 }
 
@@ -200,6 +210,7 @@ void ManagerFarm<lb_t, gt_t>::getWorkersSamples(WorkerSample& sample){
     }
     sample.loadPercentage /= numActiveWorkers;
     sample.latency /= numActiveWorkers;
+    updateTasksCount(sample);
 }
 
 template <typename lb_t, typename gt_t>
@@ -221,7 +232,6 @@ void ManagerFarm<lb_t, gt_t>::updateTasksCount(WorkerSample& sample){
     }
 }
 
-
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     MonitoredSample sample;
@@ -230,8 +240,6 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
 
     askForWorkersSamples();
     getWorkersSamples(ws);
-
-    updateTasksCount(ws);
 
     if(_counter){
         switch(_counter->getType()){
@@ -530,6 +538,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
             startSample = getMillisecondsTime();
         }
     }
+    DEBUG("Terminating...wait freezing.");
     _farm->wait_freezing();
     _farm->wait();
     DEBUG("Terminated.");

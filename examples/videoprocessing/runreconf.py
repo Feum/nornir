@@ -3,7 +3,6 @@ import subprocess
 import shlex
 import socket
 import os
-import os.path
 import shutil
 import argparse 
 from subprocess import Popen, PIPE, STDOUT
@@ -22,19 +21,18 @@ def getLastLine(fileName):
     fh.close()
     return last
 
-
-def run(contractType, fieldName, fieldValue, percentile, itnum):
+def run(contractType, fieldName, fieldValue, percentile):
     parametersFile = open("parameters.xml", "w")
     parametersFile.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
     parametersFile.write("<adaptivityParameters>\n")
 
-    parametersFile.write("<qSize>1</qSize>\n")
-    parametersFile.write("<samplingIntervalCalibration>500</samplingIntervalCalibration>\n")
-    parametersFile.write("<samplingIntervalSteady>2000</samplingIntervalSteady>\n")
-    parametersFile.write("<maxPrimaryPredictionError>10.0</maxPrimaryPredictionError>\n")
-    parametersFile.write("<smoothingFactor>0.01</smoothingFactor>\n")
-    parametersFile.write("<strategyPersistence>TASKS</strategyPersistence>\n")
-    parametersFile.write("<persistenceValue>3</persistenceValue>\n")
+    parametersFile.write("<qSize>4</qSize>\n")
+    parametersFile.write("<expectedTasksNumber>14316</expectedTasksNumber>\n")
+    parametersFile.write("<samplingIntervalCalibration>50</samplingIntervalCalibration>\n")
+    parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
+    parametersFile.write("<smoothingFactor>0.9</smoothingFactor>\n")
+    parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
+    parametersFile.write("<persistenceValue>2</persistenceValue>\n")
     parametersFile.write("<strategyPolling>SLEEP_SMALL</strategyPolling>\n")
     parametersFile.write("<strategyPrediction>" + args.prediction + "</strategyPrediction>\n")
     parametersFile.write("<contractType>" + contractType + "</contractType>\n")
@@ -42,14 +40,9 @@ def run(contractType, fieldName, fieldValue, percentile, itnum):
     parametersFile.write("</adaptivityParameters>\n")
     parametersFile.close()
 
-    run = "./pbzip2_ff -f -k -p22 /home/desensi/enwiki-20151201-abstract.xml"
+    run = "./video BigBuckBunny_640x360.m4v 0 22"
     process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     out, err = process.communicate()
-
-    logfile = open("log.csv", "w")
-    logfile.write(out)
-    logfile.write(err)
-    logfile.close()
 
     time = -1
     watts = -1
@@ -68,9 +61,8 @@ def run(contractType, fieldName, fieldValue, percentile, itnum):
     elif contractType == 'POWER_BUDGET':
         dir_results = powerdir
 
-    for outfile in ["calibration.csv", "stats.csv", "summary.csv", "parameters.xml", "log.csv"]:
-        if os.path.isfile(outfile):
-            os.rename(outfile, dir_results + "/" + str(percentile) + "." + str(itnum) + "." + outfile)
+    for outfile in ["calibration.csv", "stats.csv", "summary.csv", "parameters.xml"]:
+        os.rename(outfile, dir_results + "/" + str(percentile) + "." + outfile)
 
     # Returns completion time and watts
     return time, watts, calibration
@@ -157,20 +149,17 @@ for p in xrange(10, 100, 10):
     target = 0
 
     for i in xrange(0, iterations):
-        ct = -1
         if args.contract == "PERF_COMPLETION_TIME":
             targetTime = np.percentile(np.array(timesList), p)
             target = targetTime
-            while ct == -1:
-                ct, watts, calibration = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p, i)
+            ct, watts, calibration = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p)
             opt = getOptimalTimeBound(targetTime)
             primaryReq = targetTime
             loss = ((watts - opt) / opt) * 100.0
         elif args.contract == "POWER_BUDGET":
             targetPower = np.percentile(np.array(powersList), p)
             target = targetPower
-            while ct == -1:
-                ct, watts, calibration = run("POWER_BUDGET", "powerBudget", targetPower, p, i)
+            ct, watts, calibration = run("POWER_BUDGET", "powerBudget", targetPower, p)
             opt = getOptimalPowerBound(targetPower)
             primaryReq = targetPower
             loss = ((ct - opt) / opt) * 100.0
@@ -179,8 +168,6 @@ for p in xrange(10, 100, 10):
         opts.append(opt)
         calibrations.append(calibration)
         losses.append(loss)
-
-            
 
     if args.contract == "PERF_COMPLETION_TIME":
         avgPrimary = np.average(cts)

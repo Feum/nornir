@@ -271,6 +271,7 @@ private:
      */
     void callbackOut(void *p) CX11_KEYWORD(final);
 
+    void svc_end() CX11_KEYWORD(final);
     void eosnotify(ssize_t id) CX11_KEYWORD(final);
 
 public:

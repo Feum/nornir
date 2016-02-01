@@ -1945,9 +1945,9 @@ int main(int argc, char* argv[])
 						usage(argv[0], "Cannot parse -p argument");
 					strncpy(cmdLineTemp, argv[i]+j+1, cmdLineTempCount);
 					numCPU = atoi(cmdLineTemp);
-					if (numCPU > 4096)
+					if (numCPU > 22)
 					{
-						fprintf(stderr,"pbzip2_ff: *ERROR: Maximal number of supported processors is 4096!  Aborting...\n");
+						fprintf(stderr,"pbzip2_ff: *ERROR: Maximal number of supported processors is 22!  Aborting...\n");
 						return 1;
 					}
 					else if (numCPU < 1)

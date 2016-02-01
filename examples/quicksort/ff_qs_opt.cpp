@@ -32,7 +32,6 @@
  */
 
 #include <stdio.h>
-#include <ff/farm.hpp>
 #include <algorithm>  // it is needed to use std::sort
 
 #include "../../src/manager.hpp"

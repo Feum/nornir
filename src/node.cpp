@@ -305,10 +305,20 @@ void AdaptiveNode::callbackOut(void *p) CX11_KEYWORD(final){
     callbackIn(p);
 }
 
-void AdaptiveNode::eosnotify(ssize_t id) CX11_KEYWORD(final){
+
+void AdaptiveNode::svc_end() CX11_KEYWORD(final){
     if(_nodeType == NODE_TYPE_WORKER){
         storeSample();
     }
+}
+
+
+void AdaptiveNode::eosnotify(ssize_t id) CX11_KEYWORD(final){
+#if 0
+    if(_nodeType == NODE_TYPE_WORKER){
+        storeSample();
+    }
+#endif
 }
 
 
