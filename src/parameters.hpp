@@ -598,7 +598,6 @@ public:
     // [default = 10 for samples, 1000 for tasks, 5 for variation].
     double persistenceValue;
 
-
     // The length of the sampling interval (in milliseconds) for the data
     // reading during calibration phase. If 0, it will be automatically computed
     // such to have a low performance overhead [default = 0].
@@ -640,6 +639,12 @@ public:
     // [default = unused].
     ulong expectedTasksNumber;
 
+    /// If true, this is an application when the workers works synchronously,
+    /// i.e. the emitter works as a barrier between two successive iterations
+    /// of the workers. In this case, the emitter always broadcasts tasks
+    /// to all the workers [default = false].
+    bool synchronousWorkers;
+
     // The maximum cores power to be used. It is
     // valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
     double powerBudget;
@@ -653,6 +658,12 @@ public:
     // value. If 0, then it will be set equal to the coefficient
     // of variation of the secondary value [default = 5.0].
     double maxSecondaryPredictionError;
+
+    // The aging value for the linear regression predictor. If it has a value
+    // of n, then we will only consider the last n configurations we collected
+    // in order to perform predictions. If 0, no aging will be applied and all
+    // the previous samples will be considered [default = 0].
+    uint regressionAging;
 
     // The maximum percentage of monitoring overhead, in the range (0, 100).
     // [default = 1.0].

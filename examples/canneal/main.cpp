@@ -304,6 +304,7 @@ int main (int argc, char * const argv[]) {
     adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     ap.expectedTasksNumber = number_temp_steps;
+    ap.synchronousWorkers = true;
     adpff::ManagerFarm<> amf(&farm, ap);
     amf.start();
     std::cout << "amf started" << std::endl;
@@ -327,7 +328,7 @@ int main (int argc, char * const argv[]) {
 #endif
 	
 	cout << "Final routing is: " << my_netlist.total_routing_cost() << endl;
-        cout << "Terminated" << endl;
+    cout << "Terminated" << endl;
 
 #ifdef ENABLE_PARSEC_HOOKS
 	__parsec_bench_end();

@@ -224,6 +224,10 @@ private:
     Observations _observations;
     typedef Observations::iterator obs_it;
 
+    // Aging vector, it contains the last regressionAging KnobsValues
+    std::vector<KnobsValues> _agingVector;
+    size_t _currentAgingId;
+
     // Input to be used for predicting a value.
     RegressionData* _predictionInput;
 

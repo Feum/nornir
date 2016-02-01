@@ -281,6 +281,8 @@ PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
             _predictionInput = new RegressionDataPower(p, configuration, samples);
         }break;
     }
+    _agingVector.reserve(_p.regressionAging);
+    _currentAgingId = 0;
 }
 
 PredictorLinearRegression::~PredictorLinearRegression(){
@@ -323,6 +325,10 @@ bool PredictorLinearRegression::refine(){
     }
     obs_it lb = _observations.lower_bound(currentValues);
 
+    if(_p.regressionAging){
+        _agingVector.at(_currentAgingId) = currentValues;
+        _currentAgingId = (_currentAgingId + 1) % _p.regressionAging;
+    }
     DEBUG("Refining with configuration " << currentValues << ": "
                                          << getCurrentResponse());
     if(lb != _observations.end() &&
@@ -365,9 +371,12 @@ void PredictorLinearRegression::prepareForPredictions(){
                iterator != _observations.end();
                iterator++){
         const Observation& obs = iterator->second;
-        obs.data->toArmaRow(i, dataMl);
-        responsesMl(i) = obs.response;
-        ++i;
+
+        if(!_p.regressionAging || contains(_agingVector, iterator->first)){
+            obs.data->toArmaRow(i, dataMl);
+            responsesMl(i) = obs.response;
+            ++i;
+        }
     }
 
     _lr = LinearRegression(dataMl, responsesMl);
@@ -767,14 +776,9 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             }else{
                 AccuracyResult ar = checkAccuracy(primaryValue, secondaryValue);
                 if(ar == ACCURACY_NO){
-                    if(_numCalibrationPoints > 150){ //TODO Put this as parameter 
-                        kv = reset();
-                        DEBUG("Resetting.");
-                    }else{
-                        kv = generateRelativeKnobsValues();
-                        _forcePrediction = true;
-                        DEBUG("[Calibrator]: High prediction error. Adding new seed.");
-                    }
+                    kv = generateRelativeKnobsValues();
+                    _forcePrediction = true;
+                    DEBUG("[Calibrator]: High prediction error. Adding new seed.");
                 }else if(ar == ACCURACY_OK || ar == ACCURACY_NO_FEASIBLE){
                     if(ar == ACCURACY_NO_FEASIBLE){
                         DEBUG("No feasible solutions found.");

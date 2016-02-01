@@ -148,6 +148,7 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
              */
             DEBUG("Getting spurious..");
             getWorkersSamples(ws);
+            updateTasksCount(ws);
             DEBUG("Spurious got.");
         }
 
@@ -163,6 +164,7 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
         _lastStoredSampleMs = getMillisecondsTime();
         askForWorkersSamples();
         getWorkersSamples(ws);
+        updateTasksCount(ws);
         //resetSample();
     }
 }
@@ -210,7 +212,6 @@ void ManagerFarm<lb_t, gt_t>::getWorkersSamples(WorkerSample& sample){
     }
     sample.loadPercentage /= numActiveWorkers;
     sample.latency /= numActiveWorkers;
-    updateTasksCount(sample);
 }
 
 template <typename lb_t, typename gt_t>
@@ -222,10 +223,17 @@ void ManagerFarm<lb_t, gt_t>::resetSample(){
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::updateTasksCount(WorkerSample& sample){
-    _totalTasks += sample.tasksCount;
+    double newTasks = sample.tasksCount;
+    if(_p.synchronousWorkers){
+        // When we have synchronous workers we need to count the iterations,
+        // not the real tasks (indeed in this case each worker will receive
+        // the same amount of tasks, e.g. in canneal).
+        newTasks /= _activeWorkers.size();
+    }
+    _totalTasks += newTasks;
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        if(_remainingTasks > sample.tasksCount){
-            _remainingTasks -= sample.tasksCount;
+        if(_remainingTasks > newTasks){
+            _remainingTasks -= newTasks;
         }else{
             _remainingTasks = 0;
         }
@@ -240,6 +248,7 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
 
     askForWorkersSamples();
     getWorkersSamples(ws);
+    updateTasksCount(ws);
 
     if(_counter){
         switch(_counter->getType()){
@@ -266,6 +275,14 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     //            number than the number of tasks.
     sample.bandwidth = ws.bandwidthTotal;
     sample.latency = ws.latency;
+
+    if(_p.synchronousWorkers){
+        // When we have synchronous workers we need to divide
+        // for the number of workers since we do it for the totalTasks
+        // count. When this flag is set we count iterations, not real
+        // tasks.
+        sample.bandwidth /= _activeWorkers.size();
+    }
 
     if(_counter){
         _counter->reset();

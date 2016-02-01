@@ -155,9 +155,11 @@ void Parameters::setDefault(){
     requiredBandwidth = 0;
     requiredCompletionTime = 0;
     expectedTasksNumber = 0;
+    synchronousWorkers = false;
     powerBudget = 0;
     maxPrimaryPredictionError = 5.0;
     maxSecondaryPredictionError = 5.0;
+    regressionAging = 0;
     maxMonitoringOverhead = 1.0;
     thresholdQBlocking = -1;
     qSize = 0;
@@ -527,9 +529,11 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Double, requiredBandwidth);
     SETVALUE(xt, Uint, requiredCompletionTime);
     SETVALUE(xt, Ulong, expectedTasksNumber);
+    SETVALUE(xt, Bool, synchronousWorkers);
     SETVALUE(xt, Double, powerBudget);
     SETVALUE(xt, Double, maxPrimaryPredictionError);
     SETVALUE(xt, Double, maxSecondaryPredictionError);
+    SETVALUE(xt, Uint, regressionAging);
     SETVALUE(xt, Double, maxMonitoringOverhead);
     SETVALUE(xt, Double, thresholdQBlocking);
     SETVALUE(xt, Ulong, qSize);
