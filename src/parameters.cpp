@@ -148,6 +148,7 @@ void Parameters::setDefault(){
     persistenceValue = 0;
     samplingIntervalCalibration = 0;
     samplingIntervalSteady = 0;
+    minTasksPerSample = 0;
     underloadThresholdFarm = 80.0;
     overloadThresholdFarm = 90.0;
     underloadThresholdWorker = 80.0;
@@ -208,9 +209,6 @@ void Parameters::setDefaultPost(){
         switch(strategyPersistence){
             case STRATEGY_PERSISTENCE_SAMPLES:{
                 persistenceValue = 10;
-            }break;
-            case STRATEGY_PERSISTENCE_TASKS:{
-                persistenceValue = 1000;
             }break;
             case STRATEGY_PERSISTENCE_VARIATION:{
                 persistenceValue = 5;
@@ -493,7 +491,6 @@ template<> char const* enumStrings<StrategyPolling>::data[] = {
 
 template<> char const* enumStrings<StrategyPersistence>::data[] = {
     "SAMPLES",
-    "TASKS",
     "VARIATION"
 };
 
@@ -521,6 +518,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Double, persistenceValue);
     SETVALUE(xt, Uint, samplingIntervalCalibration);
     SETVALUE(xt, Uint, samplingIntervalSteady);
+    SETVALUE(xt, Uint, minTasksPerSample);
     SETVALUE(xt, Double, underloadThresholdFarm);
     SETVALUE(xt, Double, overloadThresholdFarm);
     SETVALUE(xt, Double, underloadThresholdWorker);

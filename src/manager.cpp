@@ -206,8 +206,7 @@ void ManagerFarm<lb_t, gt_t>::getWorkersSamples(WorkerSample& sample){
     for(size_t i = 0; i < numActiveWorkers; i++){
         WorkerSample tmp;
         w = _activeWorkers.at(i);
-        w->getSampleResponse(tmp, _p.strategyPolling,
-                             _samples->average().latency);
+        w->getSampleResponse(tmp, _samples->average().latency);
         sample += tmp;
     }
     sample.loadPercentage /= numActiveWorkers;
@@ -298,9 +297,6 @@ bool ManagerFarm<lb_t, gt_t>::persist() const{
     switch(_p.strategyPersistence){
         case STRATEGY_PERSISTENCE_SAMPLES:{
             r = _samples->size() < _p.persistenceValue;
-        }break;
-        case STRATEGY_PERSISTENCE_TASKS:{
-            r = _totalTasks < _p.persistenceValue;
         }break;
         case STRATEGY_PERSISTENCE_VARIATION:{
             const MonitoredSample& variation = _samples->coefficientVariation();
@@ -407,19 +403,15 @@ Smoother<MonitoredSample>* ManagerFarm<lb_t, gt_t>::initSamples() const{
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::initNodesPreRun() {
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
-        _activeWorkers.at(i)->initPreRun(_p.mammut, _p.archData.ticksPerNs,
-                                         NODE_TYPE_WORKER, &_terminated);
+        _activeWorkers.at(i)->initPreRun(&_p, NODE_TYPE_WORKER, &_terminated);
     }
     if (_emitter) {
-        _emitter->initPreRun(_p.mammut, _p.archData.ticksPerNs,
-                             NODE_TYPE_EMITTER, &_terminated,
-                             _farm->getlb());
+        _emitter->initPreRun(&_p, NODE_TYPE_EMITTER, &_terminated, _farm->getlb());
     } else {
         throw runtime_error("Emitter is needed to use the manager.");
     }
     if (_collector) {
-        _collector->initPreRun(_p.mammut, _p.archData.ticksPerNs,
-                               NODE_TYPE_COLLECTOR, &_terminated,
+        _collector->initPreRun(&_p, NODE_TYPE_COLLECTOR, &_terminated,
                                _farm->getgt());
     }
 }

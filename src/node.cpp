@@ -76,15 +76,16 @@ double AdaptiveNode::ticksToSeconds(double ticks) const{
     return (ticks/_ticksPerNs)/NSECS_IN_SECS;
 }
 
-void AdaptiveNode::initPreRun(Mammut& mammut, double ticksPerNs,
-                              NodeType nodeType, volatile bool* terminated,
+void AdaptiveNode::initPreRun(const Parameters* p, NodeType nodeType,
+                              volatile bool* terminated,
                               ff::ff_thread* ffThread){
-    _tasksManager = mammut.getInstanceTask();
+    _p = p;
+    _tasksManager = _p->mammut.getInstanceTask();
     if(!_tasksManager){
         throw runtime_error("Node init(): impossible to "
                             "get the tasks manager.");
     }
-    _ticksPerNs = ticksPerNs;
+    _ticksPerNs = _p->archData.ticksPerNs;
     _nodeType = nodeType;
     _terminated = terminated;
     _ffThread = ffThread;
@@ -118,12 +119,10 @@ void AdaptiveNode::move(VirtualCore* vc){
     }
 }
 
-void AdaptiveNode::getSampleResponse(WorkerSample& sample,
-                       StrategyPolling strategyPolling,
-                       double avgLatency){
+void AdaptiveNode::getSampleResponse(WorkerSample& sample, double avgLatency){
     while(_responseQ.empty()){
         if(*_terminated){return;}
-        switch(strategyPolling){
+        switch(_p->strategyPolling){
             case STRATEGY_POLLING_SPINNING:{
                 continue;
             }break;
@@ -247,14 +246,18 @@ void AdaptiveNode::storeSample(){
 
 void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
     _started = true;
-
     ManagementRequest* request;
+    bool pop = true;
 
-    while(_managementQ.pop((void**) &request)){
+    while(!_managementQ.empty()){
+        request = (ManagementRequest*) _managementQ.top();
         switch(request->type){
             case MGMT_REQ_GET_AND_RESET_SAMPLE:{
                 DEBUG("Get and reset received");
                 storeSample();
+                if(taskcnt < _p->minTasksPerSample){
+                    pop = false;
+                }
             }break;
             case MGMT_REQ_RESET_SAMPLE:{
                 DEBUG("Reset received");
@@ -297,6 +300,9 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
             default:{
                 throw runtime_error("Unexpected mgmt request.");
             }break;
+        }
+        if(pop){
+            _managementQ.inc();
         }
     }
 }

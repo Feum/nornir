@@ -146,6 +146,7 @@ private:
     ticks _tasksCount;
     NodeType _nodeType;
     ff::ff_thread* _ffThread;
+    const Parameters* _p;
 
     // Queue used by the manager to notify that a request is present.
     ff::SWSR_Ptr_Buffer _managementQ;
@@ -163,14 +164,13 @@ private:
 
     /**
      * Operations that need to take place before the node is already running.
-     * @param mammut A Mammut handle.
-     * @param ticksPerNs The number of ticks in a nanosecond.
+     * @param p The adaptivity parameters.
      * @param nodeType The type of the node.
      * @param terminated A pointer to the termination flag.
+     * @param ffThread The lb or gt thread.
      */
-    void initPreRun(mammut::Mammut& mammut, double ticksPerNs,
-                    NodeType nodeType, volatile bool* terminated,
-                    ff::ff_thread* ffThread = NULL);
+    void initPreRun(const Parameters* p, NodeType nodeType,
+                    volatile bool* terminated, ff::ff_thread* ffThread = NULL);
 
 
     /**
@@ -193,12 +193,10 @@ private:
      * The result of askForSample call.
      * @param sample The statistics computed since the last
      *               time 'askForSample' has been called.
-     * @param strategyPolling Strategy to apply if the queue is empty.
-     * @param avgLatency Current average latency of the workers (in ns).
+     * @param avgLatency The average latency.
      */
-    void getSampleResponse(WorkerSample& sample,
-                           StrategyPolling strategyPolling,
-                           double avgLatency);
+    void getSampleResponse(WorkerSample& sample, double avgLatency);
+
     /**
      * Asks the node to reset the current sample.
      **/

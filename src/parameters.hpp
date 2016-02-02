@@ -229,9 +229,6 @@ typedef enum{
     // Number of samples.
     STRATEGY_PERSISTENCE_SAMPLES = 0,
 
-    // Number of tasks.
-    STRATEGY_PERSISTENCE_TASKS,
-
     // Coefficient of variation.
     STRATEGY_PERSISTENCE_VARIATION
 }StrategyPersistence;
@@ -595,7 +592,7 @@ public:
 
     // The persistence value. It's meaning changes according to the persistence
     // strategy adopted. If 0, default value will be set.
-    // [default = 10 for samples, 1000 for tasks, 5 for variation].
+    // [default = 10 for samples, 5 for variation].
     double persistenceValue;
 
     // The length of the sampling interval (in milliseconds) for the data
@@ -607,6 +604,10 @@ public:
     // reading during steady phase. If 0, it will be automatically computed
     // such to have a low performance overhead [default = 0].
     uint32_t samplingIntervalSteady;
+
+    /// The minimum number of tasks in a worker sample. If 0, no minimum.
+    /// [default = 0].
+    uint minTasksPerSample;
 
     // The underload threshold for the entire farm. It is valid only if
     // contractType is CONTRACT_UTILIZATION [default = 80.0].
