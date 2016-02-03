@@ -73,14 +73,20 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
     _statsFile << endl;
 
     _calibrationFile << "NumSteps" << "\t";
-    _calibrationFile << "Duration" << "\t";
+    _calibrationFile << "TimeMs" << "\t";
     _calibrationFile << "Time%" << "\t";
+    _calibrationFile << "TasksNum" << "\t";
+    _calibrationFile << "Tasks%" << "\t";
     _calibrationFile << endl;
 
     _summaryFile << "Watts" << "\t";
     _summaryFile << "Bandwidth" << "\t";
-    _summaryFile << "CompletionTime" << "\t";
-    _summaryFile << "Calibration%" << "\t";
+    _summaryFile << "CompletionTimeSec" << "\t";
+    _summaryFile << "CalibrationSteps" << "\t";
+    _summaryFile << "CalibrationTimeMs" << "\t";
+    _summaryFile << "CalibrationTime%" << "\t";
+    _summaryFile << "CalibrationTasksNum" << "\t";
+    _summaryFile << "CalibrationTasks%" << "\t";
     _summaryFile << endl;
 }
 
@@ -146,30 +152,38 @@ void Observer::observe(unsigned int timeStamp,
 
 void Observer::calibrationStats(const vector<CalibrationStats>&
                               calibrationStats,
-                              uint durationMs){
+                              uint durationMs,
+                              uint64_t totalTasks){
 
     for(size_t i = 0; i < calibrationStats.size(); i++){
         const CalibrationStats& cs = calibrationStats.at(i);
         _calibrationFile << cs.numSteps << "\t";
         _calibrationFile << cs.duration << "\t";
         _calibrationFile << calibrationDurationToPerc(cs, durationMs) << "\t";
+        _calibrationFile << cs.numTasks << "\t";
+        _calibrationFile << ((double) cs.numTasks / totalTasks) * 100.0 << "\t";
         _calibrationFile << endl;
     }
 }
 
 void Observer::summaryStats(const vector<CalibrationStats>&
-                          calibrationStats,
-                          uint durationMs){
-    double totalCalibrationPerc = 0.0;
+                            calibrationStats,
+                            uint durationMs,
+                            uint64_t totalTasks){
+
+    CalibrationStats totalCalibration;
     for(size_t i = 0; i < calibrationStats.size(); i++){
-        const CalibrationStats& cs = calibrationStats.at(i);
-        totalCalibrationPerc += calibrationDurationToPerc(cs, durationMs);
+        totalCalibration += calibrationStats.at(i);
     }
 
     _summaryFile << _totalJoules / (double) (durationMs / 1000.0) << "\t";
     _summaryFile << _totalBw / (double) _numSamples << "\t";
     _summaryFile << (double) durationMs / 1000.0 << "\t";
-    _summaryFile << totalCalibrationPerc << "\t";
+    _summaryFile << totalCalibration.numSteps << "\t";
+    _summaryFile << totalCalibration.duration << "\t";
+    _summaryFile << calibrationDurationToPerc(totalCalibration, durationMs) << "\t";
+    _summaryFile << totalCalibration.numTasks << "\t";
+    _summaryFile << ((double) totalCalibration.numTasks / totalTasks) * 100.0 << "\t";
     _summaryFile << endl;
 }
 

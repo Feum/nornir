@@ -453,9 +453,11 @@ Calibrator::Calibrator(const Parameters& p,
         _numCalibrationPoints(0),
         _state(CALIBRATION_SEEDS),
         _calibrationStartMs(0),
+        _calibrationStartTasks(0),
         _firstPointGenerated(false), _forcePrediction(false),
         _primaryPrediction(0), _secondaryPrediction(0),
         _thisPrimary(0), _thisSecondary(0), _noFeasible(false){
+
 
     PredictorType primary, secondary;
     switch(p.contractType){
@@ -620,8 +622,7 @@ bool Calibrator::isFeasiblePrimaryValue(double value, bool precise) const{
     return false;
 }
 
-KnobsValues Calibrator::getBestKnobsValues(double primaryValue,
-                                           u_int64_t remainingTasks){
+KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
     KnobsValues bestValues(KNOB_VALUE_REAL);
     KnobsValues bestSuboptimalValues = _configuration.getRealValues();
 
@@ -709,23 +710,25 @@ bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{
            secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary;
 }
 
-void Calibrator::startCalibrationStat(){
+void Calibrator::startCalibrationStat(uint64_t totalTasks){
     _numCalibrationPoints = 0;
     _calibrationStartMs = getMillisecondsTime();
+    _calibrationStartTasks = totalTasks;
 }
 
-void Calibrator::stopCalibrationStat(){
-    CalibrationStats cs;
-    // We do -1 because we counted the current point and now we
-    // discovered it isn't a calibration point.
-    cs.numSteps = _numCalibrationPoints;
-    cs.duration = (getMillisecondsTime() - _calibrationStartMs);
-    _calibrationStats.push_back(cs);
+void Calibrator::stopCalibrationStat(uint64_t totalTasks){
+    if(_numCalibrationPoints){
+        CalibrationStats cs;
+        cs.numSteps = _numCalibrationPoints;
+        cs.duration = (getMillisecondsTime() - _calibrationStartMs);
+        cs.numTasks = totalTasks - _calibrationStartTasks;
+        _calibrationStats.push_back(cs);
+    }
 }
 
 KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                                            double secondaryValue,
-                                           u_int64_t remainingTasks){
+                                           u_int64_t totalTasks){
     KnobsValues kv;
     bool contractViolated = isContractViolated(primaryValue);
 
@@ -753,7 +756,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
         }
     }else{
         _firstPointGenerated = true;
-        startCalibrationStat();
+        startCalibrationStat(totalTasks);
     }
 
     switch(_state){
@@ -763,14 +766,14 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 kv = generateRelativeKnobsValues();
                 DEBUG("[Calibrator]: NumPoints: " << _numCalibrationPoints << " MinNumPoints: " << _minNumPoints);
             }else{
-                kv = getBestKnobsValues(primaryValue, remainingTasks);
+                kv = getBestKnobsValues(primaryValue);
                 _state = CALIBRATION_VALIDATE_PREDICTION;
                 DEBUG("[Calibrator]: Moving to validate prediction.");
             }
         }break;
         case CALIBRATION_VALIDATE_PREDICTION:{
             if(_forcePrediction){
-                kv = getBestKnobsValues(primaryValue, remainingTasks);
+                kv = getBestKnobsValues(primaryValue);
                 _forcePrediction = false;
                 DEBUG("[Calibrator]: Prediction forced.");
             }else{
@@ -786,7 +789,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                     }
                     
                     if((contractViolated && !_noFeasible && ar != ACCURACY_NO_FEASIBLE)){
-                        kv = getBestKnobsValues(primaryValue, remainingTasks);
+                        kv = getBestKnobsValues(primaryValue);
                         DEBUG("[Calibrator]: Low error but the contract is violated, adjusting.");
                     }else{
                         kv = _configuration.getRealValues();
@@ -797,7 +800,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                        
                     --_numCalibrationPoints;
                        
-                    stopCalibrationStat();
+                    stopCalibrationStat(totalTasks);
                     DEBUG("[Calibrator]: Moving to finished");
                     DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints <<
                           " steps with configuration " << kv);
@@ -808,6 +811,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             if((!_noFeasible && contractViolated) || 
                phaseChanged(primaryValue, secondaryValue)){
                 kv = reset();
+                startCalibrationStat(totalTasks);
                 refine();
             }else{
                 kv = _configuration.getRealValues();
@@ -828,8 +832,8 @@ bool Calibrator::isCalibrating() const{
 
 KnobsValues CalibratorDummy::getNextKnobsValues(double primaryValue,
                                                 double secondaryValue,
-                                                u_int64_t remainingTasks){
-    return getBestKnobsValues(primaryValue, remainingTasks);
+                                                u_int64_t totalTasks){
+    return getBestKnobsValues(primaryValue);
 }
 
 
@@ -925,7 +929,6 @@ KnobsValues CalibratorLowDiscrepancy::reset(){
     _state = CALIBRATION_SEEDS;
     _primaryPredictor->clear();
     _secondaryPredictor->clear();
-    startCalibrationStat();
     DEBUG("[Calibrator]: Moving to seeds");
     return kv;
 }
@@ -978,7 +981,7 @@ CalibratorLiMartinez::~CalibratorLiMartinez(){
 
 KnobsValues CalibratorLiMartinez::getNextKnobsValues(double primaryValue,
                                                      double secondaryValue,
-                                                     u_int64_t remainingTasks){
+                                                     u_int64_t totalTasks){
     KnobsValues kv(KNOB_VALUE_REAL);
     kv[KNOB_TYPE_MAPPING] = KNOB_MAPPING_LINEAR;
 
@@ -993,7 +996,7 @@ KnobsValues CalibratorLiMartinez::getNextKnobsValues(double primaryValue,
         kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies.back();
         _midId = 2;
 
-        startCalibrationStat();
+        startCalibrationStat(totalTasks);
 
         DEBUG("Generating first point: " << kv);
         ++_numCalibrationPoints;
@@ -1053,7 +1056,7 @@ changeworkers:
                     kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
                     _optimalFound = true;
                     _optimalKv = kv;
-                    stopCalibrationStat();
+                    stopCalibrationStat(totalTasks);
                     DEBUG("Both side are worst. Terminated with: " << kv);
                 }
             }else{
@@ -1080,7 +1083,7 @@ changeworkers:
                     kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
                     _optimalFound = true;
                     _optimalKv = kv;
-                    stopCalibrationStat();
+                    stopCalibrationStat(totalTasks);
                     DEBUG("Exploration finished with: " << kv);
                 }
             }

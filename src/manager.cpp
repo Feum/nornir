@@ -131,7 +131,7 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
 
     KnobsValues values = _calibrator->getNextKnobsValues(getPrimaryValue(),
                                                          getSecondaryValue(),
-                                                         _remainingTasks);
+                                                         _totalTasks);
     if(!_configuration.equal(values)){
         _configuration.setValues(values);
 
@@ -159,7 +159,6 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
         if(_counter){
             _counter->reset();
         }
-        _totalTasks = 0;
         DEBUG("Resetting sample.");
         _lastStoredSampleMs = getMillisecondsTime();
         askForWorkersSamples();
@@ -558,10 +557,11 @@ void ManagerFarm<lb_t, gt_t>::run(){
     if(_p.observer){
         vector<CalibrationStats> cs;
         if(_calibrator){
+            _calibrator->stopCalibrationStat(_totalTasks);
             cs = _calibrator->getCalibrationsStats();
-            _p.observer->calibrationStats(cs, duration);
+            _p.observer->calibrationStats(cs, duration, _totalTasks);
         }
-        _p.observer->summaryStats(cs, duration);
+        _p.observer->summaryStats(cs, duration, _totalTasks);
     }
 
     cleanNodes();

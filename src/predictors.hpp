@@ -311,6 +311,7 @@ private:
     std::vector<CalibrationStats> _calibrationStats;
     size_t _minNumPoints;
     uint _calibrationStartMs;
+    uint64_t _calibrationStartTasks;
     bool _firstPointGenerated;
     bool _forcePrediction;
     double _primaryPrediction;
@@ -362,21 +363,15 @@ protected:
     /**
      * Computes the best relative knobs values for the farm.
      * @param primaryValue The primary value.
-     * @param remainingTasks The remaining tasks.
      * @return The best relative knobs values.
      */
-    KnobsValues getBestKnobsValues(double primaryValue,
-                                   u_int64_t remainingTasks);
+    KnobsValues getBestKnobsValues(double primaryValue);
 
     /**
      * Starts the recording of calibration stats.
+     * @param totalTasks The total number of tasks processed up to now.
      */
-    void startCalibrationStat();
-
-    /**
-     * Stops the recording of calibration stats.
-     */
-    void stopCalibrationStat();
+    void startCalibrationStat(uint64_t totalTasks);
 
     /**
      *  Override this method to provide custom ways to generate
@@ -399,13 +394,13 @@ public:
      * Returns the next values to be set for the knobs.
      * @param primaryValue The primary value.
      * @param secondaryValue The secondary value.
-     * @param remainingTasks The remaining tasks.
+     * @param totalTasks The total processed tasks.
      *
      * @return The next values to be set for the knobs.
      */
     virtual KnobsValues getNextKnobsValues(double primaryValue,
                                            double secondaryValue,
-                                           u_int64_t remainingTasks);
+                                           u_int64_t totalTasks);
 
     /**
      * Returns the calibration statistics.
@@ -420,6 +415,13 @@ public:
      * false otherwise.
      */
     virtual bool isCalibrating() const;
+
+
+    /**
+     * Stops the recording of calibration stats.
+     * @param totalTasks The total number of tasks processed up to now.
+     */
+    void stopCalibrationStat(uint64_t totalTasks);
 };
 
 /**
@@ -436,7 +438,7 @@ public:
 public:
     KnobsValues getNextKnobsValues(double primaryValue,
                                    double secondaryValue,
-                                   u_int64_t remainingTasks);
+                                   u_int64_t totalTasks);
 
     virtual bool isCalibrating() const{return false;}
 };
@@ -502,7 +504,7 @@ public:
 
     KnobsValues getNextKnobsValues(double primaryValue,
                                    double secondaryValue,
-                                   u_int64_t remainingTasks);
+                                   u_int64_t totalTasks);
 
     virtual bool isCalibrating() const{return !_optimalFound;}
 };

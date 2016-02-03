@@ -45,9 +45,34 @@
 
 namespace adpff{
 
-typedef struct{
+typedef struct CalibrationStats{
     uint numSteps;
     uint duration;
+    uint numTasks;
+
+    CalibrationStats():numSteps(0), duration(0),numTasks(0){
+        ;
+    }
+
+    void swap(CalibrationStats& x){
+        using std::swap;
+
+        swap(numSteps, x.numSteps);
+        swap(duration, x.duration);
+        swap(numTasks, x.numTasks);
+    }
+
+    CalibrationStats& operator=(CalibrationStats rhs){
+        swap(rhs);
+        return *this;
+    }
+
+    CalibrationStats& operator+=(const CalibrationStats& rhs){
+        numSteps += rhs.numSteps;
+        duration += rhs.duration;
+        numTasks += rhs.numTasks;
+        return *this;
+    }
 }CalibrationStats;
 
 /*!
@@ -94,11 +119,13 @@ public:
 
     virtual void calibrationStats(const std::vector<CalibrationStats>&
                                   calibrationStats,
-                                  uint durationMs);
+                                  uint durationMs,
+                                  uint64_t totalTasks);
 
     virtual void summaryStats(const std::vector<CalibrationStats>&
                               calibrationStats,
-                              uint durationMs);
+                              uint durationMs,
+                              uint64_t totalTasks);
 };
 
 typedef struct MonitoredSample{
