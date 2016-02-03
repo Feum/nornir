@@ -31,6 +31,9 @@
  **/
 
 #include "utils.hpp"
+#include <cmath>
+#include <functional>
+#include <numeric>
 
 namespace adpff{
 
@@ -87,6 +90,8 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
     _summaryFile << "CalibrationTime%" << "\t";
     _summaryFile << "CalibrationTasksNum" << "\t";
     _summaryFile << "CalibrationTasks%" << "\t";
+    _summaryFile << "ReconfigurationsMsAverage" << "\t";
+    _summaryFile << "ReconfigurationsMsStddev" << "\t";
     _summaryFile << endl;
 }
 
@@ -150,10 +155,9 @@ void Observer::observe(unsigned int timeStamp,
     _numSamples++;
 }
 
-void Observer::calibrationStats(const vector<CalibrationStats>&
-                              calibrationStats,
-                              uint durationMs,
-                              uint64_t totalTasks){
+void Observer::calibrationStats(const vector<CalibrationStats>& calibrationStats,
+                                uint durationMs,
+                                uint64_t totalTasks){
 
     for(size_t i = 0; i < calibrationStats.size(); i++){
         const CalibrationStats& cs = calibrationStats.at(i);
@@ -166,8 +170,26 @@ void Observer::calibrationStats(const vector<CalibrationStats>&
     }
 }
 
-void Observer::summaryStats(const vector<CalibrationStats>&
-                            calibrationStats,
+inline double average(const vector<double>& v){
+    double sum = std::accumulate(v.begin(), v.end(), 0.0);
+    return sum / v.size();
+}
+
+inline double stddev(const vector<double>& v, double average){
+    std::vector<double> diff(v.size());
+    std::transform(v.begin(), v.end(), diff.begin(),
+                   bind2nd(std::minus<double>(), average));
+    double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+    return sqrt(sq_sum / v.size());
+}
+
+inline double stddev(const vector<double>& v){
+    return stddev(v, average(v));
+}
+
+
+void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
+                            const vector<double>& reconfigurationStats,
                             uint durationMs,
                             uint64_t totalTasks){
 
@@ -184,6 +206,14 @@ void Observer::summaryStats(const vector<CalibrationStats>&
     _summaryFile << calibrationDurationToPerc(totalCalibration, durationMs) << "\t";
     _summaryFile << totalCalibration.numTasks << "\t";
     _summaryFile << ((double) totalCalibration.numTasks / totalTasks) * 100.0 << "\t";
+    if(reconfigurationStats.size()){
+        double reconfigurationMsAvg = average(reconfigurationStats);
+        _summaryFile << reconfigurationMsAvg << "\t";
+        _summaryFile << stddev(reconfigurationStats, reconfigurationMsAvg) << "\t";
+    }else{
+        _summaryFile << "N.D." << "\t";
+        _summaryFile << "N.D." << "\t";
+    }
     _summaryFile << endl;
 }
 

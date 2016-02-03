@@ -164,6 +164,7 @@ void Parameters::setDefault(){
     maxMonitoringOverhead = 1.0;
     thresholdQBlocking = -1;
     qSize = 0;
+    statsReconfiguration = false;
     observer = NULL;
 }
 
@@ -535,6 +536,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Double, maxMonitoringOverhead);
     SETVALUE(xt, Double, thresholdQBlocking);
     SETVALUE(xt, Ulong, qSize);
+    SETVALUE(xt, Bool, statsReconfiguration);
 }
 
 Parameters::Parameters(Communicator* const communicator):

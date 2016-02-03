@@ -133,9 +133,19 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
                                                          getSecondaryValue(),
                                                          _totalTasks);
     if(!_configuration.equal(values)){
+        ticks reconfigurationStart;
+        if(_p.statsReconfiguration){
+            reconfigurationStart = getticks();
+        }
         _configuration.setValues(values);
+        if(_p.statsReconfiguration){
+            double millisecondsCost = (getticks() - reconfigurationStart)/
+                                      _p.archData.ticksPerNs/MSECS_IN_SECS;
+            _reconfigurationCosts.push_back(millisecondsCost);
+        }
 
-        std::vector<AdaptiveNode*> newWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS))->getActiveWorkers();        
+        const KnobWorkers* knobWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS));
+        std::vector<AdaptiveNode*> newWorkers = knobWorkers->getActiveWorkers();
         WorkerSample ws;
 
         if(_activeWorkers.size() != newWorkers.size()){
@@ -561,7 +571,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
             cs = _calibrator->getCalibrationsStats();
             _p.observer->calibrationStats(cs, duration, _totalTasks);
         }
-        _p.observer->summaryStats(cs, duration, _totalTasks);
+        _p.observer->summaryStats(cs, _reconfigurationCosts, duration, _totalTasks);
     }
 
     cleanNodes();

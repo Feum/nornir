@@ -681,6 +681,10 @@ public:
     // If 0, nothing will be modified [default = 0].
     ulong qSize;
 
+    // If true, computes the statistics about the cost
+    // of the reconfigurations [default = false].
+    bool statsReconfiguration;
+
     // The observer object. It will be called every samplingInterval
     // milliseconds to monitor the adaptivity behaviour [default = NULL].
     Observer* observer;

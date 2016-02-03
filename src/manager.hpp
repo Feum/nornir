@@ -164,6 +164,9 @@ private:
     // The calibrator of the predictors.
     Calibrator* _calibrator;
 
+    // The costs of each reconfiguration.
+    std::vector<double> _reconfigurationCosts;
+
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
