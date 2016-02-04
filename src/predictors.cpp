@@ -723,6 +723,7 @@ void Calibrator::stopCalibrationStat(uint64_t totalTasks){
         cs.duration = (getMillisecondsTime() - _calibrationStartMs);
         cs.numTasks = totalTasks - _calibrationStartTasks;
         _calibrationStats.push_back(cs);
+        _numCalibrationPoints = 0;
     }
 }
 
@@ -792,13 +793,12 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                         kv = getBestKnobsValues(primaryValue);
                         DEBUG("[Calibrator]: Low error but the contract is violated, adjusting.");
                     }else{
+                        --_numCalibrationPoints;
                         kv = _configuration.getRealValues();
                     }
                     _state = CALIBRATION_FINISHED;
                     _thisPrimary = primaryValue;
                     _thisSecondary = secondaryValue;
-                       
-                    --_numCalibrationPoints;
                        
                     stopCalibrationStat(totalTasks);
                     DEBUG("[Calibrator]: Moving to finished");

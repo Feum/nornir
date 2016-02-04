@@ -12,7 +12,8 @@ import numpy as np
 RESULTS_FILE = 'REPARA_results.csv'
 powersList = []
 timesList = []
-iterations = 10
+
+iterations = 10 
 
 def getLastLine(fileName):
     fh = open(fileName, "r")
@@ -29,12 +30,14 @@ def run(contractType, fieldName, fieldValue, percentile, itnum):
     parametersFile.write("<adaptivityParameters>\n")
 
     parametersFile.write("<qSize>1</qSize>\n")
+    parametersFile.write("<statsReconfiguration>true</statsReconfiguration>\n")
     parametersFile.write("<samplingIntervalCalibration>500</samplingIntervalCalibration>\n")
     parametersFile.write("<samplingIntervalSteady>2000</samplingIntervalSteady>\n")
     parametersFile.write("<maxPrimaryPredictionError>10.0</maxPrimaryPredictionError>\n")
     parametersFile.write("<smoothingFactor>0.01</smoothingFactor>\n")
-    parametersFile.write("<strategyPersistence>TASKS</strategyPersistence>\n")
-    parametersFile.write("<persistenceValue>3</persistenceValue>\n")
+    parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
+    parametersFile.write("<minTasksPerSample>1</minTasksPerSample>\n")
+    parametersFile.write("<persistenceValue>1</persistenceValue>\n")
     parametersFile.write("<strategyPolling>SLEEP_SMALL</strategyPolling>\n")
     parametersFile.write("<strategyPrediction>" + args.prediction + "</strategyPrediction>\n")
     parametersFile.write("<contractType>" + contractType + "</contractType>\n")
@@ -53,12 +56,25 @@ def run(contractType, fieldName, fieldValue, percentile, itnum):
 
     time = -1
     watts = -1
-    calibration = -1
+    calibrationSteps = -1
+    calibrationTime = -1
+    calibrationTimePerc = -1
+    calibrationTasks = -1
+    calibrationTasksPerc = -1
+    reconfigurationTimeAvg = -1
+    reconfigurationTimeStddev = -1
     try:
         result = getLastLine("summary.csv")
         time = float(result.split('\t')[2])
         watts = float(result.split('\t')[0])
-        calibration = float(result.split('\t')[3])
+
+        calibrationSteps = float(result.split('\t')[3])
+        calibrationTime = float(result.split('\t')[4])
+        calibrationTimePerc = float(result.split('\t')[5])
+        calibrationTasks = float(result.split('\t')[6])
+        calibrationTasksPerc = float(result.split('\t')[7])
+        reconfigurationTimeAvg = float(result.split('\t')[8])
+        reconfigurationTimeStddev = float(result.split('\t')[9])
     except:
         print "nothing"
 
@@ -72,8 +88,8 @@ def run(contractType, fieldName, fieldValue, percentile, itnum):
         if os.path.isfile(outfile):
             os.rename(outfile, dir_results + "/" + str(percentile) + "." + str(itnum) + "." + outfile)
 
-    # Returns completion time and watts
-    return time, watts, calibration
+    # Returns data
+    return time, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeAvg
 
 def loadPerfPowerData():
     fh = open(RESULTS_FILE, "r")
@@ -137,50 +153,95 @@ elif args.contract == "POWER_BUDGET":
     powerFile = open(powerdir + "/results.csv", "w")
     outFile = powerFile
 
-outFile.write("#Fraction\tPrimaryRequired\tPrimaryAvg\tPrimaryStddev\tSecondaryOptimal\tSecondaryAvg\tSecondaryStddev\tLossAvg\tLossStddev\tCalibrationAvg\tCalibrationStddev\n")
+outFile.write("#Percentile\tPrimaryRequired\tPrimaryAvg\tPrimaryStddev\tPrimaryLossAvg\tPrimaryLossStddev\t" \
+              "SecondaryOptimal\tSecondaryAvg\tSecondaryStddev\tSecondaryLossAvg\tSecondaryLossStddev\t" \
+              "CalibrationStepsAvg\tCalibrationStepsStddev\t" \
+              "CalibrationTimeAvg\tCalibrationTimeStddev\tCalibrationTimePercAvg\tCalibrationTimePercStddev\t"
+              "CalibrationTaksAvg\tCalibrationTasksStddev\tCalibrationTasksPercAvg\tCalibrationTasksPercStddev\t"
+              "ReconfigurationTimeAvg\tReconfigurationTimeStddev\n")
 
-for p in xrange(10, 100, 10):
+totalSecondaryLosses = []
+totalCalibrationSteps = []
+totalCalibrationTime = []
+totalCalibrationTimePerc = []
+totalCalibrationTasks = []
+totalCalibrationTasksPerc = []
+totalReconfigurationTime = []
+
+for p in xrange(10, 100, 20):
     cts = []
     wattses = []
     opts = []
-    calibrations = []
-    losses = []
+    calibrationsSteps = []
+    calibrationsTime = []
+    calibrationsTimePerc = []
+    calibrationsTasks = []
+    calibrationsTasksPerc = []
+    primaryLosses = []
+    secondaryLosses = []
+    reconfigurationTimes = []
     avgPrimary = 0
     stddevPrimary = 0
     avgSecondary = 0
     stddevSecondary = 0
     avgLoss = 0
     stddevLoss = 0
-    avgCalibration = 0
-    stddevCalibration = 0
+    avgCalibrationSteps = 0
+    stddevCalibrationSteps = 0
+    avgCalibrationTime = 0
+    stddevCalibrationTime = 0
+    avgCalibrationTimePerc = 0
+    stddevCalibrationTimePerc = 0
+    avgCalibrationTasks = 0
+    stddevCalibrationTasks = 0
+    avgCalibrationTasksPerc = 0
+    stddevCalibrationTasksPerc = 0
+    avgReconfigurationTime = 0
+    stddevReconfigurationTime = 0
     primaryReq = 0
     target = 0
 
     for i in xrange(0, iterations):
         ct = -1
         if args.contract == "PERF_COMPLETION_TIME":
-            targetTime = np.percentile(np.array(timesList), p)
+            ############################
+            # targetTime = np.percentile(np.array(timesList), p)
+            ############################
+            minTime = min(timesList)
+            maxTime = max(timesList)
+            targetTime = minTime + (maxTime - minTime)*(p/100.0)  
             target = targetTime
             while ct == -1:
-                ct, watts, calibration = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p, i)
+                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeAvg = run("PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p, i)
             opt = getOptimalTimeBound(targetTime)
             primaryReq = targetTime
-            loss = ((watts - opt) / opt) * 100.0
+            primaryLoss = ((ct - targetTime) / targetTime ) * 100.0
+            secondaryLoss = ((watts - opt) / opt) * 100.0
         elif args.contract == "POWER_BUDGET":
-            targetPower = np.percentile(np.array(powersList), p)
+            #############################
+            # targetPower = np.percentile(np.array(powersList), p)
+            #############################
+            minPower = min(powersList)
+            maxPower = max(powersList)
+            targetPower = minPower + (maxPower - minPower)*(p/100.0)
             target = targetPower
             while ct == -1:
-                ct, watts, calibration = run("POWER_BUDGET", "powerBudget", targetPower, p, i)
+                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeAvg = run("POWER_BUDGET", "powerBudget", targetPower, p, i)
             opt = getOptimalPowerBound(targetPower)
             primaryReq = targetPower
-            loss = ((ct - opt) / opt) * 100.0
+            primaryLoss = ((watts - targetPower) / targetPower) * 100.0
+            secondaryLoss = ((ct - opt) / opt) * 100.0
         cts.append(ct)
         wattses.append(watts)
         opts.append(opt)
-        calibrations.append(calibration)
-        losses.append(loss)
-
-            
+        calibrationsSteps.append(calibrationSteps)
+        calibrationsTime.append(calibrationTime)
+        calibrationsTimePerc.append(calibrationTimePerc)
+        calibrationsTasks.append(calibrationTasks)
+        calibrationsTasksPerc.append(calibrationTasksPerc)
+        primaryLosses.append(primaryLoss)
+        secondaryLosses.append(secondaryLoss)
+        reconfigurationTimes.append(reconfigurationTimeAvg)
 
     if args.contract == "PERF_COMPLETION_TIME":
         avgPrimary = np.average(cts)
@@ -192,15 +253,58 @@ for p in xrange(10, 100, 10):
         stddevPrimary = np.std(wattses)
         avgSecondary = np.average(cts)
         stddevSecondary = np.std(cts)
+    
+    avgPrimaryLoss = np.average(primaryLosses)
+    stddevPrimaryLoss = np.std(primaryLosses)
+    avgSecondaryLoss = np.average(secondaryLosses)
+    stddevSecondaryLoss = np.std(secondaryLosses)
 
-    avgLoss = np.average(losses)
-    stddevLoss = np.std(losses)
-    avgCalibration = np.average(calibrations)
-    stddevCalibration = np.std(calibrations)
+    avgCalibrationSteps = np.average(calibrationsSteps)
+    stddevCalibrationSteps = np.std(calibrationsSteps)
+    avgCalibrationTime = np.average(calibrationsTime)
+    stddevCalibrationTime = np.std(calibrationsTime)
+    avgCalibrationTimePerc = np.average(calibrationsTimePerc)
+    stddevCalibrationTimePerc = np.std(calibrationsTimePerc)
+    avgCalibrationTasks = np.average(calibrationsTasks)
+    stddevCalibrationTasks = np.std(calibrationsTasks)
+    avgCalibrationTasksPerc = np.average(calibrationsTasksPerc)
+    stddevCalibrationTasksPerc = np.std(calibrationsTasksPerc)
+    avgReconfigurationTime = np.average(reconfigurationTimes)
+    stddevReconfigurationTime = np.std(reconfigurationTimes)
 
-    outFile.write(str(p) + "\t" + str(target) + "\t" + str(avgPrimary) + "\t" + str(stddevPrimary) + "\t" + str(opt) + "\t" + str(avgSecondary) + "\t" + str(stddevSecondary) + "\t" + str(avgLoss) + "\t" + str(stddevLoss) + "\t" + str(avgCalibration) + "\t" + str(stddevCalibration) + "\n")
+    totalSecondaryLosses.append(avgSecondaryLoss)
+    totalCalibrationSteps.append(avgCalibrationSteps)
+    totalCalibrationTime.append(avgCalibrationTime)
+    totalCalibrationTimePerc.append(avgCalibrationTimePerc)
+    totalCalibrationTasks.append(avgCalibrationTasks)
+    totalCalibrationTasksPerc.append(avgCalibrationTasksPerc)
+    totalReconfigurationTime.append(avgReconfigurationTime)
+
+    outFile.write(str(p) + "\t" + str(target) + "\t" + str(avgPrimary) + "\t" + str(stddevPrimary) + "\t" + str(avgPrimaryLoss) + "\t" + str(stddevPrimaryLoss) + "\t" + 
+                                  str(opt) + "\t" + str(avgSecondary) + "\t" + str(stddevSecondary) + "\t" + str(avgSecondaryLoss) + "\t" + str(stddevSecondaryLoss) + "\t" + 
+                                  str(avgCalibrationSteps) + "\t" + str(stddevCalibrationSteps) + "\t" + 
+                                  str(avgCalibrationTime) + "\t" + str(stddevCalibrationTime) + "\t" + str(avgCalibrationTimePerc) + "\t" + str(stddevCalibrationTimePerc) + "\t" + 
+                                  str(avgCalibrationTasks) + "\t" + str(stddevCalibrationTasks) + "\t" + str(avgCalibrationTasksPerc) + "\t" + str(stddevCalibrationTasksPerc) + "\t" +
+                                  str(avgReconfigurationTime) + "\t" + str(stddevReconfigurationTime) + "\n")
     outFile.flush()
     os.fsync(outFile.fileno())
+
+
+### Now print the average over all the possible targets
+outFile.write("=================================================================================================================================\n")
+outFile.write("=                                                         TOTAL RESULTS                                                         =\n")
+outFile.write("=================================================================================================================================\n")
+outFile.write("AvgSecondaryLoss\tStddevSecondaryLoss\t" \
+              "AvgCalibrationSteps\tStddevCalibrationSteps\t" \
+              "AvgCalibrationTime\tStddevCalibrationTime\tAvgCalibrationTimePerc\tStddevCalibrationTimePerc\t" \
+              "AvgCalibrationTasks\tStddevCalibrationTasks\tAvgCalibrationTasksPerc\tStddevCalibrationTasksPerc\t" \
+              "AvgReconfigurationTime\tStddevReconfigurationTime\n")
+
+outFile.write(str(np.average(totalSecondaryLosses)) + "\t" + str(np.std(totalSecondaryLosses)) + "\t" +
+              str(np.average(totalCalibrationSteps))+ "\t" + str(np.std(totalCalibrationSteps)) + "\t" +
+              str(np.average(totalCalibrationTime))+ "\t" + str(np.std(totalCalibrationTime)) + "\t" + str(np.average(totalCalibrationTimePerc))+ "\t" + str(np.std(totalCalibrationTimePerc)) + "\t" +
+              str(np.average(totalCalibrationTasks))+ "\t" + str(np.std(totalCalibrationTasks)) + "\t" + str(np.average(totalCalibrationTasksPerc))+ "\t" + str(np.std(totalCalibrationTasksPerc)) + "\t" +
+              str(np.average(totalReconfigurationTime))+ "\t" + str(np.std(totalReconfigurationTime)) + "\n")
 
 if args.contract == "PERF_COMPLETION_TIME":
     perfFile.close()

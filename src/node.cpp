@@ -247,23 +247,30 @@ void AdaptiveNode::storeSample(){
 void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
     _started = true;
     ManagementRequest* request;
-    bool pop = true;
 
     while(!_managementQ.empty()){
         request = (ManagementRequest*) _managementQ.top();
         switch(request->type){
+            /*************************************/
+            /* ATTENTION: inc() must be done     */
+            /* when a new message type is added. */
+            /*************************************/
             case MGMT_REQ_GET_AND_RESET_SAMPLE:{
                 DEBUG("Get and reset received");
-                storeSample();
-                if(taskcnt < _p->minTasksPerSample){
-                    pop = false;
+                if(taskcnt >= _p->minTasksPerSample){
+                    _managementQ.inc();
+                    storeSample();
+                }else{
+                    return;
                 }
             }break;
             case MGMT_REQ_RESET_SAMPLE:{
+                _managementQ.inc();
                 DEBUG("Reset received");
                 reset();
             }break;
             case MGMT_REQ_FREEZE:{
+                _managementQ.inc();
                 /**
                  * When the emitter returns the EOS, a broadcast will be executed.
                  * The broadcast will call the callbacks, so we could pop
@@ -291,6 +298,7 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
                 }
             }break;
             case MGMT_REQ_SWITCH_BLOCKING:{
+                _managementQ.inc();
                 assert(_nodeType == NODE_TYPE_EMITTER);
                 DEBUG("Block/Nonblock request received");
                 ff_loadbalancer* lb = reinterpret_cast<ff_loadbalancer*>(p);
@@ -300,9 +308,6 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
             default:{
                 throw runtime_error("Unexpected mgmt request.");
             }break;
-        }
-        if(pop){
-            _managementQ.inc();
         }
     }
 }

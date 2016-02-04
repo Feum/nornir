@@ -133,14 +133,14 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
                                                          getSecondaryValue(),
                                                          _totalTasks);
     if(!_configuration.equal(values)){
-        ticks reconfigurationStart;
+        ticks reconfigurationStart = 0;
         if(_p.statsReconfiguration){
             reconfigurationStart = getticks();
         }
         _configuration.setValues(values);
         if(_p.statsReconfiguration){
             double millisecondsCost = (getticks() - reconfigurationStart)/
-                                      _p.archData.ticksPerNs/MSECS_IN_SECS;
+                                      _p.archData.ticksPerNs/NSECS_IN_SECS*1000;
             _reconfigurationCosts.push_back(millisecondsCost);
         }
 
