@@ -13,7 +13,7 @@ RESULTS_FILE = 'REPARA_results.csv'
 powersList = []
 timesList = []
 
-iterations = 10 
+iterations = 1
 
 def getLastLine(fileName):
     fh = open(fileName, "r")
@@ -33,8 +33,7 @@ def run(contractType, fieldName, fieldValue, percentile, itnum):
     parametersFile.write("<statsReconfiguration>true</statsReconfiguration>\n")
     parametersFile.write("<samplingIntervalCalibration>500</samplingIntervalCalibration>\n")
     parametersFile.write("<samplingIntervalSteady>2000</samplingIntervalSteady>\n")
-    parametersFile.write("<maxPrimaryPredictionError>10.0</maxPrimaryPredictionError>\n")
-    parametersFile.write("<smoothingFactor>0.01</smoothingFactor>\n")
+    parametersFile.write("<smoothingFactor>0.001</smoothingFactor>\n")
     parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
     parametersFile.write("<minTasksPerSample>1</minTasksPerSample>\n")
     parametersFile.write("<persistenceValue>1</persistenceValue>\n")

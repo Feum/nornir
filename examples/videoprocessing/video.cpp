@@ -42,38 +42,63 @@ using namespace adpff;
 
 // reads frame and sends them to the next stage
 struct Source : AdaptiveNode {
-    const std::string filename;
+    std::vector<std::string> filenames;
     VideoCapture cap;
-    
-    Source(const std::string filename):filename(filename) {
-        cap = VideoCapture(filename.c_str());
+    int maxFrames;
+    size_t currentFileId;
+    size_t currentFrameId;
+
+    void openFile(uint id){
+        cap = VideoCapture(filenames.at(id).c_str());
         if(!cap.isOpened())  {
             std::cout << "Error opening input file" << std::endl;
             exit(-1);
-        }    
+        }
+    }
+
+    Source(std::vector<std::string> filenames, int maxFramesPerFile):filenames(filenames), maxFrames(maxFramesPerFile){
+        openFile(0);
+        currentFileId = 0;
+        currentFrameId = 0;
     }
   
     
     void * svc(void *) {
         Mat * frame = new Mat();
-        if(!cap.read(*frame)){
+        if(!cap.read(*frame) || (maxFrames && currentFrameId >= maxFrames)){
             std::cout << "End of stream in input" << std::endl; 
-            TERMINATE_APPLICATION;
-        }else{
-            return (void*) frame;
+            if(currentFileId + 1 < filenames.size()){
+                ++currentFileId;
+                openFile(currentFileId);
+                currentFrameId = 0;
+                cap.read(*frame);
+            }else{
+                TERMINATE_APPLICATION;
+            }
         }
+
+        ++currentFrameId;
+        return (void*) frame;
+
     }
 }; 
 
 // this stage applys all the filters:  the GaussianBlur filter and the Sobel one, 
 // and it then sends the result to the next stage
 struct Stage1 : AdaptiveNode {
+    double d;
+    Stage1(double d):d(d){;}
+
     void * svc(void *task) {
         Mat* frame = (Mat*) task;
         Mat frame1;
         //cv::GaussianBlur(*frame, frame1, cv::Size(0, 0), 3);
         //cv::addWeighted(*frame, 1.5, frame1, -0.5, 0, *frame);
         cv::Sobel(*frame,*frame,-1,1,0,3);
+
+        cv::bilateralFilter(*frame , frame1, d, 80, 80);
+        *frame = frame1;
+
         return (void*) frame;
     }
 }; 
@@ -101,44 +126,40 @@ protected:
 }; 
 
 int main(int argc, char *argv[]) {
-    //ffvideo input.mp4 filterno output nw1
+    //ffvideo numframes d output nw1 file1 file2 ... filen
     Mat edges;
 
     if(argc == 1) {
       std::cout << "Usage is: " << argv[0] 
-                << " input_filename videooutput nw1" 
+                << " numframes(0 is all frames) d output nw1 file1 file2 ... filen"
 		<< std::endl; 
       return(0); 
     }
     
     // output 
     bool outvideo = false; 
-    if(atoi(argv[2]) == 1) outvideo = true; 
+    int numframes = atoi(argv[1]);
+    int d = atoi(argv[2]);
+    if(atoi(argv[3]) == 1) 
+        outvideo = true; 
     
     // pardegree 
-    size_t nw1 = 1;
-    if(argc == 4) {
-      nw1 = atol(argv[3]); 
-    }
+    size_t nw1 = atol(argv[4]); 
 
     // creates an ordered farm
-#if 0
-    ff_OFarm<cv::Mat> ofarm( [nw1]() {
-            
-            std::vector<std::unique_ptr<ff_node> > W; 
-            for(size_t i=0; i<nw1; i++) 
-                W.push_back(make_unique<Stage1>());
-            return W;
-            
-        } ());
-#endif
     ff_ofarm ofarm;
     std::vector<ff_node*> W;
     for(size_t i=0; i<nw1; i++)
-        W.push_back(new Stage1());
+        W.push_back(new Stage1(d));
     ofarm.add_workers(W);
-    
-    Source source(argv[1]);
+
+    std::vector<std::string> filenames;
+    uint numfiles = argc - 5;
+    for(uint i = 0; i < numfiles; i++){
+        filenames.push_back(argv[i + 5]);
+    }
+
+    Source source(filenames, numframes);
     ofarm.setEmitterF((ff_node*) &source);
     Drain  drain(outvideo);
     ofarm.setCollectorF((ff_node*) &drain);
@@ -146,6 +167,9 @@ int main(int argc, char *argv[]) {
     adpff::Observer obs;
     adpff::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
+    if(numframes){
+        ap.expectedTasksNumber = numframes*numfiles;
+    }
     adpff::ManagerFarm<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
 
     amf.start();

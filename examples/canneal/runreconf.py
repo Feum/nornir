@@ -41,6 +41,7 @@ def run(contractType, fieldName, fieldValue, percentile, itnum):
     parametersFile.write("<strategyPrediction>" + args.prediction + "</strategyPrediction>\n")
     parametersFile.write("<contractType>" + contractType + "</contractType>\n")
     parametersFile.write("<" + fieldName + ">" + str(fieldValue) + "</" + fieldName + ">\n")
+    parametersFile.write("<strategyCalibration>RANDOM</strategyCalibration>\n")
     parametersFile.write("</adaptivityParameters>\n")
     parametersFile.close()
 

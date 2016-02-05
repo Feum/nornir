@@ -326,7 +326,11 @@ bool PredictorLinearRegression::refine(){
     obs_it lb = _observations.lower_bound(currentValues);
 
     if(_p.regressionAging){
-        _agingVector.at(_currentAgingId) = currentValues;
+        if(_agingVector.size() < _p.regressionAging){
+            _agingVector.push_back(currentValues);
+        }else{
+            _agingVector.at(_currentAgingId) = currentValues;
+        }
         _currentAgingId = (_currentAgingId + 1) % _p.regressionAging;
     }
     DEBUG("Refining with configuration " << currentValues << ": "
@@ -800,10 +804,10 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                     _thisPrimary = primaryValue;
                     _thisSecondary = secondaryValue;
                        
-                    stopCalibrationStat(totalTasks);
                     DEBUG("[Calibrator]: Moving to finished");
                     DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints <<
                           " steps with configuration " << kv);
+                    stopCalibrationStat(totalTasks);
                 }
             }
         }break;
