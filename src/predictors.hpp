@@ -340,10 +340,9 @@ private:
     /**
      * Checks if a specific primary value respects the required contract.
      * @param value The value to be checked.
-     * @param precise If true it does a precise error check. If false it also
-     * consider the prediction error.
+     * @param conservative If true applies the conservativeValue.
      */
-    bool isFeasiblePrimaryValue(double value, bool precise) const;
+    bool isFeasiblePrimaryValue(double value, bool conservative) const;
 protected:
     /**
      * Checks if the contract is violated.

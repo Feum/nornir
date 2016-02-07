@@ -596,30 +596,30 @@ bool Calibrator::isBestSecondaryValue(double x, double y) const{
     return false;
 }
 
-bool Calibrator::isFeasiblePrimaryValue(double value, bool precise) const{
-    double maxError = 0;
+bool Calibrator::isFeasiblePrimaryValue(double value, bool conservative) const{
+    double conservativeOffset = 0;
 
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
-            if(!precise){
-                maxError = ((_p.overloadThresholdFarm -
-                            _p.underloadThresholdFarm) * _p.maxPrimaryPredictionError) / 100.0;
+            if(conservative){
+                conservativeOffset = ((_p.overloadThresholdFarm - _p.underloadThresholdFarm) *
+                                       _p.conservativeValue) / 100.0;
             }
-            return value > _p.underloadThresholdFarm + maxError &&
-                   value < _p.overloadThresholdFarm - maxError;
+            return value > _p.underloadThresholdFarm + conservativeOffset &&
+                   value < _p.overloadThresholdFarm - conservativeOffset;
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
-            if(!precise){
-                maxError = (_p.requiredBandwidth * _p.maxPrimaryPredictionError) / 100.0;
+            if(conservative){
+                conservativeOffset = (_p.requiredBandwidth * _p.conservativeValue) / 100.0;
             }
-            return value > _p.requiredBandwidth + maxError;
+            return value > _p.requiredBandwidth + conservativeOffset;
         }break;
         case CONTRACT_POWER_BUDGET:{
-            if(!precise){
-                maxError = (_p.powerBudget * _p.maxPrimaryPredictionError) / 100.0;
+            if(conservative){
+                conservativeOffset = (_p.powerBudget * _p.conservativeValue) / 100.0;
             }
-            return value < _p.powerBudget - maxError;
+            return value < _p.powerBudget - conservativeOffset;
         }break;
         default:{
             return false;
@@ -708,7 +708,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
 }
 
 bool Calibrator::isContractViolated(double primaryValue) const{
-    return !isFeasiblePrimaryValue(primaryValue, true);
+    return !isFeasiblePrimaryValue(primaryValue, false);
 }
 
 bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{

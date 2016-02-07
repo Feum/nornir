@@ -685,6 +685,14 @@ public:
     // If 0, nothing will be modified [default = 0].
     ulong qSize;
 
+    // If different from zero:
+    //      - If we have a PERF_* contract, we will search for a solution which
+    //        is the conservativeValue% more performing than the requirement.
+    //      - If we have a POWER_* contract, we will search for a solution
+    //        which consumes conservativeValue% less power than the requirement.
+    // This is done to amortize fluctuations. [default = 0.0]
+    double conservativeValue;
+
     // If true, computes the statistics about the cost
     // of the reconfigurations [default = false].
     bool statsReconfiguration;

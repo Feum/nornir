@@ -170,6 +170,8 @@ bool FarmConfiguration::workersWillChange(const KnobsValues& values) const{
     double newNumWorkers = 0;
     if(values.areRelative()){
         assert(_knobs[KNOB_TYPE_WORKERS]->getRealFromRelative(values[KNOB_TYPE_WORKERS], newNumWorkers));
+    }else{
+        newNumWorkers = values[KNOB_TYPE_WORKERS];
     }
     return newNumWorkers == _knobs[KNOB_TYPE_WORKERS]->getRealValue();
 }
