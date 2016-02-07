@@ -166,36 +166,69 @@ KnobsValues FarmConfiguration::getRealValues() const{
     return kv;
 }
 
-void FarmConfiguration::setRelativeValues(const KnobsValues& values){
-    // Fast reconfiguration is valid only for knobs changed before
-    // the frequency knob.
-    assert(values.areRelative());
-    setFastReconfiguration();
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        _knobs[i]->setRelativeValue(values[(KnobType)i]);
+bool FarmConfiguration::workersWillChange(const KnobsValues& values) const{
+    double newNumWorkers = 0;
+    if(values.areRelative()){
+        assert(_knobs[KNOB_TYPE_WORKERS]->getRealFromRelative(values[KNOB_TYPE_WORKERS], newNumWorkers));
     }
-    DEBUG("Changed relative knobs values.");
+    return newNumWorkers == _knobs[KNOB_TYPE_WORKERS]->getRealValue();
 }
 
-void FarmConfiguration::setRealValues(const KnobsValues& values){
-    // Fast reconfiguration is valid only for knobs changed before
-    // the frequency knob.
-    assert(values.areReal());
-    setFastReconfiguration();
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        _knobs[i]->setRealValue(values[(KnobType)i]);
+ticks FarmConfiguration::startReconfigurationStatsKnob() const{
+    if(_p.statsReconfiguration){
+        return getticks();
     }
-    DEBUG("Changed real knobs values.");
+    return 0;
+}
+
+ticks FarmConfiguration::startReconfigurationStatsTotal() const{
+    return startReconfigurationStatsKnob();
+}
+
+void FarmConfiguration::stopReconfigurationStatsKnob(ticks start, KnobType type,
+                                                  bool workersChanged){
+    if(_p.statsReconfiguration){
+        if(type == KNOB_TYPE_WORKERS && !workersChanged){
+            // We do not add statistics about workers reconfiguration
+            // since they did not changed.
+            ;
+        }else{
+            double ms = ticksToMilliseconds(getticks() - start,
+                                            _p.archData.ticksPerNs);
+            _reconfigurationStats.addSample(type, ms);
+        }
+    }
+}
+
+void FarmConfiguration::stopReconfigurationStatsTotal(ticks start){
+    if(_p.statsReconfiguration){
+        _reconfigurationStats.addSampleTotal(getticks() - start);
+    }
 }
 
 void FarmConfiguration::setValues(const KnobsValues& values){
-    if(values.areReal()){
-        setRealValues(values);
-    }else if(values.areRelative()){
-        setRelativeValues(values);
-    }else{
-        throw std::runtime_error("KnobsValues with undefined type.");
+    bool workersChanged = workersWillChange(values);
+
+    ticks totalStart = startReconfigurationStatsTotal();
+    setFastReconfiguration();
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        ticks reconfigurationStart = startReconfigurationStatsKnob();
+
+        // Start of the real reconfiguration
+        if(values.areReal()){
+            _knobs[i]->setRealValue(values[(KnobType)i]);
+        }else if(values.areRelative()){
+            _knobs[i]->setRelativeValue(values[(KnobType)i]);
+        }else{
+            throw std::runtime_error("KnobsValues with undefined type.");
+        }
+        // End of the real reconfiguration
+        stopReconfigurationStatsKnob(reconfigurationStart, (KnobType) i, workersChanged);
     }
+
+    stopReconfigurationStatsTotal(totalStart);
+
+    DEBUG("Changed knobs values.");
 }
 
 void FarmConfiguration::trigger(){

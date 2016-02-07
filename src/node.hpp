@@ -156,13 +156,6 @@ private:
     ff::SWSR_Ptr_Buffer _responseQ;
 
     /**
-     * Converts ticks to seconds.
-     * @param ticks The ticks to be converted.
-     * @return The amount of seconds corresponding to the value of ticks.
-     */
-    double ticksToSeconds(double ticks) const;
-
-    /**
      * Operations that need to take place before the node is already running.
      * @param p The adaptivity parameters.
      * @param nodeType The type of the node.

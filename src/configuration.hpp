@@ -45,11 +45,20 @@ private:
     std::vector<KnobsValues> _combinations;
     bool _knobsChangeNeeded;
     uint _numServiceNodes;
+    ReconfigurationStats _reconfigurationStats;
 
     void combinations(std::vector<std::vector<double> > array, size_t i,
                       std::vector<double> accum);
-    void setRelativeValues(const KnobsValues& values);
-    void setRealValues(const KnobsValues& values);
+
+    bool workersWillChange(const KnobsValues& values) const;
+
+    ticks startReconfigurationStatsKnob() const;
+
+    void stopReconfigurationStatsKnob(ticks start, KnobType type, bool workersChanged);
+
+    ticks startReconfigurationStatsTotal() const;
+
+    void stopReconfigurationStatsTotal(ticks start);
 public:
     FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
             AdaptiveNode* collector, ff::ff_gatherer* gt,
@@ -124,8 +133,17 @@ public:
 
     /**
      * Returns the number of service nodes.
+     * @return The number of service nodes.
      **/
-    uint getNumServiceNodes() const{return _numServiceNodes;}
+    inline uint getNumServiceNodes() const{return _numServiceNodes;}
+
+    /**
+     * Returns the reconfiguration statistics.
+     * @return The reconfiguration statistics.
+     */
+    inline ReconfigurationStats getReconfigurationStats() const{
+        return _reconfigurationStats;
+    }
 };
 
 }

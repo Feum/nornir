@@ -40,11 +40,112 @@
 #include <iterator>
 #include <stdexcept>
 #include <vector>
+#include <cmath>
+#include <functional>
+#include <numeric>
+
+#include "knob.hpp"
 
 #define MSECS_IN_SECS 1000.0 // Milliseconds in 1 second
 #define NSECS_IN_SECS 1000000000.0 // Nanoseconds in 1 second
 
 namespace adpff{
+
+inline double ticksToSeconds(double ticks, double ticksPerNs){
+    return (ticks/ticksPerNs)/NSECS_IN_SECS;
+}
+
+inline double ticksToMilliseconds(double ticks, double ticksPerNs){
+    return ticksToSeconds(ticks, ticksPerNs)*1000;
+}
+
+inline double average(const std::vector<double>& v){
+    double sum = std::accumulate(v.begin(), v.end(), 0.0);
+    return sum / v.size();
+}
+
+inline double stddev(const std::vector<double>& v, double average){
+    std::vector<double> diff(v.size());
+    std::transform(v.begin(), v.end(), diff.begin(),
+                   bind2nd(std::minus<double>(), average));
+    double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+    return sqrt(sq_sum / v.size());
+}
+
+inline double stddev(const std::vector<double>& v){
+    return stddev(v, average(v));
+}
+
+class ReconfigurationStats{
+private:
+    std::vector<double> _knobs[KNOB_TYPE_NUM];
+    std::vector<double> _total;
+    bool _storedKnob[KNOB_TYPE_NUM];
+    bool _storedTotal;
+public:
+    ReconfigurationStats(){
+        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            _storedKnob[i] = false;
+        }
+        _storedTotal = false;
+    }
+
+    void swap(ReconfigurationStats& x){
+        using std::swap;
+        swap(_knobs, x._knobs);
+        swap(_total, x._total);
+        swap(_storedKnob, x._storedKnob);
+        swap(_storedTotal, x._storedTotal);
+    }
+
+    inline ReconfigurationStats(const ReconfigurationStats& other){
+        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            _knobs[i] = other._knobs[i];
+            _storedKnob[i] = other._storedKnob[i];
+        }
+        _total = other._total;
+        _storedTotal = other._storedTotal;
+    }
+
+    inline ReconfigurationStats& operator=(ReconfigurationStats other){
+        swap(other);
+        return *this;
+    }
+
+    inline void addSample(KnobType idx, double sample){
+        _storedKnob[idx] = true;
+        _knobs[idx].push_back(sample);
+    }
+
+    inline void addSampleTotal(double total){
+        _storedTotal = true;
+        _total.push_back(total);
+    }
+
+    inline double getAverageKnob(KnobType idx){
+        return average(_knobs[idx]);
+    }
+
+    inline double getStdDevKnob(KnobType idx){
+        return stddev(_knobs[idx]);
+    }
+
+    inline double getAverageTotal(){
+        return average(_total);
+    }
+
+    inline double getStdDevTotal(){
+        return stddev(_total);
+    }
+
+    inline bool storedKnob(KnobType idx){
+        return _storedKnob[idx];
+    }
+
+    inline bool storedTotal(){
+        return _storedTotal;
+    }
+};
 
 typedef struct CalibrationStats{
     uint numSteps;
@@ -124,7 +225,7 @@ public:
                                   uint64_t totalTasks);
 
     virtual void summaryStats(const std::vector<CalibrationStats>& calibrationStats,
-                              const std::vector<double>& reconfigurationStats,
+                              ReconfigurationStats reconfigurationStats,
                               uint durationMs,
                               uint64_t totalTasks);
 };

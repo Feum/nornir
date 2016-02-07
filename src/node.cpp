@@ -72,10 +72,6 @@ static inline void nSleep(long ns) {
 #endif
 }
 
-double AdaptiveNode::ticksToSeconds(double ticks) const{
-    return (ticks/_ticksPerNs)/NSECS_IN_SECS;
-}
-
 void AdaptiveNode::initPreRun(const Parameters* p, NodeType nodeType,
                               volatile bool* terminated,
                               ff::ff_thread* ffThread){
@@ -237,7 +233,7 @@ void AdaptiveNode::storeSample(){
     }else{
         _sampleResponse.latency = 0.0;
     }
-    _sampleResponse.bandwidthTotal = (double) _tasksCount / ticksToSeconds(totalTicks);
+    _sampleResponse.bandwidthTotal = (double) _tasksCount / ticksToSeconds(totalTicks, _ticksPerNs);
 
     reset();
 
