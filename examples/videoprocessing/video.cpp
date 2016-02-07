@@ -94,7 +94,7 @@ struct Stage1 : AdaptiveNode {
         Mat frame1;
         //cv::GaussianBlur(*frame, frame1, cv::Size(0, 0), 3);
         //cv::addWeighted(*frame, 1.5, frame1, -0.5, 0, *frame);
-        cv::Sobel(*frame,*frame,-1,1,0,3);
+        //cv::Sobel(*frame,*frame,-1,1,0,3);
 
         cv::bilateralFilter(*frame , frame1, d, 80, 80);
         *frame = frame1;

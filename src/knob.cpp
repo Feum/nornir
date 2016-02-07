@@ -276,8 +276,9 @@ void KnobMapping::changeValueReal(double v){
 
     /** Updates unused virtual cores. **/
     _unusedVirtualCores.clear();
-    for(size_t i = 0; i < _vcOrder.size(); i++){
-        VirtualCore* vc = _vcOrder.at(i);
+    vector<VirtualCore*> allVcs = _topologyHandler->getVirtualCores();
+    for(size_t i = 0; i < allVcs.size(); i++){
+        VirtualCore* vc = allVcs.at(i);
         if(vc != _emitterVirtualCore && vc != _collectorVirtualCore &&
            !contains(_activeVirtualCores, vc)){
             _unusedVirtualCores.push_back(vc);
@@ -487,6 +488,7 @@ KnobFrequency::KnobFrequency(KnobConfFrequencies confFrequency,
 
         }
         DEBUG("[Frequency] Setting userspace governor. Scalable domains: " << scalableDomains);
+        DEBUG("[Frequency] Unused VC strategy: " << _unusedVc);
     }
 }
 
@@ -506,12 +508,27 @@ void KnobFrequency::changeValueReal(double v){
                                 "to set the specified frequency.");
         }
     }
+    applyUnusedVCStrategy(v);
     DEBUG("[Frequency] Frequency changed for domains: " << scalableDomains);
 }
 
 std::vector<double> KnobFrequency::getAllowedValues() const{
     return _allowedValues;
 }
+
+void KnobFrequency::applyUnusedVCStrategySame(const vector<VirtualCore*>& unusedVc, Frequency v){
+    vector<Domain*> unusedDomains = _cpufreqHandle->getDomainsComplete(unusedVc);
+    DEBUG("[Frequency] " << unusedDomains.size() << " unused domains.");
+    for(size_t i = 0; i < unusedDomains.size(); i++){
+        Domain* domain = unusedDomains.at(i);
+        DEBUG("[Frequency] Setting unused domain " << domain->getId() << " to: " << v);
+        if(!domain->setFrequencyUserspace((uint)v)){
+            throw runtime_error("AdaptivityManagerFarm: Impossible "
+                                "to set the specified frequency.");
+        }    
+    }
+}
+
 
 void KnobFrequency::applyUnusedVCStrategyOff(const vector<VirtualCore*>& unusedVc){
     for(size_t i = 0; i < unusedVc.size(); i++){
@@ -522,8 +539,8 @@ void KnobFrequency::applyUnusedVCStrategyOff(const vector<VirtualCore*>& unusedV
     }
 }
 
-void KnobFrequency::applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& vc){
-    vector<Domain*> unusedDomains = _cpufreqHandle->getDomainsComplete(vc);
+void KnobFrequency::applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& unusedVc){
+    vector<Domain*> unusedDomains = _cpufreqHandle->getDomainsComplete(unusedVc);
     for(size_t i = 0; i < unusedDomains.size(); i++){
         Domain* domain = unusedDomains.at(i);
         if(!domain->setGovernor(GOVERNOR_POWERSAVE)){
@@ -537,24 +554,29 @@ void KnobFrequency::applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& 
     }
 }
 
-void KnobFrequency::applyUnusedVCStrategy(){
+void KnobFrequency::applyUnusedVCStrategy(Frequency v){
     /**
      * OFF 'includes' LOWEST_FREQUENCY. i.e. If we shutdown all the
      * virtual cores on a domain, we can also lower its frequency to
      * the minimum.
      */
     vector<VirtualCore*> unusedVc = _knobMapping.getUnusedVirtualCores();
-    vector<VirtualCore*> virtualCores;
-    if(_unusedVc != STRATEGY_UNUSED_VC_NONE){
-        insertToEnd(unusedVc, virtualCores);
-    }
-    applyUnusedVCStrategyLowestFreq(virtualCores);
 
-    virtualCores.clear();
-    if(_unusedVc == STRATEGY_UNUSED_VC_OFF){
-        insertToEnd(unusedVc, virtualCores);
+    if(_unusedVc == STRATEGY_UNUSED_VC_SAME){
+        applyUnusedVCStrategySame(unusedVc, v);
+    }else{
+        vector<VirtualCore*> virtualCores;
+        if(_unusedVc != STRATEGY_UNUSED_VC_NONE){
+            insertToEnd(unusedVc, virtualCores);
+        }
+        applyUnusedVCStrategyLowestFreq(virtualCores);
+
+        virtualCores.clear();
+        if(_unusedVc == STRATEGY_UNUSED_VC_OFF){
+            insertToEnd(unusedVc, virtualCores);
+        }
+        applyUnusedVCStrategyOff(virtualCores);
     }
-    applyUnusedVCStrategyOff(virtualCores);
 }
 
 }

@@ -135,7 +135,7 @@ void Parameters::setDefault(){
     knobMappingCollector = KNOB_SNODE_MAPPING_AUTO;
     knobHyperthreading = KNOB_HT_AUTO;
     triggerQBlocking = TRIGGER_Q_BLOCKING_NO;
-    strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
+    strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_SAME;
     strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyCalibration = STRATEGY_CALIBRATION_HALTON;
@@ -278,6 +278,8 @@ ParametersValidation Parameters::validateUnusedVc(StrategyUnusedVirtualCores& s)
                 s = STRATEGY_UNUSED_VC_OFF;
             }else if(isLowestFrequencySettable()){
                 s = STRATEGY_UNUSED_VC_LOWEST_FREQUENCY;
+            }else{
+                s = STRATEGY_UNUSED_VC_SAME;
             }
         }break;
         default:
@@ -316,7 +318,8 @@ ParametersValidation Parameters::validateKnobFrequencies(){
     }
 
     if(fastReconfiguration &&
-       (!isHighestFrequencySettable() || knobFrequencies == KNOB_FREQUENCY_NO)){
+       (!isHighestFrequencySettable() || knobFrequencies == KNOB_FREQUENCY_NO || 
+         strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_NONE)){
         return VALIDATION_NO_FAST_RECONF;
     }
 
@@ -447,6 +450,7 @@ template<> char const* enumStrings<KnobConfHyperthreading>::data[] = {
 
 template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
     "AUTO",
+    "SAME",
     "NONE",
     "LOWEST_FREQUENCY",
     "OFF"

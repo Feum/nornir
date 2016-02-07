@@ -281,8 +281,7 @@ PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
             _predictionInput = new RegressionDataPower(p, configuration, samples);
         }break;
     }
-    _agingVector.reserve(_p.regressionAging);
-    _currentAgingId = 0;
+    clear();
 }
 
 PredictorLinearRegression::~PredictorLinearRegression(){
@@ -297,6 +296,9 @@ void PredictorLinearRegression::clear(){
         delete iterator->second.data;
     }
     _observations.clear();
+    _agingVector.clear();
+    _agingVector.reserve(_p.regressionAging);
+    _currentAgingId = 0;
 }
 
 uint PredictorLinearRegression::getMinimumPointsNeeded(){

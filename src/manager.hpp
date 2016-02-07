@@ -234,6 +234,13 @@ private:
     void resetSample();
 
     /**
+     * Gets the consumed joules since the last reset and 
+     * resets the counter.
+     * @return The joules consumed since the last reset.
+     */
+    Joules getAndResetJoules();
+
+    /**
      * Store a new sample.
      **/
     void storeNewSample();

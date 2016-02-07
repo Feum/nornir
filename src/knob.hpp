@@ -229,9 +229,10 @@ public:
     void changeValueReal(double v);
     std::vector<double> getAllowedValues() const;
 private:
+    void applyUnusedVCStrategySame(const std::vector<mammut::topology::VirtualCore*>& unusedVc, mammut::cpufreq::Frequency v);
     void applyUnusedVCStrategyOff(const std::vector<mammut::topology::VirtualCore*>& unusedVc);
-    void applyUnusedVCStrategyLowestFreq(const std::vector<mammut::topology::VirtualCore*>& vc);
-    void applyUnusedVCStrategy();
+    void applyUnusedVCStrategyLowestFreq(const std::vector<mammut::topology::VirtualCore*>& unusedVc);
+    void applyUnusedVCStrategy(mammut::cpufreq::Frequency v);
 
     KnobConfFrequencies _confFrequency;
     std::vector<double> _allowedValues;

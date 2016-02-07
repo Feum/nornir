@@ -20,7 +20,7 @@
 for bench in simple_mandelbrot canneal pbzip2 blackscholes #videoprocessing
 do
     echo "======================================" $bench "======================================"
-    for run in POWER_BUDGET_REGRESSION_LINEAR_HALTON PERF_COMPLETION_TIME_REGRESSION_LINEAR_HALTON PERF_COMPLETION_TIME_LIMARTINEZ_HALTON
+    for run in POWER_BUDGET_REGRESSION_LINEAR_HALTON POWER_BUDGET_REGRESSION_LINEAR_HALTON_FAST PERF_COMPLETION_TIME_LIMARTINEZ PERF_COMPLETION_TIME_REGRESSION_LINEAR_HALTON PERF_COMPLETION_TIME_REGRESSION_LINEAR_HALTON_FAST
     do
         echo "=============================" $run "================================="
         tail -n 2 $bench/$run/results.csv | cut -f 1,7,13 | column -t

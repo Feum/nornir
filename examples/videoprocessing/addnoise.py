@@ -2,7 +2,6 @@ import numpy as np
 import os
 import cv2
 import sys
-import skimage
 
 def noisy(noise_typ, image):
 	if noise_typ == "gauss":

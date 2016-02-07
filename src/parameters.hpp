@@ -129,6 +129,10 @@ typedef enum{
     // Automatically choose one of the other strategies.
     STRATEGY_UNUSED_VC_AUTO = 0,
 
+    // The unused virtual cores will run at the same
+    // frequency of the used ones.
+    STRATEGY_UNUSED_VC_SAME,
+
     // Nothing is done on unused virtual cores.
     STRATEGY_UNUSED_VC_NONE,
 
@@ -553,7 +557,7 @@ public:
     // The hyperthreading knob [default = KNOB_HT_AUTO].
     KnobConfHyperthreading knobHyperthreading;
 
-    // Strategy for unused virtual cores [default = STRATEGY_UNUSED_VC_NONE].
+    // Strategy for unused virtual cores [default = STRATEGY_UNUSED_VC_SAME].
     StrategyUnusedVirtualCores strategyUnusedVirtualCores;
 
     // Strategy to be used to predict power and performance values

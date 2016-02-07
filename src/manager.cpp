@@ -166,8 +166,9 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
 
         /****************** Clean state ******************/
         _samples->reset();
-        if(_counter){
-            _counter->reset();
+        Joules joules = getAndResetJoules();
+        if(_p.observer){
+            _p.observer->addJoules(joules);
         }
         DEBUG("Resetting sample.");
         _lastStoredSampleMs = getMillisecondsTime();
@@ -249,15 +250,8 @@ void ManagerFarm<lb_t, gt_t>::updateTasksCount(WorkerSample& sample){
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::storeNewSample(){
-    MonitoredSample sample;
-    WorkerSample ws;
+Joules ManagerFarm<lb_t, gt_t>::getAndResetJoules(){
     Joules joules = 0.0;
-
-    askForWorkersSamples();
-    getWorkersSamples(ws);
-    updateTasksCount(ws);
-
     if(_counter){
         switch(_counter->getType()){
             case COUNTER_CPUS:{
@@ -267,6 +261,24 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
                 joules = _counter->getJoules();
             }break;
         }
+        _counter->reset();
+    }
+    return joules;
+}
+
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::storeNewSample(){
+    MonitoredSample sample;
+    WorkerSample ws;
+    Joules joules = 0.0;
+
+    askForWorkersSamples();
+    getWorkersSamples(ws);
+    updateTasksCount(ws);
+
+    joules = getAndResetJoules();
+    if(_p.observer){
+        _p.observer->addJoules(joules);
     }
 
     double now = getMillisecondsTime();
@@ -292,9 +304,6 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
         sample.bandwidth /= _activeWorkers.size();
     }
 
-    if(_counter){
-        _counter->reset();
-    }
     _samples->add(sample);
 
     DEBUGB(samplesFile << *_samples << "\n");
@@ -329,7 +338,7 @@ void ManagerFarm<lb_t, gt_t>::initPredictors(){
                 switch(_p.strategyCalibration){
                     case STRATEGY_CALIBRATION_RANDOM:{
                         _calibrator = new CalibratorRandom(_p, _configuration, _samples);
-                    }
+                    }break;
                     case STRATEGY_CALIBRATION_HALTON:
                     case STRATEGY_CALIBRATION_HALTON_REVERSE:
                     case STRATEGY_CALIBRATION_NIEDERREITER:

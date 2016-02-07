@@ -90,10 +90,10 @@ private:
     std::ofstream _calibrationFile;
     std::ofstream _summaryFile;
     unsigned int _startMonitoringMs;
-    double _totalJoules;
-    double _totalBw;
-    unsigned long _numSamples;
+    mammut::energy::Joules _totalJoules;
     unsigned int _lastTimestamp;
+
+    void addJoules(mammut::energy::Joules j);
 
     double calibrationDurationToPerc(const CalibrationStats& cs,
                                      uint durationMs);

@@ -51,8 +51,6 @@ double Observer::calibrationDurationToPerc(const CalibrationStats& cs,
 Observer::Observer(string statsFile, string calibrationFile, string summaryFile):
         _startMonitoringMs(0),
         _totalJoules(0),
-        _totalBw(0),
-        _numSamples(0),
         _lastTimestamp(0){
     _statsFile.open(statsFile.c_str());
     _calibrationFile.open(calibrationFile.c_str());
@@ -101,6 +99,10 @@ Observer::~Observer(){
     _summaryFile.close();
 }
 
+void Observer::addJoules(Joules j){
+    _totalJoules += j;
+}
+
 void Observer::observe(unsigned int timeStamp,
                      size_t workers,
                      Frequency frequency,
@@ -114,11 +116,9 @@ void Observer::observe(unsigned int timeStamp,
                      double smoothedUtilization,
                      Joules currentWatts,
                      Joules smoothedWatts){
-    unsigned int interval;
     if(_lastTimestamp == 0){
         _lastTimestamp = _startMonitoringMs;
     }
-    interval = timeStamp - _lastTimestamp;
     _lastTimestamp = timeStamp;
     _statsFile << timeStamp - _startMonitoringMs << "\t";
     _statsFile << "[";
@@ -149,10 +149,6 @@ void Observer::observe(unsigned int timeStamp,
     _statsFile << smoothedWatts << "\t";
 
     _statsFile << endl;
-
-    _totalJoules += currentWatts * (interval / 1000.0);
-    _totalBw += currentBandwidth;
-    _numSamples++;
 }
 
 void Observer::calibrationStats(const vector<CalibrationStats>& calibrationStats,
@@ -199,7 +195,7 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
     }
 
     _summaryFile << _totalJoules / (double) (durationMs / 1000.0) << "\t";
-    _summaryFile << _totalBw / (double) _numSamples << "\t";
+    _summaryFile << totalTasks / (double) (durationMs / 1000.0) << "\t";
     _summaryFile << (double) durationMs / 1000.0 << "\t";
     _summaryFile << totalCalibration.numSteps << "\t";
     _summaryFile << totalCalibration.duration << "\t";
