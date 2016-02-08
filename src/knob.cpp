@@ -58,6 +58,20 @@ using namespace ff;
 
 using namespace std;
 
+std::string knobTypeToString(KnobType kv){
+    switch(kv){
+        case KNOB_TYPE_WORKERS:{
+            return "Workers";
+        }break;
+        case KNOB_TYPE_FREQUENCY:{
+            return "Frequency";
+        }break;
+        case KNOB_TYPE_MAPPING:{
+            return "Mapping";
+        }break;
+    }
+}
+
 bool Knob::getRealFromRelative(double relative, double& real) const{
     // Maps from the range [0, 100] to the real range.
     vector<double> values = getAllowedValues();

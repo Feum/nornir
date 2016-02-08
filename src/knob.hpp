@@ -255,6 +255,8 @@ typedef enum{
     KNOB_VALUE_RELATIVE
 }KnobValueType;
 
+std::string knobTypeToString(KnobType kv);
+
 class KnobsValues{
 private:
     KnobValueType _type;

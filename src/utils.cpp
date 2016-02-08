@@ -85,10 +85,10 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
     _summaryFile << "CalibrationTime%" << "\t";
     _summaryFile << "CalibrationTasksNum" << "\t";
     _summaryFile << "CalibrationTasks%" << "\t";
-    _summaryFile << "ReconfigurationsWorkersAverage" << "\t";
-    _summaryFile << "ReconfigurationsWorkersStddev" << "\t";
-    _summaryFile << "ReconfigurationsFrequencyAverage" << "\t";
-    _summaryFile << "ReconfigurationsFrequencyStddev" << "\t";
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        _summaryFile << "Reconfigurations" << knobTypeToString((KnobType) i) << "Average" << "\t";
+        _summaryFile << "Reconfigurations" << knobTypeToString((KnobType) i) << "Stddev" << "\t";
+    }
     _summaryFile << "ReconfigurationsTotalAverage" << "\t";
     _summaryFile << "ReconfigurationsTotalStddev" << "\t";
     _summaryFile << endl;
