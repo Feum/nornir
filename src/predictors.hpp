@@ -450,6 +450,7 @@ public:
     CalibratorRandom(const Parameters& p,
                     const FarmConfiguration& configuration,
                     const Smoother<MonitoredSample>* samples);
+    KnobsValues reset(){return generateRelativeKnobsValues();}
 protected:
     KnobsValues generateRelativeKnobsValues() const;
 };

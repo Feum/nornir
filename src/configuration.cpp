@@ -173,7 +173,7 @@ bool FarmConfiguration::workersWillChange(const KnobsValues& values) const{
     }else{
         newNumWorkers = values[KNOB_TYPE_WORKERS];
     }
-    return newNumWorkers == _knobs[KNOB_TYPE_WORKERS]->getRealValue();
+    return newNumWorkers != _knobs[KNOB_TYPE_WORKERS]->getRealValue();
 }
 
 ticks FarmConfiguration::startReconfigurationStatsKnob() const{
@@ -204,7 +204,9 @@ void FarmConfiguration::stopReconfigurationStatsKnob(ticks start, KnobType type,
 
 void FarmConfiguration::stopReconfigurationStatsTotal(ticks start){
     if(_p.statsReconfiguration){
-        _reconfigurationStats.addSampleTotal(getticks() - start);
+        double ms = ticksToMilliseconds(getticks() - start,
+                                        _p.archData.ticksPerNs);
+        _reconfigurationStats.addSampleTotal(ms);
     }
 }
 

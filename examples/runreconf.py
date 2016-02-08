@@ -101,6 +101,7 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
             parametersFile.write("<minTasksPerSample>4</minTasksPerSample>\n")
             parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
             parametersFile.write("<persistenceValue>1</persistenceValue>\n")
+            #parametersFile.write("<conservativeValue>20</conservativeValue>\n")
 
         parametersFile.write("</adaptivityParameters>\n")
         parametersFile.close()
@@ -120,8 +121,12 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
         calibrationTimePerc = -1
         calibrationTasks = -1
         calibrationTasksPerc = -1
-        reconfigurationTimeAvg = -1
-        reconfigurationTimeStddev = -1
+        reconfigurationTimeWorkersAvg = -1
+        reconfigurationTimeWorkersStddev = -1
+        reconfigurationTimeFrequencyAvg = -1
+        reconfigurationTimeFrequencyStddev = -1
+        reconfigurationTimeTotalAvg = -1
+        reconfigurationTimeTotalStddev = -1
         try:
             result = getLastLine("summary.csv")
             time = float(result.split('\t')[2])
@@ -132,8 +137,12 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
             calibrationTimePerc = float(result.split('\t')[5])
             calibrationTasks = float(result.split('\t')[6])
             calibrationTasksPerc = float(result.split('\t')[7])
-            reconfigurationTimeAvg = float(result.split('\t')[8])
-            reconfigurationTimeStddev = float(result.split('\t')[9])
+            reconfigurationTimeWorkersAvg = float(result.split('\t')[8])
+            reconfigurationTimeWorkersStddev = float(result.split('\t')[9])
+            reconfigurationTimeFrequencyAvg = float(result.split('\t')[10])
+            reconfigurationTimeFrequencyStddev = float(result.split('\t')[11])
+            reconfigurationTimeTotalAvg = float(result.split('\t')[14])
+            reconfigurationTimeTotalStddev = float(result.split('\t')[15])
         except:
             print "nothing"
 
@@ -142,7 +151,7 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
                 os.rename(outfile, dir_results + "/" + str(percentile) + "." + str(itnum) + "." + outfile)
 
     # Returns data
-    return time, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeAvg
+    return time, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg
 
 def loadPerfPowerData(bench):
     with cd(bench):
@@ -212,20 +221,14 @@ with cd(args.benchmark):
     os.makedirs(rdir)
     outFile = open(rdir + "/results.csv", "w")
 
-outFile.write("#Percentile\tPrimaryRequired\tPrimaryAvg\tPrimaryStddev\tPrimaryLossAvg\tPrimaryLossStddev\t" \
+outFile.write("#Percentile\tPrimaryRequired\tPrimaryLossCnt\tPrimaryAvg\tPrimaryStddev\tPrimaryLossAvg\tPrimaryLossStddev\t" \
               "SecondaryOptimal\tSecondaryAvg\tSecondaryStddev\tSecondaryLossAvg\tSecondaryLossStddev\t" \
               "CalibrationStepsAvg\tCalibrationStepsStddev\t" \
               "CalibrationTimeAvg\tCalibrationTimeStddev\tCalibrationTimePercAvg\tCalibrationTimePercStddev\t"
               "CalibrationTaksAvg\tCalibrationTasksStddev\tCalibrationTasksPercAvg\tCalibrationTasksPercStddev\t"
-              "ReconfigurationTimeAvg\tReconfigurationTimeStddev\n")
-
-totalSecondaryLosses = []
-totalCalibrationSteps = []
-totalCalibrationTime = []
-totalCalibrationTimePerc = []
-totalCalibrationTasks = []
-totalCalibrationTasksPerc = []
-totalReconfigurationTime = []
+              "ReconfigurationTimeWorkersAvg\tReconfigurationTimeWorkersStddev\t"
+              "ReconfigurationTimeFrequencyAvg\tReconfigurationTimeFrequencyStddev\t"
+              "ReconfigurationTimeTotalAvg\tReconfigurationTimeTotalStddev\n")
 
 for p in xrange(10, 100, 20):
     cts = []
@@ -238,7 +241,9 @@ for p in xrange(10, 100, 20):
     calibrationsTasksPerc = []
     primaryLosses = []
     secondaryLosses = []
-    reconfigurationTimes = []
+    reconfigurationTimesWorkers = []
+    reconfigurationTimesFrequency = []
+    reconfigurationTimesTotal = []
     avgPrimary = 0
     stddevPrimary = 0
     avgSecondary = 0
@@ -255,8 +260,12 @@ for p in xrange(10, 100, 20):
     stddevCalibrationTasks = 0
     avgCalibrationTasksPerc = 0
     stddevCalibrationTasksPerc = 0
-    avgReconfigurationTime = 0
-    stddevReconfigurationTime = 0
+    avgReconfigurationTimeWorkers = 0
+    stddevReconfigurationTimeWorkers = 0
+    avgReconfigurationTimeFrequency = 0
+    stddevReconfigurationTimeFrequency = 0
+    avgReconfigurationTimeTotal = 0
+    stddevReconfigurationTimeTotal = 0
     primaryReq = 0
     target = 0
     
@@ -274,7 +283,7 @@ for p in xrange(10, 100, 20):
             targetTime = minTime + (maxTime - minTime)*(p/100.0)  
             target = targetTime
             while ct == -1:
-                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeAvg = run(args.benchmark, "PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p, rdir, args.calstrategy, args.fastreconf, i)
+                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p, rdir, args.calstrategy, args.fastreconf, i)
             opt = getOptimalTimeBound(targetTime, args.benchmark)
             primaryReq = targetTime
             primaryLoss = ((ct - targetTime) / targetTime ) * 100.0
@@ -288,7 +297,7 @@ for p in xrange(10, 100, 20):
             targetPower = minPower + (maxPower - minPower)*(p/100.0)
             target = targetPower
             while ct == -1:
-                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeAvg = run(args.benchmark, "POWER_BUDGET", "powerBudget", targetPower, p, rdir, args.calstrategy, args.fastreconf, i)
+                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "POWER_BUDGET", "powerBudget", targetPower, p, rdir, args.calstrategy, args.fastreconf, i)
             opt = getOptimalPowerBound(targetPower, args.benchmark)
             primaryReq = targetPower
             primaryLoss = ((watts - targetPower) / targetPower) * 100.0
@@ -301,9 +310,13 @@ for p in xrange(10, 100, 20):
         calibrationsTimePerc.append(calibrationTimePerc)
         calibrationsTasks.append(calibrationTasks)
         calibrationsTasksPerc.append(calibrationTasksPerc)
-        primaryLosses.append(primaryLoss)
-        secondaryLosses.append(secondaryLoss)
-        reconfigurationTimes.append(reconfigurationTimeAvg)
+        if primaryLoss > 0:
+            primaryLosses.append(primaryLoss)
+        else:
+            secondaryLosses.append(secondaryLoss)
+        reconfigurationTimesWorkers.append(reconfigurationTimeWorkersAvg)
+        reconfigurationTimesFrequency.append(reconfigurationTimeFrequencyAvg)
+        reconfigurationTimesTotal.append(reconfigurationTimeTotalAvg)
 
     if args.contract == "PERF_COMPLETION_TIME":
         avgPrimary = np.average(cts)
@@ -316,10 +329,19 @@ for p in xrange(10, 100, 20):
         avgSecondary = np.average(cts)
         stddevSecondary = np.std(cts)
     
-    avgPrimaryLoss = np.average(primaryLosses)
-    stddevPrimaryLoss = np.std(primaryLosses)
-    avgSecondaryLoss = np.average(secondaryLosses)
-    stddevSecondaryLoss = np.std(secondaryLosses)
+    if len(primaryLosses):
+        avgPrimaryLoss = np.average(primaryLosses)
+        stddevPrimaryLoss = np.std(primaryLosses)
+    else:
+        avgPrimaryLoss = 0
+        stddevPrimaryLoss = 0
+
+    if len(secondaryLosses):
+        avgSecondaryLoss = np.average(secondaryLosses)
+        stddevSecondaryLoss = np.std(secondaryLosses)
+    else:
+        avgSecondaryLoss = 0
+        stddevSecondaryLoss = 0
 
     avgCalibrationSteps = np.average(calibrationsSteps)
     stddevCalibrationSteps = np.std(calibrationsSteps)
@@ -331,42 +353,23 @@ for p in xrange(10, 100, 20):
     stddevCalibrationTasks = np.std(calibrationsTasks)
     avgCalibrationTasksPerc = np.average(calibrationsTasksPerc)
     stddevCalibrationTasksPerc = np.std(calibrationsTasksPerc)
-    avgReconfigurationTime = np.average(reconfigurationTimes)
-    stddevReconfigurationTime = np.std(reconfigurationTimes)
+    avgReconfigurationTimeWorkers = np.average(reconfigurationTimesWorkers)
+    stddevReconfigurationTimeWorkers = np.std(reconfigurationTimesWorkers)
+    avgReconfigurationTimeFrequency = np.average(reconfigurationTimesFrequency)
+    stddevReconfigurationTimeFrequency = np.std(reconfigurationTimesFrequency)
+    avgReconfigurationTimeTotal = np.average(reconfigurationTimesTotal)
+    stddevReconfigurationTimeTotal = np.std(reconfigurationTimesTotal)
 
-    totalSecondaryLosses.append(avgSecondaryLoss)
-    totalCalibrationSteps.append(avgCalibrationSteps)
-    totalCalibrationTime.append(avgCalibrationTime)
-    totalCalibrationTimePerc.append(avgCalibrationTimePerc)
-    totalCalibrationTasks.append(avgCalibrationTasks)
-    totalCalibrationTasksPerc.append(avgCalibrationTasksPerc)
-    totalReconfigurationTime.append(avgReconfigurationTime)
-
-    outFile.write(str(p) + "\t" + str(target) + "\t" + str(avgPrimary) + "\t" + str(stddevPrimary) + "\t" + str(avgPrimaryLoss) + "\t" + str(stddevPrimaryLoss) + "\t" + 
+    outFile.write(str(p) + "\t" + str(target) + "\t" + len(primaryLosses) + "\t" + str(avgPrimary) + "\t" + str(stddevPrimary) + "\t" + str(avgPrimaryLoss) + "\t" + str(stddevPrimaryLoss) + "\t" + 
                                   str(opt) + "\t" + str(avgSecondary) + "\t" + str(stddevSecondary) + "\t" + str(avgSecondaryLoss) + "\t" + str(stddevSecondaryLoss) + "\t" + 
                                   str(avgCalibrationSteps) + "\t" + str(stddevCalibrationSteps) + "\t" + 
                                   str(avgCalibrationTime) + "\t" + str(stddevCalibrationTime) + "\t" + str(avgCalibrationTimePerc) + "\t" + str(stddevCalibrationTimePerc) + "\t" + 
                                   str(avgCalibrationTasks) + "\t" + str(stddevCalibrationTasks) + "\t" + str(avgCalibrationTasksPerc) + "\t" + str(stddevCalibrationTasksPerc) + "\t" +
-                                  str(avgReconfigurationTime) + "\t" + str(stddevReconfigurationTime) + "\n")
+                                  str(avgReconfigurationTimeWorkers) + "\t" + str(stddevReconfigurationTimeWorkers) + "\t" +
+                                  str(avgReconfigurationTimeFrequency) + "\t" + str(stddevReconfigurationTimeFrequency) + "\t" + 
+                                  str(avgReconfigurationTimeTotal) + "\t" + str(stddevReconfigurationTimeTotal) + "\n")
     outFile.flush()
     os.fsync(outFile.fileno())
-
-
-### Now print the average over all the possible targets
-outFile.write("=================================================================================================================================\n")
-outFile.write("=                                                         TOTAL RESULTS                                                         =\n")
-outFile.write("=================================================================================================================================\n")
-outFile.write("AvgSecondaryLoss\tStddevSecondaryLoss\t" \
-              "AvgCalibrationSteps\tStddevCalibrationSteps\t" \
-              "AvgCalibrationTime\tStddevCalibrationTime\tAvgCalibrationTimePerc\tStddevCalibrationTimePerc\t" \
-              "AvgCalibrationTasks\tStddevCalibrationTasks\tAvgCalibrationTasksPerc\tStddevCalibrationTasksPerc\t" \
-              "AvgReconfigurationTime\tStddevReconfigurationTime\n")
-
-outFile.write(str(np.average(totalSecondaryLosses)) + "\t" + str(np.std(totalSecondaryLosses)) + "\t" +
-              str(np.average(totalCalibrationSteps))+ "\t" + str(np.std(totalCalibrationSteps)) + "\t" +
-              str(np.average(totalCalibrationTime))+ "\t" + str(np.std(totalCalibrationTime)) + "\t" + str(np.average(totalCalibrationTimePerc))+ "\t" + str(np.std(totalCalibrationTimePerc)) + "\t" +
-              str(np.average(totalCalibrationTasks))+ "\t" + str(np.std(totalCalibrationTasks)) + "\t" + str(np.average(totalCalibrationTasksPerc))+ "\t" + str(np.std(totalCalibrationTasksPerc)) + "\t" +
-              str(np.average(totalReconfigurationTime))+ "\t" + str(np.std(totalReconfigurationTime)) + "\n")
 
 outFile.close()
 
