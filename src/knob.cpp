@@ -69,6 +69,9 @@ std::string knobTypeToString(KnobType kv){
         case KNOB_TYPE_MAPPING:{
             return "Mapping";
         }break;
+        default:{
+            return "Unknown";
+        }break;
     }
 }
 
@@ -125,7 +128,7 @@ KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
         _gt(gt), _allWorkers(workers), _terminated(terminated){
     _realValue = _allWorkers.size();
 
-    if(confWorkers == KNOB_WORKERS_YES){
+    if(needsCalibration()){
         for(size_t i = 0; i < _allWorkers.size(); i++){
             _knobValues.push_back(i + 1);
         }
@@ -137,11 +140,11 @@ KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
 }
 
 bool KnobWorkers::needsCalibration() const{
-    return _confWorkers == KNOB_WORKERS_YES;
+    return _confWorkers != KNOB_WORKERS_NO;
 }
 
 void KnobWorkers::changeValueReal(double v){
-    if(v != _realValue){
+    if(v != _realValue && _confWorkers == KNOB_WORKERS_THREADS){
         DEBUG("[Workers] Changing real value to: " << v);
         prepareToFreeze();
         freeze();
@@ -163,8 +166,22 @@ std::vector<double> KnobWorkers::getAllowedValues() const{
     return _knobValues;
 }
 
-uint KnobWorkers::getNumActiveWorkers() const{
-    return _activeWorkers.size();
+uint KnobWorkers::getNumActiveCores() const{
+    switch(_confWorkers){
+        case KNOB_WORKERS_NO:
+        case KNOB_WORKERS_THREADS:{
+            return _activeWorkers.size();
+        }break;
+        case KNOB_WORKERS_MAPPING:{
+            // _activeWorkers.size() is the number of active threads.
+            // However, it never changes since we should map more threads
+            // to fewer cores, so we return the real value of the knob.
+            return getRealValue();
+        }break;
+        default:{
+            throw runtime_error("Unkown KnobWorkers configuration parameter.");
+        }
+    }
 }
 
 const std::vector<AdaptiveNode*>& KnobWorkers::getActiveWorkers() const{
@@ -400,6 +417,7 @@ void KnobMapping::performLinearMapping(){
     getMappingIndexes(emitterIndex, firstWorkerIndex, collectorIndex);
 
     const vector<AdaptiveNode*>& activeWorkers = _knobWorkers.getActiveWorkers();
+    uint activeCores = _knobWorkers.getNumActiveCores();
 
     _activeVirtualCores.clear();
     _workersVirtualCores.clear();
@@ -415,7 +433,7 @@ void KnobMapping::performLinearMapping(){
 
 
     size_t nextWorkerIndex = firstWorkerIndex;
-    for(size_t i = 0; i < activeWorkers.size(); i++){
+    for(size_t i = 0; i < activeCores; i++){
         VirtualCore* vc = _vcOrder.at(nextWorkerIndex);
 
         _workersVirtualCores.push_back(vc);

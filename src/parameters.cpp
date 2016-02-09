@@ -128,7 +128,7 @@ void ArchData::loadXml(const string& archFileName){
 
 void Parameters::setDefault(){
     contractType = CONTRACT_NONE;
-    knobWorkers = KNOB_WORKERS_YES;
+    knobWorkers = KNOB_WORKERS_THREADS;
     knobFrequencies = KNOB_FREQUENCY_YES;
     knobMapping = KNOB_MAPPING_AUTO;
     knobMappingEmitter = KNOB_SNODE_MAPPING_AUTO;
@@ -420,7 +420,8 @@ template<> char const* enumStrings<ContractType>::data[] = {
 
 template<> char const* enumStrings<KnobConfWorkers>::data[] = {
     "NO",
-    "YES"
+    "THREADS",
+    "MAPPING"
 };
 
 template<> char const* enumStrings<KnobConfFrequencies>::data[] = {

@@ -65,11 +65,14 @@ typedef enum{
 
 /// Cores knob.
 typedef enum{
-    // Doesn't changes the number of used workers.
+    // Never changes the number of threads or their mapping.
     KNOB_WORKERS_NO = 0,
 
-    // Changes the number of workers used by the application.
-    KNOB_WORKERS_YES,
+    // Changes the number of threads used by the application.
+    KNOB_WORKERS_THREADS,
+
+    // Changes the mapping of the threads used by the application.
+    KNOB_WORKERS_MAPPING,
 }KnobConfWorkers;
 
 /// Frequency knob.
@@ -534,7 +537,7 @@ public:
     // [default = CONTRACT_NONE].
     ContractType contractType;
 
-    // The workers knob [default = KNOB_WORKERS_YES].
+    // The workers knob [default = KNOB_WORKERS_THREADS].
     KnobConfWorkers knobWorkers;
 
     // The frequency knob. It can be KNOB_FREQUENCY_YES

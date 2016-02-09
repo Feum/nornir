@@ -111,7 +111,19 @@ public:
     bool needsCalibration() const;
     void changeValueReal(double v);
     std::vector<double> getAllowedValues() const;
-    uint getNumActiveWorkers() const;
+
+    /**
+     * Returns the number of cores on which the workers should be
+     * executed.
+     * @return The number of cores on which the workers should be
+     * executed.
+     */
+    uint getNumActiveCores() const;
+
+    /**
+     * Returns a vector containing all the active workers.
+     * @return A vector containing all the active workers.
+     */
     const std::vector<AdaptiveNode*>& getActiveWorkers() const;
 private:
     /**
