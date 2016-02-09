@@ -166,7 +166,7 @@ std::vector<double> KnobWorkers::getAllowedValues() const{
     return _knobValues;
 }
 
-uint KnobWorkers::getNumActiveCores() const{
+uint KnobWorkers::getNumActivePhysicalCores() const{
     switch(_confWorkers){
         case KNOB_WORKERS_NO:
         case KNOB_WORKERS_THREADS:{
@@ -414,16 +414,17 @@ void KnobMapping::getMappingIndexes(size_t& emitterIndex,
 
 void KnobMapping::performLinearMapping(){
     size_t emitterIndex, firstWorkerIndex, collectorIndex;
+    size_t numPhysicalCores = _topologyHandler->getPhysicalCores().size();
     getMappingIndexes(emitterIndex, firstWorkerIndex, collectorIndex);
 
     const vector<AdaptiveNode*>& activeWorkers = _knobWorkers.getActiveWorkers();
-    uint activeCores = _knobWorkers.getNumActiveCores();
+    uint activePhysicalCores = _knobWorkers.getNumActivePhysicalCores();
 
     _activeVirtualCores.clear();
     _workersVirtualCores.clear();
 
     if(_emitter && _confEmitterMapping != KNOB_SNODE_MAPPING_NO){
-        _emitterVirtualCore = _vcOrder.at(emitterIndex);
+        _emitterVirtualCore = _vcOrderLinear.at(emitterIndex);
         _activeVirtualCores.push_back(_emitterVirtualCore);
         if(!_emitterVirtualCore->isHotPlugged()){
             _emitterVirtualCore->hotPlug();
@@ -433,8 +434,18 @@ void KnobMapping::performLinearMapping(){
 
 
     size_t nextWorkerIndex = firstWorkerIndex;
+    size_t remapFirstWorkerIndex = firstWorkerIndex;
     for(size_t i = 0; i < activeWorkers.size(); i++){
-        VirtualCore* vc = _vcOrder.at(nextWorkerIndex);
+        if(i == activePhysicalCores){
+            // This happens only for remapping workers knob. In this
+            // case we need to use only the specified number of
+            // active cores (we can use more contextes on the same core).
+            nextWorkerIndex = (remapFirstWorkerIndex + activePhysicalCores) %
+                               _vcOrderLinear.size();
+            remapFirstWorkerIndex = nextWorkerIndex;
+        }
+
+        VirtualCore* vc = _vcOrderLinear.at(nextWorkerIndex);
 
         _workersVirtualCores.push_back(vc);
         _activeVirtualCores.push_back(vc);
@@ -444,14 +455,13 @@ void KnobMapping::performLinearMapping(){
 
         activeWorkers.at(i)->move(vc);
 
-        if(++nextWorkerIndex == _vcOrder.size() ||
-           i + 1 == activeCores){ //TODO This should be fixed in order to exploit hyperthreading. Indeed now we map the threads on the same context.
+        if(++nextWorkerIndex == _vcOrder.size()){
             nextWorkerIndex = firstWorkerIndex;
         }
     }
 
     if(_collector && _confCollectorMapping != KNOB_SNODE_MAPPING_NO){
-        _collectorVirtualCore = _vcOrder.at(collectorIndex);
+        _collectorVirtualCore = _vcOrderLinear.at(collectorIndex);
         _activeVirtualCores.push_back(_collectorVirtualCore);
         if(!_collectorVirtualCore->isHotPlugged()){
             _collectorVirtualCore->hotPlug();
