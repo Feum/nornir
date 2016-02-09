@@ -111,7 +111,8 @@ void RegressionData::init(){init(_configuration.getRealValues());}
 
 void RegressionDataServiceTime::init(const KnobsValues& values){
     _numPredictors = 0;
-    double physicalCores = getUsedPhysicalCores(values[KNOB_TYPE_WORKERS], false);
+    uint workersCores = ((KnobWorkers*) _configuration.getKnob(KNOB_TYPE_WORKERS))->getWorkersPhysicalCores();
+    double physicalCores = getUsedPhysicalCores(workersCores, false);
 
     if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
         double frequency = values[KNOB_TYPE_FREQUENCY];
@@ -153,7 +154,8 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
 void RegressionDataPower::init(const KnobsValues& values){
     _numPredictors = 0;
     Frequency frequency = values[KNOB_TYPE_FREQUENCY];
-    double usedPhysicalCores = getUsedPhysicalCores(values[KNOB_TYPE_WORKERS], true);
+    uint workersCores = ((KnobWorkers*) _configuration.getKnob(KNOB_TYPE_WORKERS))->getWorkersPhysicalCores();
+    double usedPhysicalCores = getUsedPhysicalCores(workersCores, true);
 
     if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
         uint usedCpus = 0;
@@ -162,10 +164,13 @@ void RegressionDataPower::init(const KnobsValues& values){
                 case KNOB_HT_AUTO:{
                     throw std::runtime_error("This should never happen.");
                 }
+                case KNOB_HT_LATER:
+                case KNOB_HT_SOONER:
                 case KNOB_HT_NO:{
                     usedCpus = std::ceil(usedPhysicalCores /
                                          (double) _phyCoresPerCpu);
                 }break;
+                /*
                 case KNOB_HT_LATER:{
                     usedCpus = std::ceil(usedPhysicalCores /
                                          (double) _phyCoresPerCpu);
@@ -181,6 +186,7 @@ void RegressionDataPower::init(const KnobsValues& values){
                     usedCpus = std::ceil(usedPhysicalCores /
                                          ((double) _phyCoresPerCpu * (double) _virtCoresPerPhyCores));
                 }break;
+                */
             }
         }else{
             ; //TODO
@@ -250,9 +256,11 @@ void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
             matrix(rowId++, columnId) = _voltagePerUnusedSockets;
         }
     }
+    /*
     if(_p.knobHyperthreading != KNOB_HT_NO){
         matrix(rowId++, columnId) = _additionalContextes;
     }
+    */
 }
 
 Predictor::Predictor(PredictorType type,

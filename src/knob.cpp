@@ -166,7 +166,7 @@ std::vector<double> KnobWorkers::getAllowedValues() const{
     return _knobValues;
 }
 
-uint KnobWorkers::getNumActivePhysicalCores() const{
+uint KnobWorkers::getWorkersPhysicalCores() const{
     switch(_confWorkers){
         case KNOB_WORKERS_NO:
         case KNOB_WORKERS_THREADS:{
@@ -418,7 +418,7 @@ void KnobMapping::performLinearMapping(){
     getMappingIndexes(emitterIndex, firstWorkerIndex, collectorIndex);
 
     const vector<AdaptiveNode*>& activeWorkers = _knobWorkers.getActiveWorkers();
-    uint activePhysicalCores = _knobWorkers.getNumActivePhysicalCores();
+    uint activePhysicalCores = _knobWorkers.getWorkersPhysicalCores();
 
     _activeVirtualCores.clear();
     _workersVirtualCores.clear();
@@ -440,7 +440,7 @@ void KnobMapping::performLinearMapping(){
             // This happens only for remapping workers knob. In this
             // case we need to use only the specified number of
             // active cores (we can use more contextes on the same core).
-            nextWorkerIndex = (remapFirstWorkerIndex + activePhysicalCores) %
+            nextWorkerIndex = (remapFirstWorkerIndex + numPhysicalCores) %
                                _vcOrderLinear.size();
             remapFirstWorkerIndex = nextWorkerIndex;
         }

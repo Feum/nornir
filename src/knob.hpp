@@ -118,7 +118,7 @@ public:
      * @return The number of cores on which the workers should be
      * executed.
      */
-    uint getNumActivePhysicalCores() const;
+    uint getWorkersPhysicalCores() const;
 
     /**
      * Returns a vector containing all the active workers.
