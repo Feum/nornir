@@ -433,7 +433,7 @@ void KnobMapping::performLinearMapping(){
 
 
     size_t nextWorkerIndex = firstWorkerIndex;
-    for(size_t i = 0; i < activeCores; i++){
+    for(size_t i = 0; i < activeWorkers.size(); i++){
         VirtualCore* vc = _vcOrder.at(nextWorkerIndex);
 
         _workersVirtualCores.push_back(vc);
@@ -441,9 +441,11 @@ void KnobMapping::performLinearMapping(){
         if(!vc->isHotPlugged()){
             vc->hotPlug();
         }
+
         activeWorkers.at(i)->move(vc);
 
-        if(++nextWorkerIndex == _vcOrder.size()){
+        if(++nextWorkerIndex == _vcOrder.size() ||
+           i + 1 == activeCores){ //TODO This should be fixed in order to exploit hyperthreading. Indeed now we map the threads on the same context.
             nextWorkerIndex = firstWorkerIndex;
         }
     }
