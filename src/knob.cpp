@@ -436,7 +436,7 @@ void KnobMapping::performLinearMapping(){
     size_t nextWorkerIndex = firstWorkerIndex;
     size_t remapFirstWorkerIndex = firstWorkerIndex;
     for(size_t i = 0; i < activeWorkers.size(); i++){
-        if(i == activePhysicalCores){
+        if(i % activePhysicalCores == 0){
             // This happens only for remapping workers knob. In this
             // case we need to use only the specified number of
             // active cores (we can use more contextes on the same core).

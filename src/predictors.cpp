@@ -111,7 +111,7 @@ void RegressionData::init(){init(_configuration.getRealValues());}
 
 void RegressionDataServiceTime::init(const KnobsValues& values){
     _numPredictors = 0;
-    uint workersCores = ((KnobWorkers*) _configuration.getKnob(KNOB_TYPE_WORKERS))->getWorkersPhysicalCores();
+    uint workersCores = values[KNOB_TYPE_WORKERS];
     double physicalCores = getUsedPhysicalCores(workersCores, false);
 
     if(_p.knobFrequencies == KNOB_FREQUENCY_YES){

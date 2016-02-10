@@ -47,6 +47,9 @@ fields['ReconfigurationTimeTotalStddev'] = 27
 
 alternatives = ('LIMARTINEZ', 'REGRESSION_LINEAR_RANDOM', 'REGRESSION_LINEAR_HALTON', 'REGRESSION_LINEAR_HALTON_FAST')
 alternativesReconfTime = ('REGRESSION_LINEAR_HALTON', 'REGRESSION_LINEAR_HALTON_FAST')
+alternativesMandelPerf = ('LIMARTINEZ', 'REGRESSION_LINEAR_HALTON_FAST', 'REGRESSION_LINEAR_HALTON_FAST_AGING3', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE20', 'REGRESSION_LINEAR_HALTON_FAST_AGING3_CONSERVATIVE20')
+alternativesMandelPower = ('LIMARTINEZ', 'REGRESSION_LINEAR_HALTON_FAST', 'REGRESSION_LINEAR_HALTON_FAST_AGING3')
+
 
 def printField(bench, contract, alt, field):
     try:
@@ -74,6 +77,11 @@ def printField(bench, contract, alt, field):
     except:
         sys.stdout.write('N.D.\tN.D.\t')
 
+def getAlt(alt):
+    alt = alt.replace('REGRESSION_LINEAR_HALTON', 'RLH')
+    alt = alt.replace('REGRESSION_LINEAR', 'RL')
+    alt = alt.replace('LIMARTINEZ', 'LM')
+    return alt
 
 #############################################################################################
 benchmarks = ('blackscholes', 'canneal', 'pbzip2', 'simple_mandelbrot', 'videoprocessing')
@@ -81,13 +89,19 @@ contracts = ('PERF_COMPLETION_TIME', 'POWER_BUDGET')
 fields 
 
 parser = argparse.ArgumentParser(description='Runs the application to check the accuracy of the reconfiguration.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('-b', '--benchmark', help='Benchmark.', required=False)
 parser.add_argument('-c', '--contract', help='Contract type.', required=True)
 parser.add_argument('-f', '--field', help='Field type (PrimaryLossCnt, PrimaryLossAvg, SecondaryLossAvg, CalibrationTimePercAvg, ReconfigurationTimeWorkersAvg).', required=True)
 args = parser.parse_args()
 
 
-#if args.benchmark is not None:
-#    benchmarks = ([args.benchmark])
+if args.benchmark is not None:
+    benchmarks = ([args.benchmark])
+    if 'simple_mandelbrot' in args.benchmark:
+        if 'PERF' in args.contract:
+            alternatives = alternativesMandelPerf
+        else:
+            alternatives = alternativesMandelPower
 
 if args.contract is not None:
     contracts = ([args.contract])
@@ -96,11 +110,11 @@ sys.stdout.write('#Bench\t')
 
 if 'ReconfigurationTime' in args.field:
     for alt in alternativesReconfTime:
-        sys.stdout.write(alt + '_AVG\t' + alt + '_STDDEV\t')
+        sys.stdout.write(getAlt(alt) + '_AVG\t' + getAlt(alt) + '_STDDEV\t')
     print ""
 else:
     for alt in alternatives:
-        sys.stdout.write(alt + '_AVG\t' + alt + '_STDDEV\t')
+        sys.stdout.write(getAlt(alt) + '_AVG\t' + getAlt(alt) + '_STDDEV\t')
     print ""
 
 for bench in benchmarks:

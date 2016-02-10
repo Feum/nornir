@@ -35,7 +35,7 @@ class cd:
     def __exit__(self, etype, value, traceback):
         os.chdir(self.savedPath)
 
-def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, calstrategy, fastreconf, itnum):
+def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, calstrategy, fastreconf, aging, conservative, knobworkers, itnum):
     with cd(bench):
         parametersFile = open("parameters.xml", "w")
         parametersFile.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
@@ -62,6 +62,9 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
         if calstrategy is not None:
             print "Using strategy " + calstrategy
             parametersFile.write("<strategyCalibration>" + calstrategy + "</strategyCalibration>\n")
+
+        if knobworkers is not None:
+            parametersFile.write("<knobWorkers>" + knobworkers + "</knobWorkers>\n")
 
         if bench == 'blackscholes':
             run = "./blackscholes 23 inputs/in_10M.txt tmp.txt"
@@ -90,18 +93,28 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
             parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
             parametersFile.write("<persistenceValue>1</persistenceValue>\n")
         elif bench == 'videoprocessing':
-            run = ""
+            run = "./video 0 5 0 22 VIRAT/VIRAT_S_040001_02_001102_001530.mp4"
+            parametersFile.write("<qSize>1</qSize>\n")
+            parametersFile.write("<samplingIntervalCalibration>10</samplingIntervalCalibration>\n")
+            parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
+            parametersFile.write("<minTasksPerSample>5</minTasksPerSample>\n")
+            parametersFile.write("<expectedTasksNumber>12828</expectedTasksNumber>\n")
+            parametersFile.write("<smoothingFactor>0.1</smoothingFactor>\n")
+            parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
+            parametersFile.write("<persistenceValue>1</persistenceValue>\n")
         elif bench == 'simple_mandelbrot':
             run = "./mandel_ff 8192 4096 1 22"
             parametersFile.write("<qSize>4</qSize>\n")
             parametersFile.write("<samplingIntervalCalibration>50</samplingIntervalCalibration>\n")
             parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
             parametersFile.write("<smoothingFactor>0.9</smoothingFactor>\n")
-            parametersFile.write("<regressionAging>3</regressionAging>\n")
+            if aging is not None:
+                parametersFile.write("<regressionAging>" + str(aging) + "</regressionAging>\n")
             parametersFile.write("<minTasksPerSample>4</minTasksPerSample>\n")
             parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
             parametersFile.write("<persistenceValue>1</persistenceValue>\n")
-            #parametersFile.write("<conservativeValue>20</conservativeValue>\n")
+            if conservative is not None:
+                parametersFile.write("<conservativeValue>" + str(conservative) + "</conservativeValue>\n")
 
         parametersFile.write("</adaptivityParameters>\n")
         parametersFile.close()
@@ -204,6 +217,9 @@ parser.add_argument('-p', '--prediction', help='Prediction strategy.', required=
 parser.add_argument('-c', '--contract', help='Contract type.', required=True)
 parser.add_argument('-k', '--calstrategy', help='Calibration strategy.', required=False, default='HALTON')
 parser.add_argument('-f', '--fastreconf', help='Fast reconfiguration.', required=False,  action='store_true')
+parser.add_argument('-a', '--aging', help='Aging factor.', required=False)
+parser.add_argument('-o', '--conservative', help='Conservative value.', required=False)
+parser.add_argument('-w', '--knobworkers', help='Knob Workers.', required=False)
 
 args = parser.parse_args()
 
@@ -215,6 +231,12 @@ if args.prediction == 'REGRESSION_LINEAR':
     rdir += '_' + args.calstrategy
 if args.fastreconf:
     rdir += '_FAST'
+if args.knobworkers:
+    rdir += '_' + args.knobworkers
+if args.aging:
+    rdir += '_AGING' + str(args.aging)
+if args.conservative:
+    rdir += '_CONSERVATIVE' + str(args.conservative)
 
 with cd(args.benchmark):
     shutil.rmtree(rdir, ignore_errors=True)
@@ -283,7 +305,7 @@ for p in xrange(10, 100, 20):
             targetTime = minTime + (maxTime - minTime)*(p/100.0)  
             target = targetTime
             while ct == -1:
-                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p, rdir, args.calstrategy, args.fastreconf, i)
+                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p, rdir, args.calstrategy, args.fastreconf, args.aging, args.conservative, args.knobworkers, i)
             opt = getOptimalTimeBound(targetTime, args.benchmark)
             primaryReq = targetTime
             primaryLoss = ((ct - targetTime) / targetTime ) * 100.0
@@ -297,7 +319,7 @@ for p in xrange(10, 100, 20):
             targetPower = minPower + (maxPower - minPower)*(p/100.0)
             target = targetPower
             while ct == -1:
-                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "POWER_BUDGET", "powerBudget", targetPower, p, rdir, args.calstrategy, args.fastreconf, i)
+                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "POWER_BUDGET", "powerBudget", targetPower, p, rdir, args.calstrategy, args.fastreconf, args.aging, args.conservative, args.knobworkers, i)
             opt = getOptimalPowerBound(targetPower, args.benchmark)
             primaryReq = targetPower
             primaryLoss = ((watts - targetPower) / targetPower) * 100.0
@@ -360,7 +382,7 @@ for p in xrange(10, 100, 20):
     avgReconfigurationTimeTotal = np.average(reconfigurationTimesTotal)
     stddevReconfigurationTimeTotal = np.std(reconfigurationTimesTotal)
 
-    outFile.write(str(p) + "\t" + str(target) + "\t" + len(primaryLosses) + "\t" + str(avgPrimary) + "\t" + str(stddevPrimary) + "\t" + str(avgPrimaryLoss) + "\t" + str(stddevPrimaryLoss) + "\t" + 
+    outFile.write(str(p) + "\t" + str(target) + "\t" + str(len(primaryLosses)) + "\t" + str(avgPrimary) + "\t" + str(stddevPrimary) + "\t" + str(avgPrimaryLoss) + "\t" + str(stddevPrimaryLoss) + "\t" + 
                                   str(opt) + "\t" + str(avgSecondary) + "\t" + str(stddevSecondary) + "\t" + str(avgSecondaryLoss) + "\t" + str(stddevSecondaryLoss) + "\t" + 
                                   str(avgCalibrationSteps) + "\t" + str(stddevCalibrationSteps) + "\t" + 
                                   str(avgCalibrationTime) + "\t" + str(stddevCalibrationTime) + "\t" + str(avgCalibrationTimePerc) + "\t" + str(stddevCalibrationTimePerc) + "\t" + 
