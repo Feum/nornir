@@ -8,17 +8,17 @@ run = "cpupower frequency-set -g userspace"
 process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 out, err = process.communicate()
 
-parametersFile = open("parameters.xml", "w")
+parametersFile = open("parameters.xml", "w") 
 parametersFile.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 parametersFile.write("<adaptivityParameters>\n")
-parametersFile.write("<qSize>4</qSize>\n")
+parametersFile.write("<qSize>1</qSize>\n")
 parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
 parametersFile.write("<contractType>NONE</contractType>\n")
 parametersFile.write("<strategyPolling>SLEEP_SMALL</strategyPolling>\n")
 parametersFile.write("</adaptivityParameters>\n")
 parametersFile.close()
 
-outfile = open("REPARA_results.csv", "w")
+outfile = open("REPARA_results.csv", "w") 
 outfile.write("#Workers\tFrequency\tTime\tWatts\n")
 
 for c in xrange(1, 23):
@@ -26,8 +26,8 @@ for c in xrange(1, 23):
         run = "cpupower frequency-set -f " + str(f)
         process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         out, err = process.communicate()
-
-        run = "./video BigBuckBunny_640x360.m4v 0 " + str(c)
+        
+        run = "./video 0 1 0 " + str(c) + " VIRAT/960X540.mp4 VIRAT/480X270.mp4 VIRAT/480X270.mp4 VIRAT/960X540.mp4"
         process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         out, err = process.communicate()
 

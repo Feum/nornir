@@ -93,13 +93,13 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
             parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
             parametersFile.write("<persistenceValue>1</persistenceValue>\n")
         elif bench == 'videoprocessing':
-            run = "./video 0 5 0 22 VIRAT/VIRAT_S_040001_02_001102_001530.mp4"
+            run = "./video 0 1 0 22 VIRAT/960X540.mp4 VIRAT/480X270.mp4 VIRAT/480X270.mp4 VIRAT/960X540.mp4"
             parametersFile.write("<qSize>1</qSize>\n")
             parametersFile.write("<samplingIntervalCalibration>10</samplingIntervalCalibration>\n")
             parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
             parametersFile.write("<minTasksPerSample>5</minTasksPerSample>\n")
-            parametersFile.write("<expectedTasksNumber>12828</expectedTasksNumber>\n")
-            parametersFile.write("<smoothingFactor>0.1</smoothingFactor>\n")
+            parametersFile.write("<expectedTasksNumber>64790</expectedTasksNumber>\n")
+            parametersFile.write("<smoothingFactor>0.7</smoothingFactor>\n")
             parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
             parametersFile.write("<persistenceValue>1</persistenceValue>\n")
         elif bench == 'simple_mandelbrot':
