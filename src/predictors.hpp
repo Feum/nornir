@@ -312,6 +312,7 @@ private:
     size_t _minNumPoints;
     uint _calibrationStartMs;
     uint64_t _calibrationStartTasks;
+    mammut::energy::Counter* _joulesCounter;
     bool _firstPointGenerated;
     bool _forcePrediction;
     double _primaryPrediction;

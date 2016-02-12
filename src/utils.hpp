@@ -151,8 +151,9 @@ typedef struct CalibrationStats{
     uint numSteps;
     uint duration;
     uint numTasks;
+    mammut::energy::Joules joules;
 
-    CalibrationStats():numSteps(0), duration(0),numTasks(0){
+    CalibrationStats():numSteps(0), duration(0),numTasks(0),joules(0){
         ;
     }
 
@@ -162,6 +163,7 @@ typedef struct CalibrationStats{
         swap(numSteps, x.numSteps);
         swap(duration, x.duration);
         swap(numTasks, x.numTasks);
+        swap(joules, x.joules);
     }
 
     CalibrationStats& operator=(CalibrationStats rhs){
@@ -173,6 +175,7 @@ typedef struct CalibrationStats{
         numSteps += rhs.numSteps;
         duration += rhs.duration;
         numTasks += rhs.numTasks;
+        joules += rhs.joules;
         return *this;
     }
 }CalibrationStats;

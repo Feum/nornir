@@ -510,6 +510,8 @@ Calibrator::Calibrator(const Parameters& p,
                                  _secondaryPredictor->getMinimumPointsNeeded());
         DEBUG("Minimum number of points required for calibration: " << _minNumPoints);
     }
+
+    _joulesCounter = _p.mammut.getInstanceEnergy()->getCounter();
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
 }
 
@@ -728,6 +730,9 @@ void Calibrator::startCalibrationStat(uint64_t totalTasks){
     _numCalibrationPoints = 0;
     _calibrationStartMs = getMillisecondsTime();
     _calibrationStartTasks = totalTasks;
+    if(_joulesCounter){
+        _joulesCounter->reset();
+    }
 }
 
 void Calibrator::stopCalibrationStat(uint64_t totalTasks){
@@ -736,6 +741,9 @@ void Calibrator::stopCalibrationStat(uint64_t totalTasks){
         cs.numSteps = _numCalibrationPoints;
         cs.duration = (getMillisecondsTime() - _calibrationStartMs);
         cs.numTasks = totalTasks - _calibrationStartTasks;
+        if(_joulesCounter){
+            cs.joules = _joulesCounter->getJoules();
+        }
         _calibrationStats.push_back(cs);
         _numCalibrationPoints = 0;
     }
