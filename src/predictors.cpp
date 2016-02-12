@@ -154,7 +154,7 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
 void RegressionDataPower::init(const KnobsValues& values){
     _numPredictors = 0;
     Frequency frequency = values[KNOB_TYPE_FREQUENCY];
-    uint workersCores = ((KnobWorkers*) _configuration.getKnob(KNOB_TYPE_WORKERS))->getWorkersPhysicalCores();
+    uint workersCores = values[KNOB_TYPE_WORKERS];
     double usedPhysicalCores = getUsedPhysicalCores(workersCores, true);
 
     if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
@@ -783,6 +783,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             }else{
                 kv = getBestKnobsValues(primaryValue);
                 _state = CALIBRATION_VALIDATE_PREDICTION;
+                _forcePrediction = false;
                 DEBUG("[Calibrator]: Moving to validate prediction.");
             }
         }break;
