@@ -1,0 +1,38 @@
+PARSEC Benchmark Suite
+Num of Options: 10000000
+Num of Runs: 100
+Size of data: 400000000
+amf started
+Generating end of stream.amf joined
+[Predictors] Generating first point: [11, 2, 2.4e+06, ]
+[Predictors] Found a new optimal watts: 59.5758 vs. 1.79769e+308
+[Predictors] Optimal: 11, 2400000
+[Predictors] Required BW: 8151.93 Current BW: 57407.6 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [11, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 31.331 vs. 59.5758
+[Predictors] Optimal: 11, 1200000
+[Predictors] Required BW: 8084.11 Current BW: 29128.9 Best frequency: 1200000
+[Predictors] New interval 1: [1,5,10]
+[Predictors] New interval 2: [12,17,23]
+[Predictors] We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 8053.43 Current BW: 26021 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 23.1241 vs. 31.331
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 8036.67 Current BW: 13196.6 Best frequency: 1200000
+[Predictors] New interval 1: [1,2,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 8032.42 Current BW: 10543.5 Best frequency: 1900000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.9e+06, ]
+[Predictors] Required BW: 8031.75 Current BW: 8393.45 Best frequency: 1900000
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Trying with the right side. We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 8000.76 Current BW: 26494.7 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 23.1156 vs. 23.1241
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 7983.61 Current BW: 13206.6 Best frequency: 1200000
+[Predictors] New interval 1: [6,5,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] Exploration finished with: [5, 2, 1.2e+06, ]

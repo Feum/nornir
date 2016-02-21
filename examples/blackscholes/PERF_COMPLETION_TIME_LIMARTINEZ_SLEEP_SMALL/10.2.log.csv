@@ -1,0 +1,27 @@
+PARSEC Benchmark Suite
+Num of Options: 10000000
+Num of Runs: 100
+Size of data: 400000000
+amf started
+Generating end of stream.amf joined
+[Predictors] Generating first point: [11, 2, 2.4e+06, ]
+[Predictors] Found a new optimal watts: 59.2905 vs. 1.79769e+308
+[Predictors] Optimal: 11, 2400000
+[Predictors] Required BW: 21314.3 Current BW: 57422 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [11, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 31.0873 vs. 59.2905
+[Predictors] Optimal: 11, 1200000
+[Predictors] Required BW: 21248.5 Current BW: 29105.2 Best frequency: 1200000
+[Predictors] New interval 1: [1,5,10]
+[Predictors] New interval 2: [12,17,23]
+[Predictors] We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 21227.6 Current BW: 26118.8 Best frequency: 2000000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 2e+06, ]
+[Predictors] Required BW: 21224.4 Current BW: 21724 Best frequency: 2000000
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Trying with the right side. We move to [17, 2, 2.4e+06, ]
+[Predictors] Required BW: 20921.5 Current BW: 89616.6 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [17, 2, 1.2e+06, ]
+[Predictors] Required BW: 20712.8 Current BW: 44838.5 Best frequency: 1200000
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Both side are worst. Terminated with: [11, 2, 1.2e+06, ]

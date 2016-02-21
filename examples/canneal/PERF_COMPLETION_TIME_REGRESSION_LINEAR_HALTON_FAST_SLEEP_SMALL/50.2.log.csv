@@ -1,0 +1,79 @@
+PARSEC Benchmark Suite
+Threadcount: 23
+15000 swaps per temperature step
+start temperature: 2000
+netlist filename: 2500000.nets
+number of temperature steps: 6000
+locs created
+locs assigned
+Just saw element: 100000
+Just saw element: 200000
+Just saw element: 300000
+Just saw element: 400000
+Just saw element: 500000
+Just saw element: 600000
+Just saw element: 700000
+Just saw element: 800000
+Just saw element: 900000
+Just saw element: 1000000
+Just saw element: 1100000
+Just saw element: 1200000
+Just saw element: 1300000
+Just saw element: 1400000
+Just saw element: 1500000
+Just saw element: 1600000
+Just saw element: 1700000
+Just saw element: 1800000
+Just saw element: 1900000
+Just saw element: 2000000
+Just saw element: 2100000
+Just saw element: 2200000
+Just saw element: 2300000
+Just saw element: 2400000
+Just saw element: 2500000
+netlist created. 2500000 elements.
+amf started
+amf joined
+Final routing is: 9.03295e+09
+Terminated
+Generated 6000 tasks.
+[Predictors] Minimum number of points required for calibration: 3
+[Predictors] [Calibrator] Will generate low discrepancy points in 2 dimensions
+[Predictors] [Calibrator]: NumPoints: 0 MinNumPoints: 3
+[Predictors] Refining with configuration [12, 2, 1.6e+06, ]: 0.00409433
+[Predictors] Refining with configuration [13, 2, 1.6e+06, ]: 41.3568
+[Predictors] [Calibrator]: NumPoints: 1 MinNumPoints: 3
+[Predictors] Refining with configuration [7, 2, 2e+06, ]: 0.00651412
+[Predictors] Refining with configuration [8, 2, 2e+06, ]: 36.613
+[Predictors] [Calibrator]: NumPoints: 2 MinNumPoints: 3
+[Predictors] Refining with configuration [18, 2, 1.3e+06, ]: 0.00310438
+[Predictors] Refining with configuration [19, 2, 1.3e+06, ]: 41.2563
+[Predictors] Error in model: 1.06578e-36
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 4.99858e-15
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [5, 2, 1.2e+06, ]
+[Predictors] Primary prediction: 48.883
+[Predictors] Secondary prediction: 34.8173
+[Predictors] [Calibrator]: Moving to validate prediction.
+[Predictors] Refining with configuration [5, 2, 1.2e+06, ]: 0.0114364
+[Predictors] Refining with configuration [6, 2, 1.2e+06, ]: 22.6314
+[Predictors] Primary prediction: 48.883 Secondary prediction: 34.8173
+[Predictors] Primary error: 44.0956 Secondary error: 53.8453
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [4, 2, 1.7e+06, ]: 0.0121599
+[Predictors] Refining with configuration [5, 2, 1.7e+06, ]: 26.8252
+[Predictors] Error in model: 8.58756e-08
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 0.00178277
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [3, 2, 1.2e+06, ]
+[Predictors] Primary prediction: 49.8497
+[Predictors] Secondary prediction: 20.2918
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [3, 2, 1.2e+06, ]: 0.0189799
+[Predictors] Refining with configuration [4, 2, 1.2e+06, ]: 20.1338
+[Predictors] Primary prediction: 49.8497 Secondary prediction: 20.2918
+[Predictors] Primary error: 5.38562 Secondary error: 0.785152
+[Predictors] [Calibrator]: Moving to finished
+[Predictors] [Calibrator]: Finished in 5 steps with configuration [3, 2, 1.2e+06, ]

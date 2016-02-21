@@ -75,7 +75,7 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
     _calibrationFile << "Time%" << "\t";
     _calibrationFile << "TasksNum" << "\t";
     _calibrationFile << "Tasks%" << "\t";
-    _calibrationFile << "Joules" << "\t";
+    _calibrationFile << "Watts" << "\t";
     _calibrationFile << endl;
 
     _summaryFile << "Watts" << "\t";
@@ -86,7 +86,7 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
     _summaryFile << "CalibrationTime%" << "\t";
     _summaryFile << "CalibrationTasksNum" << "\t";
     _summaryFile << "CalibrationTasks%" << "\t";
-    _summaryFile << "CalibrationJoules" << "\t";
+    _summaryFile << "CalibrationWatts" << "\t";
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         _summaryFile << "Reconfigurations" << knobTypeToString((KnobType) i) << "Average" << "\t";
         _summaryFile << "Reconfigurations" << knobTypeToString((KnobType) i) << "Stddev" << "\t";
@@ -164,8 +164,8 @@ void Observer::calibrationStats(const vector<CalibrationStats>& calibrationStats
         _calibrationFile << cs.duration << "\t";
         _calibrationFile << calibrationDurationToPerc(cs, durationMs) << "\t";
         _calibrationFile << cs.numTasks << "\t";
-        _calibrationFile << cs.joules << "\t";
         _calibrationFile << ((double) cs.numTasks / totalTasks) * 100.0 << "\t";
+        _calibrationFile << cs.joules / (cs.duration / 1000.0)<< "\t";
         _calibrationFile << endl;
     }
 }
@@ -180,7 +180,7 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
         totalCalibration += calibrationStats.at(i);
     }
 
-    _summaryFile << _totalJoules / (double) (durationMs / 1000.0) << "\t";
+    _summaryFile << (_totalJoules - totalCalibration.joules) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
     _summaryFile << totalTasks / (double) (durationMs / 1000.0) << "\t";
     _summaryFile << (double) durationMs / 1000.0 << "\t";
     _summaryFile << totalCalibration.numSteps << "\t";
@@ -188,7 +188,7 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
     _summaryFile << calibrationDurationToPerc(totalCalibration, durationMs) << "\t";
     _summaryFile << totalCalibration.numTasks << "\t";
     _summaryFile << ((double) totalCalibration.numTasks / totalTasks) * 100.0 << "\t";
-    _summaryFile << totalCalibration.joules << "\t";
+    _summaryFile << totalCalibration.joules / (totalCalibration.duration / 1000.0) << "\t";
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         if(reconfigurationStats.storedKnob((KnobType) i)){
             _summaryFile << reconfigurationStats.getAverageKnob((KnobType) i) << "\t";

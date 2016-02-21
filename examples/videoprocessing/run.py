@@ -27,7 +27,8 @@ for c in xrange(1, 23):
         process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         out, err = process.communicate()
         
-        run = "./video 0 1 0 " + str(c) + " VIRAT/960X540.mp4 VIRAT/480X270.mp4 VIRAT/480X270.mp4 VIRAT/960X540.mp4"
+        #run = "./video 0 1 0 " + str(c) + " VIRAT/960X540.mp4 VIRAT/480X270.mp4 VIRAT/480X270.mp4 VIRAT/960X540.mp4"
+        run = "./video 0 1 0 " + str(c) + " VIRAT/480X270.mp4"
         process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         out, err = process.communicate()
 

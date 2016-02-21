@@ -117,9 +117,6 @@ private:
     // The parameters used to take management decisions.
     Parameters _p;
 
-    // Starting time of the manager.
-    double _startTimeMs;
-
     // The cpufreq module.
     CpuFreq* _cpufreq;
 

@@ -1,0 +1,40 @@
+[Predictors] Minimum number of points required for calibration: 3
+[Predictors] [Calibrator] Will generate low discrepancy points in 2 dimensions
+[Predictors] [Calibrator]: NumPoints: 0 MinNumPoints: 3
+[Predictors] Refining with configuration [12, 2, 1.6e+06, ]: 0.0256002
+[Predictors] Refining with configuration [14, 2, 1.6e+06, ]: 50.3559
+[Predictors] [Calibrator]: NumPoints: 1 MinNumPoints: 3
+[Predictors] Refining with configuration [6, 2, 2e+06, ]: 0.043469
+[Predictors] Refining with configuration [8, 2, 2e+06, ]: 41.5486
+[Predictors] [Calibrator]: NumPoints: 2 MinNumPoints: 3
+[Predictors] Refining with configuration [17, 2, 1.3e+06, ]: 0.0269663
+[Predictors] Refining with configuration [19, 2, 1.3e+06, ]: 49.1182
+[Predictors] Error in model: 3.08951e-34
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 1.82188e-14
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [10, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 119.555
+[Predictors] Secondary prediction: 34.394
+[Predictors] [Calibrator]: Moving to validate prediction.
+[Predictors] Refining with configuration [10, 2, 2.4e+06, ]: 0.0210671
+[Predictors] Refining with configuration [12, 2, 2.4e+06, ]: 63.416
+[Predictors] Primary prediction: 119.555 Secondary prediction: 34.394
+[Predictors] Primary error: 151.867 Secondary error: 45.7645
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [4, 2, 1.7e+06, ]: 0.0746254
+[Predictors] Refining with configuration [6, 2, 1.7e+06, ]: 30.8808
+[Predictors] Error in model: 1.61017e-06
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 0.0685401
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [2, 2, 1.2e+06, ]
+[Predictors] Primary prediction: 4.73075
+[Predictors] Secondary prediction: 21.4097
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [2, 2, 1.2e+06, ]: 0.204264
+[Predictors] Refining with configuration [4, 2, 1.2e+06, ]: 20.9483
+[Predictors] Primary prediction: 4.73075 Secondary prediction: 21.4097
+[Predictors] Primary error: 3.36786 Secondary error: 2.2026
+[Predictors] [Calibrator]: Moving to finished
+[Predictors] [Calibrator]: Finished in 5 steps with configuration [2, 2, 1.2e+06, ]

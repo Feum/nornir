@@ -1,0 +1,41 @@
+PARSEC Benchmark Suite
+Num of Options: 10000000
+Num of Runs: 100
+Size of data: 400000000
+amf started
+Generating end of stream.amf joined
+[Predictors] Generating first point: [11, 2, 2.4e+06, ]
+[Predictors] Found a new optimal watts: 65.2219 vs. 1.79769e+308
+[Predictors] Optimal: 11, 2400000
+[Predictors] Required BW: 2841.66 Current BW: 58168.5 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [11, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 31.6024 vs. 65.2219
+[Predictors] Optimal: 11, 1200000
+[Predictors] Required BW: 2812.09 Current BW: 29115.2 Best frequency: 1200000
+[Predictors] New interval 1: [1,5,10]
+[Predictors] New interval 2: [12,17,23]
+[Predictors] We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 2798.3 Current BW: 26097.6 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 23.1338 vs. 31.6024
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 2786.55 Current BW: 13078.3 Best frequency: 1200000
+[Predictors] New interval 1: [1,2,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 2781.94 Current BW: 10581.6 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 18.9986 vs. 23.1338
+[Predictors] Optimal: 2, 1200000
+[Predictors] Required BW: 2779.11 Current BW: 5284.72 Best frequency: 1200000
+[Predictors] New interval 1: [1,1,1]
+[Predictors] New interval 2: [3,2,1]
+[Predictors] We move to [1, 2, 2.4e+06, ]
+[Predictors] Required BW: 2777.65 Current BW: 5274.81 Best frequency: 1300000
+[Predictors] Keeping going down on frequencies. We move to: [1, 2, 1.3e+06, ]
+[Predictors] Found a new optimal watts: 18.5833 vs. 18.9986
+[Predictors] Optimal: 1, 1300000
+[Predictors] Required BW: 2777.54 Current BW: 2886.27 Best frequency: 1300000
+[Predictors] New interval 1: [1,0,0]
+[Predictors] New interval 2: [2,1,0]
+[Predictors] Exploration finished with: [1, 2, 1.3e+06, ]

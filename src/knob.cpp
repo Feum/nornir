@@ -275,6 +275,7 @@ KnobMapping::KnobMapping(KnobConfMapping confMapping,
                              _knobWorkers(knobWorkers),
                              _topologyHandler(mammut.getInstanceTopology()){
     computeVcOrderLinear();
+    _realValue = KNOB_MAPPING_LINEAR;
 }
 
 bool KnobMapping::needsCalibration() const{
@@ -516,6 +517,7 @@ KnobFrequency::KnobFrequency(KnobConfFrequencies confFrequency,
     if(_confFrequency == KNOB_FREQUENCY_YES){
         std::vector<mammut::cpufreq::Frequency> availableFrequencies;
         availableFrequencies = _frequencyHandler->getDomains().at(0)->getAvailableFrequencies();
+        _realValue = availableFrequencies.front();
 
         std::vector<mammut::cpufreq::Domain*> scalableDomains;
         scalableDomains = _frequencyHandler->getDomains();

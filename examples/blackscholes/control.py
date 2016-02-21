@@ -5,6 +5,7 @@ import subprocess
 import shlex
 import socket
 import os
+import os.path
 import subprocess, signal
 
 def kill():
@@ -17,10 +18,13 @@ def kill():
             print "Killing"
 
 def hang():
-    run = "wc -l summary.csv"
-    process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    out, err = process.communicate()
-    return int(out.split(' ')[0]) == 2
+    if os.path.isfile("summary.csv"):
+        run = "wc -l summary.csv"
+        process = subprocess.Popen(shlex.split(run), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        out, err = process.communicate()
+        return int(out.split(' ')[0]) == 2
+    else:
+        return 0
 
 def get_pid(name):
     return check_output(["pidof",name]).split("\n")[0]

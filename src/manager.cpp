@@ -366,7 +366,6 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
         _farm(farm),
         _terminated(false),
         _p(validate(parameters)),
-        _startTimeMs(0),
         _cpufreq(_p.mammut.getInstanceCpuFreq()),
         _counter(_p.mammut.getInstanceEnergy()->getCounter()),
         _task(_p.mammut.getInstanceTask()),
@@ -456,6 +455,14 @@ void ManagerFarm<lb_t, gt_t>::cleanNodes() {
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::run(){
+    initPredictors();
+    assert(_calibrator);
+
+    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+        _remainingTasks = _p.expectedTasksNumber;
+        _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
+    }
+
     if(_p.qSize){
         _farm->setFixedSize(true);
         // We need to multiply for the number of workers since FastFlow
@@ -472,12 +479,8 @@ void ManagerFarm<lb_t, gt_t>::run(){
 
     DEBUG("Init post run");
     initNodesPostRun();
-
     DEBUG("Farm started.");
-
-    _configuration.maxAllKnobs();
-    DEBUG("All knobs maxed.");
-
+#if 0
     /** Creates the parallel section begin file. **/
     char* default_in_roi = (char*) malloc(sizeof(char)*256);
     default_in_roi[0]='\0';
@@ -487,25 +490,17 @@ void ManagerFarm<lb_t, gt_t>::run(){
     free(default_in_roi);
     FILE* in_roi = fopen(getenv(PAR_BEGIN_ENV), "w");
     fclose(in_roi);
+#endif
 
-    _startTimeMs = getMillisecondsTime();
     if(_counter){
         _counter->reset();
     }
-    _lastStoredSampleMs = _startTimeMs;
+    _lastStoredSampleMs = getMillisecondsTime();
     if(_p.observer){
         _p.observer->_startMonitoringMs = _lastStoredSampleMs;
     }
 
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        _remainingTasks = _p.expectedTasksNumber;
-        _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
-    }
-
-    initPredictors();
-
     /* Force the first calibration point. **/
-    assert(_calibrator);
     changeKnobs();
 
     ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
@@ -556,14 +551,17 @@ void ManagerFarm<lb_t, gt_t>::run(){
             startSample = getMillisecondsTime();
         }
     }
+
     DEBUG("Terminating...wait freezing.");
     _farm->wait_freezing();
     _farm->wait();
+
     DEBUG("Terminated.");
 
     double duration = _farm->ffTime();
-
+#if 0
     unlink(getenv(PAR_BEGIN_ENV));
+#endif
     if(_p.observer){
         vector<CalibrationStats> cs;
         if(_calibrator){

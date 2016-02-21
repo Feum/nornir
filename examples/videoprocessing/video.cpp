@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
     //ffvideo numframes d output nw1 file1 file2 ... filen
     Mat edges;
 
-    setNumThreads(0);
+    //setNumThreads(0);
     if(argc == 1) {
       std::cout << "Usage is: " << argv[0] 
                 << " numframes(0 is all frames) d output nw1 file1 file2 ... filen"

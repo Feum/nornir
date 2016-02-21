@@ -1,0 +1,30 @@
+PARSEC Benchmark Suite
+Num of Options: 10000000
+Num of Runs: 100
+Size of data: 400000000
+amf started
+Generating end of stream.amf joined
+[Predictors] Minimum number of points required for calibration: 3
+[Predictors] [Calibrator]: NumPoints: 0 MinNumPoints: 3
+[Predictors] Refining with configuration [9, 2, 1.7e+06, ]: 2.96765e-05
+[Predictors] Refining with configuration [10, 2, 1.7e+06, ]: 41.2746
+[Predictors] [Calibrator]: NumPoints: 1 MinNumPoints: 3
+[Predictors] Refining with configuration [5, 2, 2.2e+06, ]: 4.12176e-05
+[Predictors] Refining with configuration [6, 2, 2.2e+06, ]: 42.8635
+[Predictors] [Calibrator]: NumPoints: 2 MinNumPoints: 3
+[Predictors] Refining with configuration [9, 2, 1.9e+06, ]: 2.65308e-05
+[Predictors] Refining with configuration [10, 2, 1.9e+06, ]: 45.9018
+[Predictors] Error in model: 2.14283e-40
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 6.64576e-14
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [9, 2, 1.2e+06, ]
+[Predictors] Primary prediction: 23737.2
+[Predictors] Secondary prediction: 31.5692
+[Predictors] [Calibrator]: Moving to validate prediction.
+[Predictors] Refining with configuration [9, 2, 1.2e+06, ]: 4.1939e-05
+[Predictors] Refining with configuration [10, 2, 1.2e+06, ]: 29.0349
+[Predictors] Primary prediction: 23737.2 Secondary prediction: 31.5692
+[Predictors] Primary error: 0.448714 Secondary error: 8.72828
+[Predictors] [Calibrator]: Moving to finished
+[Predictors] [Calibrator]: Finished in 3 steps with configuration [9, 2, 1.2e+06, ]

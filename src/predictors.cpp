@@ -195,6 +195,7 @@ void RegressionDataPower::init(const KnobsValues& values){
         uint unusedCpus = _cpus - usedCpus;
 
         double staticPowerProp = 0, dynamicPowerProp = 0;
+        //TODO: Potrebbe non esserci una frequenza se FREQUENCY_NO. In tal caso non possiamo predirre nulla.
         getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
                 frequency, _phyCoresPerCpu,
                 staticPowerProp, dynamicPowerProp);
@@ -511,7 +512,8 @@ Calibrator::Calibrator(const Parameters& p,
         DEBUG("Minimum number of points required for calibration: " << _minNumPoints);
     }
 
-    _joulesCounter = _p.mammut.getInstanceEnergy()->getCounter();
+    _joulesCounter = _localMammut.getInstanceEnergy()->getCounter();
+    //TODO Fare meglio con mammut
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
 }
 
@@ -742,7 +744,7 @@ void Calibrator::stopCalibrationStat(uint64_t totalTasks){
         cs.duration = (getMillisecondsTime() - _calibrationStartMs);
         cs.numTasks = totalTasks - _calibrationStartTasks;
         if(_joulesCounter){
-            cs.joules = _joulesCounter->getJoules();
+            cs.joules = ((CounterCpus*) _joulesCounter)->getJoulesCoresAll();
         }
         _calibrationStats.push_back(cs);
         _numCalibrationPoints = 0;

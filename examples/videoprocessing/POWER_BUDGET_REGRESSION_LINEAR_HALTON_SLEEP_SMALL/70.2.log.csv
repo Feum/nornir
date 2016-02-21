@@ -1,0 +1,194 @@
+End of stream in input
+[Predictors] Minimum number of points required for calibration: 3
+[Predictors] [Calibrator] Will generate low discrepancy points in 2 dimensions
+[Predictors] [Calibrator]: NumPoints: 0 MinNumPoints: 3
+[Predictors] Refining with configuration [14, 2, 1.6e+06, ]: 48.0136
+[Predictors] Refining with configuration [12, 2, 1.6e+06, ]: 0.000761357
+[Predictors] [Calibrator]: NumPoints: 1 MinNumPoints: 3
+[Predictors] Refining with configuration [8, 2, 2e+06, ]: 41.7416
+[Predictors] Refining with configuration [6, 2, 2e+06, ]: 0.00104546
+[Predictors] [Calibrator]: NumPoints: 2 MinNumPoints: 3
+[Predictors] Refining with configuration [19, 2, 1.3e+06, ]: 45.9012
+[Predictors] Refining with configuration [17, 2, 1.3e+06, ]: 0.0021292
+[Predictors] Error in model: 5.66752e-14
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 1.41216e-35
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [16, 2, 1.6e+06, ]
+[Predictors] Primary prediction: 40.624
+[Predictors] Secondary prediction: 171345
+[Predictors] [Calibrator]: Moving to validate prediction.
+[Predictors] Refining with configuration [18, 2, 1.6e+06, ]: 55.4917
+[Predictors] Refining with configuration [16, 2, 1.6e+06, ]: 0.000626722
+[Predictors] Primary prediction: 40.624 Secondary prediction: 171345
+[Predictors] Primary error: 26.7926 Secondary error: 10638.6
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [6, 2, 1.7e+06, ]: 34.001
+[Predictors] Refining with configuration [4, 2, 1.7e+06, ]: 0.00155825
+[Predictors] Error in model: 0.0866306
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 9.57754e-08
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [15, 2, 2.1e+06, ]
+[Predictors] Primary prediction: 69.0352
+[Predictors] Secondary prediction: 68353.9
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [17, 2, 2.1e+06, ]: 71.7595
+[Predictors] Refining with configuration [15, 2, 2.1e+06, ]: 0.000503095
+[Predictors] Primary prediction: 69.0352 Secondary prediction: 68353.9
+[Predictors] Primary error: 3.79648 Secondary error: 3338.85
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [16, 2, 2.1e+06, ]: 69.5027
+[Predictors] Refining with configuration [14, 2, 2.1e+06, ]: 0.000487537
+[Predictors] Error in model: 0.327655
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 8.37075e-08
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [12, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 74.6139
+[Predictors] Secondary prediction: 7113.53
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [14, 2, 2.4e+06, ]: 75.2533
+[Predictors] Refining with configuration [12, 2, 2.4e+06, ]: 0.00048547
+[Predictors] Primary prediction: 74.6139 Secondary prediction: 7113.53
+[Predictors] Primary error: 0.849699 Secondary error: 245.341
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [11, 2, 1.5e+06, ]: 39.7908
+[Predictors] Refining with configuration [9, 2, 1.5e+06, ]: 0.000933675
+[Predictors] Error in model: 0.361511
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 9.6494e-08
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [12, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 74.7627
+[Predictors] Secondary prediction: 3396.19
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [14, 2, 2.4e+06, ]: 75.3048
+[Predictors] Replacing [14, 2, 2.4e+06, ]
+[Predictors] Refining with configuration [12, 2, 2.4e+06, ]: 0.000483614
+[Predictors] Replacing [12, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 74.7627 Secondary prediction: 3396.19
+[Predictors] Primary error: 0.719898 Secondary error: 64.2446
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [21, 2, 1.9e+06, ]: 74.252
+[Predictors] Refining with configuration [19, 2, 1.9e+06, ]: 0.00059844
+[Predictors] Error in model: 0.336679
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 8.6796e-08
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [12, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 74.7848
+[Predictors] Secondary prediction: 3439.88
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [14, 2, 2.4e+06, ]: 75.2179
+[Predictors] Replacing [14, 2, 2.4e+06, ]
+[Predictors] Refining with configuration [12, 2, 2.4e+06, ]: 0.000498947
+[Predictors] Replacing [12, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 74.7848 Secondary prediction: 3439.88
+[Predictors] Primary error: 0.575879 Secondary error: 71.6318
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [4, 2, 2.3e+06, ]: 43.7056
+[Predictors] Refining with configuration [2, 2, 2.3e+06, ]: 0.00196525
+[Predictors] Error in model: 2.53975
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 8.73206e-08
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [12, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 76.103
+[Predictors] Secondary prediction: 3186.31
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [14, 2, 2.4e+06, ]: 74.7731
+[Predictors] Replacing [14, 2, 2.4e+06, ]
+[Predictors] Refining with configuration [12, 2, 2.4e+06, ]: 0.000553447
+[Predictors] Replacing [12, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 76.103 Secondary prediction: 3186.31
+[Predictors] Primary error: 1.77851 Secondary error: 76.3453
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [15, 2, 1.2e+06, ]: 38.4671
+[Predictors] Refining with configuration [13, 2, 1.2e+06, ]: 0.000874221
+[Predictors] Error in model: 2.46258
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 1.18486e-07
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [12, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 75.7994
+[Predictors] Secondary prediction: 2157.12
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [14, 2, 2.4e+06, ]: 75.5289
+[Predictors] Replacing [14, 2, 2.4e+06, ]
+[Predictors] Refining with configuration [12, 2, 2.4e+06, ]: 0.000470801
+[Predictors] Replacing [12, 2, 2.4e+06, ]
+[Predictors] Primary prediction: 75.7994 Secondary prediction: 2157.12
+[Predictors] Primary error: 0.358075 Secondary error: 1.5574
+[Predictors] [Calibrator]: Moving to finished
+[Predictors] [Calibrator]: Finished in 15 steps with configuration [12, 2, 2.4e+06, ]
+[Predictors] [Calibrator]: Moving to seeds
+[Predictors] Refining with configuration [14, 2, 2.4e+06, ]: 76.3052
+[Predictors] Refining with configuration [12, 2, 2.4e+06, ]: 0.000468698
+[Predictors] Refining with configuration [14, 2, 1.6e+06, ]: 51.5122
+[Predictors] Refining with configuration [12, 2, 1.6e+06, ]: 0.000673453
+[Predictors] [Calibrator]: NumPoints: 1 MinNumPoints: 3
+[Predictors] Refining with configuration [8, 2, 2e+06, ]: 48.7482
+[Predictors] Refining with configuration [6, 2, 2e+06, ]: 0.000924037
+[Predictors] [Calibrator]: NumPoints: 2 MinNumPoints: 3
+[Predictors] Refining with configuration [19, 2, 1.3e+06, ]: 48.3946
+[Predictors] Refining with configuration [17, 2, 1.3e+06, ]: 0.000746594
+[Predictors] Error in model: 6.72741e-27
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 5.14861e-10
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [16, 2, 2.1e+06, ]
+[Predictors] Primary prediction: 75.6115
+[Predictors] Secondary prediction: 2233.45
+[Predictors] [Calibrator]: Moving to validate prediction.
+[Predictors] Refining with configuration [18, 2, 2.1e+06, ]: 77.2385
+[Predictors] Refining with configuration [16, 2, 2.1e+06, ]: 0.000539354
+[Predictors] Primary prediction: 75.6115 Secondary prediction: 2233.45
+[Predictors] Primary error: 2.10651 Secondary error: 20.4618
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [6, 2, 1.7e+06, ]: 36.6005
+[Predictors] Refining with configuration [4, 2, 1.7e+06, ]: 0.00161741
+[Predictors] Error in model: 0.635652
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 2.03141e-09
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [20, 2, 1.8e+06, ]
+[Predictors] Primary prediction: 75.6336
+[Predictors] Secondary prediction: 2080.73
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [22, 2, 1.8e+06, ]: 72.8146
+[Predictors] Refining with configuration [20, 2, 1.8e+06, ]: 0.000582666
+[Predictors] Primary prediction: 75.6336 Secondary prediction: 2080.73
+[Predictors] Primary error: 3.87152 Secondary error: 21.2371
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [16, 2, 2.1e+06, ]: 72.1166
+[Predictors] Refining with configuration [14, 2, 2.1e+06, ]: 0.000465521
+[Predictors] Error in model: 0.916271
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 2.88762e-09
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [21, 2, 1.8e+06, ]
+[Predictors] Primary prediction: 76.0493
+[Predictors] Secondary prediction: 2071.83
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [23, 2, 1.8e+06, ]: 74.3273
+[Predictors] Refining with configuration [21, 2, 1.8e+06, ]: 0.000539874
+[Predictors] Primary prediction: 76.0493 Secondary prediction: 2071.83
+[Predictors] Primary error: 2.31677 Secondary error: 11.8524
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [11, 2, 1.5e+06, ]: 41.9919
+[Predictors] Refining with configuration [9, 2, 1.5e+06, ]: 0.000879372
+[Predictors] Error in model: 0.942656
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 3.16942e-09
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [19, 2, 1.9e+06, ]
+[Predictors] Primary prediction: 75.6558
+[Predictors] Secondary prediction: 2056.63
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [21, 2, 1.9e+06, ]: 74.3109
+[Predictors] Refining with configuration [19, 2, 1.9e+06, ]: 0.000520912
+[Predictors] Primary prediction: 75.6558 Secondary prediction: 2056.63
+[Predictors] Primary error: 1.80974 Secondary error: 7.13256
+[Predictors] [Calibrator]: Moving to finished
+[Predictors] [Calibrator]: Finished in 9 steps with configuration [19, 2, 1.9e+06, ]

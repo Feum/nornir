@@ -1,0 +1,33 @@
+End of stream in input
+[Predictors] Generating first point: [11, 2, 2.4e+06, ]
+[Predictors] Found a new optimal watts: 76.0003 vs. 1.79769e+308
+[Predictors] Optimal: 11, 2400000
+[Predictors] Required BW: 322.76 Current BW: 1878.03 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [11, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 34.9937 vs. 76.0003
+[Predictors] Optimal: 11, 1200000
+[Predictors] Required BW: 321.565 Current BW: 940.029 Best frequency: 1200000
+[Predictors] New interval 1: [1,5,10]
+[Predictors] New interval 2: [12,17,22]
+[Predictors] We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 320.949 Current BW: 801.967 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 28.3733 vs. 34.9937
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 320.604 Current BW: 524.516 Best frequency: 1200000
+[Predictors] New interval 1: [1,2,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 320.399 Current BW: 520.208 Best frequency: 1500000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.5e+06, ]
+[Predictors] Required BW: 320.4 Current BW: 326.446 Best frequency: 1500000
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Trying with the right side. We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 319.872 Current BW: 1056.25 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 27.8762 vs. 28.3733
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 319.47 Current BW: 507.45 Best frequency: 1200000
+[Predictors] New interval 1: [6,5,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] Exploration finished with: [5, 2, 1.2e+06, ]

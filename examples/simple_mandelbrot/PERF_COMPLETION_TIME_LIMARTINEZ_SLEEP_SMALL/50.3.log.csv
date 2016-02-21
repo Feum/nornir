@@ -1,0 +1,40 @@
+Mandebroot set from (-2.125+I -1.5) to (0.875+I 1.5)
+resolution 67108864 pixel, Max. n. of iterations 4096 - Using 22 workers
+
+NOTE: using farm template WITH the collector module!
+
+amf started
+amf joined
+[Predictors] Generating first point: [11, 2, 2.4e+06, ]
+[Predictors] Found a new optimal watts: 67.6194 vs. 1.79769e+308
+[Predictors] Optimal: 11, 2400000
+[Predictors] Required BW: 22.1594 Current BW: 299.881 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [11, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 30.9457 vs. 67.6194
+[Predictors] Optimal: 11, 1200000
+[Predictors] Required BW: 21.88 Current BW: 112.432 Best frequency: 1200000
+[Predictors] New interval 1: [1,5,10]
+[Predictors] New interval 2: [12,17,22]
+[Predictors] We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 21.5521 Current BW: 98.8242 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 23.7551 vs. 30.9457
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 21.4637 Current BW: 48.8976 Best frequency: 1200000
+[Predictors] New interval 1: [1,2,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 21.3713 Current BW: 39.5499 Best frequency: 1300000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.3e+06, ]
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Trying with the right side. We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 21.253 Current BW: 95.0651 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Required BW: 21.1685 Current BW: 43.9801 Best frequency: 1200000
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Both side are worst. Terminated with: [5, 2, 1.2e+06, ]
+Run [0] DONE, time= 95875.1 (ms)
+Average on 1 experiments = 95875.1 (ms) Std. Dev. 0
+
+Press a key
+

@@ -1,0 +1,82 @@
+PARSEC Benchmark Suite
+Threadcount: 23
+15000 swaps per temperature step
+start temperature: 2000
+netlist filename: 2500000.nets
+number of temperature steps: 6000
+locs created
+locs assigned
+Just saw element: 100000
+Just saw element: 200000
+Just saw element: 300000
+Just saw element: 400000
+Just saw element: 500000
+Just saw element: 600000
+Just saw element: 700000
+Just saw element: 800000
+Just saw element: 900000
+Just saw element: 1000000
+Just saw element: 1100000
+Just saw element: 1200000
+Just saw element: 1300000
+Just saw element: 1400000
+Just saw element: 1500000
+Just saw element: 1600000
+Just saw element: 1700000
+Just saw element: 1800000
+Just saw element: 1900000
+Just saw element: 2000000
+Just saw element: 2100000
+Just saw element: 2200000
+Just saw element: 2300000
+Just saw element: 2400000
+Just saw element: 2500000
+netlist created. 2500000 elements.
+amf started
+amf joined
+Final routing is: 9.03349e+09
+Terminated
+Generated 6000 tasks.
+[Predictors] Generating first point: [11, 2, 2.4e+06, ]
+[Predictors] Found a new optimal watts: 62.0921 vs. 1.79769e+308
+[Predictors] Optimal: 11, 2400000
+[Predictors] Required BW: 29.2646 Current BW: 282.104 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [11, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 29.9623 vs. 62.0921
+[Predictors] Optimal: 11, 1200000
+[Predictors] Required BW: 29.1821 Current BW: 185.113 Best frequency: 1200000
+[Predictors] New interval 1: [1,5,10]
+[Predictors] New interval 2: [12,17,23]
+[Predictors] We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 29.1008 Current BW: 115.53 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 22.3749 vs. 29.9623
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 29.0363 Current BW: 84.9584 Best frequency: 1200000
+[Predictors] New interval 1: [1,2,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 28.9846 Current BW: 54.0915 Best frequency: 1300000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.3e+06, ]
+[Predictors] Found a new optimal watts: 20.1363 vs. 22.3749
+[Predictors] Optimal: 2, 1300000
+[Predictors] Required BW: 28.9657 Current BW: 35.5321 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 19.2417 vs. 20.1363
+[Predictors] Optimal: 2, 1200000
+[Predictors] Required BW: 28.9509 Current BW: 34.2377 Best frequency: 1200000
+[Predictors] New interval 1: [1,1,1]
+[Predictors] New interval 2: [3,2,1]
+[Predictors] We move to [1, 2, 2.4e+06, ]
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Trying with the right side. We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 28.9304 Current BW: 46.4953 Best frequency: 1500000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.5e+06, ]
+[Predictors] Required BW: 28.9067 Current BW: 37.9221 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 18.7515 vs. 19.2417
+[Predictors] Optimal: 2, 1200000
+[Predictors] Required BW: 28.8914 Current BW: 34.1545 Best frequency: 1200000
+[Predictors] New interval 1: [3,2,1]
+[Predictors] New interval 2: [3,2,1]
+[Predictors] Exploration finished with: [2, 2, 1.2e+06, ]

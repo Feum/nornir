@@ -1,0 +1,52 @@
+Mandebroot set from (-2.125+I -1.5) to (0.875+I 1.5)
+resolution 67108864 pixel, Max. n. of iterations 4096 - Using 22 workers
+
+NOTE: using farm template WITH the collector module!
+
+amf started
+amf joined
+[Predictors] Generating first point: [11, 2, 2.4e+06, ]
+[Predictors] Found a new optimal watts: 64.7926 vs. 1.79769e+308
+[Predictors] Optimal: 11, 2400000
+[Predictors] Required BW: 16.0448 Current BW: 302.608 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [11, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 31.0949 vs. 64.7926
+[Predictors] Optimal: 11, 1200000
+[Predictors] Required BW: 15.8297 Current BW: 112.793 Best frequency: 1200000
+[Predictors] New interval 1: [1,5,10]
+[Predictors] New interval 2: [12,17,22]
+[Predictors] We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 15.5742 Current BW: 98.885 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 23.7217 vs. 31.0949
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 15.4965 Current BW: 48.911 Best frequency: 1200000
+[Predictors] New interval 1: [1,2,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 15.4111 Current BW: 39.8165 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 20.2707 vs. 23.7217
+[Predictors] Optimal: 2, 1200000
+[Predictors] Required BW: 15.4014 Current BW: 19.5009 Best frequency: 1200000
+[Predictors] New interval 1: [1,1,1]
+[Predictors] New interval 2: [3,2,1]
+[Predictors] We move to [1, 2, 2.4e+06, ]
+[Predictors] Required BW: 15.3914 Current BW: 19.3861 Best frequency: 2000000
+[Predictors] Keeping going down on frequencies. We move to: [1, 2, 2e+06, ]
+[Predictors] Required BW: 15.3903 Current BW: 16.1194 Best frequency: 2000000
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Trying with the right side. We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 15.362 Current BW: 37.9444 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 20.1319 vs. 20.2707
+[Predictors] Optimal: 2, 1200000
+[Predictors] Required BW: 15.3538 Current BW: 18.6133 Best frequency: 1200000
+[Predictors] New interval 1: [3,2,1]
+[Predictors] New interval 2: [3,2,1]
+[Predictors] Exploration finished with: [2, 2, 1.2e+06, ]
+Run [0] DONE, time= 231287 (ms)
+Average on 1 experiments = 231287 (ms) Std. Dev. 0
+
+Press a key
+

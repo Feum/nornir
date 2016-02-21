@@ -1,0 +1,43 @@
+Mandebroot set from (-2.125+I -1.5) to (0.875+I 1.5)
+resolution 67108864 pixel, Max. n. of iterations 4096 - Using 22 workers
+
+NOTE: using farm template WITH the collector module!
+
+amf started
+amf joined
+[Predictors] Generating first point: [11, 2, 2.4e+06, ]
+[Predictors] Found a new optimal watts: 65.785 vs. 1.79769e+308
+[Predictors] Optimal: 11, 2400000
+[Predictors] Required BW: 22.2363 Current BW: 304.021 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [11, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 30.9807 vs. 65.785
+[Predictors] Optimal: 11, 1200000
+[Predictors] Required BW: 21.9561 Current BW: 112.932 Best frequency: 1200000
+[Predictors] New interval 1: [1,5,10]
+[Predictors] New interval 2: [12,17,22]
+[Predictors] We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 21.6274 Current BW: 98.9287 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 23.7749 vs. 30.9807
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 21.539 Current BW: 48.9259 Best frequency: 1200000
+[Predictors] New interval 1: [1,2,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 21.4466 Current BW: 39.9081 Best frequency: 1300000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.3e+06, ]
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Trying with the right side. We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 21.3281 Current BW: 95.5487 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 23.6572 vs. 23.7749
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 21.2432 Current BW: 44.3266 Best frequency: 1200000
+[Predictors] New interval 1: [6,5,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] Exploration finished with: [5, 2, 1.2e+06, ]
+Run [0] DONE, time= 95824 (ms)
+Average on 1 experiments = 95824 (ms) Std. Dev. 0
+
+Press a key
+

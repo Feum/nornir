@@ -1,0 +1,63 @@
+PARSEC Benchmark Suite
+Threadcount: 23
+15000 swaps per temperature step
+start temperature: 2000
+netlist filename: 2500000.nets
+number of temperature steps: 6000
+locs created
+locs assigned
+Just saw element: 100000
+Just saw element: 200000
+Just saw element: 300000
+Just saw element: 400000
+Just saw element: 500000
+Just saw element: 600000
+Just saw element: 700000
+Just saw element: 800000
+Just saw element: 900000
+Just saw element: 1000000
+Just saw element: 1100000
+Just saw element: 1200000
+Just saw element: 1300000
+Just saw element: 1400000
+Just saw element: 1500000
+Just saw element: 1600000
+Just saw element: 1700000
+Just saw element: 1800000
+Just saw element: 1900000
+Just saw element: 2000000
+Just saw element: 2100000
+Just saw element: 2200000
+Just saw element: 2300000
+Just saw element: 2400000
+Just saw element: 2500000
+netlist created. 2500000 elements.
+amf started
+amf joined
+Final routing is: 9.03209e+09
+Terminated
+Generated 6000 tasks.
+[Predictors] Minimum number of points required for calibration: 3
+[Predictors] [Calibrator]: NumPoints: 0 MinNumPoints: 3
+[Predictors] Refining with configuration [5, 2, 1.4e+06, ]: 0.0105156
+[Predictors] Refining with configuration [6, 2, 1.4e+06, ]: 26.5145
+[Predictors] [Calibrator]: NumPoints: 1 MinNumPoints: 3
+[Predictors] Refining with configuration [21, 2, 1.8e+06, ]: 0.00223835
+[Predictors] Refining with configuration [22, 2, 1.8e+06, ]: 63.5454
+[Predictors] [Calibrator]: NumPoints: 2 MinNumPoints: 3
+[Predictors] Refining with configuration [11, 2, 1.2e+06, ]: 0.00530621
+[Predictors] Refining with configuration [12, 2, 1.2e+06, ]: 29.1986
+[Predictors] Error in model: 1.56733e-36
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 2.95613e-14
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [10, 2, 1.2e+06, ]
+[Predictors] Primary prediction: 170.462
+[Predictors] Secondary prediction: 28.424
+[Predictors] [Calibrator]: Moving to validate prediction.
+[Predictors] Refining with configuration [10, 2, 1.2e+06, ]: 0.00585075
+[Predictors] Refining with configuration [11, 2, 1.2e+06, ]: 28.245
+[Predictors] Primary prediction: 170.462 Secondary prediction: 28.424
+[Predictors] Primary error: 0.266847 Secondary error: 0.633881
+[Predictors] [Calibrator]: Moving to finished
+[Predictors] [Calibrator]: Finished in 3 steps with configuration [10, 2, 1.2e+06, ]

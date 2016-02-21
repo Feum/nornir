@@ -1,0 +1,43 @@
+PARSEC Benchmark Suite
+Num of Options: 10000000
+Num of Runs: 100
+Size of data: 400000000
+amf started
+Generating end of stream.amf joined
+[Predictors] Generating first point: [11, 2, 2.4e+06, ]
+[Predictors] Found a new optimal watts: 59.6796 vs. 1.79769e+308
+[Predictors] Optimal: 11, 2400000
+[Predictors] Required BW: 5002.32 Current BW: 57532 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [11, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 31.1945 vs. 59.6796
+[Predictors] Optimal: 11, 1200000
+[Predictors] Required BW: 4954.46 Current BW: 29134.2 Best frequency: 1200000
+[Predictors] New interval 1: [1,5,10]
+[Predictors] New interval 2: [12,17,23]
+[Predictors] We move to [5, 2, 2.4e+06, ]
+[Predictors] Required BW: 4932.24 Current BW: 26384.7 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [5, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 23.0229 vs. 31.1945
+[Predictors] Optimal: 5, 1200000
+[Predictors] Required BW: 4915.68 Current BW: 13268.1 Best frequency: 1200000
+[Predictors] New interval 1: [1,2,4]
+[Predictors] New interval 2: [6,5,4]
+[Predictors] We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 4909.84 Current BW: 10539.3 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.2e+06, ]
+[Predictors] Found a new optimal watts: 19.4366 vs. 23.0229
+[Predictors] Optimal: 2, 1200000
+[Predictors] Required BW: 4909.06 Current BW: 5303.11 Best frequency: 1200000
+[Predictors] New interval 1: [1,1,1]
+[Predictors] New interval 2: [3,2,1]
+[Predictors] We move to [1, 2, 2.4e+06, ]
+[Predictors] Required BW: 4908.68 Current BW: 5314.54 Best frequency: 2300000
+[Predictors] Keeping going down on frequencies. We move to: [1, 2, 2.3e+06, ]
+[Predictors] Required BW: 4908.49 Current BW: 5094.65 Best frequency: 2300000
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Trying with the right side. We move to [2, 2, 2.4e+06, ]
+[Predictors] Required BW: 4902.65 Current BW: 10599.7 Best frequency: 1200000
+[Predictors] Keeping going down on frequencies. We move to: [2, 2, 1.2e+06, ]
+[Predictors] Required BW: 4901.84 Current BW: 5308.98 Best frequency: 1200000
+[Predictors] This number of workers is worst than the best we found up to now.
+[Predictors] Both side are worst. Terminated with: [2, 2, 1.2e+06, ]

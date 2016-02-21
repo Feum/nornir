@@ -12,6 +12,7 @@ import numpy as np
 RESULTS_FILE = 'REPARA_results.csv'
 powersList = []
 timesList = []
+bandwidthList = []
 
 iterations = 5
 
@@ -35,24 +36,27 @@ class cd:
     def __exit__(self, etype, value, traceback):
         os.chdir(self.savedPath)
 
-def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, calstrategy, fastreconf, aging, conservative, knobworkers, itnum):
+def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, calstrategy, fastreconf, aging, conservative, knobworkers, polling, itnum):
     with cd(bench):
         parametersFile = open("parameters.xml", "w")
         parametersFile.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
         parametersFile.write("<adaptivityParameters>\n")
-        parametersFile.write("<strategyPolling>SLEEP_SMALL</strategyPolling>\n")
+        parametersFile.write("<strategyPolling>" + polling + "</strategyPolling>\n")
         parametersFile.write("<statsReconfiguration>true</statsReconfiguration>\n")
         parametersFile.write("<strategyPrediction>" + args.prediction + "</strategyPrediction>\n")
         parametersFile.write("<contractType>" + contractType + "</contractType>\n")
         parametersFile.write("<" + fieldName + ">" + str(fieldValue) + "</" + fieldName + ">\n")
         
         maxPerformanceError = 10.0
+        maxPowerError = 10.0
         if bench == 'simple_mandelbrot':
             maxPerformanceError = 20.0
 
-        if contractType == "PERF_COMPLETION_TIME":
+        if contractType == "PERF_COMPLETION_TIME" or contractType == "PERF_BANDWIDTH":
             parametersFile.write("<maxPrimaryPredictionError>" + str(maxPerformanceError) + "</maxPrimaryPredictionError>\n")
+            parametersFile.write("<maxSecondaryPredictionError>" + str(maxPowerError) + "</maxSecondaryPredictionError>\n")
         else:
+            parametersFile.write("<maxPrimaryPredictionError>" + str(maxPowerError) + "</maxPrimaryPredictionError>\n")
             parametersFile.write("<maxSecondaryPredictionError>" + str(maxPerformanceError) + "</maxSecondaryPredictionError>\n")
 
         if fastreconf:
@@ -65,6 +69,8 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
 
         if knobworkers is not None:
             parametersFile.write("<knobWorkers>" + knobworkers + "</knobWorkers>\n")
+            if 'MAPPING' in knobworkers:
+                parametersFile.write("<knobHyperthreading>KNOB_HT_SOONER</knobHyperthreading>\n")
 
         if bench == 'blackscholes':
             run = "./blackscholes 23 inputs/in_10M.txt tmp.txt"
@@ -93,13 +99,15 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
             parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
             parametersFile.write("<persistenceValue>1</persistenceValue>\n")
         elif bench == 'videoprocessing':
-            run = "./video 0 1 0 22 VIRAT/960X540.mp4 VIRAT/480X270.mp4 VIRAT/480X270.mp4 VIRAT/960X540.mp4"
+            #run = "./video 0 1 0 22 VIRAT/960X540.mp4 VIRAT/480X270.mp4 VIRAT/480X270.mp4 VIRAT/960X540.mp4"
+            run = "./video 0 1 0 22 VIRAT/480X270.mp4"
             parametersFile.write("<qSize>1</qSize>\n")
             parametersFile.write("<samplingIntervalCalibration>10</samplingIntervalCalibration>\n")
             parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
             parametersFile.write("<minTasksPerSample>5</minTasksPerSample>\n")
-            parametersFile.write("<expectedTasksNumber>64790</expectedTasksNumber>\n")
-            parametersFile.write("<smoothingFactor>0.7</smoothingFactor>\n")
+            parametersFile.write("<expectedTasksNumber>19567</expectedTasksNumber>\n")
+            #parametersFile.write("<smoothingFactor>0.7</smoothingFactor>\n")
+            parametersFile.write("<smoothingFactor>0.1</smoothingFactor>\n")
             parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
             parametersFile.write("<persistenceValue>1</persistenceValue>\n")
         elif bench == 'simple_mandelbrot':
@@ -129,11 +137,13 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
 
         time = -1
         watts = -1
+        bandwidth = -1
         calibrationSteps = -1
         calibrationTime = -1
         calibrationTimePerc = -1
         calibrationTasks = -1
         calibrationTasksPerc = -1
+        calibrationWatts = -1
         reconfigurationTimeWorkersAvg = -1
         reconfigurationTimeWorkersStddev = -1
         reconfigurationTimeFrequencyAvg = -1
@@ -144,18 +154,20 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
             result = getLastLine("summary.csv")
             time = float(result.split('\t')[2])
             watts = float(result.split('\t')[0])
+            bandwidth = float(result.split('\t')[1])
 
             calibrationSteps = float(result.split('\t')[3])
             calibrationTime = float(result.split('\t')[4])
             calibrationTimePerc = float(result.split('\t')[5])
             calibrationTasks = float(result.split('\t')[6])
             calibrationTasksPerc = float(result.split('\t')[7])
-            reconfigurationTimeWorkersAvg = float(result.split('\t')[8])
-            reconfigurationTimeWorkersStddev = float(result.split('\t')[9])
-            reconfigurationTimeFrequencyAvg = float(result.split('\t')[10])
-            reconfigurationTimeFrequencyStddev = float(result.split('\t')[11])
-            reconfigurationTimeTotalAvg = float(result.split('\t')[14])
-            reconfigurationTimeTotalStddev = float(result.split('\t')[15])
+            calibrationWatts = float(result.split('\t')[8])
+            reconfigurationTimeWorkersAvg = float(result.split('\t')[9])
+            reconfigurationTimeWorkersStddev = float(result.split('\t')[10])
+            reconfigurationTimeFrequencyAvg = float(result.split('\t')[12])
+            reconfigurationTimeFrequencyStddev = float(result.split('\t')[12])
+            reconfigurationTimeTotalAvg = float(result.split('\t')[15])
+            reconfigurationTimeTotalStddev = float(result.split('\t')[16])
         except:
             print "nothing"
 
@@ -164,23 +176,41 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
                 os.rename(outfile, dir_results + "/" + str(percentile) + "." + str(itnum) + "." + outfile)
 
     # Returns data
-    return time, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg
+    return bandwidth, time, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, calibrationWatts, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg
 
 def loadPerfPowerData(bench):
     with cd(bench):
-        fh = open(RESULTS_FILE, "r")
+        fh = open(args.resultsfile, "r")
         for line in fh:
             #Workers Frequency Time Watts
             if line[0] != '#':
                 fields = line.split("\t")
                 timesList.append(float(fields[2]))
                 powersList.append(float(fields[3]))
+                if len(fields) > 4:
+                    bandwidthList.append(float(fields[4]))
 
         fh.close()
 
+def getOptimalBandwidthBound(bw, bench):
+    with cd(bench):
+        fh = open(args.resultsfile, "r")
+        bestPower = 99999999999
+        for line in fh:
+            #Workers Frequency Time Watts Bandwidth
+            if line[0] != '#':
+                fields = line.split("\t")
+                curbw = float(fields[2])
+                curpower = float(fields[3])
+                if curpower < bestPower and curbw >= float(bw):
+                    bestPower = curpower
+
+        fh.close()
+        return bestPower
+
 def getOptimalTimeBound(time, bench):
     with cd(bench):
-        fh = open(RESULTS_FILE, "r")
+        fh = open(args.resultsfile, "r")
         bestPower = 99999999999
         for line in fh:
             #Workers Frequency Time Watts
@@ -196,7 +226,7 @@ def getOptimalTimeBound(time, bench):
 
 def getOptimalPowerBound(power, bench):
     with cd(bench):
-        fh = open(RESULTS_FILE, "r")
+        fh = open(args.resultsfile, "r")
         bestTime = 9999999999
         for line in fh:
             #Workers Frequency Time Watts
@@ -212,6 +242,7 @@ def getOptimalPowerBound(power, bench):
 ############################################################################################################
 
 parser = argparse.ArgumentParser(description='Runs the application to check the accuracy of the reconfiguration.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('-r', '--resultsfile', help='Post mortem results file.', required=False, default=RESULTS_FILE)
 parser.add_argument('-b', '--benchmark', help='Benchmark.', required=True)
 parser.add_argument('-p', '--prediction', help='Prediction strategy.', required=True)
 parser.add_argument('-c', '--contract', help='Contract type.', required=True)
@@ -220,6 +251,7 @@ parser.add_argument('-f', '--fastreconf', help='Fast reconfiguration.', required
 parser.add_argument('-a', '--aging', help='Aging factor.', required=False)
 parser.add_argument('-o', '--conservative', help='Conservative value.', required=False)
 parser.add_argument('-w', '--knobworkers', help='Knob Workers.', required=False)
+parser.add_argument('-l', '--polling', help='Polling strategy.', required=False, default="SLEEP_SMALL")
 
 args = parser.parse_args()
 
@@ -237,6 +269,8 @@ if args.aging:
     rdir += '_AGING' + str(args.aging)
 if args.conservative:
     rdir += '_CONSERVATIVE' + str(args.conservative)
+if args.polling:
+    rdir += '_' + str(args.polling)
 
 with cd(args.benchmark):
     shutil.rmtree(rdir, ignore_errors=True)
@@ -248,6 +282,7 @@ outFile.write("#Percentile\tPrimaryRequired\tPrimaryLossCnt\tPrimaryAvg\tPrimary
               "CalibrationStepsAvg\tCalibrationStepsStddev\t" \
               "CalibrationTimeAvg\tCalibrationTimeStddev\tCalibrationTimePercAvg\tCalibrationTimePercStddev\t"
               "CalibrationTaksAvg\tCalibrationTasksStddev\tCalibrationTasksPercAvg\tCalibrationTasksPercStddev\t"
+              "CalibrationWattsAvg\tCalibrationWattsStddev\t"
               "ReconfigurationTimeWorkersAvg\tReconfigurationTimeWorkersStddev\t"
               "ReconfigurationTimeFrequencyAvg\tReconfigurationTimeFrequencyStddev\t"
               "ReconfigurationTimeTotalAvg\tReconfigurationTimeTotalStddev\n")
@@ -261,6 +296,7 @@ for p in xrange(10, 100, 20):
     calibrationsTimePerc = []
     calibrationsTasks = []
     calibrationsTasksPerc = []
+    calibrationsWatts = []
     primaryLosses = []
     secondaryLosses = []
     reconfigurationTimesWorkers = []
@@ -282,6 +318,8 @@ for p in xrange(10, 100, 20):
     stddevCalibrationTasks = 0
     avgCalibrationTasksPerc = 0
     stddevCalibrationTasksPerc = 0
+    avgCalibrationWatts = 0
+    stddevCalibrationWatts = 0
     avgReconfigurationTimeWorkers = 0
     stddevReconfigurationTimeWorkers = 0
     avgReconfigurationTimeFrequency = 0
@@ -296,7 +334,20 @@ for p in xrange(10, 100, 20):
 
     for i in xrange(0, iterations):
         ct = -1
-        if args.contract == "PERF_COMPLETION_TIME":
+        if args.contract == 'PERF_BANDWIDTH':
+            #minBw = min(bandwidthList) TODO
+            #maxBw = max(bandwidthList) TODO
+            minBw = 22
+            maxBw = 680
+            targetBw = minBw + (maxBw - minBw)*(p/100.0)
+            target = targetBw
+            while ct == -1:
+                bw, ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, calibrationWatts, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "PERF_BANDWIDTH", "requiredBandwidth", targetBw, p, rdir, args.calstrategy, args.fastreconf, args.aging, args.conservative, args.knobworkers, args.polling, i)
+            opt = getOptimalBandwidthBound(targetBw, args.benchmark)
+            primaryReq = targetBw
+            primaryLoss = ((targetBw - bw) / targetBw ) * 100.0
+            secondaryLoss = ((watts - opt) / opt) * 100.0
+        elif args.contract == "PERF_COMPLETION_TIME":
             ############################
             # targetTime = np.percentile(np.array(timesList), p)
             ############################
@@ -305,7 +356,7 @@ for p in xrange(10, 100, 20):
             targetTime = minTime + (maxTime - minTime)*(p/100.0)  
             target = targetTime
             while ct == -1:
-                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p, rdir, args.calstrategy, args.fastreconf, args.aging, args.conservative, args.knobworkers, i)
+                bw, ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, calibrationWatts, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "PERF_COMPLETION_TIME", "requiredCompletionTime", targetTime, p, rdir, args.calstrategy, args.fastreconf, args.aging, args.conservative, args.knobworkers, args.polling, i)
             opt = getOptimalTimeBound(targetTime, args.benchmark)
             primaryReq = targetTime
             primaryLoss = ((ct - targetTime) / targetTime ) * 100.0
@@ -319,7 +370,7 @@ for p in xrange(10, 100, 20):
             targetPower = minPower + (maxPower - minPower)*(p/100.0)
             target = targetPower
             while ct == -1:
-                ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "POWER_BUDGET", "powerBudget", targetPower, p, rdir, args.calstrategy, args.fastreconf, args.aging, args.conservative, args.knobworkers, i)
+                bw, ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, calibrationWatts, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "POWER_BUDGET", "powerBudget", targetPower, p, rdir, args.calstrategy, args.fastreconf, args.aging, args.conservative, args.knobworkers, args.polling, i)
             opt = getOptimalPowerBound(targetPower, args.benchmark)
             primaryReq = targetPower
             primaryLoss = ((watts - targetPower) / targetPower) * 100.0
@@ -332,6 +383,7 @@ for p in xrange(10, 100, 20):
         calibrationsTimePerc.append(calibrationTimePerc)
         calibrationsTasks.append(calibrationTasks)
         calibrationsTasksPerc.append(calibrationTasksPerc)
+        calibrationsWatts.append(calibrationWatts)
         if primaryLoss > 0:
             primaryLosses.append(primaryLoss)
         else:
@@ -375,6 +427,8 @@ for p in xrange(10, 100, 20):
     stddevCalibrationTasks = np.std(calibrationsTasks)
     avgCalibrationTasksPerc = np.average(calibrationsTasksPerc)
     stddevCalibrationTasksPerc = np.std(calibrationsTasksPerc)
+    avgCalibrationWatts = np.average(calibrationsWatts)
+    stddevCalibrationWatts = np.std(calibrationsWatts)
     avgReconfigurationTimeWorkers = np.average(reconfigurationTimesWorkers)
     stddevReconfigurationTimeWorkers = np.std(reconfigurationTimesWorkers)
     avgReconfigurationTimeFrequency = np.average(reconfigurationTimesFrequency)
@@ -387,6 +441,7 @@ for p in xrange(10, 100, 20):
                                   str(avgCalibrationSteps) + "\t" + str(stddevCalibrationSteps) + "\t" + 
                                   str(avgCalibrationTime) + "\t" + str(stddevCalibrationTime) + "\t" + str(avgCalibrationTimePerc) + "\t" + str(stddevCalibrationTimePerc) + "\t" + 
                                   str(avgCalibrationTasks) + "\t" + str(stddevCalibrationTasks) + "\t" + str(avgCalibrationTasksPerc) + "\t" + str(stddevCalibrationTasksPerc) + "\t" +
+                                  str(avgCalibrationWatts) + "\t" + str(stddevCalibrationWatts) + "\t" +
                                   str(avgReconfigurationTimeWorkers) + "\t" + str(stddevReconfigurationTimeWorkers) + "\t" +
                                   str(avgReconfigurationTimeFrequency) + "\t" + str(stddevReconfigurationTimeFrequency) + "\t" + 
                                   str(avgReconfigurationTimeTotal) + "\t" + str(stddevReconfigurationTimeTotal) + "\n")

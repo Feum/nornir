@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adaptivityParameters>
+<strategyPolling>SLEEP_SMALL</strategyPolling>
+<statsReconfiguration>true</statsReconfiguration>
+<strategyPrediction>REGRESSION_LINEAR</strategyPrediction>
+<contractType>PERF_COMPLETION_TIME</contractType>
+<requiredCompletionTime>191.7555</requiredCompletionTime>
+<maxPrimaryPredictionError>10.0</maxPrimaryPredictionError>
+<maxSecondaryPredictionError>10.0</maxSecondaryPredictionError>
+<strategyCalibration>HALTON</strategyCalibration>
+<qSize>4</qSize>
+<samplingIntervalCalibration>100</samplingIntervalCalibration>
+<samplingIntervalSteady>1000</samplingIntervalSteady>
+<smoothingFactor>0.1</smoothingFactor>
+<minTasksPerSample>500</minTasksPerSample>
+<strategyPersistence>SAMPLES</strategyPersistence>
+<persistenceValue>1</persistenceValue>
+</adaptivityParameters>

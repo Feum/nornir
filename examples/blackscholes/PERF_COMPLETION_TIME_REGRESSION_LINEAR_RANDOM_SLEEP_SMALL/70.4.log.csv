@@ -1,0 +1,87 @@
+PARSEC Benchmark Suite
+Num of Options: 10000000
+Num of Runs: 100
+Size of data: 400000000
+amf started
+Generating end of stream.amf joined
+[Predictors] Minimum number of points required for calibration: 3
+[Predictors] [Calibrator]: NumPoints: 0 MinNumPoints: 3
+[Predictors] Refining with configuration [4, 2, 1.3e+06, ]: 8.7528e-05
+[Predictors] Refining with configuration [5, 2, 1.3e+06, ]: 30.2099
+[Predictors] [Calibrator]: NumPoints: 1 MinNumPoints: 3
+[Predictors] Refining with configuration [11, 2, 1.9e+06, ]: 2.18091e-05
+[Predictors] Refining with configuration [12, 2, 1.9e+06, ]: 49.9692
+[Predictors] [Calibrator]: NumPoints: 2 MinNumPoints: 3
+[Predictors] Refining with configuration [14, 2, 2.2e+06, ]: 1.47973e-05
+[Predictors] Refining with configuration [15, 2, 2.2e+06, ]: 66.4479
+[Predictors] Error in model: 1.60712e-40
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 1.27574e-14
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [2, 2, 1.2e+06, ]
+[Predictors] Primary prediction: 5277.32
+[Predictors] Secondary prediction: 27.1778
+[Predictors] [Calibrator]: Moving to validate prediction.
+[Predictors] Refining with configuration [2, 2, 1.2e+06, ]: 0.000188895
+[Predictors] Refining with configuration [3, 2, 1.2e+06, ]: 19.5815
+[Predictors] Primary prediction: 5277.32 Secondary prediction: 27.1778
+[Predictors] Primary error: 0.313843 Secondary error: 38.7932
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [9, 2, 2.1e+06, ]: 2.40681e-05
+[Predictors] Refining with configuration [10, 2, 2.1e+06, ]: 45.6734
+[Predictors] Error in model: 6.25312e-16
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Error in model: 5.81229
+[Predictors] ========================== Preparing for predictions: ========================== 
+[Predictors] Best solution found [1, 2, 1.6e+06, ]
+[Predictors] Primary prediction: 3539.14
+[Predictors] Secondary prediction: 22.4822
+[Predictors] [Calibrator]: Prediction forced.
+[Predictors] Refining with configuration [1, 2, 1.6e+06, ]: 0.000282007
+[Predictors] Refining with configuration [2, 2, 1.6e+06, ]: 20.7708
+[Predictors] Primary prediction: 3539.14 Secondary prediction: 22.4822
+[Predictors] Primary error: 0.193811 Secondary error: 8.23981
+[Predictors] [Calibrator]: Moving to finished
+[Predictors] [Calibrator]: Finished in 5 steps with configuration [1, 2, 1.6e+06, ]
+[Predictors] Refining with configuration [1, 2, 1.6e+06, ]: 0.0002838
+[Predictors] Replacing [1, 2, 1.6e+06, ]
+[Predictors] Refining with configuration [2, 2, 1.6e+06, ]: 20.8011
+[Predictors] Replacing [2, 2, 1.6e+06, ]
+[Predictors] Refining with configuration [3, 2, 1.3e+06, ]: 0.000118983
+[Predictors] Refining with configuration [4, 2, 1.3e+06, ]: 21.3685
+[Predictors] Refining with configuration [15, 2, 1.3e+06, ]: 2.332e-05
+[Predictors] Refining with configuration [16, 2, 1.3e+06, ]: 39.8432
+[Predictors] Refining with configuration [6, 2, 2e+06, ]: 3.7784e-05
+[Predictors] Refining with configuration [7, 2, 2e+06, ]: 36.5126
+[Predictors] Refining with configuration [10, 2, 1.8e+06, ]: 2.52027e-05
+[Predictors] Refining with configuration [11, 2, 1.8e+06, ]: 41.9503
+[Predictors] Refining with configuration [19, 2, 1.6e+06, ]: 1.49913e-05
+[Predictors] Refining with configuration [20, 2, 1.6e+06, ]: 57.0497
+[Predictors] Refining with configuration [5, 2, 2.1e+06, ]: 4.3184e-05
+[Predictors] Refining with configuration [6, 2, 2.1e+06, ]: 35.4217
+[Predictors] Refining with configuration [19, 2, 1.3e+06, ]: 1.84673e-05
+[Predictors] Refining with configuration [20, 2, 1.3e+06, ]: 46.3175
+[Predictors] Refining with configuration [12, 2, 2e+06, ]: 1.8918e-05
+[Predictors] Refining with configuration [13, 2, 2e+06, ]: 55.1269
+[Predictors] Refining with configuration [5, 2, 2.3e+06, ]: 3.94096e-05
+[Predictors] Refining with configuration [6, 2, 2.3e+06, ]: 45.1312
+[Predictors] Refining with configuration [23, 2, 2.4e+06, ]: 8.27325e-06
+[Predictors] Refining with configuration [24, 2, 2.4e+06, ]: 100.576
+[Predictors] Refining with configuration [19, 2, 1.3e+06, ]: 1.84551e-05
+[Predictors] Replacing [19, 2, 1.3e+06, ]
+[Predictors] Refining with configuration [20, 2, 1.3e+06, ]: 46.4215
+[Predictors] Replacing [20, 2, 1.3e+06, ]
+[Predictors] Refining with configuration [8, 2, 2.4e+06, ]: 2.36235e-05
+[Predictors] Refining with configuration [9, 2, 2.4e+06, ]: 51.7924
+[Predictors] Refining with configuration [18, 2, 2.1e+06, ]: 1.2054e-05
+[Predictors] Refining with configuration [19, 2, 2.1e+06, ]: 73.7515
+[Predictors] Refining with configuration [2, 2, 2.3e+06, ]: 9.86675e-05
+[Predictors] Refining with configuration [3, 2, 2.3e+06, ]: 32.39
+[Predictors] Refining with configuration [4, 2, 1.7e+06, ]: 6.6615e-05
+[Predictors] Refining with configuration [5, 2, 1.7e+06, ]: 27.5307
+[Predictors] Refining with configuration [15, 2, 1.5e+06, ]: 2.02144e-05
+[Predictors] Refining with configuration [16, 2, 1.5e+06, ]: 45.9908
+[Predictors] Refining with configuration [12, 2, 1.5e+06, ]: 2.5223e-05
+[Predictors] Refining with configuration [13, 2, 1.5e+06, ]: 40.7643
+[Predictors] Refining with configuration [20, 2, 1.5e+06, ]: 1.52045e-05
+[Predictors] Refining with configuration [21, 2, 1.5e+06, ]: 46.0819

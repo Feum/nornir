@@ -38,14 +38,16 @@ fields['CalibrationTaksAvg'] = 18
 fields['CalibrationTasksStddev'] = 19
 fields['CalibrationTasksPercAvg'] = 20
 fields['CalibrationTasksPercStddev'] = 21
-fields['ReconfigurationTimeWorkersAvg'] = 22
-fields['ReconfigurationTimeWorkersStddev'] = 23
-fields['ReconfigurationTimeFrequencyAvg'] = 24
-fields['ReconfigurationTimeFrequencyStddev'] = 25
-fields['ReconfigurationTimeTotalAvg'] = 26
-fields['ReconfigurationTimeTotalStddev'] = 27
+fields['CalibrationWattsAvg'] = 22
+fields['CalibrationWattsStddev'] = 23
+fields['ReconfigurationTimeWorkersAvg'] = 24
+fields['ReconfigurationTimeWorkersStddev'] = 25
+fields['ReconfigurationTimeFrequencyAvg'] = 26
+fields['ReconfigurationTimeFrequencyStddev'] = 27
+fields['ReconfigurationTimeTotalAvg'] = 28
+fields['ReconfigurationTimeTotalStddev'] = 29
 
-alternatives = ('LIMARTINEZ', 'REGRESSION_LINEAR_RANDOM', 'REGRESSION_LINEAR_HALTON', 'REGRESSION_LINEAR_HALTON_FAST')
+alternatives = ('LIMARTINEZ_SLEEP_SMALL', 'REGRESSION_LINEAR_RANDOM_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_SLEEP_LATENCY', 'REGRESSION_LINEAR_HALTON_FAST_SPINNING', 'REGRESSION_LINEAR_HALTON_FAST_MAPPING_SLEEP_SMALL')
 alternativesReconfTime = ('REGRESSION_LINEAR_HALTON', 'REGRESSION_LINEAR_HALTON_FAST')
 alternativesMandelPerf = ('LIMARTINEZ', 'REGRESSION_LINEAR_HALTON_FAST', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE10', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE20', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE30')
 alternativesMandelPower = ('LIMARTINEZ', 'REGRESSION_LINEAR_HALTON_FAST', 'REGRESSION_LINEAR_HALTON_FAST_AGING3', 'REGRESSION_LINEAR_HALTON_FAST_AGING6', 'REGRESSION_LINEAR_HALTON_FAST_AGING10')
@@ -60,6 +62,10 @@ def printField(bench, contract, alt, field):
         for i in xrange(10, 100, 20):
             fieldsLine = fh.readline()
             fieldValue = float(fieldsLine.split('\t')[fields[field]])
+            if 'CalibrationWatts' in field and 'POWER_BUDGET' in contract:
+                budget = float(fieldsLine.split('\t')[fields['PrimaryRequired']])
+                fieldValue = ((fieldValue - budget)/budget)*100.0
+                
             if field != 'PrimaryLossAvg' or fieldValue != 0:
                 values.append(fieldValue)
 
@@ -108,24 +114,15 @@ if args.contract is not None:
 
 sys.stdout.write('#Bench\t')
 
-if 'ReconfigurationTime' in args.field:
-    for alt in alternativesReconfTime:
-        sys.stdout.write(getAlt(alt) + '_AVG\t' + getAlt(alt) + '_STDDEV\t')
-    print ""
-else:
-    for alt in alternatives:
-        sys.stdout.write(getAlt(alt) + '_AVG\t' + getAlt(alt) + '_STDDEV\t')
-    print ""
+for alt in alternatives:
+    sys.stdout.write(getAlt(alt) + '_AVG\t' + getAlt(alt) + '_STDDEV\t')
+print ""
 
 for bench in benchmarks:
     sys.stdout.write(bench + '\t')
     for contract in contracts:
-        if not 'ReconfigurationTime' in args.field:
-            for alt in alternatives:
-                printField(bench, contract, alt, args.field)
-            print ""
-        else:
-            for alt in alternativesReconfTime:
-                printField(bench, contract, alt, args.field)
-            print ""
+        for alt in alternatives:
+            printField(bench, contract, alt, args.field)
+        print ""
+
 
