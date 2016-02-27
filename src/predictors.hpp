@@ -173,12 +173,13 @@ public:
     virtual ~Predictor();
 
     /**
-     * Gets the number of minimum points needed.
-     * Let this number be x. The user need to call
-     * refine() method at least x times before
-     * starting doing predictions.
+     * Returns true if the predictor is ready to make prediction.
+     * If false is returned, we need to refine the model with
+     * more points.
+     * @return true if the predictor is ready to make prediction,
+     *         false otherwise.
      */
-    virtual uint getMinimumPointsNeeded(){return 0;}
+    virtual bool readyForPredictions(){return true;}
 
     /**
      * Clears the predictor removing all the collected
@@ -242,7 +243,7 @@ public:
 
     void clear();
 
-    uint getMinimumPointsNeeded();
+    bool readyForPredictions();
 
     bool refine();
 
@@ -299,7 +300,6 @@ protected:
     Predictor* _secondaryPredictor;
 private:
     std::vector<CalibrationStats> _calibrationStats;
-    size_t _minNumPoints;
     uint _calibrationStartMs;
     uint64_t _calibrationStartTasks;
     mammut::Mammut _localMammut;

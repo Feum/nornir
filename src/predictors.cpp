@@ -46,7 +46,7 @@
 #define DEBUGB(x)
 #endif
 
-#define NO_PREDICTION DBL_MIN
+#define NOT_VALID DBL_MIN
 
 namespace adpff{
 
@@ -310,9 +310,10 @@ void PredictorLinearRegression::clear(){
     _currentAgingId = 0;
 }
 
-uint PredictorLinearRegression::getMinimumPointsNeeded(){
+bool PredictorLinearRegression::readyForPredictions(){
     _predictionInput->init(_configuration.getRealValues());
-    return std::max<uint>(_predictionInput->getNumPredictors(), 2);
+    uint minPoints = std::max<uint>(_predictionInput->getNumPredictors(), 2);
+    return _observations.size() >= minPoints;
 }
 
 double PredictorLinearRegression::getCurrentResponse() const{
@@ -371,7 +372,7 @@ bool PredictorLinearRegression::refine(){
 }
 
 void PredictorLinearRegression::prepareForPredictions(){
-    if(_observations.size() < getMinimumPointsNeeded()){
+    if(!readyForPredictions()){
         throw std::runtime_error("prepareForPredictions: Not enough " 
                                  "points are present");
     }
@@ -506,12 +507,6 @@ Calibrator::Calibrator(const Parameters& p,
         }break;
     }
 
-    if(_primaryPredictor && _secondaryPredictor){
-        _minNumPoints = std::max(_primaryPredictor->getMinimumPointsNeeded(),
-                                 _secondaryPredictor->getMinimumPointsNeeded());
-        DEBUG("Minimum number of points required for calibration: " << _minNumPoints);
-    }
-
     _joulesCounter = _localMammut.getInstanceEnergy()->getCounter();
     //TODO Fare meglio con mammut
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
@@ -523,8 +518,12 @@ bool Calibrator::refine(){
     return p & s;
 }
 
-bool Calibrator::isAccurate(double primaryValue,
-                                      double secondaryValue) const{
+bool Calibrator::isAccurate(double primaryValue, double secondaryValue) const{
+    if(_primaryPrediction == NOT_VALID ||
+       _secondaryPrediction == NOT_VALID){
+        return false;
+    }
+
     double primaryError = std::abs((primaryValue - _primaryPrediction)/
                                    primaryValue)*100.0;
     double secondaryError = 0;
@@ -701,7 +700,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
     }else{
         DEBUG("Suboptimal solution found.");
         _primaryPrediction = bestSuboptimalValue;
-        _secondaryPrediction = NO_PREDICTION;
+        _secondaryPrediction = NOT_VALID;
         return bestSuboptimalValues;
     }
 }
@@ -711,8 +710,8 @@ bool Calibrator::isContractViolated(double primaryValue) const{
 }
 
 bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{
-    return (_thisPrimary != -1 && (primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary)) ||
-        (_thisSecondary != -1 && (secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary));
+    return (_thisPrimary != NOT_VALID && (primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary)) ||
+        (_thisSecondary != NOT_VALID && (secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary));
 }
 
 void Calibrator::startCalibrationStat(uint64_t totalTasks){
@@ -765,6 +764,9 @@ void Calibrator::updateConservativeValue(){
         case CONTRACT_POWER_BUDGET:{
             _conservativeValue = _samples->coefficientVariation().watts;
         }break;
+        default:{
+            ;
+        }break;
     }
 }
 
@@ -804,26 +806,27 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
     switch(_state){
         case CALIBRATION_SEEDS:{
             _noFeasible = false;
-            if(_numCalibrationPoints < _minNumPoints){
+            if(!_primaryPredictor->readyForPredictions() ||
+               !_secondaryPredictor->readyForPredictions()){
                 kv = generateRelativeKnobsValues();
+                _primaryPrediction = NOT_VALID;
+                _secondaryPrediction = NOT_VALID;
             }else{
-                if(!isAccurate(primaryValue, secondaryValue) ||
-                   _numCalibrationPoints == _minNumPoints){
+                if(!isAccurate(primaryValue, secondaryValue)){
                     kv = generateRelativeKnobsValues();
                     updatePredictions(kv);
                     DEBUG("[Calibrator]: High prediction error. Adding new seed.");
                 }else{
                     kv = getBestKnobsValues(primaryValue);
-                    DEBUG("[Calibrator]: Low error but the contract is violated, adjusting.");
 
-                    if(_secondaryPrediction == NO_PREDICTION){
+                    if(_secondaryPrediction == NOT_VALID){
                         DEBUG("No feasible solutions found.");
                         _noFeasible = true;
                     }
 
                     _state = CALIBRATION_FINISHED;
-                    _thisPrimary = -1; // primaryValue;
-                    _thisSecondary = -1; //secondaryValue;
+                    _thisPrimary = NOT_VALID;
+                    _thisSecondary = NOT_VALID;
 
                     DEBUG("[Calibrator]: Moving to finished");
                     DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints <<
