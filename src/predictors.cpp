@@ -469,10 +469,10 @@ Calibrator::Calibrator(const Parameters& p,
         _state(CALIBRATION_SEEDS),
         _calibrationStartMs(0),
         _calibrationStartTasks(0),
-        _firstPointGenerated(false), _forcePrediction(false),
+        _firstPointGenerated(false),
         _primaryPrediction(0), _secondaryPrediction(0),
-        _thisPrimary(0), _thisSecondary(0), _noFeasible(false){
-
+        _thisPrimary(0), _thisSecondary(0), _noFeasible(false),
+        _contractViolations(0), _conservativeValue(_p.conservativeValue){
 
     PredictorType primary, secondary;
     switch(p.contractType){
@@ -523,37 +523,24 @@ bool Calibrator::refine(){
     return p & s;
 }
 
-AccuracyResult Calibrator::checkAccuracy(double primaryValue, double secondaryValue) const{
+bool Calibrator::isAccurate(double primaryValue,
+                                      double secondaryValue) const{
     double primaryError = std::abs((primaryValue - _primaryPrediction)/
                                    primaryValue)*100.0;
     double secondaryError = 0;
+    secondaryError = std::abs((secondaryValue - _secondaryPrediction)/
+                               secondaryValue)*100.0;
 
-    if(_secondaryPrediction != NO_PREDICTION){
-        secondaryError = std::abs((secondaryValue - _secondaryPrediction)/
-                                   secondaryValue)*100.0;
+    DEBUG("Primary prediction: " << _primaryPrediction << " " <<
+          "Secondary prediction: " << _secondaryPrediction);
+    DEBUG("Primary error: " << primaryError << " " <<
+          "Secondary error: " << secondaryError);
 
-        DEBUG("Primary prediction: " << _primaryPrediction << " " <<
-              "Secondary prediction: " << _secondaryPrediction);
-        DEBUG("Primary error: " << primaryError << " " <<
-              "Secondary error: " << secondaryError);
-
-        if(primaryError > _p.maxPrimaryPredictionError ||
-           secondaryError > _p.maxSecondaryPredictionError){
-            return ACCURACY_NO;
-        }else{
-            return ACCURACY_OK;
-        }
+    if(primaryError > _p.maxPrimaryPredictionError ||
+       secondaryError > _p.maxSecondaryPredictionError){
+        return false;
     }else{
-        DEBUG("Primary prediction: " << _primaryPrediction);
-        DEBUG("Primary error: " << primaryError);
-        // We never predicted the secondary value because
-        // there are no feasible solutions.
-        secondaryError = 0.0;
-        if(primaryError > _p.maxPrimaryPredictionError){
-            return ACCURACY_NO;
-        }else{
-            return ACCURACY_NO_FEASIBLE;
-        }
+        return true;
     }
 }
 
@@ -615,7 +602,7 @@ bool Calibrator::isFeasiblePrimaryValue(double value, bool conservative) const{
         case CONTRACT_PERF_UTILIZATION:{
             if(conservative){
                 conservativeOffset = ((_p.overloadThresholdFarm - _p.underloadThresholdFarm) *
-                                       _p.conservativeValue) / 100.0;
+                                       _conservativeValue) / 100.0;
             }
             return value > _p.underloadThresholdFarm + conservativeOffset &&
                    value < _p.overloadThresholdFarm - conservativeOffset;
@@ -623,13 +610,13 @@ bool Calibrator::isFeasiblePrimaryValue(double value, bool conservative) const{
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
             if(conservative){
-                conservativeOffset = (_p.requiredBandwidth * _p.conservativeValue) / 100.0;
+                conservativeOffset = (_p.requiredBandwidth * _conservativeValue) / 100.0;
             }
             return value > _p.requiredBandwidth + conservativeOffset;
         }break;
         case CONTRACT_POWER_BUDGET:{
             if(conservative){
-                conservativeOffset = (_p.powerBudget * _p.conservativeValue) / 100.0;
+                conservativeOffset = (_p.powerBudget * _conservativeValue) / 100.0;
             }
             return value < _p.powerBudget - conservativeOffset;
         }break;
@@ -724,8 +711,8 @@ bool Calibrator::isContractViolated(double primaryValue) const{
 }
 
 bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{
-    return primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary ||
-           secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary;
+    return (_thisPrimary != -1 && (primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary)) ||
+        (_thisSecondary != -1 && (secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary));
 }
 
 void Calibrator::startCalibrationStat(uint64_t totalTasks){
@@ -749,6 +736,19 @@ void Calibrator::stopCalibrationStat(uint64_t totalTasks){
         _calibrationStats.push_back(cs);
         _numCalibrationPoints = 0;
     }
+}
+
+void Calibrator::updatePredictions(const KnobsValues& next){
+    KnobsValues real;
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        double realv;
+        _configuration.getKnob((KnobType)i)->getRealFromRelative(next[(KnobType)i], realv);
+        real[(KnobType)i] = realv;
+    }
+    _primaryPredictor->prepareForPredictions();
+    _secondaryPredictor->prepareForPredictions();
+    _primaryPrediction = _primaryPredictor->predict(real);
+    _secondaryPrediction = _secondaryPredictor->predict(real);
 }
 
 KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
@@ -776,7 +776,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
         if(_state == CALIBRATION_FINISHED){
             ;
         }else{
-            bool newPoint = refine();
+            refine();
             ++_numCalibrationPoints;
         }
     }else{
@@ -789,42 +789,25 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             _noFeasible = false;
             if(_numCalibrationPoints < _minNumPoints){
                 kv = generateRelativeKnobsValues();
-                DEBUG("[Calibrator]: NumPoints: " << _numCalibrationPoints << " MinNumPoints: " << _minNumPoints);
             }else{
-                kv = getBestKnobsValues(primaryValue);
-                _state = CALIBRATION_VALIDATE_PREDICTION;
-                _forcePrediction = false;
-                DEBUG("[Calibrator]: Moving to validate prediction.");
-            }
-        }break;
-        case CALIBRATION_VALIDATE_PREDICTION:{
-            if(_forcePrediction){
-                kv = getBestKnobsValues(primaryValue);
-                _forcePrediction = false;
-                DEBUG("[Calibrator]: Prediction forced.");
-            }else{
-                AccuracyResult ar = checkAccuracy(primaryValue, secondaryValue);
-                if(ar == ACCURACY_NO){
+                if(!isAccurate(primaryValue, secondaryValue) ||
+                   _numCalibrationPoints == _minNumPoints){
                     kv = generateRelativeKnobsValues();
-                    _forcePrediction = true;
+                    updatePredictions(kv);
                     DEBUG("[Calibrator]: High prediction error. Adding new seed.");
-                }else if(ar == ACCURACY_OK || ar == ACCURACY_NO_FEASIBLE){
-                    if(ar == ACCURACY_NO_FEASIBLE){
+                }else{
+                    kv = getBestKnobsValues(primaryValue);
+                    DEBUG("[Calibrator]: Low error but the contract is violated, adjusting.");
+
+                    if(_secondaryPrediction == NO_PREDICTION){
                         DEBUG("No feasible solutions found.");
                         _noFeasible = true;
                     }
-                    
-                    if((contractViolated && !_noFeasible && ar != ACCURACY_NO_FEASIBLE)){
-                        kv = getBestKnobsValues(primaryValue);
-                        DEBUG("[Calibrator]: Low error but the contract is violated, adjusting.");
-                    }else{
-                        --_numCalibrationPoints;
-                        kv = _configuration.getRealValues();
-                    }
+
                     _state = CALIBRATION_FINISHED;
-                    _thisPrimary = primaryValue;
-                    _thisSecondary = secondaryValue;
-                       
+                    _thisPrimary = -1; // primaryValue;
+                    _thisSecondary = -1; //secondaryValue;
+
                     DEBUG("[Calibrator]: Moving to finished");
                     DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints <<
                           " steps with configuration " << kv);
@@ -833,11 +816,28 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             }
         }break;
         case CALIBRATION_FINISHED:{
-            if((!_noFeasible && contractViolated) || 
-               phaseChanged(primaryValue, secondaryValue)){
+            if(_contractViolations >= 1){
+                _conservativeValue = _p.conservativeValue + _contractViolations;
+            }
+
+            if(phaseChanged(primaryValue, secondaryValue)){
                 kv = reset();
+
+                _state = CALIBRATION_SEEDS;
                 startCalibrationStat(totalTasks);
+
+                _contractViolations = 0;
+            }else if((!_noFeasible && contractViolated) ||
+                     !isAccurate(primaryValue, secondaryValue)){
+                kv = generateRelativeKnobsValues();
+                updatePredictions(kv);
+
                 refine();
+
+                _state = CALIBRATION_SEEDS;
+                startCalibrationStat(totalTasks);
+
+                ++_contractViolations;
             }else{
                 kv = _configuration.getRealValues();
             }
@@ -951,7 +951,6 @@ KnobsValues CalibratorLowDiscrepancy::generateRelativeKnobsValues() const{
 KnobsValues CalibratorLowDiscrepancy::reset(){
     gsl_qrng_init(_generator);
     KnobsValues kv = generateRelativeKnobsValues();
-    _state = CALIBRATION_SEEDS;
     _primaryPredictor->clear();
     _secondaryPredictor->clear();
     DEBUG("[Calibrator]: Moving to seeds");

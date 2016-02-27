@@ -612,6 +612,11 @@ public:
     // such to have a low performance overhead [default = 0].
     uint32_t samplingIntervalSteady;
 
+    // If the application stays in the steady phase for at least
+    // steadyThreshold samples, then we consider the application to be stedy
+    // [default = 4].
+    uint32_t steadyThreshold;
+
     /// The minimum number of tasks in a worker sample. If 0, no minimum.
     /// [default = 0].
     uint minTasksPerSample;

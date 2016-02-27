@@ -282,18 +282,8 @@ public:
  */
 typedef enum{
     CALIBRATION_SEEDS = 0,
-    CALIBRATION_VALIDATE_PREDICTION,
     CALIBRATION_FINISHED
 }CalibrationState;
-
-/**
- * Result of an accuracy check.
- */
-typedef enum{
-    ACCURACY_OK = 0,
-    ACCURACY_NO,
-    ACCURACY_NO_FEASIBLE
-}AccuracyResult;
 
 /**
  * Used to obtain calibration points.
@@ -315,14 +305,15 @@ private:
     mammut::Mammut _localMammut;
     mammut::energy::Counter* _joulesCounter;
     bool _firstPointGenerated;
-    bool _forcePrediction;
     double _primaryPrediction;
     double _secondaryPrediction;
     double _thisPrimary;
     double _thisSecondary;
     bool _noFeasible;
+    uint _contractViolations;
+    double _conservativeValue;
 
-    AccuracyResult checkAccuracy(double primaryValue, double secondaryValue) const;
+    bool isAccurate(double primaryValue, double secondaryValue) const;
     bool refine();
 
     /**
@@ -345,6 +336,11 @@ private:
      * @param conservative If true applies the conservativeValue.
      */
     bool isFeasiblePrimaryValue(double value, bool conservative) const;
+
+    /**
+     * Updates the predictions for the next configuration.
+     */
+    void updatePredictions(const KnobsValues& next);
 protected:
     /**
      * Checks if the contract is violated.

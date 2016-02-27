@@ -148,6 +148,7 @@ void Parameters::setDefault(){
     persistenceValue = 0;
     samplingIntervalCalibration = 0;
     samplingIntervalSteady = 0;
+    steadyThreshold = 4;
     minTasksPerSample = 0;
     underloadThresholdFarm = 80.0;
     overloadThresholdFarm = 90.0;
@@ -525,6 +526,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Double, persistenceValue);
     SETVALUE(xt, Uint, samplingIntervalCalibration);
     SETVALUE(xt, Uint, samplingIntervalSteady);
+    SETVALUE(xt, Uint, steadyThreshold);
     SETVALUE(xt, Uint, minTasksPerSample);
     SETVALUE(xt, Double, underloadThresholdFarm);
     SETVALUE(xt, Double, overloadThresholdFarm);

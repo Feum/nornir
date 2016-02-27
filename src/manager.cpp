@@ -511,11 +511,16 @@ void ManagerFarm<lb_t, gt_t>::run(){
     double overheadMs = 0;
 
     uint samplingInterval;
+    uint steadySamples = 0;
 
     while(!_terminated){
         overheadMs = getMillisecondsTime() - startSample;
         if(_calibrator->isCalibrating()){
             samplingInterval = _p.samplingIntervalCalibration;
+            steadySamples = 0;
+        }else if(steadySamples < _p.steadyThreshold){
+            samplingInterval = _p.samplingIntervalCalibration;
+            steadySamples++;
         }else{
             samplingInterval = _p.samplingIntervalSteady;
         }
