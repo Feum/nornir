@@ -751,6 +751,23 @@ void Calibrator::updatePredictions(const KnobsValues& next){
     _secondaryPrediction = _secondaryPredictor->predict(real);
 }
 
+void Calibrator::updateConservativeValue(){
+    /*
+    if(_contractViolations >= 1){
+        _conservativeValue = _p.conservativeValue + _contractViolations;
+    }*/
+    switch(_p.contractType){
+        case CONTRACT_PERF_COMPLETION_TIME:
+        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_UTILIZATION:{
+            _conservativeValue = _samples->coefficientVariation().bandwidth;
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            _conservativeValue = _samples->coefficientVariation().watts;
+        }break;
+    }
+}
+
 KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                                            double secondaryValue,
                                            u_int64_t totalTasks){
@@ -816,9 +833,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             }
         }break;
         case CALIBRATION_FINISHED:{
-            if(_contractViolations >= 1){
-                _conservativeValue = _p.conservativeValue + _contractViolations;
-            }
+            updateConservativeValue();
 
             if(phaseChanged(primaryValue, secondaryValue)){
                 kv = reset();

@@ -339,8 +339,14 @@ private:
 
     /**
      * Updates the predictions for the next configuration.
+     * @param next The next configuration.
      */
     void updatePredictions(const KnobsValues& next);
+
+    /**
+     * Updates the conservative value.
+     */
+    void updateConservativeValue();
 protected:
     /**
      * Checks if the contract is violated.
