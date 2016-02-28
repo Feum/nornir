@@ -450,8 +450,8 @@ public:
     virtual T standardDeviation() const = 0;
 
     /**
-     * Returns the coefficient of variation of the stored samples.
-     * @return The coefficient of variation of the stored samples.
+     * Returns the coefficient of variation of the stored samples [0, 100].
+     * @return The coefficient of variation of the stored samples [0, 100].
      */
     virtual T coefficientVariation() const = 0;
 };

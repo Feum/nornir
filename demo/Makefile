@@ -1,4 +1,4 @@
-TARGET               = demo-farm demo-farm-sendout
+TARGET               = demo-farm demo-farm-sendout demo-farm-new
 
 .PHONY: clean cleanall
 

@@ -82,7 +82,7 @@ public:
         --ntask;
         if (ntask<0){
             std::cout << "Emitter finished" << std::endl;
-            return NULL;
+            TERMINATE_APPLICATION;
         }
         return task;
     }

@@ -307,13 +307,14 @@ private:
     bool _firstPointGenerated;
     double _primaryPrediction;
     double _secondaryPrediction;
+    double _primaryError;
+    double _secondaryError;
     double _thisPrimary;
     double _thisSecondary;
     bool _noFeasible;
     uint _contractViolations;
-    double _conservativeValue;
 
-    bool isAccurate(double primaryValue, double secondaryValue) const;
+    bool isAccurate(double primaryValue, double secondaryValue);
     bool refine();
 
     /**
@@ -343,10 +344,9 @@ private:
      */
     void updatePredictions(const KnobsValues& next);
 
-    /**
-     * Updates the conservative value.
-     */
-    void updateConservativeValue();
+    double getPrimaryVariation() const;
+
+    double getSecondaryVariation() const;
 protected:
     /**
      * Checks if the contract is violated.

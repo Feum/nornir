@@ -33,61 +33,48 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "../src/manager.hpp"
+#include "../src/interface.hpp"
 
 using namespace ff;
 
-// generic worker
-class Worker: public adpff::AdaptiveNode{
+//#define MICROSECSSLEEP 200000
+#define MICROSECSSLEEP 1000000
+
+static int maxTasks;
+
+class Emitter: public adpff::Scheduler<int>{
 public:
-    int svc_init(){
-        std::cout << "Worker svc_init called" << std::endl;
-        return 0;
-    }
-
-    void * svc(void * task) {
-        int * t = (int *)task;
-        sleep(1);
-        std::cout << "Worker " << ff_node::get_my_id()
-                  << " received task " << *t << "\n";
-        ff_send_out(task);
-        return GO_ON;
-    }
-    // I don't need the following functions for this test
-    //int   svc_init() { return 0; }
-    //void  svc_end() {}
-
-};
-
-// the gatherer filter
-class Collector: public adpff::AdaptiveNode {
-public:
-    void * svc(void * task) {
-        int * t = (int *)task;
-        if (*t == -1) return NULL;
+    int* schedule() {
+        usleep(MICROSECSSLEEP);
+        int * task = new int(maxTasks);
+        --maxTasks;
+        if (maxTasks < 0){
+            std::cout << "Emitter finished" << std::endl;
+            return NULL;
+        }
         return task;
     }
 };
 
-// the load-balancer filter
-class Emitter: public adpff::AdaptiveNode {
-public:
-    Emitter(int max_task):ntask(max_task) {};
 
-    void * svc(void *) {
-        while(ntask >= 0){
-            sleep(1);
-            int * task = new int(ntask);
-            --ntask;
-            ff_send_out(task);
-        }
-        std::cout << "Emitter finished" << std::endl;
-        TERMINATE_APPLICATION;
+// generic worker
+class Worker: public adpff::Worker<int, int>{
+public:
+    int * compute(int * task) {
+        usleep(MICROSECSSLEEP);
+        std::cout << "Worker " << ff_node::get_my_id()
+                  << " received task " << *task << "\n";
+        return task;
     }
-private:
-    int ntask;
 };
 
+// the gatherer filter
+class Collector: public adpff::Gatherer<int> {
+public:
+    void gather(int* task) {
+        std::cout << "Collector received task " << *task << "\n";
+    }
+};
 
 int main(int argc, char * argv[]) {
     int nworkers = 1;
@@ -100,40 +87,23 @@ int main(int argc, char * argv[]) {
                       << " nworkers streamlen\n";
             return -1;
         }   
-        nworkers=atoi(argv[1]);
-        streamlen=atoi(argv[2]);
+        nworkers = atoi(argv[1]);
+        streamlen = atoi(argv[2]);
     }
 
     if (!nworkers || !streamlen) {
         std::cerr << "Wrong parameters values\n";
         return -1;
     }
-    
-    ff::ff_farm<> farm; // farm object
-    
-    Emitter E(streamlen);
-    farm.add_emitter(&E);
 
-    std::vector<ff_node *> w;
-    for(int i=0;i<nworkers;++i) w.push_back(new Worker);
-    farm.add_workers(w); // add all workers to the farm
+    maxTasks = streamlen;
 
-    Collector C;
-    farm.add_collector(&C);
-    
-    adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml", "archdata.xml");
-    ap.observer = &obs;
-    adpff::ManagerFarm<> amf(&farm, ap);
-    std::cout << "Starting manager. " << std::endl;
-    amf.start();
-    std::cout << "Manager started. " << std::endl;
-    amf.join();
-    std::cout << "Manager joined. " << std::endl;
-
-    std::cout << "Farm end" << std::endl;
-    std::cerr << "DONE, time= " << farm.ffTime() << " (ms)\n";
-    farm.ffStats(std::cerr);
+    adpff::Farm<int, int> farm("parameters.xml", "archdata.xml");
+    std::cout << "Starting farm. " << std::endl;
+    farm.start<Emitter, Worker, Collector>(nworkers);
+    std::cout << "Farm started. " << std::endl;
+    farm.wait();
+    std::cout << "Farm joined. " << std::endl;
 
     return 0;
 }
