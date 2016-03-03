@@ -394,6 +394,12 @@ void PredictorLinearRegression::prepareForPredictions(){
             ++i;
         }
     }
+   
+    if(_p.regressionAging && _agingVector.size() != _observations.size()){
+        dataMl.resize(_observations.begin()->second.data->getNumPredictors(),
+                      _agingVector.size());
+        responsesMl.resize(_agingVector.size());
+    }
 
     _lr = LinearRegression(dataMl, responsesMl);
     DEBUG("Error in model: " << _lr.ComputeError(dataMl, responsesMl));
@@ -532,7 +538,7 @@ double Calibrator::getPrimaryVariation() const{
             return _samples->coefficientVariation().watts;
         }break;
         default:{
-            ;
+            return 0;
         }break;
     }
 }
@@ -548,7 +554,7 @@ double Calibrator::getSecondaryVariation() const{
             return _samples->coefficientVariation().bandwidth / 100.0;
         }break;
         default:{
-            ;
+            return 0;
         }break;
     }
 }
@@ -633,10 +639,7 @@ bool Calibrator::isFeasiblePrimaryValue(double value, bool conservative) const{
 
     if(conservative && !conservativeValue){
         //conservativeValue = std::max(getPrimaryVariation(), (double) _contractViolations);
-        //conservativeValue = _contractViolations;
-        if(_primaryError){
-            conservativeValue = _primaryError + 1;
-        }
+        conservativeValue = _contractViolations;
     }
 
     switch(_p.contractType){
@@ -876,9 +879,8 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 _state = CALIBRATION_SEEDS;
                 startCalibrationStat(totalTasks);
 
-                ++_contractViolations;
-                
                 if(contractViolated){
+                    ++_contractViolations; //TODO: Prima era fuori dall'if
                     DEBUG("[Calibrator]: Contract violated, adding more points");
                 }else{
                     DEBUG("[Calibrator]: Inaccurate model, adding more points");
