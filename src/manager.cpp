@@ -309,8 +309,11 @@ bool ManagerFarm<lb_t, gt_t>::persist() const{
         }break;
         case STRATEGY_PERSISTENCE_VARIATION:{
             const MonitoredSample& variation = _samples->coefficientVariation();
-            r = getPrimaryValue(variation) < _p.persistenceValue &&
-                getSecondaryValue(variation) < _p.persistenceValue;
+            double primaryVariation =  getPrimaryValue(variation);
+            double secondaryVariation =  getSecondaryValue(variation);
+            r = _samples->size() > 1 &&
+                primaryVariation < _p.persistenceValue &&
+                secondaryVariation < _p.persistenceValue;
         }break;
     }
     return r;

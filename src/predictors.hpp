@@ -164,6 +164,7 @@ protected:
     const Parameters& _p;
     const FarmConfiguration& _configuration;
     const Smoother<MonitoredSample>* _samples;
+    double _modelError;
 public:
     Predictor(PredictorType type,
               const Parameters& p,
@@ -206,6 +207,13 @@ public:
      * @return The predicted value at a specific combination of real knobs values.
      */
     virtual double predict(const KnobsValues& realValues) = 0;
+
+    /**
+     * Returns the model error, i.e. the error between the observations and the
+     * predictions.
+     * @return The model error.
+     */
+    virtual double getModelError(){return _modelError;}
 };
 
 

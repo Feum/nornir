@@ -269,7 +269,7 @@ Predictor::Predictor(PredictorType type,
                      const FarmConfiguration& configuration,
                      const Smoother<MonitoredSample>* samples):
         _type(type), _p(p), _configuration(configuration),
-        _samples(samples){
+        _samples(samples), _modelError(0){
     ;
 }
 
@@ -402,8 +402,8 @@ void PredictorLinearRegression::prepareForPredictions(){
     }
 
     _lr = LinearRegression(dataMl, responsesMl);
-    DEBUG("Error in model: " << _lr.ComputeError(dataMl, responsesMl));
-    DEBUG("========================== Preparing for predictions: ========================== ");
+    _modelError =  _lr.ComputeError(dataMl, responsesMl);
+    DEBUG("Error in model: " << _modelError);
 }
 
 double PredictorLinearRegression::predict(const KnobsValues& values){
@@ -575,7 +575,9 @@ bool Calibrator::isAccurate(double primaryValue, double secondaryValue){
           "Secondary error: " << _secondaryError);
 
     if(std::abs(_primaryError) > _p.maxPrimaryPredictionError ||
-       std::abs(_secondaryError) > _p.maxSecondaryPredictionError){
+       std::abs(_secondaryError) > _p.maxSecondaryPredictionError /* ||
+       _primaryPredictor->getModelError() > 10 ||
+       _secondaryPredictor->getModelError() > 10*/){
         return false;
     }else{
         return true;
@@ -707,6 +709,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
     for(size_t i = 0; i < combinations.size(); i++){
         KnobsValues currentValues = combinations.at(i);
         primaryPrediction = _primaryPredictor->predict(currentValues);
+        //        primaryPrediction += (_primaryError / 100.0)*primaryPrediction; //TODO Experimental
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
                 primaryPrediction = (_samples->average().bandwidth / primaryPrediction) *
@@ -720,6 +723,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
         //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
             secondaryPrediction = _secondaryPredictor->predict(currentValues);
+            //            secondaryPrediction += (_secondaryError / 100.0)*secondaryPrediction; //TODO Experimental
             //std::cout << secondaryPrediction;
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
@@ -735,6 +739,9 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
         //std::cout << std::endl;
     }
 
+    //    primaryPrediction -= (_primaryError / 100.0)*primaryPrediction; //TODO Experimental
+    //    secondaryPrediction -= (_secondaryError / 100.0)*secondaryPrediction; //TODO Experimental
+
     if(feasibleSolutionFound){
         DEBUG("Best solution found " << bestValues);
         _primaryPrediction = bestPrimaryPrediction;
@@ -746,6 +753,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
         DEBUG("Suboptimal solution found.");
         _primaryPrediction = bestSuboptimalValue;
         _secondaryPrediction = NOT_VALID;
+        _noFeasible = true;
         return bestSuboptimalValues;
     }
 }
@@ -800,6 +808,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                                            u_int64_t totalTasks){
     KnobsValues kv;
     bool contractViolated = isContractViolated(primaryValue);
+    bool accurate = isAccurate(primaryValue, secondaryValue);
 
     /**
      * The first point is generated as soon as the application starts.
@@ -830,24 +839,18 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
 
     switch(_state){
         case CALIBRATION_SEEDS:{
-            _noFeasible = false;
             if(!_primaryPredictor->readyForPredictions() ||
                !_secondaryPredictor->readyForPredictions()){
                 kv = generateRelativeKnobsValues();
                 _primaryPrediction = NOT_VALID;
                 _secondaryPrediction = NOT_VALID;
             }else{
-                if(!isAccurate(primaryValue, secondaryValue)){
+                if(!accurate){
                     kv = generateRelativeKnobsValues();
                     updatePredictions(kv);
                     DEBUG("[Calibrator]: High prediction error. Adding new seed.");
                 }else{
                     kv = getBestKnobsValues(primaryValue);
-
-                    if(_secondaryPrediction == NOT_VALID){
-                        DEBUG("No feasible solutions found.");
-                        _noFeasible = true;
-                    }
 
                     _state = CALIBRATION_FINISHED;
                     _thisPrimary = NOT_VALID;
@@ -870,7 +873,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 _contractViolations = 0;
                 DEBUG("[Calibrator]: Phase changed, ricalibrating");
             }else if((!_noFeasible && contractViolated) ||
-                     !isAccurate(primaryValue, secondaryValue)){
+                     !accurate){
                 kv = generateRelativeKnobsValues();
                 updatePredictions(kv);
 
@@ -879,11 +882,11 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 _state = CALIBRATION_SEEDS;
                 startCalibrationStat(totalTasks);
 
-                if(contractViolated){
-                    ++_contractViolations; //TODO: Prima era fuori dall'if
-                    DEBUG("[Calibrator]: Contract violated, adding more points");
-                }else{
+                if(!accurate){
                     DEBUG("[Calibrator]: Inaccurate model, adding more points");
+                }else{
+                    ++_contractViolations;
+                    DEBUG("[Calibrator]: Contract violated, adding more points");
                 }
             }else{
                 kv = _configuration.getRealValues();
