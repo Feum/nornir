@@ -157,6 +157,7 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
 
         /****************** Clean state ******************/
         _samples->reset();
+        _variations->reset();
         Joules joules = getAndResetJoules();
         if(_p.observer){
             _p.observer->addJoules(joules);
@@ -296,6 +297,7 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     }
 
     _samples->add(sample);
+    _variations->add(getPrimaryValue(_samples->coefficientVariation()));
 
     DEBUGB(samplesFile << *_samples << "\n");
 }
@@ -311,9 +313,14 @@ bool ManagerFarm<lb_t, gt_t>::persist() const{
             const MonitoredSample& variation = _samples->coefficientVariation();
             double primaryVariation =  getPrimaryValue(variation);
             double secondaryVariation =  getSecondaryValue(variation);
-            r = _samples->size() > 1 &&
-                primaryVariation < _p.persistenceValue &&
-                secondaryVariation < _p.persistenceValue;
+            r = _samples->size() < 1 ||
+                primaryVariation > _p.persistenceValue ||
+                secondaryVariation > _p.persistenceValue;
+#if 0
+            double primaryVariation = _variations->coefficientVariation();
+            std::cout << "Variation size: " << _variations->size() << " PrimaryVariation: " << primaryVariation << std::endl;
+            r = _variations->size() < 2 || primaryVariation > _p.persistenceValue;
+#endif
         }break;
     }
     return r;
@@ -377,6 +384,7 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
         _collector(dynamic_cast<AdaptiveNode*>(_farm->getCollector())),
         _activeWorkers(convertWorkers(_farm->getWorkers())),
         _samples(initSamples()),
+        _variations(new MovingAverageExponential<double>(0.5)),
         _configuration(_p, _emitter, _collector, _farm->getgt(), _activeWorkers,
                        _samples, &_terminated),
         _totalTasks(0),
@@ -390,6 +398,7 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
 template <typename lb_t, typename gt_t>
 ManagerFarm<lb_t, gt_t>::~ManagerFarm(){
     delete _samples;
+    delete _variations;
     if(_calibrator){
         delete _calibrator;
     }

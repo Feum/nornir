@@ -560,14 +560,31 @@ double Calibrator::getSecondaryVariation() const{
 }
 
 bool Calibrator::isAccurate(double primaryValue, double secondaryValue){
-    if(_primaryPrediction == NOT_VALID || _secondaryPrediction == NOT_VALID){
-        return false;
+    double primaryValueUp = primaryValue + primaryValue * (getPrimaryVariation() / 100.0);
+    double primaryValueDown = primaryValue - primaryValue * (getPrimaryVariation() / 100.0);
+    double primaryComp = 0;
+    if(_primaryPrediction < primaryValue){
+        primaryComp = primaryValueDown;
+    }else{
+        primaryComp = primaryValueUp;
+    }
+    
+    double secondaryValueUp = secondaryValue + secondaryValue * (getSecondaryVariation() / 100.0);
+    double secondaryValueDown = secondaryValue - secondaryValue * (getSecondaryVariation() / 100.0);
+    double secondaryComp= 0;
+    if(_secondaryPrediction < secondaryValue){
+        secondaryComp = secondaryValueDown;
+    }else{
+        secondaryComp = secondaryValueUp;
     }
 
-    _primaryError = (primaryValue - _primaryPrediction)/
-                     primaryValue*100.0;
-    _secondaryError = (secondaryValue - _secondaryPrediction)/
-                      secondaryValue*100.0;
+    primaryComp = primaryValue; //TODO Phases
+    secondaryComp = secondaryValue;  //TODO phases
+
+    _primaryError = (primaryComp - _primaryPrediction)/
+                     primaryComp*100.0;
+    _secondaryError = (secondaryComp - _secondaryPrediction)/
+                      secondaryComp*100.0;
 
     DEBUG("Primary prediction: " << _primaryPrediction << " " <<
           "Secondary prediction: " << _secondaryPrediction);
@@ -723,7 +740,6 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
         //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
             secondaryPrediction = _secondaryPredictor->predict(currentValues);
-            //            secondaryPrediction += (_secondaryError / 100.0)*secondaryPrediction; //TODO Experimental
             //std::cout << secondaryPrediction;
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
@@ -738,9 +754,6 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
         }
         //std::cout << std::endl;
     }
-
-    //    primaryPrediction -= (_primaryError / 100.0)*primaryPrediction; //TODO Experimental
-    //    secondaryPrediction -= (_secondaryError / 100.0)*secondaryPrediction; //TODO Experimental
 
     if(feasibleSolutionFound){
         DEBUG("Best solution found " << bestValues);
@@ -763,8 +776,9 @@ bool Calibrator::isContractViolated(double primaryValue) const{
 }
 
 bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{
-    return (_thisPrimary != NOT_VALID && (primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary)) ||
-        (_thisSecondary != NOT_VALID && (secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary));
+    //    return (getPrimaryVariation() > 20 || getSecondaryVariation() > 20); //TODO Phases
+    return ((primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary) ||
+            (secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary));
 }
 
 void Calibrator::startCalibrationStat(uint64_t totalTasks){
@@ -845,7 +859,7 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 _primaryPrediction = NOT_VALID;
                 _secondaryPrediction = NOT_VALID;
             }else{
-                if(!accurate){
+                if(_primaryPrediction == NOT_VALID || !accurate){
                     kv = generateRelativeKnobsValues();
                     updatePredictions(kv);
                     DEBUG("[Calibrator]: High prediction error. Adding new seed.");
@@ -853,8 +867,6 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                     kv = getBestKnobsValues(primaryValue);
 
                     _state = CALIBRATION_FINISHED;
-                    _thisPrimary = NOT_VALID;
-                    _thisSecondary = NOT_VALID;
 
                     DEBUG("[Calibrator]: Moving to finished");
                     DEBUG("[Calibrator]: Finished in " << _numCalibrationPoints <<
@@ -864,7 +876,12 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             }
         }break;
         case CALIBRATION_FINISHED:{
-            if(phaseChanged(primaryValue, secondaryValue)){
+            /** 
+             * We need to check that this configuration is equal to the previous one
+             * to avoid to detect as a phase change a configuration change.
+             **/
+            if(_configuration.equal(_previousConfiguration) &&
+               phaseChanged(primaryValue, secondaryValue)){
                 kv = reset();
 
                 _state = CALIBRATION_SEEDS;
@@ -894,6 +911,9 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
         }break;
     }
 
+    _previousConfiguration = _configuration.getRealValues();
+    _thisPrimary = primaryValue;
+    _thisSecondary = secondaryValue;
     return kv;
 }
 

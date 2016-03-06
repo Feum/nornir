@@ -371,12 +371,19 @@ inline MonitoredSample squareRoot(const MonitoredSample& x){
     return r;
 }
 
-
 inline void regularize(MonitoredSample& x){
     if(x.watts < 0){x.watts = 0;}
     if(x.bandwidth < 0){x.bandwidth = 0;}
     if(x.utilization < 0){x.utilization = 0;}
     if(x.latency < 0){x.latency = 0;}
+}
+
+inline double squareRoot(const double& x){
+    return x?sqrt(x):0;
+}
+
+inline void regularize(double& x){
+    if(x < 0){x = 0;}
 }
 
 /**

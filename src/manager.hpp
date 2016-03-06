@@ -141,6 +141,9 @@ private:
     // Monitored samples;
     Smoother<MonitoredSample>* _samples;
 
+    // Variations
+    Smoother<double>* _variations;
+
     // The current configuration of the farm.
     FarmConfiguration _configuration;
 
