@@ -480,7 +480,8 @@ Calibrator::Calibrator(const Parameters& p,
         _primaryPrediction(0), _secondaryPrediction(0),
         _primaryError(0), _secondaryError(0),
         _thisPrimary(0), _thisSecondary(0), _noFeasible(false),
-        _contractViolations(0), _accuracyViolations(0){
+        _contractViolations(0), _accuracyViolations(0),
+        _totalCalibrationTime(0){
 
     PredictorType primary, secondary;
     switch(p.contractType){
@@ -755,9 +756,9 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
         }
 
         secondaryPrediction = _secondaryPredictor->predict(currentValues);
-        //std::cout << currentValues << " " << primaryPrediction << " ";
+        std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
-            //std::cout << secondaryPrediction;
+            std::cout << secondaryPrediction;
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
                 feasibleSolutionFound = true;
@@ -770,7 +771,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
             bestSuboptimalValues = currentValues;
             suboptimalSecondary = secondaryPrediction;
         }
-        //std::cout << std::endl;
+        std::cout << std::endl;
     }
 
     if(feasibleSolutionFound){
@@ -783,7 +784,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
     }else{
         DEBUG("Suboptimal solution found.");
         _primaryPrediction = bestSuboptimalValue;
-        _secondaryPrediction = NOT_VALID;
+        _secondaryPrediction = suboptimalSecondary;
         _noFeasible = true;
         return bestSuboptimalValues;
     }
@@ -799,11 +800,11 @@ bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{
     case CONTRACT_PERF_BANDWIDTH:
     case CONTRACT_PERF_UTILIZATION:{
         //return (primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary);
-        return getPrimaryVariation() > 40.0;
+        return getPrimaryVariation() > 30.0;
     }break;
     case CONTRACT_POWER_BUDGET:{
         //return (secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary);
-        return getSecondaryVariation() > 40.0;
+        return getSecondaryVariation() > 30.0;
     }break;
     default:{
         return false;
@@ -825,6 +826,7 @@ void Calibrator::stopCalibrationStat(uint64_t totalTasks){
         CalibrationStats cs;
         cs.numSteps = _numCalibrationPoints;
         cs.duration = (getMillisecondsTime() - _calibrationStartMs);
+        _totalCalibrationTime += cs.duration;
         cs.numTasks = totalTasks - _calibrationStartTasks;
         if(_joulesCounter){
             cs.joules = ((CounterCpus*) _joulesCounter)->getJoulesCoresAll();
@@ -925,11 +927,12 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 _state = CALIBRATION_SEEDS;
                 startCalibrationStat(totalTasks);
 
+                _totalCalibrationTime = 0;
                 _accuracyViolations = 0;
                 _contractViolations = 0;
                 DEBUG("[Calibrator]: Phase changed, ricalibrating");
-            }else if((!_noFeasible && (contractViolated && _contractViolations > _p.tolerableSamples)) ||
-                     (!accurate && _accuracyViolations > _p.tolerableSamples)){
+            }else if((!_p.maxCalibrationTime || _totalCalibrationTime < _p.maxCalibrationTime) && ((!_noFeasible && (contractViolated && _contractViolations > _p.tolerableSamples)) ||
+                      (!accurate && _accuracyViolations > _p.tolerableSamples))){
                 kv = generateRelativeKnobsValues();
                 updatePredictions(kv);
 

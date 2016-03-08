@@ -662,6 +662,12 @@ public:
     // valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
     double powerBudget;
 
+    // Maximum calibration time (milliseconds). 0 is no limit.
+    // We will keep calibrating until the error is higher than the
+    // max*PredictionError AND calibration time is lower than the
+    // maxCalibrationTime [default = 0.0].
+    double maxCalibrationTime;
+
     // Maximum error percentage allowed for prediction of primary
     // value. If 0, then it will be set equal to the coefficient
     // of variation of the primary value [default = 5.0].

@@ -159,6 +159,7 @@ void Parameters::setDefault(){
     expectedTasksNumber = 0;
     synchronousWorkers = false;
     powerBudget = 0;
+    maxCalibrationTime = 0;
     maxPrimaryPredictionError = 5.0;
     maxSecondaryPredictionError = 5.0;
     regressionAging = 0;
@@ -402,10 +403,11 @@ ParametersValidation Parameters::validateContract(){
         }break;
     }
 
-    if(maxPrimaryPredictionError < 0      ||
-       maxPrimaryPredictionError > 100.0  ||
-       maxSecondaryPredictionError < 0    ||
-       maxSecondaryPredictionError > 100.0){
+    if(maxCalibrationTime == 0 &&
+       (maxPrimaryPredictionError <= 0      ||
+        maxPrimaryPredictionError > 100.0   ||
+        maxSecondaryPredictionError <= 0    ||
+        maxSecondaryPredictionError > 100.0)){
         return VALIDATION_WRONG_CONTRACT_PARAMETERS;
     }
 
@@ -539,6 +541,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Ulong, expectedTasksNumber);
     SETVALUE(xt, Bool, synchronousWorkers);
     SETVALUE(xt, Double, powerBudget);
+    SETVALUE(xt, Double, maxCalibrationTime);
     SETVALUE(xt, Double, maxPrimaryPredictionError);
     SETVALUE(xt, Double, maxSecondaryPredictionError);
     SETVALUE(xt, Uint, regressionAging);

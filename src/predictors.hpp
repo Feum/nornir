@@ -323,6 +323,7 @@ private:
     uint _contractViolations;
     uint _accuracyViolations;
     KnobsValues _previousConfiguration;
+    double _totalCalibrationTime;
 
     bool isAccurate(double primaryValue, double secondaryValue);
     bool refine();
