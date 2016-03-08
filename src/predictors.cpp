@@ -480,7 +480,7 @@ Calibrator::Calibrator(const Parameters& p,
         _primaryPrediction(0), _secondaryPrediction(0),
         _primaryError(0), _secondaryError(0),
         _thisPrimary(0), _thisSecondary(0), _noFeasible(false),
-        _contractViolations(0){
+        _contractViolations(0), _accuracyViolations(0){
 
     PredictorType primary, secondary;
     switch(p.contractType){
@@ -548,10 +548,10 @@ double Calibrator::getSecondaryVariation() const{
         case CONTRACT_PERF_COMPLETION_TIME:
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_UTILIZATION:{
-            return _samples->coefficientVariation().watts / 100.0;
+            return _samples->coefficientVariation().watts;
         }break;
         case CONTRACT_POWER_BUDGET:{
-            return _samples->coefficientVariation().bandwidth / 100.0;
+            return _samples->coefficientVariation().bandwidth;
         }break;
         default:{
             return 0;
@@ -563,23 +563,40 @@ bool Calibrator::isAccurate(double primaryValue, double secondaryValue){
     double primaryValueUp = primaryValue + primaryValue * (getPrimaryVariation() / 100.0);
     double primaryValueDown = primaryValue - primaryValue * (getPrimaryVariation() / 100.0);
     double primaryComp = 0;
-    if(_primaryPrediction < primaryValue){
-        primaryComp = primaryValueDown;
+    if(_primaryPrediction < primaryValueUp && _primaryPrediction > primaryValueDown){
+        primaryComp = _primaryPrediction; //TODO Trovare un altro modo per dire che non c'è errore
     }else{
-        primaryComp = primaryValueUp;
+        if(_primaryPrediction < primaryValue){
+            primaryComp = primaryValueDown;
+        }else{
+            primaryComp = primaryValueUp;
+        }
     }
     
     double secondaryValueUp = secondaryValue + secondaryValue * (getSecondaryVariation() / 100.0);
     double secondaryValueDown = secondaryValue - secondaryValue * (getSecondaryVariation() / 100.0);
     double secondaryComp= 0;
-    if(_secondaryPrediction < secondaryValue){
-        secondaryComp = secondaryValueDown;
+
+    if(_secondaryPrediction < secondaryValueUp && _secondaryPrediction > secondaryValueDown){
+        secondaryComp = _secondaryPrediction;
     }else{
-        secondaryComp = secondaryValueUp;
+        if(_secondaryPrediction < secondaryValue){
+            secondaryComp = secondaryValueDown;
+        }else{
+            secondaryComp = secondaryValueUp;
+        }
     }
 
-    primaryComp = primaryValue; //TODO Phases
-    secondaryComp = secondaryValue;  //TODO phases
+    DEBUG("Primary: " << primaryValue << " " <<
+          "PrimaryUp: " << primaryValueUp << " " <<
+          "PrimaryDown: " << primaryValueDown);
+
+    DEBUG("Secondary: " << " " <<
+          "SecondaryUp: " << secondaryValueUp << " " <<
+          "SecondaryDown: " << secondaryValueDown);
+
+    //primaryComp = primaryValue; //TODO Phases
+    //secondaryComp = secondaryValue;  //TODO phases
 
     _primaryError = (primaryComp - _primaryPrediction)/
                      primaryComp*100.0;
@@ -654,16 +671,14 @@ bool Calibrator::isBestSecondaryValue(double x, double y) const{
 
 bool Calibrator::isFeasiblePrimaryValue(double value, bool conservative) const{
     double conservativeOffset = 0;
-    double conservativeValue = _p.conservativeValue;
-
-    if(conservative && !conservativeValue){
-        //conservativeValue = std::max(getPrimaryVariation(), (double) _contractViolations);
-        conservativeValue = _contractViolations;
+    double conservativeValue = 0;
+    if(conservative){
+        conservativeValue = _p.conservativeValue;
     }
 
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
-            if(conservative){
+            if(conservativeValue){
                 conservativeOffset = (_p.overloadThresholdFarm - _p.underloadThresholdFarm) *
                                      (conservativeValue / 100.0) / 2.0;
             }
@@ -672,15 +687,16 @@ bool Calibrator::isFeasiblePrimaryValue(double value, bool conservative) const{
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
-            if(conservative){
+            if(conservativeValue){
                 conservativeOffset = _p.requiredBandwidth * (conservativeValue / 100.0);
             }
             return value > _p.requiredBandwidth + conservativeOffset;
         }break;
         case CONTRACT_POWER_BUDGET:{
-            if(conservative){
+            if(conservativeValue){
                 conservativeOffset = _p.powerBudget * (conservativeValue / 100.0);
             }
+            
             return value < _p.powerBudget - conservativeOffset;
         }break;
         default:{
@@ -700,6 +716,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
     double bestPrimaryPrediction = 0;
     double bestSecondaryPrediction = 0;
     double bestSuboptimalValue = primaryValue;
+    double suboptimalSecondary = 0;
 
     bool feasibleSolutionFound = false;
 
@@ -737,9 +754,9 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
             }
         }
 
+        secondaryPrediction = _secondaryPredictor->predict(currentValues);
         //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
-            secondaryPrediction = _secondaryPredictor->predict(currentValues);
             //std::cout << secondaryPrediction;
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
@@ -751,6 +768,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
                  isBestSuboptimalValue(primaryPrediction, bestSuboptimalValue)){
             bestSuboptimalValue = primaryPrediction;
             bestSuboptimalValues = currentValues;
+            suboptimalSecondary = secondaryPrediction;
         }
         //std::cout << std::endl;
     }
@@ -776,9 +794,21 @@ bool Calibrator::isContractViolated(double primaryValue) const{
 }
 
 bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{
-    //    return (getPrimaryVariation() > 20 || getSecondaryVariation() > 20); //TODO Phases
-    return ((primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary) ||
-            (secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary));
+    switch(_p.contractType){
+    case CONTRACT_PERF_COMPLETION_TIME:
+    case CONTRACT_PERF_BANDWIDTH:
+    case CONTRACT_PERF_UTILIZATION:{
+        //return (primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary);
+        return getPrimaryVariation() > 40.0;
+    }break;
+    case CONTRACT_POWER_BUDGET:{
+        //return (secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary);
+        return getSecondaryVariation() > 40.0;
+    }break;
+    default:{
+        return false;
+    }break;
+    }
 }
 
 void Calibrator::startCalibrationStat(uint64_t totalTasks){
@@ -876,6 +906,14 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
             }
         }break;
         case CALIBRATION_FINISHED:{
+            if(contractViolated){
+                ++_contractViolations;
+            }
+            
+            if(!accurate){
+                ++_accuracyViolations;
+            }
+
             /** 
              * We need to check that this configuration is equal to the previous one
              * to avoid to detect as a phase change a configuration change.
@@ -887,10 +925,11 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 _state = CALIBRATION_SEEDS;
                 startCalibrationStat(totalTasks);
 
+                _accuracyViolations = 0;
                 _contractViolations = 0;
                 DEBUG("[Calibrator]: Phase changed, ricalibrating");
-            }else if((!_noFeasible && contractViolated) ||
-                     !accurate){
+            }else if((!_noFeasible && (contractViolated && _contractViolations > _p.tolerableSamples)) ||
+                     (!accurate && _accuracyViolations > _p.tolerableSamples)){
                 kv = generateRelativeKnobsValues();
                 updatePredictions(kv);
 
@@ -899,13 +938,16 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 _state = CALIBRATION_SEEDS;
                 startCalibrationStat(totalTasks);
 
+                _accuracyViolations = 0;
+                _contractViolations = 0;
                 if(!accurate){
                     DEBUG("[Calibrator]: Inaccurate model, adding more points");
                 }else{
-                    ++_contractViolations;
                     DEBUG("[Calibrator]: Contract violated, adding more points");
                 }
             }else{
+                if(accurate && _accuracyViolations){ --_accuracyViolations;}
+                if(!contractViolated && _contractViolations){ --_contractViolations;}
                 kv = _configuration.getRealValues();
             }
         }break;

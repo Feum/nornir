@@ -689,6 +689,10 @@ public:
     // the runtime will never switch [default = -1.0].
     double thresholdQBlocking;
 
+    // Max number of samples that can be violated (either accuracy or contract
+    // violations) [default = 0].
+    uint tolerableSamples;
+
     // Maximum size for the internal queues of the farm.
     // If 0, nothing will be modified [default = 0].
     ulong qSize;

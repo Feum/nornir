@@ -321,6 +321,7 @@ private:
     double _thisSecondary;
     bool _noFeasible;
     uint _contractViolations;
+    uint _accuracyViolations;
     KnobsValues _previousConfiguration;
 
     bool isAccurate(double primaryValue, double secondaryValue);

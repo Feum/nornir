@@ -164,6 +164,7 @@ void Parameters::setDefault(){
     regressionAging = 0;
     maxMonitoringOverhead = 1.0;
     thresholdQBlocking = -1;
+    tolerableSamples = 0;
     qSize = 0;
     conservativeValue = 0;
     statsReconfiguration = false;
@@ -543,6 +544,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Uint, regressionAging);
     SETVALUE(xt, Double, maxMonitoringOverhead);
     SETVALUE(xt, Double, thresholdQBlocking);
+    SETVALUE(xt, Uint, tolerableSamples);
     SETVALUE(xt, Ulong, qSize);
     SETVALUE(xt, Double, conservativeValue);
     SETVALUE(xt, Bool, statsReconfiguration);
