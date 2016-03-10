@@ -181,7 +181,7 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
     }
 
     _summaryFile << (_totalJoules - totalCalibration.joules) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
-    _summaryFile << totalTasks / (double) (durationMs / 1000.0) << "\t";
+    _summaryFile << (totalTasks - totalCalibration.numTasks) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
     _summaryFile << (double) durationMs / 1000.0 << "\t";
     _summaryFile << totalCalibration.numSteps << "\t";
     _summaryFile << totalCalibration.duration << "\t";

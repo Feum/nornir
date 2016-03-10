@@ -561,53 +561,10 @@ double Calibrator::getSecondaryVariation() const{
 }
 
 bool Calibrator::isAccurate(double primaryValue, double secondaryValue){
-    double primaryValueUp = primaryValue + primaryValue * (getPrimaryVariation() / 100.0);
-    double primaryValueDown = primaryValue - primaryValue * (getPrimaryVariation() / 100.0);
-    double primaryComp = 0;
-    if(_primaryPrediction < primaryValueUp && _primaryPrediction > primaryValueDown){
-        primaryComp = _primaryPrediction; //TODO Trovare un altro modo per dire che non c'è errore
-    }else{
-        if(_primaryPrediction < primaryValue){
-            primaryComp = primaryValueDown;
-        }else{
-            primaryComp = primaryValueUp;
-        }
-    }
-    
-    double secondaryValueUp = secondaryValue + secondaryValue * (getSecondaryVariation() / 100.0);
-    double secondaryValueDown = secondaryValue - secondaryValue * (getSecondaryVariation() / 100.0);
-    double secondaryComp= 0;
-
-    if(_secondaryPrediction < secondaryValueUp && _secondaryPrediction > secondaryValueDown){
-        secondaryComp = _secondaryPrediction;
-    }else{
-        if(_secondaryPrediction < secondaryValue){
-            secondaryComp = secondaryValueDown;
-        }else{
-            secondaryComp = secondaryValueUp;
-        }
-    }
-
-    DEBUG("Primary: " << primaryValue << " " <<
-          "PrimaryUp: " << primaryValueUp << " " <<
-          "PrimaryDown: " << primaryValueDown);
-
-    DEBUG("Secondary: " << " " <<
-          "SecondaryUp: " << secondaryValueUp << " " <<
-          "SecondaryDown: " << secondaryValueDown);
-
-    //primaryComp = primaryValue; //TODO Phases
-    //secondaryComp = secondaryValue;  //TODO phases
-
-    _primaryError = (primaryComp - _primaryPrediction)/
-                     primaryComp*100.0;
-    _secondaryError = (secondaryComp - _secondaryPrediction)/
-                      secondaryComp*100.0;
-
-    DEBUG("Primary prediction: " << _primaryPrediction << " " <<
-          "Secondary prediction: " << _secondaryPrediction);
-    DEBUG("Primary error: " << _primaryError << " " <<
-          "Secondary error: " << _secondaryError);
+     _primaryError = (primaryValue - _primaryPrediction)/
+                     primaryValue*100.0;
+    _secondaryError = (secondaryValue - _secondaryPrediction)/
+                       secondaryValue*100.0;
 
     if(std::abs(_primaryError) > _p.maxPrimaryPredictionError ||
        std::abs(_secondaryError) > _p.maxSecondaryPredictionError /* ||
@@ -672,30 +629,26 @@ bool Calibrator::isBestSecondaryValue(double x, double y) const{
 
 bool Calibrator::isFeasiblePrimaryValue(double value, bool conservative) const{
     double conservativeOffset = 0;
-    double conservativeValue = 0;
-    if(conservative){
-        conservativeValue = _p.conservativeValue;
-    }
 
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
-            if(conservativeValue){
+            if(conservative && _p.conservativeValue){
                 conservativeOffset = (_p.overloadThresholdFarm - _p.underloadThresholdFarm) *
-                                     (conservativeValue / 100.0) / 2.0;
+                                     (_p.conservativeValue / 100.0) / 2.0;
             }
             return value > _p.underloadThresholdFarm + conservativeOffset &&
                    value < _p.overloadThresholdFarm - conservativeOffset;
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
-            if(conservativeValue){
-                conservativeOffset = _p.requiredBandwidth * (conservativeValue / 100.0);
+            if(conservative && _p.conservativeValue){
+                conservativeOffset = _p.requiredBandwidth * (_p.conservativeValue / 100.0);
             }
             return value > _p.requiredBandwidth + conservativeOffset;
         }break;
         case CONTRACT_POWER_BUDGET:{
-            if(conservativeValue){
-                conservativeOffset = _p.powerBudget * (conservativeValue / 100.0);
+            if(conservative && _p.conservativeValue){
+                conservativeOffset = _p.powerBudget * (_p.conservativeValue / 100.0);
             }
             
             return value < _p.powerBudget - conservativeOffset;
@@ -744,7 +697,6 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
     for(size_t i = 0; i < combinations.size(); i++){
         KnobsValues currentValues = combinations.at(i);
         primaryPrediction = _primaryPredictor->predict(currentValues);
-        //        primaryPrediction += (_primaryError / 100.0)*primaryPrediction; //TODO Experimental
         switch(_p.contractType){
             case CONTRACT_PERF_UTILIZATION:{
                 primaryPrediction = (_samples->average().bandwidth / primaryPrediction) *
@@ -756,9 +708,9 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
         }
 
         secondaryPrediction = _secondaryPredictor->predict(currentValues);
-        std::cout << currentValues << " " << primaryPrediction << " ";
+        //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
-            std::cout << secondaryPrediction;
+            //std::cout << secondaryPrediction;
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
                 feasibleSolutionFound = true;
@@ -771,7 +723,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
             bestSuboptimalValues = currentValues;
             suboptimalSecondary = secondaryPrediction;
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
     }
 
     if(feasibleSolutionFound){
@@ -780,6 +732,7 @@ KnobsValues Calibrator::getBestKnobsValues(double primaryValue){
         _secondaryPrediction = bestSecondaryPrediction;
         DEBUG("Primary prediction: " << _primaryPrediction);
         DEBUG("Secondary prediction: " << _secondaryPrediction);
+        _noFeasible = false;
         return bestValues;
     }else{
         DEBUG("Suboptimal solution found.");
@@ -799,11 +752,9 @@ bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{
     case CONTRACT_PERF_COMPLETION_TIME:
     case CONTRACT_PERF_BANDWIDTH:
     case CONTRACT_PERF_UTILIZATION:{
-        //return (primaryValue > 2*_thisPrimary || primaryValue < 0.5*_thisPrimary);
         return getPrimaryVariation() > 30.0;
     }break;
     case CONTRACT_POWER_BUDGET:{
-        //return (secondaryValue > 2*_thisSecondary || secondaryValue < 0.5*_thisSecondary);
         return getSecondaryVariation() > 30.0;
     }break;
     default:{
@@ -931,8 +882,9 @@ KnobsValues Calibrator::getNextKnobsValues(double primaryValue,
                 _accuracyViolations = 0;
                 _contractViolations = 0;
                 DEBUG("[Calibrator]: Phase changed, ricalibrating");
-            }else if((!_p.maxCalibrationTime || _totalCalibrationTime < _p.maxCalibrationTime) && ((!_noFeasible && (contractViolated && _contractViolations > _p.tolerableSamples)) ||
-                      (!accurate && _accuracyViolations > _p.tolerableSamples))){
+            }else if((!_p.maxCalibrationTime || _totalCalibrationTime < _p.maxCalibrationTime) && 
+                        ((!_noFeasible && (contractViolated && _contractViolations > _p.tolerableSamples)) ||
+                        (!accurate && _accuracyViolations > _p.tolerableSamples))){
                 kv = generateRelativeKnobsValues();
                 updatePredictions(kv);
 
