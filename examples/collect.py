@@ -47,17 +47,16 @@ fields['ReconfigurationTimeFrequencyStddev'] = 27
 fields['ReconfigurationTimeTotalAvg'] = 28
 fields['ReconfigurationTimeTotalStddev'] = 29
 
-alternatives = ('LIMARTINEZ_SLEEP_SMALL', 'REGRESSION_LINEAR_RANDOM_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_SLEEP_LATENCY', 'REGRESSION_LINEAR_HALTON_FAST_SPINNING', 'REGRESSION_LINEAR_HALTON_FAST_MAPPING_SLEEP_SMALL')
+alternatives = ('LIMARTINEZ_SLEEP_SMALL', 'REGRESSION_LINEAR_RANDOM_FAST_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_SLEEP_LATENCY', 'REGRESSION_LINEAR_HALTON_FAST_SPINNING', 'REGRESSION_LINEAR_HALTON_FAST_MAPPING_SLEEP_SMALL', 'INTEL_SLEEP_SMALL')
 alternativesReconfTime = ('REGRESSION_LINEAR_HALTON', 'REGRESSION_LINEAR_HALTON_FAST')
-alternativesMandelPerf = ('LIMARTINEZ', 'REGRESSION_LINEAR_HALTON_FAST', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE10', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE20', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE30')
-alternativesMandelPower = ('LIMARTINEZ', 'REGRESSION_LINEAR_HALTON_FAST', 'REGRESSION_LINEAR_HALTON_FAST_AGING3', 'REGRESSION_LINEAR_HALTON_FAST_AGING6', 'REGRESSION_LINEAR_HALTON_FAST_AGING10')
-
+alternativesMandel = ('LIMARTINEZ', 'REGRESSION_LINEAR_HALTON_FAST_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE10_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE20_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_CONSERVATIVE30_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_AGING4_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_AGING8_SLEEP_SMALL', 'REGRESSION_LINEAR_HALTON_FAST_AGING12_SLEEP_SMALL')
 
 def printField(bench, contract, alt, field):
     try:
         fh = open(bench + "/" + contract + "_" + alt + "/results.csv")
         fh.readline() # Skip header
         values = []
+        variances = []
 
         for i in xrange(10, 100, 20):
             fieldsLine = fh.readline()
@@ -66,15 +65,16 @@ def printField(bench, contract, alt, field):
                 budget = float(fieldsLine.split('\t')[fields['PrimaryRequired']])
                 fieldValue = ((fieldValue - budget)/budget)*100.0
                 
-            if field != 'PrimaryLossAvg' or fieldValue != 0:
+            if (field != 'PrimaryLossAvg' and field != 'SecondaryLossAvg') or fieldValue != 0:
                 values.append(fieldValue)
+                variances.append(float(fieldsLine.split('\t')[fields[field] + 1]) ** 2) # ^2 because in the field there is stddev e we need the variance
 
         if field == 'PrimaryLossCnt':
             sys.stdout.write(str(np.sum(values)) + '\t0\t')
         else:
             if len(values):
                 avg = np.average(values)
-                std = np.std(values)
+                std = math.sqrt(np.sum(variances)/len(variances)) # Pooled variance formula
             else:
                 avg = 0
                 std = 0
@@ -90,8 +90,8 @@ def getAlt(alt):
     return alt
 
 #############################################################################################
-benchmarks = ('blackscholes', 'canneal', 'pbzip2', 'simple_mandelbrot', 'videoprocessing')
-contracts = ('PERF_COMPLETION_TIME', 'POWER_BUDGET')
+benchmarks = ('blackscholes', 'canneal', 'pbzip2', 'videoprocessing', 'simple_mandelbrot')
+contracts = ('PERF_BANDWIDTH', 'POWER_BUDGET')
 fields 
 
 parser = argparse.ArgumentParser(description='Runs the application to check the accuracy of the reconfiguration.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -104,10 +104,7 @@ args = parser.parse_args()
 if args.benchmark is not None:
     benchmarks = ([args.benchmark])
     if 'simple_mandelbrot' in args.benchmark:
-        if 'PERF' in args.contract:
-            alternatives = alternativesMandelPerf
-        else:
-            alternatives = alternativesMandelPower
+        alternatives = alternativesMandel
 
 if args.contract is not None:
     contracts = ([args.contract])
@@ -119,7 +116,12 @@ for alt in alternatives:
 print ""
 
 for bench in benchmarks:
-    sys.stdout.write(bench + '\t')
+    if 'mandelbrot' in bench:
+        sys.stdout.write('mandelbrot\t')
+    elif 'videoprocessing' in bench:
+        sys.stdout.write('denoiser\t')
+    else:
+        sys.stdout.write(bench + '\t')
     for contract in contracts:
         for alt in alternatives:
             printField(bench, contract, alt, args.field)

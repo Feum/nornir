@@ -14,7 +14,7 @@ powersList = []
 timesList = []
 bandwidthList = []
 
-iterations = 5
+iterations = 2 #5
 
 def getLastLine(fileName):
     fh = open(fileName, "r")
@@ -37,6 +37,11 @@ class cd:
         os.chdir(self.savedPath)
 
 def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, calstrategy, fastreconf, aging, conservative, knobworkers, polling, itnum):
+    if 'INTEL' in args.prediction:
+        process = subprocess.Popen(shlex.split("sh intelpowercapenable.sh " + str(fieldValue)), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        out, err = process.communicate()
+        print out
+        print err
     with cd(bench):
         parametersFile = open("parameters.xml", "w")
         parametersFile.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
@@ -44,13 +49,28 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
         parametersFile.write("<strategyPolling>" + polling + "</strategyPolling>\n")
         parametersFile.write("<statsReconfiguration>true</statsReconfiguration>\n")
         parametersFile.write("<strategyPrediction>" + args.prediction + "</strategyPrediction>\n")
-        parametersFile.write("<contractType>" + contractType + "</contractType>\n")
+        if 'INTEL' in args.prediction:
+            parametersFile.write("<contractType>NONE</contractType>\n")
+        else:
+            parametersFile.write("<contractType>" + contractType + "</contractType>\n")
         parametersFile.write("<" + fieldName + ">" + str(fieldValue) + "</" + fieldName + ">\n")
-        
+        parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
+        parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
+        parametersFile.write("<persistenceValue>1</persistenceValue>\n")
+
+        #parametersFile.write("<maxCalibrationTime>1000</maxCalibrationTime>\n")
+
         maxPerformanceError = 10.0
-        maxPowerError = 10.0
+        maxPowerError = 5.0 
+
         if bench == 'simple_mandelbrot':
+            maxPowerError = 10.0
             maxPerformanceError = 20.0
+            if aging is not None:
+                parametersFile.write("<regressionAging>" + str(aging) + "</regressionAging>\n")
+
+        parametersFile.write("<regressionAging>10</regressionAging>\n")
+        parametersFile.write("<tolerableSamples>3</tolerableSamples>\n") #TODO 
 
         if contractType == "PERF_COMPLETION_TIME" or contractType == "PERF_BANDWIDTH":
             parametersFile.write("<maxPrimaryPredictionError>" + str(maxPerformanceError) + "</maxPrimaryPredictionError>\n")
@@ -76,53 +96,36 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
             run = "./blackscholes 23 inputs/in_10M.txt tmp.txt"
             parametersFile.write("<qSize>4</qSize>\n")
             parametersFile.write("<samplingIntervalCalibration>100</samplingIntervalCalibration>\n")
-            parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
             parametersFile.write("<smoothingFactor>0.1</smoothingFactor>\n")
-            parametersFile.write("<minTasksPerSample>500</minTasksPerSample>\n")
-            parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
-            parametersFile.write("<persistenceValue>1</persistenceValue>\n")
+            parametersFile.write("<minTasksPerSample>300</minTasksPerSample>\n")
         elif bench == 'pbzip2':
             run = "./pbzip2_ff -f -k -p22 /home/desensi/enwiki-20151201-abstract.xml"
             parametersFile.write("<qSize>1</qSize>\n")
-            parametersFile.write("<samplingIntervalCalibration>500</samplingIntervalCalibration>\n")
-            parametersFile.write("<samplingIntervalSteady>2000</samplingIntervalSteady>\n")
-            parametersFile.write("<smoothingFactor>0.001</smoothingFactor>\n")
-            parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
-            parametersFile.write("<persistenceValue>1</persistenceValue>\n")
+            parametersFile.write("<samplingIntervalCalibration>100</samplingIntervalCalibration>\n")
+            parametersFile.write("<smoothingFactor>0.1</smoothingFactor>\n")
         elif bench == 'canneal':
             run = "./canneal 23 15000 2000 2500000.nets 6000"
             parametersFile.write("<qSize>1</qSize>\n")
             parametersFile.write("<samplingIntervalCalibration>10</samplingIntervalCalibration>\n")
-            parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
-            parametersFile.write("<smoothingFactor>0.01</smoothingFactor>\n")
-            parametersFile.write("<minTasksPerSample>10</minTasksPerSample>\n")
-            parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
-            parametersFile.write("<persistenceValue>1</persistenceValue>\n")
+            parametersFile.write("<smoothingFactor>0.1</smoothingFactor>\n")
+            #parametersFile.write("<minTasksPerSample>10</minTasksPerSample>\n")
         elif bench == 'videoprocessing':
             #run = "./video 0 1 0 22 VIRAT/960X540.mp4 VIRAT/480X270.mp4 VIRAT/480X270.mp4 VIRAT/960X540.mp4"
             run = "./video 0 1 0 22 VIRAT/480X270.mp4"
             parametersFile.write("<qSize>1</qSize>\n")
-            parametersFile.write("<samplingIntervalCalibration>10</samplingIntervalCalibration>\n")
-            parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
-            parametersFile.write("<minTasksPerSample>5</minTasksPerSample>\n")
-            parametersFile.write("<expectedTasksNumber>19567</expectedTasksNumber>\n")
-            #parametersFile.write("<smoothingFactor>0.7</smoothingFactor>\n")
+            parametersFile.write("<samplingIntervalCalibration>200</samplingIntervalCalibration>\n")
             parametersFile.write("<smoothingFactor>0.1</smoothingFactor>\n")
-            parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
-            parametersFile.write("<persistenceValue>1</persistenceValue>\n")
+            parametersFile.write("<expectedTasksNumber>117402</expectedTasksNumber>\n")
         elif bench == 'simple_mandelbrot':
             run = "./mandel_ff 8192 4096 1 22"
-            parametersFile.write("<qSize>4</qSize>\n")
-            parametersFile.write("<samplingIntervalCalibration>50</samplingIntervalCalibration>\n")
-            parametersFile.write("<samplingIntervalSteady>1000</samplingIntervalSteady>\n")
+            parametersFile.write("<qSize>1</qSize>\n")
+            parametersFile.write("<samplingIntervalCalibration>100</samplingIntervalCalibration>\n")
             parametersFile.write("<smoothingFactor>0.9</smoothingFactor>\n")
-            if aging is not None:
-                parametersFile.write("<regressionAging>" + str(aging) + "</regressionAging>\n")
-            parametersFile.write("<minTasksPerSample>4</minTasksPerSample>\n")
-            parametersFile.write("<strategyPersistence>SAMPLES</strategyPersistence>\n")
-            parametersFile.write("<persistenceValue>1</persistenceValue>\n")
+            parametersFile.write("<minTasksPerSample>1</minTasksPerSample>\n")
             if conservative is not None:
                 parametersFile.write("<conservativeValue>" + str(conservative) + "</conservativeValue>\n")
+            else:
+                parametersFile.write("<conservativeValue>5</conservativeValue>\n")
 
         parametersFile.write("</adaptivityParameters>\n")
         parametersFile.close()
@@ -174,6 +177,12 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
         for outfile in ["calibration.csv", "stats.csv", "summary.csv", "parameters.xml", "log.csv"]:
             if os.path.isfile(outfile):
                 os.rename(outfile, dir_results + "/" + str(percentile) + "." + str(itnum) + "." + outfile)
+ 
+    if 'INTEL' in args.prediction:
+        process = subprocess.Popen(shlex.split("sh intelpowercapdisable.sh"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        out, err = process.communicate()
+        print out 
+        print err
 
     # Returns data
     return bandwidth, time, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, calibrationWatts, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg
@@ -187,8 +196,7 @@ def loadPerfPowerData(bench):
                 fields = line.split("\t")
                 timesList.append(float(fields[2]))
                 powersList.append(float(fields[3]))
-                if len(fields) > 4:
-                    bandwidthList.append(float(fields[4]))
+                bandwidthList.append(float(fields[4]))
 
         fh.close()
 
@@ -200,7 +208,7 @@ def getOptimalBandwidthBound(bw, bench):
             #Workers Frequency Time Watts Bandwidth
             if line[0] != '#':
                 fields = line.split("\t")
-                curbw = float(fields[2])
+                curbw = float(fields[4])
                 curpower = float(fields[3])
                 if curpower < bestPower and curbw >= float(bw):
                     bestPower = curpower
@@ -213,7 +221,7 @@ def getOptimalTimeBound(time, bench):
         fh = open(args.resultsfile, "r")
         bestPower = 99999999999
         for line in fh:
-            #Workers Frequency Time Watts
+            #Workers Frequency Time Watts Bandwidth
             if line[0] != '#':
                 fields = line.split("\t")
                 curtime = float(fields[2])
@@ -227,17 +235,17 @@ def getOptimalTimeBound(time, bench):
 def getOptimalPowerBound(power, bench):
     with cd(bench):
         fh = open(args.resultsfile, "r")
-        bestTime = 9999999999
+        bestBw = 0
         for line in fh:
-            #Workers Frequency Time Watts
+            #Workers Frequency Time Watts Bandwidth
             if line[0] != '#':
                 fields = line.split("\t")
-                curtime = float(fields[2])
+                curbw = float(fields[4])
                 curpower = float(fields[3])
-                if curtime < bestTime and curpower <= float(power):
-                    bestTime = curtime
+                if curbw > bestBw and curpower <= float(power):
+                    bestBw = curbw
         fh.close()
-        return bestTime
+        return bestBw
 
 ############################################################################################################
 
@@ -289,6 +297,7 @@ outFile.write("#Percentile\tPrimaryRequired\tPrimaryLossCnt\tPrimaryAvg\tPrimary
 
 for p in xrange(10, 100, 20):
     cts = []
+    bws = []
     wattses = []
     opts = []
     calibrationsSteps = []
@@ -330,15 +339,13 @@ for p in xrange(10, 100, 20):
     target = 0
     
     if args.benchmark == 'pbzip2':
-        iterations = 1
+        iterations = 2
 
     for i in xrange(0, iterations):
         ct = -1
         if args.contract == 'PERF_BANDWIDTH':
-            #minBw = min(bandwidthList) TODO
-            #maxBw = max(bandwidthList) TODO
-            minBw = 22
-            maxBw = 680
+            minBw = min(bandwidthList) 
+            maxBw = max(bandwidthList) 
             targetBw = minBw + (maxBw - minBw)*(p/100.0)
             target = targetBw
             while ct == -1:
@@ -368,14 +375,21 @@ for p in xrange(10, 100, 20):
             minPower = min(powersList)
             maxPower = max(powersList)
             targetPower = minPower + (maxPower - minPower)*(p/100.0)
+            if 'INTEL' in args.prediction:
+                # The tool by Intel can only set the bound to an integer value. Since
+                # the script we use divide the targetPower by the number of sockets and
+                # since we have two sockets, we round the target power to the closest
+                # even number 
+                targetPower = round(targetPower / 2.) * 2
             target = targetPower
             while ct == -1:
                 bw, ct, watts, calibrationSteps, calibrationTime, calibrationTimePerc, calibrationTasks, calibrationTasksPerc, calibrationWatts, reconfigurationTimeWorkersAvg, reconfigurationTimeFrequencyAvg, reconfigurationTimeTotalAvg = run(args.benchmark, "POWER_BUDGET", "powerBudget", targetPower, p, rdir, args.calstrategy, args.fastreconf, args.aging, args.conservative, args.knobworkers, args.polling, i)
             opt = getOptimalPowerBound(targetPower, args.benchmark)
             primaryReq = targetPower
             primaryLoss = ((watts - targetPower) / targetPower) * 100.0
-            secondaryLoss = ((ct - opt) / opt) * 100.0
+            secondaryLoss = ((opt - bw) / opt) * 100.0
         cts.append(ct)
+        bws.append(bw)
         wattses.append(watts)
         opts.append(opt)
         calibrationsSteps.append(calibrationSteps)
@@ -384,7 +398,7 @@ for p in xrange(10, 100, 20):
         calibrationsTasks.append(calibrationTasks)
         calibrationsTasksPerc.append(calibrationTasksPerc)
         calibrationsWatts.append(calibrationWatts)
-        if primaryLoss > 0:
+        if primaryLoss > 3:
             primaryLosses.append(primaryLoss)
         else:
             secondaryLosses.append(secondaryLoss)
@@ -392,7 +406,12 @@ for p in xrange(10, 100, 20):
         reconfigurationTimesFrequency.append(reconfigurationTimeFrequencyAvg)
         reconfigurationTimesTotal.append(reconfigurationTimeTotalAvg)
 
-    if args.contract == "PERF_COMPLETION_TIME":
+    if args.contract == "PERF_BANDWIDTH":
+        avgPrimary = np.average(bws)
+        stddevPrimary = np.std(bws)
+        avgSecondary = np.average(wattses)
+        stddevSecondary = np.std(wattses)
+    elif args.contract == "PERF_COMPLETION_TIME":
         avgPrimary = np.average(cts)
         stddevPrimary = np.std(cts)
         avgSecondary = np.average(wattses)
@@ -400,8 +419,8 @@ for p in xrange(10, 100, 20):
     elif args.contract == "POWER_BUDGET":    
         avgPrimary = np.average(wattses)
         stddevPrimary = np.std(wattses)
-        avgSecondary = np.average(cts)
-        stddevSecondary = np.std(cts)
+        avgSecondary = np.average(bws)
+        stddevSecondary = np.std(bws)
     
     if len(primaryLosses):
         avgPrimaryLoss = np.average(primaryLosses)
