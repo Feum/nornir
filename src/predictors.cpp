@@ -337,7 +337,7 @@ bool PredictorLinearRegression::refine(){
     }
     obs_it lb = _observations.lower_bound(currentValues);
 
-    if(_p.regressionAging){
+    if(_p.regressionAging && !contains(_agingVector, currentValues)){
         if(_agingVector.size() < _p.regressionAging){
             _agingVector.push_back(currentValues);
         }else{
@@ -748,6 +748,7 @@ bool Calibrator::isContractViolated(double primaryValue) const{
 }
 
 bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{
+#if 0
     switch(_p.contractType){
     case CONTRACT_PERF_COMPLETION_TIME:
     case CONTRACT_PERF_BANDWIDTH:
@@ -761,6 +762,8 @@ bool Calibrator::phaseChanged(double primaryValue, double secondaryValue) const{
         return false;
     }break;
     }
+#endif
+    return _samples->coefficientVariation().latency > 20.0 || _samples->coefficientVariation().watts > 20.0;
 }
 
 void Calibrator::startCalibrationStat(uint64_t totalTasks){

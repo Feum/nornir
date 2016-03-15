@@ -1,2 +1,2 @@
 Watts	Bandwidth	CompletionTimeSec	CalibrationSteps	CalibrationTimeMs	CalibrationTime%	CalibrationTasksNum	CalibrationTasks%	CalibrationWatts	ReconfigurationsWorkersAverage	ReconfigurationsWorkersStddev	ReconfigurationsMappingAverage	ReconfigurationsMappingStddev	ReconfigurationsFrequencyAverage	ReconfigurationsFrequencyStddev	ReconfigurationsTotalAverage	ReconfigurationsTotalStddev	
-85.0299	79327.3	12.606	5	4496	35.6656	168288	16.8288	43.4558	0.0014184	0.000405901	0.6441	0.209293	1.0523	0.3929	4.65942	4.22739	
+90.9004	105016	11.865	7	3485	29.3721	119967	11.9967	41.0154	0.00107227	0.00036713	1.81319	3.46279	1.02394	0.227212	3.93889	3.46142	

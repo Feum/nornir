@@ -1,41 +1,30 @@
 End of stream in input
-[Predictors] Minimum number of points required for calibration: 3
 [Predictors] [Calibrator] Will generate low discrepancy points in 2 dimensions
-[Predictors] [Calibrator]: NumPoints: 0 MinNumPoints: 3
-[Predictors] Refining with configuration [14, 2, 1.6e+06, ]: 50.024
-[Predictors] Refining with configuration [12, 2, 1.6e+06, ]: 0.000711088
-[Predictors] [Calibrator]: NumPoints: 1 MinNumPoints: 3
-[Predictors] Refining with configuration [8, 2, 2e+06, ]: 44.8719
-[Predictors] Refining with configuration [6, 2, 2e+06, ]: 0.00106999
-[Predictors] [Calibrator]: NumPoints: 2 MinNumPoints: 3
-[Predictors] Refining with configuration [19, 2, 1.3e+06, ]: 46.5476
-[Predictors] Refining with configuration [17, 2, 1.3e+06, ]: 0.000776888
-[Predictors] Error in model: 5.3771e-14
-[Predictors] ========================== Preparing for predictions: ========================== 
-[Predictors] Error in model: 4.11423e-37
-[Predictors] ========================== Preparing for predictions: ========================== 
-[Predictors] Best solution found [21, 2, 2.2e+06, ]
-[Predictors] Primary prediction: -22.3458
-[Predictors] Secondary prediction: 1.24058e+06
-[Predictors] [Calibrator]: Moving to validate prediction.
-[Predictors] Refining with configuration [23, 2, 2.2e+06, ]: 92.454
-[Predictors] Refining with configuration [21, 2, 2.2e+06, ]: 0.000467277
-[Predictors] Primary prediction: -22.3458 Secondary prediction: 1.24058e+06
-[Predictors] Primary error: 124.17 Secondary error: 57869.4
+[Predictors] Refining with configuration [14, 2, 1.6e+06, ]: 49.4033
+[Predictors] Refining with configuration [12, 2, 1.6e+06, ]: 0.000773484
+[Predictors] Refining with configuration [8, 2, 2e+06, ]: 49.5466
+[Predictors] Refining with configuration [6, 2, 2e+06, ]: 0.000994613
+[Predictors] Refining with configuration [19, 2, 1.3e+06, ]: 48.6386
+[Predictors] Refining with configuration [17, 2, 1.3e+06, ]: 0.000713083
+[Predictors] Error in model: 5.57005e-14
+[Predictors] Error in model: 7.05297e-38
 [Predictors] [Calibrator]: High prediction error. Adding new seed.
-[Predictors] Refining with configuration [6, 2, 1.7e+06, ]: 35.0538
-[Predictors] Refining with configuration [4, 2, 1.7e+06, ]: 0.00156743
-[Predictors] Error in model: 0.0988179
-[Predictors] ========================== Preparing for predictions: ========================== 
-[Predictors] Error in model: 1.62408e-09
-[Predictors] ========================== Preparing for predictions: ========================== 
-[Predictors] Best solution found [22, 2, 1.8e+06, ]
-[Predictors] Primary prediction: 75.4079
-[Predictors] Secondary prediction: 1898.46
-[Predictors] [Calibrator]: Prediction forced.
-[Predictors] Refining with configuration [24, 2, 1.8e+06, ]: 75.5043
-[Predictors] Refining with configuration [22, 2, 1.8e+06, ]: 0.000558141
-[Predictors] Primary prediction: 75.4079 Secondary prediction: 1898.46
-[Predictors] Primary error: 0.12759 Secondary error: 5.96075
+[Predictors] Refining with configuration [6, 2, 1.7e+06, ]: 36.2113
+[Predictors] Refining with configuration [4, 2, 1.7e+06, ]: 0.00164362
+[Predictors] Error in model: 7.69928e-28
+[Predictors] Error in model: 2.48955e-10
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [16, 2, 2.1e+06, ]: 71.4326
+[Predictors] Refining with configuration [14, 2, 2.1e+06, ]: 0.00072131
+[Predictors] Error in model: 0.583353
+[Predictors] Error in model: 2.44103e-09
+[Predictors] [Calibrator]: High prediction error. Adding new seed.
+[Predictors] Refining with configuration [11, 2, 1.5e+06, ]: 42.4877
+[Predictors] Refining with configuration [9, 2, 1.5e+06, ]: 0.000924737
+[Predictors] Error in model: 1.4853
+[Predictors] Error in model: 2.3256e-09
+[Predictors] Best solution found [22, 2, 1.6e+06, ]
+[Predictors] Primary prediction: 72.5045
+[Predictors] Secondary prediction: 1716.79
 [Predictors] [Calibrator]: Moving to finished
-[Predictors] [Calibrator]: Finished in 5 steps with configuration [22, 2, 1.8e+06, ]
+[Predictors] [Calibrator]: Finished in 6 steps with configuration [22, 2, 1.6e+06, ]

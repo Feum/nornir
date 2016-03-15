@@ -29,19 +29,18 @@ OPT     = -DNDEBUG -O3
 OPENCVLIB = `pkg-config --libs opencv` -pthread 
 LDLIBS 	+= $(OPENCVLIB)
 
-TARGETS	= seqvideo video
+TARGETS	= seqvideo video video_nocvthreads
 
 all: $(TARGETS)
 
 seqvideo: seqvideo.cpp
 	$(CXX) $(OPT) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
-
 video: video.cpp
 	$(CXX) -DNO_DEFAULT_MAPPING $(OPT) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
-
+video_nocvthreads: video.cpp
+	$(CXX) -DNO_DEFAULT_MAPPING -DNO_CV_THREADS $(OPT) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
 clean: 
 	rm -f $(TARGETS)
-
 cleanall: clean
 	rm -f *.o *.a *~ 
 

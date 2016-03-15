@@ -648,7 +648,7 @@ int directcompress(int hInfile, OFF_T fileSize, int blockSize, char *OutFilename
 			CompressedData = NULL;
 		}
 		
-		// check to make sure all the data we expected was read in
+		// check to make sure all the data we expecte was read in
 		if (rret != inSize)
 			inSize = rret;
 	} // while
@@ -2543,6 +2543,7 @@ int main(int argc, char* argv[])
 				    adpff::Parameters ap("parameters.xml", "archdata.xml");
 				    ap.observer = &obs;
                                     ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
+                                    std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
 				    adpff::ManagerFarm<> amf(&farm, ap);
                     amf.start();
                     amf.join();
@@ -2602,6 +2603,8 @@ int main(int argc, char* argv[])
 				adpff::Parameters ap("parameters.xml", "archdata.xml");
 				ap.observer = &obs;
                                 ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
+                                std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
+
 				adpff::ManagerFarm<> amf(&farm, ap);
 				amf.start();
 				amf.join();

@@ -4,7 +4,13 @@
 <statsReconfiguration>true</statsReconfiguration>
 <strategyPrediction>REGRESSION_LINEAR</strategyPrediction>
 <contractType>POWER_BUDGET</contractType>
-<powerBudget>84.02625</powerBudget>
+<powerBudget>82.70004</powerBudget>
+<samplingIntervalSteady>1000</samplingIntervalSteady>
+<strategyPersistence>SAMPLES</strategyPersistence>
+<persistenceValue>1</persistenceValue>
+<conservativeValue>3</conservativeValue>
+<regressionAging>10</regressionAging>
+<tolerableSamples>3</tolerableSamples>
 <maxPrimaryPredictionError>10.0</maxPrimaryPredictionError>
 <maxSecondaryPredictionError>10.0</maxSecondaryPredictionError>
 <fastReconfiguration>true</fastReconfiguration>
@@ -12,9 +18,6 @@
 <knobWorkers>MAPPING</knobWorkers>
 <knobHyperthreading>KNOB_HT_SOONER</knobHyperthreading>
 <qSize>1</qSize>
-<samplingIntervalCalibration>500</samplingIntervalCalibration>
-<samplingIntervalSteady>2000</samplingIntervalSteady>
-<smoothingFactor>0.001</smoothingFactor>
-<strategyPersistence>SAMPLES</strategyPersistence>
-<persistenceValue>1</persistenceValue>
+<samplingIntervalCalibration>100</samplingIntervalCalibration>
+<smoothingFactor>0.1</smoothingFactor>
 </adaptivityParameters>

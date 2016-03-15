@@ -43,14 +43,15 @@ using namespace adpff;
 // reads frame and sends them to the next stage
 struct Source : AdaptiveNode {
     std::vector<std::string> filenames;
-    VideoCapture cap;
+    VideoCapture* cap;
     int maxFrames;
     size_t currentFileId;
     size_t currentFrameId;
 
+
     void openFile(uint id){
-        cap = VideoCapture(filenames.at(id).c_str());
-        if(!cap.isOpened())  {
+        cap = new VideoCapture(filenames.at(id).c_str());
+        if(!cap->isOpened())  {
             std::cout << "Error opening input file" << std::endl;
             exit(-1);
         }
@@ -65,13 +66,15 @@ struct Source : AdaptiveNode {
     
     void * svc(void *) {
         Mat * frame = new Mat();
-        if(!cap.read(*frame) || (maxFrames && currentFrameId >= maxFrames)){
+        if(!cap->read(*frame) || (maxFrames && currentFrameId >= maxFrames)){
             std::cout << "End of stream in input" << std::endl; 
             if(currentFileId + 1 < filenames.size()){
                 ++currentFileId;
+                cap->release();
+                delete cap;
                 openFile(currentFileId);
                 currentFrameId = 0;
-                cap.read(*frame);
+                cap->read(*frame);
             }else{
                 TERMINATE_APPLICATION;
             }
@@ -87,7 +90,9 @@ struct Source : AdaptiveNode {
 // and it then sends the result to the next stage
 struct Stage1 : AdaptiveNode {
     double d;
-    Stage1(double d):d(d){;}
+    uint id;
+    Stage1(double d, uint id):d(d),id(id){;}
+
 
     void * svc(void *task) {
         Mat* frame = (Mat*) task;
@@ -108,8 +113,8 @@ struct Drain: AdaptiveNode {
     Drain(bool ovf):outvideo(ovf) {}
 
     int svc_init() {
-	if(outvideo) namedWindow("edges",1);
-	return 0; 
+        if(outvideo) namedWindow("edges",1);
+        return 0; 
     }
 
     void *svc (void * task) {
@@ -127,9 +132,11 @@ protected:
 
 int main(int argc, char *argv[]) {
     //ffvideo numframes d output nw1 file1 file2 ... filen
-    Mat edges;
 
-    //setNumThreads(0);
+#ifdef NO_CV_THREADS
+    setNumThreads(0);
+#endif
+
     if(argc == 1) {
       std::cout << "Usage is: " << argv[0] 
                 << " numframes(0 is all frames) d output nw1 file1 file2 ... filen"
@@ -151,7 +158,7 @@ int main(int argc, char *argv[]) {
     ff_ofarm ofarm;
     std::vector<ff_node*> W;
     for(size_t i=0; i<nw1; i++)
-        W.push_back(new Stage1(d));
+        W.push_back(new Stage1(d, i+1));
     ofarm.add_workers(W);
 
     std::vector<std::string> filenames;
