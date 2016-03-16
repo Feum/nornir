@@ -4,7 +4,7 @@ TARGET               = demo-farm demo-farm-sendout demo-farm-new
 
 all: $(TARGET)
 
-%: %.cpp ../src/libgrape.a
+%: %.cpp ../src/libnornir.a
 	$(CXX) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
 clean: 
 	-rm -fr *.o *~

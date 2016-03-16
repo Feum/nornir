@@ -362,7 +362,7 @@ char *memstr(char *searchBuf, int searchBufSize, char *searchString, int searchS
  * FastFlow's collector filter.
  */
 
-class FileWriter: public adpff::AdaptiveNode {
+class FileWriter: public nornir::AdaptiveNode {
 public:
         FileWriter():
 		OutFilename(NULL),currBlock(0),hOutfile(1),// default to stdout
@@ -912,7 +912,7 @@ ssize_t bufread(int hf, char *buf, size_t bsize)
  * FastFlow's emitter filter.
  */
 
-class Producer: public adpff::AdaptiveNode {
+class Producer: public nornir::AdaptiveNode {
 public:
 	Producer():
 	    hInfile(-1),blockSize(0),fileSize(0), comp_decomp(0),bz2NumBlocks(0) {}
@@ -1306,7 +1306,7 @@ private:
  * FastFlow's worker filter.
  */
 
-class Consumer: public adpff::AdaptiveNode {
+class Consumer: public nornir::AdaptiveNode {
 public:
 	Consumer():comp_decomp(0) {}
 
@@ -2539,12 +2539,12 @@ int main(int argc, char* argv[])
 					
 					if (FW) FW->set_input_data(OutFilename);
 					
-                                        adpff::Observer obs;
-				    adpff::Parameters ap("parameters.xml", "archdata.xml");
+                                        nornir::Observer obs;
+				    nornir::Parameters ap("parameters.xml", "archdata.xml");
 				    ap.observer = &obs;
                                     ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
                                     std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
-				    adpff::ManagerFarm<> amf(&farm, ap);
+				    nornir::ManagerFarm<> amf(&farm, ap);
                     amf.start();
                     amf.join();
 #if 0
@@ -2599,13 +2599,13 @@ int main(int argc, char* argv[])
 				
 				if (FW) FW->set_input_data(OutFilename);
 
-				adpff::Observer obs;
-				adpff::Parameters ap("parameters.xml", "archdata.xml");
+				nornir::Observer obs;
+				nornir::Parameters ap("parameters.xml", "archdata.xml");
 				ap.observer = &obs;
                                 ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
                                 std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
 
-				adpff::ManagerFarm<> amf(&farm, ap);
+				nornir::ManagerFarm<> amf(&farm, ap);
 				amf.start();
 				amf.join();
 

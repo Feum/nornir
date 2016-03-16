@@ -48,7 +48,7 @@
 
 #define NOT_VALID DBL_MIN
 
-namespace adpff{
+namespace nornir{
 
 using namespace mammut::cpufreq;
 using namespace mammut::utils;

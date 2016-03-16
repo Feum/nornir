@@ -113,7 +113,7 @@
 #include "../../src/manager.hpp"
 
 //#define USE_FF_ALLOCATOR
-using namespace adpff;
+using namespace nornir;
 
 /* 
    Notes on MAX_BOARDSIZE:
@@ -537,9 +537,8 @@ int main(int argc, char** argv) {
     ffalloc.init();
 #endif
 
-    adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml", "archdata.xml");
-    //adpff::Parameters ap;
+    nornir::Observer obs;
+    nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     size_t bufSize = 128; //8192;
     ff_farm<> farm(false, bufSize, bufSize, false, DEF_MAX_NUM_WORKERS, true);
@@ -555,7 +554,7 @@ int main(int argc, char** argv) {
     time(&t1);
     printf("Start: \t%s", ctime(&t1));
 
-    adpff::ManagerFarm<> amf(&farm, ap);
+    nornir::ManagerFarm<> amf(&farm, ap);
     amf.start();
     amf.join();  
 

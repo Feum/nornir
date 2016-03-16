@@ -27,7 +27,7 @@
 
 #include "trigger.hpp"
 
-namespace adpff{
+namespace nornir{
 
 TriggerQBlocking::TriggerQBlocking(TriggerConfQBlocking confQBlocking,
                                    double thresholdQBlocking,

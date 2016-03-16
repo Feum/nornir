@@ -25,8 +25,8 @@
  * =========================================================================
  */
 
-#ifndef ADAPTIVE_FASTFLOW_NODE_HPP_
-#define ADAPTIVE_FASTFLOW_NODE_HPP_
+#ifndef NORNIR_NODE_HPP_
+#define NORNIR_NODE_HPP_
 
 #include "./parameters.hpp"
 
@@ -38,7 +38,7 @@
 
 #define TERMINATE_APPLICATION do{ terminate(); return (void*) ff::FF_EOS;} while(0)
 
-namespace adpff{
+namespace nornir{
 
 typedef enum{
     NODE_TYPE_EMITTER,
@@ -119,7 +119,7 @@ typedef struct{
 }ManagementRequest;
 
 /*!private
- * \class adpff_node
+ * \class AdaptiveNode
  * \brief This class wraps a ff_node to let it reconfigurable.
  *
  * This class wraps a ff_node to let it reconfigurable.
@@ -299,4 +299,4 @@ public:
 
 }
 
-#endif /* ADAPTIVE_FASTFLOW_NODE_HPP_ */
+#endif /* NORNIR_NODE_HPP_ */

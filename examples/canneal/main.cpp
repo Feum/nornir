@@ -49,7 +49,7 @@
 #include "../../src/manager.hpp"
 
 using namespace std;
-using namespace adpff;
+using namespace nornir;
 
 void* entry_pt(void*);
 
@@ -300,12 +300,12 @@ int main (int argc, char * const argv[]) {
     farm.remove_collector();
     //farm.set_scheduling_ondemand();
 
-    adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Observer obs;
+    nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     ap.expectedTasksNumber = number_temp_steps;
     ap.synchronousWorkers = true;
-    adpff::ManagerFarm<> amf(&farm, ap);
+    nornir::ManagerFarm<> amf(&farm, ap);
     amf.start();
     std::cout << "amf started" << std::endl;
     amf.join();

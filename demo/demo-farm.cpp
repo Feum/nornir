@@ -41,7 +41,7 @@ using namespace ff;
 #define MICROSECSSLEEP 1000000
 
 // generic worker
-class Worker: public adpff::AdaptiveNode{
+class Worker: public nornir::AdaptiveNode{
 public:
     int svc_init(){
         std::cout << "Worker svc_init called" << std::endl;
@@ -62,7 +62,7 @@ public:
 };
 
 // the gatherer filter
-class Collector: public adpff::AdaptiveNode {
+class Collector: public nornir::AdaptiveNode {
 public:
     void * svc(void * task) {
         int * t = (int *)task;
@@ -72,7 +72,7 @@ public:
 };
 
 // the load-balancer filter
-class Emitter: public adpff::AdaptiveNode {
+class Emitter: public nornir::AdaptiveNode {
 public:
     Emitter(int max_task):ntask(max_task) {};
 
@@ -123,10 +123,10 @@ int main(int argc, char * argv[]) {
     Collector C;
     farm.add_collector(&C);
     
-    adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Observer obs;
+    nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
-    adpff::ManagerFarm<> amf(&farm, ap);
+    nornir::ManagerFarm<> amf(&farm, ap);
     std::cout << "Starting manager. " << std::endl;
     amf.start();
     std::cout << "Manager started. " << std::endl;

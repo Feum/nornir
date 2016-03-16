@@ -26,18 +26,27 @@
  */
 
 
-#ifndef SRC_INTERFACE_HPP_
-#define SRC_INTERFACE_HPP_
+#ifndef NORNIR_INTERFACE_HPP_
+#define NORNIR_INTERFACE_HPP_
 
 #include "manager.hpp"
 
-namespace adpff{
+namespace nornir{
+
+template <typename I, typename O> class Farm;
 
 template <typename O> class Scheduler: public AdaptiveNode{
+    template <typename IN, typename OUT> friend class Farm;
+private:
+    ff::ff_loadbalancer* _lb;
+
+    void setLb(ff::ff_loadbalancer* lb){
+        _lb = lb;
+    }
 public:
     virtual ~Scheduler(){;}
 
-    void* svc(void* t) CX11_KEYWORD(final){
+    void* svc(void* task) CX11_KEYWORD(final){
         void* r = (void*) schedule();
         if(r){
            return r;
@@ -48,6 +57,18 @@ public:
     }
 
     virtual O* schedule() = 0;
+
+    void send(O* task) CX11_KEYWORD(final){
+        while(!ff_send_out((void*) task)){;}
+    }
+
+    void sendTo(O* task, uint id) CX11_KEYWORD(final){
+        while(!_lb->ff_send_out_to(task, id)){;} //TODO: Chiedere a Massimo
+    }
+
+    void broadcast(O* task) CX11_KEYWORD(final){
+        _lb->broadcast_task(task);
+    }
 };
 
 template <typename I, typename O> class Worker: public AdaptiveNode{
@@ -59,6 +80,18 @@ public:
     }
 
     virtual O* compute(I*) = 0;
+};
+
+template <typename I> class WorkerNoOut: public AdaptiveNode{
+public:
+    virtual ~WorkerNoOut(){;}
+
+    void* svc(void* t) CX11_KEYWORD(final){
+        compute(reinterpret_cast<I*>(t));
+        return (void*) GO_ON;
+    }
+
+    virtual void compute(I*) = 0;
 };
 
 template <typename I> class Gatherer: public AdaptiveNode{
@@ -143,6 +176,7 @@ public:
 
     void start(){
         _farm.add_workers(_workers);
+        _scheduler->setLb(_farm.getlb());
         _manager = new ManagerFarm<>(&_farm, *_params);
         _manager->start();
     }
@@ -168,4 +202,4 @@ public:
 
 }
 
-#endif /* SRC_INTERFACE_HPP_ */
+#endif /* NORNIR_INTERFACE_HPP_ */

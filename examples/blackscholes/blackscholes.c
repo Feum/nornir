@@ -42,7 +42,7 @@ using namespace tbb;
 #ifdef ENABLE_FF
 //#define BLOCKING_MODE
 #include <iostream>
-#include "../../src/manager.hpp"
+#include "../../src/interface.hpp"
 
 using namespace ff;
 #endif //ENABLE_FF
@@ -288,7 +288,7 @@ typedef struct{
 
 #define CHUNKSIZE 1000
 
-class Emitter: adpff::AdaptiveNode {
+class Emitter: nornir::Scheduler<fftask_t> {
 private:
     int currentIteration;
     int currentOption;
@@ -297,13 +297,12 @@ public:
         ;
     }
 
-    void *svc(void *task){
-      fftask_t* t = (fftask_t*) task;
+    fftask_t* schedule(){
         while(true){
             if(currentIteration >= NUM_RUNS){
                 printf("Generating end of stream.");
                 fflush(stdout);
-                TERMINATE_APPLICATION;
+                return NULL;
             }
 
             fftask_t* outTask = new fftask_t;
@@ -325,15 +324,14 @@ public:
 
             currentOption = (currentOption + outTask->numElems) % numOptions;
 
-            ff_send_out(outTask);
+            send(outTask);
         }	
     }
 };
 
-class Worker: adpff::AdaptiveNode {
+class Worker: nornir::WorkerNoOut<fftask_t> {
 public:
-    void* svc(void* task) {
-      fftask_t* t = (fftask_t*) task;
+    void compute(fftask_t* t){
         uint j = 0;
         for(uint i = 0; i < t->numElems; i++){
             fptype price;
@@ -358,7 +356,7 @@ public:
         }
 
         delete t;
-        return GO_ON;
+        return;
     }
 };
 
@@ -564,11 +562,11 @@ int main (int argc, char **argv)
     farm.remove_collector();
     //farm.set_scheduling_ondemand();
 
-    adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Observer obs;
+    nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     ap.expectedTasksNumber = numOptions * NUM_RUNS / CHUNKSIZE;
-    adpff::ManagerFarm<> amf(&farm, ap);
+    nornir::ManagerFarm<> amf(&farm, ap);
     amf.start();
     std::cout << "amf started" << std::endl;
     amf.join();

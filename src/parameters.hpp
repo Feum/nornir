@@ -26,8 +26,8 @@
  */
 
 
-#ifndef ADAPTIVE_FASTFLOW_PARAMETERS_HPP_
-#define ADAPTIVE_FASTFLOW_PARAMETERS_HPP_
+#ifndef NORNIR_PARAMETERS_HPP_
+#define NORNIR_PARAMETERS_HPP_
 
 #include "external/rapidXml/rapidxml.hpp"
 
@@ -36,7 +36,7 @@
 #include <mammut/utils.hpp>
 #include <mammut/mammut.hpp>
 
-namespace adpff{
+namespace nornir{
 
 class Observer;
 
@@ -753,4 +753,4 @@ public:
 
 }
 
-#endif /* ADAPTIVE_FASTFLOW_PARAMETERS_HPP_ */
+#endif /* NORNIR_PARAMETERS_HPP_ */

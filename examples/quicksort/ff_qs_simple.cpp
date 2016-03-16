@@ -44,7 +44,7 @@
 #include <stdio.h>
 #include "../../src/manager.hpp"
 
-using namespace adpff;
+using namespace nornir;
 
 //FastFlow task type
 typedef struct {
@@ -285,8 +285,8 @@ int main(int argc, char *argv[]) {
     farm.add_workers(w);
     farm.wrap_around();
     
-    adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Observer obs;
+    nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
 
 
@@ -296,7 +296,7 @@ int main(int argc, char *argv[]) {
         std::cout << "I do not know the expected tasks number." << std::endl;
     }
     std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
-    adpff::ManagerFarm<> amf(&farm, ap);
+    nornir::ManagerFarm<> amf(&farm, ap);
     std::cout << "Starting manager. " << std::endl;
     amf.start();
     std::cout << "Manager started. " << std::endl;

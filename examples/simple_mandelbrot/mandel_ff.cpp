@@ -71,7 +71,7 @@ double step = range/((double) DIM);
 int dim = DIM;
 int niter = ITERATION;
 
-class Worker: public adpff::AdaptiveNode {
+class Worker: public nornir::AdaptiveNode {
 public:
   void * svc(void * task) {
 	int * t = (int *)task;
@@ -111,7 +111,7 @@ public:
   }
 };
 
-class Worker2: public adpff::AdaptiveNode {
+class Worker2: public nornir::AdaptiveNode {
 public:
       void * svc(void * task) {
 	int * t = (int *)task;
@@ -160,7 +160,7 @@ public:
 
 
 // the gatherer filter
-class Collector: public adpff::AdaptiveNode {
+class Collector: public nornir::AdaptiveNode {
 public:
   void * svc(void * task) {	  
 	ostream_t * t = (ostream_t *)task;
@@ -179,7 +179,7 @@ private:
 };
 
 // the load-balancer filter
-class Emitter: public adpff::AdaptiveNode {
+class Emitter: public nornir::AdaptiveNode {
 public:
   Emitter(int max_task):ntask(max_task) {};
   
@@ -246,11 +246,11 @@ int main(int argc, char ** argv) {
 	if(ncores>=4)
 	    farm.add_collector(&C);
 
-    adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Observer obs;
+    nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     ap.expectedTasksNumber = dim;
-    adpff::ManagerFarm<> amf(&farm, ap);
+    nornir::ManagerFarm<> amf(&farm, ap);
     amf.start();
     std::cout << "amf started" << std::endl;
     amf.join();

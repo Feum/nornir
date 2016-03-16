@@ -49,7 +49,7 @@
 #define DEBUGB(x)
 #endif
 
-namespace adpff{
+namespace nornir{
 
 using namespace std;
 

@@ -25,13 +25,13 @@
  * =========================================================================
  */
 
-#ifndef SRC_TRIGGER_HPP_
-#define SRC_TRIGGER_HPP_
+#ifndef NORNIR_TRIGGER_HPP_
+#define NORNIR_TRIGGER_HPP_
 
 #include "node.hpp"
 #include "utils.hpp"
 
-namespace adpff{
+namespace nornir{
 
 typedef enum{
     TRIGGER_TYPE_Q_BLOCKING = 0,

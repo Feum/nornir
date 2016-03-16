@@ -35,7 +35,7 @@
 #define DEBUGB(x)
 #endif
 
-namespace adpff{
+namespace nornir{
 
 FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
         AdaptiveNode* collector, ff::ff_gatherer* gt,

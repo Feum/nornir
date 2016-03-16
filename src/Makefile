@@ -12,14 +12,14 @@ clean:
 cleanall:
 	-rm -fr *.o *~ *.a
 lib: $(TARGET)
-	ar rc libgrape.a $(TARGET)
-	ranlib libgrape.a
+	ar rc libnornir.a $(TARGET)
+	ranlib libnornir.a
 	ar -M < buildlib.ar
 install:
-	mkdir -p $(GRAPE_PATH_INCLUDE)
-	find . -name '*.hpp' -exec cp --parents \{\} $(GRAPE_PATH_INCLUDE) \;
-	cp ./libgrape.a $(GRAPE_PATH_LIB)/libgrape.a
+	mkdir -p $(NORNIR_PATH_INCLUDE)
+	find . -name '*.hpp' -exec cp --parents \{\} $(NORNIR_PATH_INCLUDE) \;
+	cp ./libnornir.a $(NORNIR_PATH_LIB)/libnornir.a
 uninstall:
-	rm -r $(GRAPE_PATH_INCLUDE)/*
-	rm $(GRAPE_PATH_LIB)/libgrape.a
+	rm -r $(NORNIR_PATH_INCLUDE)/*
+	rm $(NORNIR_PATH_LIB)/libnornir.a
 

@@ -42,7 +42,7 @@ using namespace ff;
 
 static int maxTasks;
 
-class Emitter: public adpff::Scheduler<int>{
+class Emitter: public nornir::Scheduler<int>{
 public:
     int* schedule() {
         usleep(MICROSECSSLEEP);
@@ -58,7 +58,7 @@ public:
 
 
 // generic worker
-class Worker: public adpff::Worker<int, int>{
+class Worker: public nornir::Worker<int, int>{
 public:
     int * compute(int * task) {
         usleep(MICROSECSSLEEP);
@@ -69,7 +69,7 @@ public:
 };
 
 // the gatherer filter
-class Collector: public adpff::Gatherer<int> {
+class Collector: public nornir::Gatherer<int> {
 public:
     void gather(int* task) {
         std::cout << "Collector received task " << *task << "\n";
@@ -98,7 +98,7 @@ int main(int argc, char * argv[]) {
 
     maxTasks = streamlen;
 
-    adpff::Farm<int, int> farm("parameters.xml", "archdata.xml");
+    nornir::Farm<int, int> farm("parameters.xml", "archdata.xml");
     std::cout << "Starting farm. " << std::endl;
     farm.start<Emitter, Worker, Collector>(nworkers);
     std::cout << "Farm started. " << std::endl;

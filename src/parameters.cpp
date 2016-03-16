@@ -27,7 +27,7 @@
 
 #include "parameters.hpp"
 
-namespace adpff{
+namespace nornir{
 
 using namespace std;
 using namespace mammut::cpufreq;

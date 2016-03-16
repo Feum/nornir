@@ -25,8 +25,8 @@
  * =========================================================================
  */
 
-#ifndef ADAPTIVE_FASTFLOW_CONFIGURATION_HPP_
-#define ADAPTIVE_FASTFLOW_CONFIGURATION_HPP_
+#ifndef NORNIR_CONFIGURATION_HPP_
+#define NORNIR_CONFIGURATION_HPP_
 
 #include "knob.hpp"
 #include "node.hpp"
@@ -35,7 +35,7 @@
 
 #include <mammut/utils.hpp>
 
-namespace adpff{
+namespace nornir{
 
 class FarmConfiguration: public mammut::utils::NonCopyable {
 private:
@@ -147,4 +147,4 @@ public:
 };
 
 }
-#endif /* ADAPTIVE_FASTFLOW_CONFIGURATION_HPP_ */
+#endif /* NORNIR_CONFIGURATION_HPP_ */

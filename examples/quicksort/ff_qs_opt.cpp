@@ -36,7 +36,7 @@
 
 #include "../../src/manager.hpp"
 
-using namespace adpff;
+using namespace nornir;
 
 using namespace ff;
 
@@ -306,10 +306,10 @@ int main(int argc, char *argv[]) {
     farm.add_workers(w);
     farm.wrap_around();
 
-    adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Observer obs;
+    nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
-    adpff::ManagerFarm<my_loadbalancer> amf(&farm, ap);
+    nornir::ManagerFarm<my_loadbalancer> amf(&farm, ap);
     std::cout << "Starting manager. " << std::endl;
     amf.start();
     std::cout << "Manager started. " << std::endl;

@@ -52,7 +52,7 @@
 #define DEBUGB(x)
 #endif
 
-namespace adpff{
+namespace nornir{
 
 class Parameters;
 

@@ -25,13 +25,13 @@
  * =========================================================================
  */
 
-#ifndef SRC_KNOB_HPP_
-#define SRC_KNOB_HPP_
+#ifndef NORNIR_KNOB_HPP_
+#define NORNIR_KNOB_HPP_
 
 #include "node.hpp"
 #include <ff/farm.hpp>
 
-namespace adpff{
+namespace nornir{
 
 typedef enum{
     KNOB_TYPE_WORKERS = 0,
@@ -369,4 +369,4 @@ inline bool operator>=(const KnobsValues& lhs,
 
 }
 
-#endif /* SRC_KNOB_HPP_ */
+#endif /* NORNIR_KNOB_HPP_ */

@@ -30,8 +30,8 @@
  * \brief Implementation of various utilities.
  **/
 
-#ifndef UTILS_HPP_
-#define UTILS_HPP_
+#ifndef NORNIR_UTILS_HPP_
+#define NORNIR_UTILS_HPP_
 
 #include <mammut/mammut.hpp>
 
@@ -49,7 +49,7 @@
 #define MSECS_IN_SECS 1000.0 // Milliseconds in 1 second
 #define NSECS_IN_SECS 1000000000.0 // Nanoseconds in 1 second
 
-namespace adpff{
+namespace nornir{
 
 inline double ticksToSeconds(double ticks, double ticksPerNs){
     return (ticks/ticksPerNs)/NSECS_IN_SECS;
@@ -678,4 +678,4 @@ std::ostream& operator<< (std::ostream& out, const std::vector<T>& v){
 
 }
 
-#endif /* UTILS_HPP_ */
+#endif /* NORNIR_UTILS_HPP_ */

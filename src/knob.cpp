@@ -47,7 +47,7 @@
 #define DEBUGB(x)
 #endif
 
-namespace adpff{
+namespace nornir{
 
 using namespace mammut;
 using namespace mammut::cpufreq;

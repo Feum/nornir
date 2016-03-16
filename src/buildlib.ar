@@ -1,4 +1,4 @@
-OPEN libgrape.a
+OPEN libnornir.a
 ADDLIB external/Mammut/mammut/libmammut.a
 SAVE
 END

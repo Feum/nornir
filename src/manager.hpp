@@ -30,15 +30,16 @@
  *
  * To let an existing fastflow farm-based adaptive, follow these steps:
  *  1. Emitter, Workers and Collector of the farm must extend
- *     adpff::AdaptiveNode instead of ff::ff_node
+ *     nornir::AdaptiveNode instead of ff::ff_node
  *  2. If the application wants to be aware of the changes in the number
  *     of workers, the nodes can implement the notifyWorkersChange virtual
  *     method.
  */
 
-#ifndef ADAPTIVE_FASTFLOW_FARM_HPP_
-#define ADAPTIVE_FASTFLOW_FARM_HPP_
+#ifndef NORNIR_FARM_HPP_
+#define NORNIR_FARM_HPP_
 
+//TODO
 //#if !defined(TRACE_FASTFLOW) || !defined(FF_TASK_CALLBACK)
 //#error "TRACE_FASTFLOW and FF_TASK_CALLBACK macros need to be defined."
 //#endif
@@ -59,7 +60,7 @@
 #include <iostream>
 #include <limits>
 
-namespace adpff{
+namespace nornir{
 
 class Parameters;
 
@@ -287,4 +288,4 @@ private:
 
 #include "manager.cpp"
 
-#endif /* ADAPTIVE_FASTFLOW_FARM_HPP_ */
+#endif /* NORNIR_FARM_HPP_ */

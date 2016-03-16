@@ -38,7 +38,7 @@
 
 using namespace ff; 
 using namespace cv;
-using namespace adpff;
+using namespace nornir;
 
 // reads frame and sends them to the next stage
 struct Source : AdaptiveNode {
@@ -172,13 +172,13 @@ int main(int argc, char *argv[]) {
     Drain  drain(outvideo);
     ofarm.setCollectorF((ff_node*) &drain);
     
-    adpff::Observer obs;
-    adpff::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Observer obs;
+    nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     if(numframes){
         ap.expectedTasksNumber = numframes*numfiles;
     }
-    adpff::ManagerFarm<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
+    nornir::ManagerFarm<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
 
     amf.start();
     amf.join();

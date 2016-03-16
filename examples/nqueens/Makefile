@@ -34,10 +34,10 @@ TARGET               = nq_ff nq_ff_acc nq
 
 all: $(TARGET)
 
-nq_ff: nq_ff.cpp ../../src/libgrape.a
+nq_ff: nq_ff.cpp
 	$(CXX) $(INCS) $(CXXFLAGS) $(OPTIMIZE_FLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
 
-nq_ff_acc: nq_ff_acc.cpp ../../src/libgrape.a
+nq_ff_acc: nq_ff_acc.cpp
 	$(CXX) $(INCS) $(CXXFLAGS) $(OPTIMIZE_FLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
 
 nq: nq.c

@@ -29,8 +29,8 @@
  * \brief Predictors used by adaptive farm.
  *
  */
-#ifndef PREDICTORS_HPP_
-#define PREDICTORS_HPP_
+#ifndef NORNIR_PREDICTORS_HPP_
+#define NORNIR_PREDICTORS_HPP_
 
 #include "configuration.hpp"
 #include "utils.hpp"
@@ -46,7 +46,7 @@
 
 using namespace mlpack::regression;
 
-namespace adpff{
+namespace nornir{
 
 class KnobsValues;
 
@@ -527,4 +527,4 @@ public:
 }
 
 
-#endif /* PREDICTORS_HPP_ */
+#endif /* NORNIR_PREDICTORS_HPP_ */
