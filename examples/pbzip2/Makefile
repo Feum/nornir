@@ -4,7 +4,7 @@ SHELL = /bin/sh
 # Comment out CFLAGS line below for compatability mode for 32bit file sizes
 # (less than 2GB) and systems that have compilers that treat int as 64bit
 # natively (ie: modern AIX)
-CXXFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DDEBUG_FARM -DDEBUG_NODE -DDEBUG_PREDICTORS
+CXXFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
 # Uncomment CFLAGS line below if you want to compile pbzip2 without load
 # average support for systems that do not support it
