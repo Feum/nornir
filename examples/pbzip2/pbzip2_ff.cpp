@@ -154,7 +154,7 @@
 #include <mammut/energy/energy.hpp>
 #include <mammut/cpufreq/cpufreq.hpp>
 #include <mammut/utils.hpp>
-#include "../../src/manager.hpp"
+#include "../../src/interface.hpp"
 
 /* ------------------ FastFlow specific ---------------- */
 
@@ -362,11 +362,11 @@ char *memstr(char *searchBuf, int searchBufSize, char *searchString, int searchS
  * FastFlow's collector filter.
  */
 
-class FileWriter: public nornir::AdaptiveNode {
+class FileWriter: public nornir::Gatherer<ff_task_t>{
 public:
         FileWriter():
 		OutFilename(NULL),currBlock(0),hOutfile(1),// default to stdout
-		CompressedSize(0),OutputBuffer(NumBlocks,(ff_task_t*)0) {};
+		CompressedSize(0),OutputBuffer(NumBlocks,(ff_task_t*)0), firstRun(true) {};
 
 	void set_input_data(char * f) {
 		OutFilename = f;
@@ -377,21 +377,22 @@ public:
 
 	// called just once at very beginning
         int svc_init() {
-		if (OutputStdOut == 0)
-		{
-			hOutfile = open(OutFilename, O_RDWR | O_CREAT | O_TRUNC | O_BINARY, FILE_MODE);
-			// check to see if file creation was successful
-			if (hOutfile == -1)
-			{
-				fprintf(stderr, "pbzip2_ff: *ERROR: Could not create output file [%s]!\n", OutFilename);
-				return -1;
-			}
-		}	
+            if(firstRun){
+                if (OutputStdOut == 0)
+                {
+                    hOutfile = open(OutFilename, O_RDWR | O_CREAT | O_TRUNC | O_BINARY, FILE_MODE);
+                    // check to see if file creation was successful
+                    if (hOutfile == -1)
+                    {
+                        fprintf(stderr, "pbzip2_ff: *ERROR: Could not create output file [%s]!\n", OutFilename);
+                        return -1;
+                    }
+                }
+            }
 		return 0;
 	}
 	
-	void * svc(void * t) {      
-		ff_task_t * task = (ff_task_t*)t;
+        void gather(ff_task_t* task){
 		int ret;
 		int percentComplete = 0;
 		
@@ -415,7 +416,7 @@ public:
 					OutputBuffer.resize(newsize,(ff_task_t*)0);
 					if (OutputBuffer.size() != newsize) {
 						fprintf(stderr, "fileWriter:  *ERROR: cannot resize IutputBuffer\n");
-						return NULL;
+						return;
 					}
 				}
 				OutputBuffer[task->blockNum] = task;
@@ -424,7 +425,7 @@ public:
 				fprintf(stderr, "fileWriter:  *STORE:  Buffer: %x  Size: %u   Block: %d  currBlock: %d\n", OutputBuffer[task->blockNum]->buf, OutputBuffer[task->blockNum]->buffSize, task->blockNum, currBlock);
                                 #endif
 				
-				return GO_ON;
+				return;
 			}
 			
                         #ifdef PBZIP_DEBUG
@@ -442,7 +443,7 @@ public:
 			if (ret <= 0)
 			{
 				fprintf(stderr, "pbzip2_ff: *ERROR: Could not write to file!  Skipping...\n");
-				return NULL;
+				return;
 				
 			}
 			if (task->in != NULL)
@@ -461,24 +462,27 @@ public:
 			}
 			
                         // check if next block is already arrived
-			if (currBlock>=NumBlocks || !OutputBuffer[currBlock]) return GO_ON; //block not yet arrived
+			if (currBlock>=NumBlocks || !OutputBuffer[currBlock]) return; //block not yet arrived
 
 			task=OutputBuffer[currBlock];
 			OutputBuffer[currBlock]=NULL;
 
 		} while(1);
-		return NULL; // not reached
+		return; // not reached
 	}
 	
 	void svc_end() {
-		if (OutputStdOut == 0)
-			close(hOutfile);
-		if ((QuietMode != 1))
-		{
-			fprintf(stderr, "    Output Size: %" PRIu64 " bytes\n", (unsigned long long)CompressedSize);
-		}
-		
-		OutputBuffer.clear();
+	    if(firstRun){
+            if (OutputStdOut == 0)
+                close(hOutfile);
+            if ((QuietMode != 1))
+            {
+                fprintf(stderr, "    Output Size: %" PRIu64 " bytes\n", (unsigned long long)CompressedSize);
+            }
+
+            OutputBuffer.clear();
+            firstRun = false;
+	    }
 	}
 	
 private:
@@ -487,6 +491,7 @@ private:
 	int hOutfile;
 	OFF_T CompressedSize;
 	std::vector <ff_task_t *> OutputBuffer;
+	bool firstRun;
 };
 
 
@@ -912,7 +917,7 @@ ssize_t bufread(int hf, char *buf, size_t bsize)
  * FastFlow's emitter filter.
  */
 
-class Producer: public nornir::AdaptiveNode {
+class Producer: public nornir::Scheduler<ff_task_t> {
 public:
 	Producer():
 	    hInfile(-1),blockSize(0),fileSize(0), comp_decomp(0),bz2NumBlocks(0) {}
@@ -1275,13 +1280,12 @@ public:
 	}
 	
 	
-	void * svc(void * notused) {
+	ff_task_t* schedule(){
 		if (comp_decomp==0) 
 			errLevel = producer(hInfile,blockSize);
 		else 
 			errLevel = producer_decompress_phase2();
-		TERMINATE_APPLICATION;
-		//return NULL; // exit
+		return NULL;
 	}
 	
 	int getErrLevel() const { return errLevel;}
@@ -1306,7 +1310,7 @@ private:
  * FastFlow's worker filter.
  */
 
-class Consumer: public nornir::AdaptiveNode {
+class Consumer: public nornir::Worker<ff_task_t, ff_task_t> {
 public:
 	Consumer():comp_decomp(0) {}
 
@@ -1431,14 +1435,13 @@ public:
 		}
 
 
-	
-	void * svc(void * task) {
+	ff_task_t* compute(ff_task_t* task){
 		if (comp_decomp==0) 
 		{
-			if (consumer((ff_task_t*)task)<0) return NULL;
+			if (consumer(task)<0) return NULL;
 		} else
 		{
-			if (consumer_decompress((ff_task_t*)task)<0) return NULL;
+			if (consumer_decompress(task)<0) return NULL;
 		}				
 		return task; // return the task to send to the collector
 	}

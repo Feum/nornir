@@ -122,7 +122,7 @@ public:
             for(size_t i = 0; i < _activeWorkers; i++){
                 allTasks[i].present = false;
                 if(!keep_going(_temp_steps_completed, allTasks[i].accepted_good_moves, allTasks[i].accepted_bad_moves)){
-                    TERMINATE_APPLICATION;
+                    return NULL;
                 }
             }
 

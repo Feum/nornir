@@ -1,4 +1,4 @@
-APPS                 = canneal #quicksort simple_mandelbrot blackscholes pbzip2 videoprocessing
+APPS                 = canneal simple_mandelbrot blackscholes pbzip2 videoprocessing quicksort 
 
 .PHONY: all clean cleanall
 
