@@ -28,9 +28,9 @@
 #include "knob.hpp"
 #include "parameters.hpp"
 
-#include <mammut/mammut.hpp>
-#include <mammut/utils.hpp>
-#include <mammut/cpufreq/cpufreq.hpp>
+#include "external/Mammut/mammut/mammut.hpp"
+#include "external/Mammut/mammut/utils.hpp"
+#include "external/Mammut/mammut/cpufreq/cpufreq.hpp"
 
 #include <algorithm>
 #include <cmath>

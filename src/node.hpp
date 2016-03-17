@@ -31,7 +31,7 @@
 #include "./parameters.hpp"
 
 #include <ff/node.hpp>
-#include <mammut/mammut.hpp>
+#include "external/Mammut/mammut/mammut.hpp"
 
 #undef DEBUG
 #undef DEBUGB

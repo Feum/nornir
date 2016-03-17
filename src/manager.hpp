@@ -46,9 +46,9 @@
 #include "utils.hpp"
 
 #include <ff/farm.hpp>
-#include <mammut/module.hpp>
-#include <mammut/utils.hpp>
-#include <mammut/mammut.hpp>
+#include "external/Mammut/mammut/module.hpp"
+#include "external/Mammut/mammut/utils.hpp"
+#include "external/Mammut/mammut/mammut.hpp"
 
 #include <cmath>
 #include <iostream>

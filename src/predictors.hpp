@@ -35,7 +35,7 @@
 #include "configuration.hpp"
 #include "utils.hpp"
 
-#include <mammut/mammut.hpp>
+#include "external/Mammut/mammut/mammut.hpp"
 
 #include <mlpack/core.hpp>
 #include <mlpack/methods/linear_regression/linear_regression.hpp>

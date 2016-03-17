@@ -28,8 +28,8 @@
 #include "./node.hpp"
 #include "./utils.hpp"
 
-#include <mammut/module.hpp>
-#include <mammut/utils.hpp>
+#include "external/Mammut/mammut/module.hpp"
+#include "external/Mammut/mammut/utils.hpp"
 
 #include <fstream>
 #include <streambuf>

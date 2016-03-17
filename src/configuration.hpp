@@ -33,7 +33,7 @@
 #include "parameters.hpp"
 #include "trigger.hpp"
 
-#include <mammut/utils.hpp>
+#include "external/Mammut/mammut/utils.hpp"
 
 namespace nornir{
 

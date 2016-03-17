@@ -33,7 +33,7 @@
 #include "predictors.hpp"
 #include "manager.hpp"
 
-#include <mammut/cpufreq/cpufreq.hpp>
+#include "external/Mammut/mammut/cpufreq/cpufreq.hpp"
 
 #undef DEBUG
 #undef DEBUGB
