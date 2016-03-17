@@ -288,7 +288,7 @@ typedef struct{
 
 #define CHUNKSIZE 1000
 
-class Emitter: nornir::Scheduler<fftask_t> {
+class Emitter: public nornir::Scheduler<fftask_t> {
 private:
     int currentIteration;
     int currentOption;
@@ -329,7 +329,7 @@ public:
     }
 };
 
-class Worker: nornir::WorkerNoOut<fftask_t> {
+class Worker: public nornir::Worker<fftask_t> {
 public:
     void compute(fftask_t* t){
         uint j = 0;
@@ -552,25 +552,15 @@ int main (int argc, char **argv)
     bs_thread(&tid);
 #else //ENABLE_TBB
 #ifdef ENABLE_FF
-    std::vector<ff_node*> W;
-    for(int i = 0; i < nThreads; i++){
-        W.push_back((ff_node*)new Worker());
-    }
-
-    ff_farm<> farm(W);
-    farm.add_emitter((ff_node*)new Emitter());
-    farm.remove_collector();
-    //farm.set_scheduling_ondemand();
-
     nornir::Observer obs;
     nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     ap.expectedTasksNumber = numOptions * NUM_RUNS / CHUNKSIZE;
-    nornir::ManagerFarm<> amf(&farm, ap);
-    amf.start();
-    std::cout << "amf started" << std::endl;
-    amf.join();
-    std::cout << "amf joined" << std::endl;
+    nornir::Farm<fftask_t> farm(&ap);
+    farm.start<Emitter, Worker>(nThreads);
+    std::cout << "Farm started" << std::endl;
+    farm.wait();
+    std::cout << "Farm joined" << std::endl;
 
     //farm.ffStats(std::cout);
 #else //ENABLE_FF

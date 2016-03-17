@@ -289,9 +289,6 @@ typedef enum{
     // the voltage file has not been specified or it does not exist.
     VALIDATION_VOLTAGE_FILE_NEEDED,
 
-    // Fast reconfiguration not available.
-    VALIDATION_NO_FAST_RECONF,
-
     // Blocking threshold needs to be specified.
     VALIDATION_NO_BLOCKING_THRESHOLD
 }ParametersValidation;
@@ -573,7 +570,7 @@ public:
     // Calibration strategy [default = STRATEGY_CALIBRATION_HALTON].
     StrategyCalibration strategyCalibration;
 
-    // Polling strategy [default = STRATEGY_POLLING_SLEEP_LATENCY].
+    // Polling strategy [default = STRATEGY_POLLING_SLEEP_SMALL].
     StrategyPolling strategyPolling;
 
     // Persistence strategy [default = STRATEGY_PERSISTENCE_SAMPLES].
@@ -585,7 +582,7 @@ public:
     // If true, before changing the number of workers the frequency will be
     // set to maximum to reduce the latency of the reconfiguration. The
     // frequency will be be set again to the correct value after the farm
-    // is restarted [default = false].
+    // is restarted [default = true].
     bool fastReconfiguration;
 
     // If true, when a reconfiguration occur, the collector is migrated to a
@@ -594,22 +591,22 @@ public:
 
     // The smoothing factor. It's meaning changes according to the smoothing
     // strategy adopted. If 0, default value will be set.
-    // [default = 10 for moving average, 0.5 for exponential].
+    // [default = 10 for moving average, 0.1 for exponential].
     double smoothingFactor;
 
     // The persistence value. It's meaning changes according to the persistence
     // strategy adopted. If 0, default value will be set.
-    // [default = 10 for samples, 5 for variation].
+    // [default = 1 for samples, 5 for variation].
     double persistenceValue;
 
     // The length of the sampling interval (in milliseconds) for the data
     // reading during calibration phase. If 0, it will be automatically computed
-    // such to have a low performance overhead [default = 0].
+    // such to have a low performance overhead [default = 100].
     uint32_t samplingIntervalCalibration;
 
     // The length of the sampling interval (in milliseconds) for the data
     // reading during steady phase. If 0, it will be automatically computed
-    // such to have a low performance overhead [default = 0].
+    // such to have a low performance overhead [default = 1000].
     uint32_t samplingIntervalSteady;
 
     // If the application stays in the steady phase for at least
@@ -668,20 +665,18 @@ public:
     // maxCalibrationTime [default = 0.0].
     double maxCalibrationTime;
 
-    // Maximum error percentage allowed for prediction of primary
-    // value. If 0, then it will be set equal to the coefficient
-    // of variation of the primary value [default = 5.0].
-    double maxPrimaryPredictionError;
+    // Maximum error percentage allowed for performance prediction.
+    // [default = 10.0].
+    double maxPerformancePredictionError;
 
-    // Maximum error percentage allowed for prediction of secondary
-    // value. If 0, then it will be set equal to the coefficient
-    // of variation of the secondary value [default = 5.0].
-    double maxSecondaryPredictionError;
+    // Maximum error percentage allowed for power consumption prediction.
+    // [default = 5.0].
+    double maxPowerPredictionError;
 
     // The aging value for the linear regression predictor. If it has a value
     // of n, then we will only consider the last n configurations we collected
     // in order to perform predictions. If 0, no aging will be applied and all
-    // the previous samples will be considered [default = 0].
+    // the previous samples will be considered [default = 10].
     uint regressionAging;
 
     // The maximum percentage of monitoring overhead, in the range (0, 100).
@@ -700,7 +695,7 @@ public:
     uint tolerableSamples;
 
     // Maximum size for the internal queues of the farm.
-    // If 0, nothing will be modified [default = 0].
+    // If 0, nothing will be modified [default = 1].
     ulong qSize;
 
     // If different from zero:

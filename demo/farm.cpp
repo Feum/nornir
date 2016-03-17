@@ -1,35 +1,34 @@
-/* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* ***************************************************************************
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 as 
- *  published by the Free Software Foundation.
+/*
+ * farm_ffcompat.hpp
  *
- *  This program is distributed in the hope that it will be useful,
+ * Created on: 27/02/2016
+ *
+ * =========================================================================
+ *  Copyright (C) 2015-, Daniele De Sensi (d.desensi.software@gmail.com)
+ *
+ *  This file is part of AdaptiveFastFlow.
+ *
+ *  AdaptiveFastFlow is free software: you can redistribute it and/or
+ *  modify it under the terms of the Lesser GNU General Public
+ *  License as published by the Free Software Foundation, either
+ *  version 3 of the License, or (at your option) any later version.
+
+ *  AdaptiveFastFlow is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ *  Lesser GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *  You should have received a copy of the Lesser GNU General Public
+ *  License along with AdaptiveFastFlow.
+ *  If not, see <http://www.gnu.org/licenses/>.
  *
- *  As a special exception, you may use this file as part of a free software
- *  library without restriction.  Specifically, if other files instantiate
- *  templates or use macros or inline functions from this file, or you compile
- *  this file and link it with other files to produce an executable, this
- *  file does not by itself cause the resulting executable to be covered by
- *  the GNU General Public License.  This exception does not however
- *  invalidate any other reasons why the executable file might be covered by
- *  the GNU General Public License.
- *
- ****************************************************************************
+ * =========================================================================
  */
 
 /**
+ * Basic test for the nornir farm.
+ */
 
- Very basic test for the FastFlow farm.
- 
-*/
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -37,11 +36,13 @@
 
 using namespace ff;
 
-//#define MICROSECSSLEEP 200000
 #define MICROSECSSLEEP 1000000
 
 static int maxTasks;
 
+/**
+ * Scheduler.
+ */
 class Emitter: public nornir::Scheduler<int>{
 public:
     int* schedule() {
@@ -56,8 +57,9 @@ public:
     }
 };
 
-
-// generic worker
+/**
+ * Worker.
+ */
 class Worker: public nornir::Worker<int, int>{
 public:
     int * compute(int * task) {
@@ -68,7 +70,9 @@ public:
     }
 };
 
-// the gatherer filter
+/**
+ * Gatherer.
+ */
 class Collector: public nornir::Gatherer<int> {
 public:
     void gather(int* task) {
@@ -99,11 +103,8 @@ int main(int argc, char * argv[]) {
     maxTasks = streamlen;
 
     nornir::Farm<int, int> farm("parameters.xml", "archdata.xml");
-    std::cout << "Starting farm. " << std::endl;
     farm.start<Emitter, Worker, Collector>(nworkers);
-    std::cout << "Farm started. " << std::endl;
     farm.wait();
-    std::cout << "Farm joined. " << std::endl;
 
     return 0;
 }

@@ -244,14 +244,14 @@ void KnobWorkers::run(uint numWorkers){
 
 void KnobWorkers::notifyNewConfiguration(uint numWorkers){
     if(_emitter){
-        _emitter->notifyWorkersChange(_realValue, numWorkers);
+        _emitter->notifyRethreading(_realValue, numWorkers);
     }
     for(size_t i = 0; i < numWorkers; i++){
         AdaptiveNode* w = _activeWorkers.at(i);
-        w->notifyWorkersChange(_realValue, numWorkers);
+        w->notifyRethreading(_realValue, numWorkers);
     }
     if(_collector){
-        _collector->notifyWorkersChange(_realValue, numWorkers);
+        _collector->notifyRethreading(_realValue, numWorkers);
     }
 }
 

@@ -293,8 +293,8 @@ public:
      * @param oldNumWorkers The old number of workers.
      * @param newNumWorkers The new number of workers.
      */
-    virtual void notifyWorkersChange(size_t oldNumWorkers,
-                                     size_t newNumWorkers);
+    virtual void notifyRethreading(size_t oldNumWorkers,
+                                   size_t newNumWorkers);
 };
 
 }

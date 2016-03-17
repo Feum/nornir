@@ -72,12 +72,9 @@ def run(bench, contractType, fieldName, fieldValue, percentile, dir_results, cal
         parametersFile.write("<regressionAging>10</regressionAging>\n")
         parametersFile.write("<tolerableSamples>3</tolerableSamples>\n") #TODO 
 
-        if contractType == "PERF_COMPLETION_TIME" or contractType == "PERF_BANDWIDTH":
-            parametersFile.write("<maxPrimaryPredictionError>" + str(maxPerformanceError) + "</maxPrimaryPredictionError>\n")
-            parametersFile.write("<maxSecondaryPredictionError>" + str(maxPowerError) + "</maxSecondaryPredictionError>\n")
-        else:
-            parametersFile.write("<maxPrimaryPredictionError>" + str(maxPowerError) + "</maxPrimaryPredictionError>\n")
-            parametersFile.write("<maxSecondaryPredictionError>" + str(maxPerformanceError) + "</maxSecondaryPredictionError>\n")
+
+        parametersFile.write("<maxPerformancePredictionError>" + str(maxPerformanceError) + "</maxPerformancePredictionError>\n")
+        parametersFile.write("<maxPowerPredictionError>" + str(maxPowerError) + "</maxPowerPredictionError>\n")
 
         if fastreconf:
             print "Using fast reconf."

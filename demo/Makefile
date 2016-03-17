@@ -1,4 +1,4 @@
-TARGET               = demo-farm demo-farm-sendout demo-farm-new
+TARGET               = farm farm_ffcompat
 
 .PHONY: clean cleanall
 

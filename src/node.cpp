@@ -357,7 +357,7 @@ void AdaptiveNode::terminate(){
     *_terminated = true;
 }
 
-void AdaptiveNode::notifyWorkersChange(size_t oldNumWorkers,
+void AdaptiveNode::notifyRethreading(size_t oldNumWorkers,
                                        size_t newNumWorkers){;}
 }
 

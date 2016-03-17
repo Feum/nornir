@@ -139,15 +139,15 @@ void Parameters::setDefault(){
     strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyCalibration = STRATEGY_CALIBRATION_HALTON;
-    strategyPolling = STRATEGY_POLLING_SLEEP_LATENCY;
+    strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
     turboBoost = false;
-    fastReconfiguration = false;
+    fastReconfiguration = true;
     migrateCollector = false;
     smoothingFactor = 0;
     persistenceValue = 0;
-    samplingIntervalCalibration = 0;
-    samplingIntervalSteady = 0;
+    samplingIntervalCalibration = 100;
+    samplingIntervalSteady = 1000;
     steadyThreshold = 4;
     minTasksPerSample = 0;
     underloadThresholdFarm = 80.0;
@@ -160,13 +160,13 @@ void Parameters::setDefault(){
     synchronousWorkers = false;
     powerBudget = 0;
     maxCalibrationTime = 0;
-    maxPrimaryPredictionError = 5.0;
-    maxSecondaryPredictionError = 5.0;
-    regressionAging = 0;
+    maxPerformancePredictionError = 10.0;
+    maxPowerPredictionError = 5.0;
+    regressionAging = 10;
     maxMonitoringOverhead = 1.0;
     thresholdQBlocking = -1;
     tolerableSamples = 0;
-    qSize = 0;
+    qSize = 1;
     conservativeValue = 0;
     statsReconfiguration = false;
     observer = NULL;
@@ -205,7 +205,7 @@ void Parameters::setDefaultPost(){
                 smoothingFactor = 10;
             }break;
             case STRATEGY_SMOOTHING_EXPONENTIAL:{
-                smoothingFactor = 0.5;
+                smoothingFactor = 0.1;
             }break;
         }
     }
@@ -213,7 +213,7 @@ void Parameters::setDefaultPost(){
     if(!persistenceValue){
         switch(strategyPersistence){
             case STRATEGY_PERSISTENCE_SAMPLES:{
-                persistenceValue = 10;
+                persistenceValue = 1;
             }break;
             case STRATEGY_PERSISTENCE_VARIATION:{
                 persistenceValue = 5;
@@ -303,13 +303,13 @@ ParametersValidation Parameters::validateKnobFrequencies(){
         knobFrequencies = KNOB_FREQUENCY_NO;
     }
 
-    if(knobFrequencies == KNOB_FREQUENCY_NO){
-        for(size_t i = 0; i < virtualCores.size(); i++){
-            if(!virtualCores.at(i)->hasFlag("constant_tsc")){
-                return VALIDATION_NO_CONSTANT_TSC;
-            }
+    for(size_t i = 0; i < virtualCores.size(); i++){
+        if(!virtualCores.at(i)->hasFlag("constant_tsc")){
+            return VALIDATION_NO_CONSTANT_TSC;
         }
-    }else{
+    }
+
+    if(knobFrequencies != KNOB_FREQUENCY_NO){
         if(knobMapping == KNOB_MAPPING_NO){
             return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
         }
@@ -324,7 +324,7 @@ ParametersValidation Parameters::validateKnobFrequencies(){
     if(fastReconfiguration &&
        (!isHighestFrequencySettable() || knobFrequencies == KNOB_FREQUENCY_NO || 
          strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_NONE)){
-        return VALIDATION_NO_FAST_RECONF;
+        fastReconfiguration = false;
     }
 
     if(mammut.getInstanceCpuFreq()->isBoostingSupported()){
@@ -404,10 +404,10 @@ ParametersValidation Parameters::validateContract(){
     }
 
     if(maxCalibrationTime == 0 &&
-       (maxPrimaryPredictionError <= 0      ||
-        maxPrimaryPredictionError > 100.0   ||
-        maxSecondaryPredictionError <= 0    ||
-        maxSecondaryPredictionError > 100.0)){
+       (maxPerformancePredictionError <= 0      ||
+        maxPerformancePredictionError > 100.0   ||
+        maxPowerPredictionError <= 0    ||
+        maxPowerPredictionError > 100.0)){
         return VALIDATION_WRONG_CONTRACT_PARAMETERS;
     }
 
@@ -542,8 +542,8 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, synchronousWorkers);
     SETVALUE(xt, Double, powerBudget);
     SETVALUE(xt, Double, maxCalibrationTime);
-    SETVALUE(xt, Double, maxPrimaryPredictionError);
-    SETVALUE(xt, Double, maxSecondaryPredictionError);
+    SETVALUE(xt, Double, maxPerformancePredictionError);
+    SETVALUE(xt, Double, maxPowerPredictionError);
     SETVALUE(xt, Uint, regressionAging);
     SETVALUE(xt, Double, maxMonitoringOverhead);
     SETVALUE(xt, Double, thresholdQBlocking);

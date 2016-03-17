@@ -563,11 +563,29 @@ double Calibrator::getSecondaryVariation() const{
 bool Calibrator::isAccurate(double primaryValue, double secondaryValue){
      _primaryError = (primaryValue - _primaryPrediction)/
                      primaryValue*100.0;
-    _secondaryError = (secondaryValue - _secondaryPrediction)/
+     _secondaryError = (secondaryValue - _secondaryPrediction)/
                        secondaryValue*100.0;
 
-    if(std::abs(_primaryError) > _p.maxPrimaryPredictionError ||
-       std::abs(_secondaryError) > _p.maxSecondaryPredictionError /* ||
+     double performanceError, powerError;
+
+     switch(_p.contractType){
+         case CONTRACT_PERF_UTILIZATION:
+         case CONTRACT_PERF_COMPLETION_TIME:
+         case CONTRACT_PERF_BANDWIDTH:{
+             performanceError = std::abs(_primaryError);
+             powerError = std::abs(_secondaryError);
+         }break;
+         case CONTRACT_POWER_BUDGET:{
+             performanceError = std::abs(_secondaryError);
+             powerError = std::abs(_primaryError);
+         }break;
+         default:{
+             ;
+         }break;
+     }
+
+    if(performanceError > _p.maxPerformancePredictionError ||
+       powerError > _p.maxPowerPredictionError /* ||
        _primaryPredictor->getModelError() > 10 ||
        _secondaryPredictor->getModelError() > 10*/){
         return false;

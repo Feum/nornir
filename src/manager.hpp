@@ -25,15 +25,9 @@
  * =========================================================================
  */
 
-/*! \file manager.hpp
- * \brief Implementation of an adaptive fastflow farm.
- *
- * To let an existing fastflow farm-based adaptive, follow these steps:
- *  1. Emitter, Workers and Collector of the farm must extend
- *     nornir::AdaptiveNode instead of ff::ff_node
- *  2. If the application wants to be aware of the changes in the number
- *     of workers, the nodes can implement the notifyWorkersChange virtual
- *     method.
+/*!
+ * @file manager.hpp
+ * @brief Implementation of an adaptive fastflow farm.
  */
 
 #ifndef NORNIR_FARM_HPP_
