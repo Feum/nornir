@@ -566,7 +566,7 @@ bool Calibrator::isAccurate(double primaryValue, double secondaryValue){
      _secondaryError = (secondaryValue - _secondaryPrediction)/
                        secondaryValue*100.0;
 
-     double performanceError, powerError;
+     double performanceError = 100.0, powerError = 100.0;
 
      switch(_p.contractType){
          case CONTRACT_PERF_UTILIZATION:

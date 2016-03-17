@@ -15,5 +15,7 @@ all:
 
 clean:
 	rm -f *.o $(TARGET)
+cleanall:
+	make clean
 
 

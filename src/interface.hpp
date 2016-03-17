@@ -95,6 +95,23 @@ public:
     }
 };
 
+//! @cond
+/**
+ * @class WorkerBase
+ * Common base class for workers (e.g. worker, worker with no output, etc...).
+ */
+class WorkerBase: public AdaptiveNode{
+public:
+    /**
+     * Returns the identifier of this worker.
+     * @return The identifier of this worker.
+     */
+    uint getId() const{
+        return get_my_id();
+    }
+};
+//! @endcond
+
 /**
  * @class Worker
  * @brief The worker of the farm.
@@ -103,7 +120,7 @@ public:
  *           gatherer. If not present, it means that the worker does not produce
  *           data.
  */
-template <typename I, typename O = std::nullptr_t> class Worker: public AdaptiveNode{
+template <typename I, typename O = std::nullptr_t> class Worker: public WorkerBase{
 private:
     void* svc(void* t) CX11_KEYWORD(final){
         return (void*) compute(reinterpret_cast<I*>(t));
@@ -125,7 +142,7 @@ public:
  * Template specialisation for the worker with no output.
  */
 template <typename I>
-class Worker<I, std::nullptr_t>{
+class Worker<I, std::nullptr_t>: public WorkerBase{
 private:
     void* svc(void* t) CX11_KEYWORD(final){
         compute(reinterpret_cast<I*>(t));
@@ -293,6 +310,9 @@ public:
     void start(){
         _farm.add_workers(_workers);
         _scheduler->setLb(_farm.getlb());
+        if(!_gatherer){
+            _farm.remove_collector();
+        }
         _manager = new ManagerFarm<>(&_farm, *_params);
         _manager->start();
     }

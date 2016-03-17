@@ -46,7 +46,7 @@
 #include "netlist.h"
 #include "rng.h"
 
-#include "../../src/manager.hpp"
+#include "../../src/interface.hpp"
 
 using namespace std;
 using namespace nornir;
@@ -62,16 +62,14 @@ typedef struct{
 static CTask dummyTask;
 static CTask* allTasks;
 
-class Emitter: public AdaptiveNode{
+class Emitter: public Scheduler<void>{
 private:
-    ff::ff_loadbalancer* _lb;
     int _temp_steps_completed;
     uint _activeWorkers;
     int _number_temp_steps;
     bool _keep_going_global_flag;
 public:
-    Emitter(ff::ff_loadbalancer* lb, uint maxNumWorkers, int number_temp_steps):
-        _lb(lb),
+    Emitter(uint maxNumWorkers, int number_temp_steps):
         _temp_steps_completed(0),
         _activeWorkers(maxNumWorkers),
         _number_temp_steps(number_temp_steps),
@@ -102,13 +100,12 @@ public:
         return rv;
     }
 
-
-    void notifyWorkersChange(size_t oldNumWorkers, size_t newNumWorkers){
+    void notifyRethreading(size_t oldNumWorkers, size_t newNumWorkers){
         _activeWorkers = newNumWorkers;
     }
 
-    void* svc(void* task){
-        _lb->broadcast_task((void*) &dummyTask);
+    void* schedule(){
+        broadcast((void*) &dummyTask);
         while(true){
             size_t numPresent = 0;
             while(numPresent != _activeWorkers){
@@ -129,12 +126,12 @@ public:
                 }
             }
 
-            _lb->broadcast_task((void*) &dummyTask);
+            broadcast((void*) &dummyTask);
         }
     }
 };
 
-class Worker: public AdaptiveNode{
+class CWorker: public Worker<void>{
 private:
     Rng _rng;
     netlist* _netlist;
@@ -183,7 +180,7 @@ public:
         return delta_cost;
     }
 
-    Worker(netlist* netlist, double startTemp, int swapsPerTemp, int maxNumWorkers):
+    CWorker(netlist* netlist, double startTemp, int swapsPerTemp, int maxNumWorkers):
         _netlist(netlist), _T(startTemp), _swapsPerTemp(swapsPerTemp),
         _movesPerThreadTemp(swapsPerTemp/maxNumWorkers),
         _a_id(0), _b_id(0){
@@ -191,11 +188,11 @@ public:
         _b = _netlist->get_random_element(&_b_id, NO_MATCHING_ELEMENT, &_rng);
     }
 
-    void notifyWorkersChange(size_t oldNumWorkers, size_t newNumWorkers){
+    void notifyRethreading(size_t oldNumWorkers, size_t newNumWorkers){
         _movesPerThreadTemp = _swapsPerTemp/newNumWorkers;
     }
 
-    void* svc(void* task){
+    void compute(void* task){
         _T = _T / 1.5;
         int accepted_good_moves = 0;
         int accepted_bad_moves = 0;
@@ -220,10 +217,10 @@ public:
                 //no need to do anything for a rejected move
             }
         }
-        allTasks[get_my_id()].present = true;
-        allTasks[get_my_id()].accepted_good_moves = accepted_good_moves;
-        allTasks[get_my_id()].accepted_bad_moves = accepted_bad_moves;
-        return GO_ON;
+        allTasks[getId()].present = true;
+        allTasks[getId()].accepted_good_moves = accepted_good_moves;
+        allTasks[getId()].accepted_bad_moves = accepted_bad_moves;
+        return;
     }
 };
 
@@ -289,27 +286,21 @@ int main (int argc, char * const argv[]) {
 
 #ifdef ENABLE_THREADS
 #ifdef ENABLE_FF
-    std::vector<ff_node*> W;
-    for(int i = 0; i < num_threads; i++){
-        W.push_back((ff_node*)new Worker(&my_netlist, start_temp, swaps_per_temp, num_threads));
-    }
-
-    ff_farm<> farm(W);
-    Emitter e(farm.getlb(), num_threads, number_temp_steps);
-    farm.add_emitter(&e);
-    farm.remove_collector();
-    //farm.set_scheduling_ondemand();
-
     nornir::Observer obs;
     nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     ap.expectedTasksNumber = number_temp_steps;
     ap.synchronousWorkers = true;
-    nornir::ManagerFarm<> amf(&farm, ap);
-    amf.start();
-    std::cout << "amf started" << std::endl;
-    amf.join();
-    std::cout << "amf joined" << std::endl;
+
+    Farm<void> farm(&ap);
+
+    for(int i = 0; i < num_threads; i++){
+        farm.addWorker(new CWorker(&my_netlist, start_temp, swaps_per_temp, num_threads));
+    }
+    farm.addScheduler(new Emitter(num_threads, number_temp_steps));
+
+    farm.start();
+    farm.wait();
 #else
 	std::vector<pthread_t> threads(num_threads);
 	void* thread_in = static_cast<void*>(&a_thread);
@@ -341,4 +332,5 @@ void* entry_pt(void* data)
 {
 	annealer_thread* ptr = static_cast<annealer_thread*>(data);
 	ptr->Run();
+	return NULL;
 }

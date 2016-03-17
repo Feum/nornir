@@ -228,7 +228,8 @@ void ManagerFarm<lb_t, gt_t>::updateTasksCount(WorkerSample& sample){
     if(_p.synchronousWorkers){
         // When we have synchronous workers we need to count the iterations,
         // not the real tasks (indeed in this case each worker will receive
-        // the same amount of tasks, e.g. in canneal).
+        // the same amount of tasks, e.g. in canneal) since they are sent in
+        // broadcast.
         newTasks /= _activeWorkers.size();
     }
     _totalTasks += newTasks;
