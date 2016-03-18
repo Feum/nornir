@@ -207,23 +207,37 @@
                 </div>
             </div>
             
-            <div class="row">                
-                <div class="col-sm-4 text-center">
-                    <a target="_blank" href="https://github.com/DanieleDeSensi/nornir" class="btn btn-lg btn-outline">
-                        <i class="fa fa-github"></i> View on GitHub
-                    </a>
-                </div>
-                <div class="col-sm-4 text-center">
-                    <a target="_blank" href="https://github.com/DanieleDeSensi/nornir/zipball/master" class="btn btn-lg btn-outline">
+            <div class="row">       
+                <h2>Stable version</h2>         
+                <div class="col-sm-6 text-center">
+                    <a target="_blank" href="https://github.com/DanieleDeSensi/nornir/archive/v0.1.0.zip" class="btn btn-lg btn-outline">
                         <i class="fa fa-download"></i> Download .zip
                     </a>
                 </div>
-                <div class="col-sm-4 text-center">
-                    <a target="_blank" href="https://github.com/DanieleDeSensi/nornir/tarball/master" class="btn btn-lg btn-outline">
+                <div class="col-sm-6 text-center">
+                    <a target="_blank" href="https://github.com/DanieleDeSensi/nornir/archive/v0.1.0.tar.gz" class="btn btn-lg btn-outline">
                         <i class="fa fa-download"></i> Download .tar.gz
                     </a>
                 </div>
             </div>
+
+            <div class="row">       
+                <h2>Development version</h2>         
+                <div class="col-sm-12 text-center">
+                    <a target="_blank" href="https://github.com/DanieleDeSensi/nornir" class="btn btn-lg btn-outline">
+                        <i class="fa fa-github"></i> View on GitHub
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">       
+                <h2>Dependencies</h2>
+                <p>This project has the following dependencies:</p>
+                <ul>
+                    <li><a href="http://www.mlpack.org/" target="_blank">mlpack</a></li>
+                </ul>
+            </div>
+
             
             <div class="code row col-sm-12">
                 <p class="title">Quick-start Instructions</p>
@@ -231,20 +245,25 @@
                     <p class="line">
                         <span class="path">~</span>
                         <span class="prompt">$</span>
-                        <span class="command hyphenate">git clone git://github.com/DanieleDeSensi/nornir.git</span>
+                        <span class="command hyphenate">wget https://github.com/DanieleDeSensi/nornir/archive/v0.1.0.zip</span>
                     </p>
                     <p class="line">
                         <span class="path">~</span>
                         <span class="prompt">$</span>
-                        <span class="command">cd nornir</span>
+                        <span class="command hyphenate">unzip v0.1.0.zip</span>
                     </p>
                     <p class="line">
-                        <span class="path">~/nornir</span>
+                        <span class="path">~</span>
+                        <span class="prompt">$</span>
+                        <span class="command">cd nornir-0.1.0</span>
+                    </p>
+                    <p class="line">
+                        <span class="path">~/nornir-0.1.0</span>
                         <span class="prompt">$</span>
                         <span class="command">make</span>
                     </p>
                     <p class="line">
-                        <span class="path">~/nornir</span>
+                        <span class="path">~/nornir-0.1.0</span>
                         <span class="prompt">$</span>
                         <span class="command">make install</span>
                     </p>
