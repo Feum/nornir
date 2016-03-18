@@ -32,7 +32,7 @@
 
 #include <ff/utils.hpp>
 #include <opencv2/opencv.hpp>
-#include <mammut/utils.hpp>
+
 
 #define PEOPLE_DETECT
 

@@ -150,10 +150,6 @@
 #define PRIu64 "llu"
 #endif
 
-/* ------------------- Mammut specific ----------------- */
-#include <mammut/energy/energy.hpp>
-#include <mammut/cpufreq/cpufreq.hpp>
-#include <mammut/utils.hpp>
 #include "../../src/interface.hpp"
 
 /* ------------------ FastFlow specific ---------------- */

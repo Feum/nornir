@@ -32,8 +32,6 @@
 
 #include <ff/utils.hpp>
 #include <opencv2/opencv.hpp>
-#include <mammut/utils.hpp>
-
 
 // #define SHOWTIMES
 #ifdef SHOWTIMES
@@ -115,11 +113,7 @@ int main(int argc, char *argv[]) {
         
         frames++; 
 
-        // start and end times
-        double start, end;
 
-        // fps calculated using number of frames / seconds
-        double fps;
 
         // frame counter
         int counter = 0;
@@ -127,8 +121,6 @@ int main(int argc, char *argv[]) {
         // floating point seconds elapsed since start
         double sec;
 
-        // start the clock
-        start = mammut::utils::getMillisecondsTime();
         vector<Rect> found, found_filtered;
         hog.detectMultiScale(frame, found, 0, Size(8,8), Size(32,32), 1.05, 2);
         size_t i, j;
@@ -151,18 +143,9 @@ int main(int argc, char *argv[]) {
             r.height = cvRound(r.height*0.8);
             rectangle(frame, r.tl(), r.br(), Scalar(0,255,0), 3);
         }
-
-        // see how much time has elapsed
-        end = mammut::utils::getMillisecondsTime();
-
+        
         // calculate current FPS
         ++counter;
-        sec = (end - start) / 1000.0;
-
-        fps = counter / sec;
-
-        // will print out Inf until sec is greater than 0
-        printf("FPS = %.2f Sec = %.2f\n", fps, sec);
 
 #ifdef SHOWTIMES
         t0 = ff::getusec();

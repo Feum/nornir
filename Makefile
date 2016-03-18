@@ -10,7 +10,7 @@ export OPTIMIZE_FLAGS        = -finline-functions -O3
 export DEBUG_FLAGS           = #-DDEBUG_PREDICTORS #-DDEBUG_NODE -DDEBUG_KNOB -DDEBUG_PREDICTORS -DDEBUG_MANAGER 
 export CXXFLAGS              = -Wall -pedantic --std=c++11 -DFF_TASK_CALLBACK -DTRACE_FASTFLOW $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
 export LDLIBS                =  -lnornir -pthread -lrt -lm -lmlpack -llapack -lblas -lgsl -lgslcblas 
-export INCS                  = -I$(realpath ./src/external/fastflow) -I$(MAMMUT_ROOT) -I/usr/include/libxml2
+export INCS                  = -I$(realpath ./src/external/fastflow) -I/usr/include/libxml2
 export LDFLAGS               = -L$(MAMMUT_ROOT)/mammut -L$(realpath .)/src
 
 .PHONY: all demo clean cleanall install uninstall

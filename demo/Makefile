@@ -4,6 +4,8 @@ TARGET               = farm farm_ffcompat
 
 all: $(TARGET)
 
+INCS += -I$(..)
+
 %: %.cpp ../src/libnornir.a
 	$(CXX) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
 clean: 

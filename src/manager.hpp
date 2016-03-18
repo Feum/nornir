@@ -280,6 +280,6 @@ private:
 
 }
 
-#include "manager.cpp"
+#include "manager.tpp"
 
 #endif /* NORNIR_FARM_HPP_ */

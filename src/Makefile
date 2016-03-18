@@ -18,6 +18,7 @@ lib: $(TARGET)
 install:
 	mkdir -p $(NORNIR_PATH_INCLUDE)
 	find . -name '*.hpp' -exec cp --parents \{\} $(NORNIR_PATH_INCLUDE) \;
+	find . -name '*.tpp' -exec cp --parents \{\} $(NORNIR_PATH_INCLUDE) \;
 	cp ./libnornir.a $(NORNIR_PATH_LIB)/libnornir.a
 uninstall:
 	rm -r $(NORNIR_PATH_INCLUDE)/*

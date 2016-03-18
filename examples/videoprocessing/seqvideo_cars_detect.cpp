@@ -32,7 +32,6 @@
 
 #include <ff/utils.hpp>
 #include <opencv2/opencv.hpp>
-#include <mammut/utils.hpp>
 
 
 // #define SHOWTIMES
@@ -124,11 +123,7 @@ int main(int argc, char *argv[]) {
         frames++; 
 
         // start and end times
-        double start, end;
-        double fps;
         int counter = 0;
-        double sec;
-        start = mammut::utils::getMillisecondsTime();
 
         std::vector<cv::Rect> cars;
         //Detect the cars
@@ -139,14 +134,7 @@ int main(int argc, char *argv[]) {
         }
         std::cout << "Number of detected faces: " << cars.size() << std::endl;
 
-        end = mammut::utils::getMillisecondsTime();
         ++counter;
-        sec = (end - start) / 1000.0;
-        fps = counter / sec;
-
-        // will print out Inf until sec is greater than 0
-        printf("FPS = %.2f Sec = %.2f\n", fps, sec);
-
 #ifdef SHOWTIMES
         t0 = ff::getusec();
 #endif
