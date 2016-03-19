@@ -599,6 +599,7 @@ public:
         _lastSample = value;
         if(_storedValues == 1){
             _average = value;
+            _variance = T();
         }else{
             T diff = value - _average;
             T incr = diff * _alpha;
