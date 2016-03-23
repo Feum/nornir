@@ -36,8 +36,6 @@ namespace nornir{
 
 template <typename I, typename O> class FarmBase;
 
-
-
 /**
  * @class SchedulerBase
  * Common base class for scheduler (e.g. scheduler, accelerator scheduler, etc...).
@@ -95,7 +93,7 @@ private:
         if(outTask){
            return outTask;
         }else{
-            terminate();
+            AdaptiveNode::terminate();
             return (void*) ff::FF_EOS;
         }
     }
@@ -131,7 +129,7 @@ private:
         if(outTask){
            return outTask;
         }else{
-            terminate();
+            AdaptiveNode::terminate();
             return (void*) ff::FF_EOS;
         }
     }
@@ -151,6 +149,8 @@ public:
 template <typename I, typename O>
 class WorkerBase: public AdaptiveNode{
 public:
+    virtual ~WorkerBase(){;}
+
     /**
      * Returns the identifier of this worker.
      * @return The identifier of this worker.
@@ -277,9 +277,7 @@ public:
 template <typename I, typename O> class FarmBase{
 protected:
     ff::ff_farm<>* _farm;
-    SchedulerBase<I>* _scheduler;
     std::vector<ff::ff_node*> _workers;
-    GathererBase<O>* _gatherer;
 private:
     bool _nodesCreated;
     const Parameters* _params;
@@ -289,8 +287,7 @@ private:
     template <class S, class W>
     void init(size_t numWorkers){
         _nodesCreated = true;
-        _scheduler = new S();
-        setScheduler(_scheduler);
+        setScheduler(new S());
         for(size_t i = 0; i < numWorkers; i++){
             setWorker(new W());
         }
@@ -305,6 +302,9 @@ protected:
         if(!s){
             throw std::runtime_error("setScheduler: Scheduler must be != NULL.");
         }
+        if(!_farm){
+            createFarm();
+        }
         _farm->add_emitter(s);
     }
 
@@ -316,6 +316,9 @@ protected:
         if(!w){
             throw std::runtime_error("setWorker: Worker must be != NULL.");
         }
+        if(!_farm){
+            createFarm();
+        }
         _workers.push_back(dynamic_cast<ff::ff_node*>(w));
     }
 
@@ -326,6 +329,9 @@ protected:
     void setGatherer(GathererBase<O>* g){
         if(!g){
             throw std::runtime_error("setGatherer: Gatherer must be != NULL.");
+        }
+        if(!_farm){
+            createFarm();
         }
         _farm->add_collector(g);
     }
@@ -342,7 +348,7 @@ public:
      * The constructor of the farm.
      * @param parameters The configuration parameters.
      */
-    FarmBase(const Parameters* parameters):_farm(NULL), _scheduler(NULL), _gatherer(NULL),
+    FarmBase(const Parameters* parameters):_farm(NULL),
                                        _params(NULL), _manager(NULL){
         _nodesCreated = false;
         _params = parameters;
@@ -357,7 +363,7 @@ public:
      *        architectural parameters.
      */
     FarmBase(const std::string& paramFileName,
-         const std::string& archFileName):_farm(NULL), _scheduler(NULL), _gatherer(NULL),
+         const std::string& archFileName):_farm(NULL),
                                           _params(NULL), _manager(NULL){
         _nodesCreated = false;
         _params = new Parameters(paramFileName, archFileName);
@@ -404,8 +410,7 @@ public:
     template <class S, class W, class G>
     void start(size_t numWorkers){
         init<S, W>(numWorkers);
-        _gatherer = new G();
-        setGatherer(_gatherer);
+        setGatherer(new G());
         start();
     }
 
@@ -417,8 +422,8 @@ public:
             createFarm();
         }
         _farm->add_workers(_workers);
-        if(_scheduler){
-            _scheduler->setLb(_farm->getlb());
+        if(_farm->getEmitter()){
+            (dynamic_cast<SchedulerBase<I>*>(_farm->getEmitter()))->setLb(_farm->getlb());
         }
         preStart();
         _manager = new ManagerFarm<>(_farm, *_params);
@@ -434,14 +439,14 @@ public:
             delete _manager;
         }
         if(_nodesCreated){
-            if(_scheduler){
-                delete _scheduler;
+            if(_farm->getEmitter()){
+                delete _farm->getEmitter();
             }
             for(size_t i = 0; i < _workers.size(); i++){
                 delete _workers.at(i);
             }
-            if(_gatherer){
-                delete _gatherer;
+            if(_farm->getCollector()){
+                delete _farm->getCollector();
             }
         }
     }
@@ -499,10 +504,10 @@ public:
 };
 
 
-template <typename I> class SchedulerDummy: public Scheduler<I, I>{
+template <typename I, typename O> class SchedulerDummy: public Scheduler<I, O>{
 public:
-    I* schedule(I* task){
-        return task;
+    O* schedule(I* task){
+        return (O*) task;
     }
 };
 
@@ -514,18 +519,17 @@ public:
 };
 
 /**
- * @class FarmAccelerator
- * @brief A farm accelerator.
- * @tparam F The type of data sent from the application to the scheduler.
+ * @class FarmAcceleratorBase
+ * @brief The base class for farm accelerators.
+ * @tparam S The type of data sent from the application to the scheduler.
  * @tparam I The type of data sent by the scheduler to the workers.
  * @tparam O The type of data sent by the workers to the gatherer.
  * @tparam G The type of data sent by the gatherer to the application.
  */
-template <typename S, typename I = S, typename O = I, typename G = O> class FarmAccelerator: public FarmBase<I, O>{
+template <typename S, typename I, typename O, typename G>
+class FarmAcceleratorBase: public FarmBase<I, O>{
 private:
-    bool _resultsNeeded;
-    SchedulerDummy<S>* _schedulerDummy;
-    GathererDummy<O>* _gathererDummy;
+    SchedulerDummy<S, I>* _schedulerDummy;
 protected:
     void createFarm(){
         FarmBase<I, O>::_farm = new ff::ff_farm<>(true);
@@ -533,62 +537,38 @@ protected:
 
     void preStart(){
         // Adds default gatherer and scheduler.
-        if(!FarmBase<I, O>::_scheduler){
-            _schedulerDummy = new SchedulerDummy<S>();
+        if(!FarmBase<I, O>::_farm->getEmitter()){
+            _schedulerDummy = new SchedulerDummy<S, I>();
             FarmBase<I, O>::setScheduler(_schedulerDummy);
         }
-        if(!FarmBase<I, O>::_gatherer && _resultsNeeded){
-            _gathererDummy = new GathererDummy<S>();
-            FarmBase<I, O>::setGatherer(_gathererDummy);
-        }
-    }
-
-    bool isManagementTask(void* task){
-        return task == EOSW   ||
-               task == GO_OUT ||
-               task == BLK    ||
-               task == NBLK;
     }
 public:
     /**
      * The constructor of the farm.
-     * @param resultsNeeded True if the application need the results back
-     *        from the accelerator.
      * @param parameters The configuration parameters.
      */
-    FarmAccelerator(bool resultsNeeded, const Parameters* parameters):
-            FarmBase<I,O>(parameters),
-            _resultsNeeded(resultsNeeded),
-            _schedulerDummy(NULL),
-            _gathererDummy(NULL){;}
+    FarmAcceleratorBase(const Parameters* parameters):
+            FarmBase<I,O>::FarmBase(parameters),
+            _schedulerDummy(NULL){;}
 
     /**
      * The constructor of the farm.
-     * @param resultsNeeded True if the application need the results back
-     *        from the accelerator.
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
      * @param archFileName The filename of the XML file containing the
      *        architectural parameters.
      */
-    FarmAccelerator(bool resultsNeeded,
-                    const std::string& paramFileName,
+    FarmAcceleratorBase(const std::string& paramFileName,
                     const std::string& archFileName):
-             FarmBase<I,O>(paramFileName, archFileName),
-             _resultsNeeded(resultsNeeded),
-             _schedulerDummy(NULL),
-             _gathererDummy(NULL){;}
+             FarmBase<I,O>::FarmBase(paramFileName, archFileName),
+             _schedulerDummy(NULL){;}
 
     /**
      * Denstructor of the accelerator.
      */
-    ~FarmAccelerator(){
+    ~FarmAcceleratorBase(){
         if(_schedulerDummy){
             delete _schedulerDummy;
-        }
-
-        if(_gathererDummy){
-            delete _gathererDummy;
         }
     }
 
@@ -609,14 +589,6 @@ public:
     }
 
     /**
-     * Adds the gatherer to the farm.
-     * @param g The gatherer of the farm.
-     */
-    void addGatherer(Gatherer<O, G>* g){
-        FarmBase<I,O>::setGatherer(g);
-    }
-
-    /**
      * Offloads a task to the accelerator.
      * If the task is NULL, the accelerator will be shutdown. You need to
      * wait for its termination with the wait() call.
@@ -631,6 +603,9 @@ public:
             realTask = (void*) task;
         }
         while(!FarmBase<I,O>::_farm->offload(realTask));
+        if(realTask == EOS){
+            ((Scheduler<S, I>*) FarmBase<I, O>::_farm->getEmitter())->terminate();
+        }
     }
 
     /**
@@ -648,7 +623,108 @@ public:
         }else{
             realTask = (void*) task;
         }
-        return FarmBase<I,O>::_farm->offload(realTask, 1);
+        bool res = FarmBase<I,O>::_farm->offload(realTask, 1);
+        if(res && realTask == EOS){
+            ((Scheduler<S, I>*) FarmBase<I, O>::_farm->getEmitter())->terminate();
+        }
+        return res;
+    }
+
+    /**
+     * Shutdown the farm. You need to wait for its termination with the
+     * wait() call.
+     * This call blocks until it is possible to send a shutdown request.
+     */
+    void shutdown(){
+        offload(NULL);
+    }
+
+    /**
+     * Shutdown the farm. You need to wait for its termination with the
+     * wait() call.
+     * @return True if the shutdown request has been sent, false otherwise.
+     */
+    bool shutdownNonBlocking(){
+        return offloadNonBlocking(NULL);
+    }
+};
+
+/**
+ * @class FarmAccelerator
+ * @brief Accelerator with collector and output channel.
+ *
+ * @tparam S The type of data sent from the application to the scheduler.
+ * @tparam I The type of data sent by the scheduler to the workers.
+ * @tparam O The type of data sent by the workers to the gatherer.
+ * @tparam G The type of data sent by the gatherer to the application.
+ *
+ * - 1 tparams specified: Accelerator with no collector. Same type between
+ *     application and scheduler and between scheduler and workers.
+ * - 2 tparams specified: Accelerator with no collector. One type between
+ *     application and scheduler and the other between scheduler and workers.
+ *     You MUST explicitly provide a Scheduler.
+ * - 3 tparams specified: Accelerator with collector. One type between application
+ *     and scheduler, one type between scheduler and workers, and one type between
+ *     workers and collector.
+ * - 4 tparams specified: Accelerator with collector. One type for each channel(s).
+ *
+ */
+template <typename S, typename I = S, typename O = std::nullptr_t, typename G = std::nullptr_t>
+class FarmAccelerator: public FarmAcceleratorBase<S, I, O, G>{
+private:
+    GathererDummy<O>* _gathererDummy;
+
+    bool isManagementTask(void* task){
+        return task == EOSW   ||
+               task == GO_OUT ||
+               task == BLK    ||
+               task == NBLK;
+    }
+protected:
+    void preStart(){
+        FarmAcceleratorBase<S, I, O, G>::preStart();
+        if(!FarmBase<I, O>::_farm->getCollector()){
+            _gathererDummy = new GathererDummy<O>();
+            FarmBase<I, O>::setGatherer(_gathererDummy);
+        }
+    }
+public:
+    /**
+     * The constructor of the farm.
+     * @param parameters The configuration parameters.
+     */
+    FarmAccelerator(const Parameters* parameters):
+            FarmAcceleratorBase<S, I, O, G>(parameters),
+            _gathererDummy(NULL){;}
+
+    /**
+     * The constructor of the farm.
+     * @param paramFileName The filename of the XML file containing the
+     *        configuration parameters.
+     * @param archFileName The filename of the XML file containing the
+     *        architectural parameters.
+     */
+    FarmAccelerator(const std::string& paramFileName,
+                    const std::string& archFileName):
+            FarmAcceleratorBase<S, I, O, G>(paramFileName, archFileName),
+            _gathererDummy(NULL){;}
+
+    /**
+     * Denstructor of the accelerator.
+     */
+    ~FarmAccelerator(){
+        if(_gathererDummy){
+            delete _gathererDummy;
+        }
+    }
+
+
+    /**
+     * Adds the gatherer to the farm.
+     * @param g The gatherer of the farm.
+     */
+    void addGatherer(Gatherer<O, G>* g){
+        FarmBase<I, O>::setGatherer(g);
     }
 
     /**
@@ -658,13 +734,10 @@ public:
      *         result.
      */
     G* getResult(){
-        if(!_resultsNeeded){
-            throw std::runtime_error("If you need to retrieve the results, you"
-                    " need to set the corresponding parameter in the constructor.");
-        }
         G* r = NULL;
         G** pr = &r;
-        while((!FarmBase<I,O>::_farm->load_result((void**)pr) && *pr != EOS) || isManagementTask((void*)*pr)){
+        while((!FarmBase<I,O>::_farm->load_result((void**)pr) && *pr != EOS) ||
+              isManagementTask((void*)*pr)){
             ;
         }
 
@@ -683,13 +756,10 @@ public:
      *         result.
      */
     G* getResultNonBlocking(bool& validResult){
-        if(!_resultsNeeded){
-            throw std::runtime_error("If you need to retrieve the results, you"
-                    " need to set the corresponding parameter in the constructor.");
-        }
         G* r = NULL;
         G** pr = &r;
-        if(!FarmBase<I,O>::_farm->load_result_nb((void**)pr) || isManagementTask((void*)*pr)){
+        if(!FarmBase<I,O>::_farm->load_result_nb((void**)pr) ||
+           isManagementTask((void*)*pr)){
             validResult = false;
             return NULL;
         }else{
@@ -701,6 +771,64 @@ public:
         }
     }
 
+};
+
+/**
+ * @brief Accelerator with no collector.
+ */
+template <typename S, typename I>
+class FarmAccelerator<S, I, std::nullptr_t, std::nullptr_t>: public FarmAcceleratorBase<S, I, std::nullptr_t, std::nullptr_t>{
+public:
+    /**
+     * The constructor of the farm.
+     * @param parameters The configuration parameters.
+     */
+    FarmAccelerator(const Parameters* parameters):
+            FarmAcceleratorBase<S, I, std::nullptr_t, std::nullptr_t>(parameters){;}
+
+    /**
+     * The constructor of the farm.
+     * @param paramFileName The filename of the XML file containing the
+     *        configuration parameters.
+     * @param archFileName The filename of the XML file containing the
+     *        architectural parameters.
+     */
+    FarmAccelerator(const std::string& paramFileName,
+                    const std::string& archFileName):
+            FarmAcceleratorBase<S, I, std::nullptr_t, std::nullptr_t>(paramFileName, archFileName){;}
+};
+
+/**
+ * @brief Accelerator with collector but no output channel.
+ */
+template <typename S, typename I, typename O>
+class FarmAccelerator<S, I, O, std::nullptr_t>: public FarmAcceleratorBase<S, I, O, std::nullptr_t>{
+public:
+    /**
+     * The constructor of the farm.
+     * @param parameters The configuration parameters.
+     */
+    FarmAccelerator(const Parameters* parameters):
+            FarmAcceleratorBase<S, I, O, std::nullptr_t>(parameters){;}
+
+    /**
+     * The constructor of the farm.
+     * @param paramFileName The filename of the XML file containing the
+     *        configuration parameters.
+     * @param archFileName The filename of the XML file containing the
+     *        architectural parameters.
+     */
+    FarmAccelerator(const std::string& paramFileName,
+                    const std::string& archFileName):
+            FarmAcceleratorBase<S, I, O, std::nullptr_t>(paramFileName, archFileName){;}
+
+    /**
+     * Adds the gatherer to the farm.
+     * @param g The gatherer of the farm.
+     */
+    void addGatherer(Gatherer<O>* g){
+        FarmBase<I, O>::setGatherer(g);
+    }
 };
 
 

@@ -6,20 +6,20 @@
  * =========================================================================
  *  Copyright (C) 2015-, Daniele De Sensi (d.desensi.software@gmail.com)
  *
- *  This file is part of AdaptiveFastFlow.
+ *  This file is part of nornir.
  *
- *  AdaptiveFastFlow is free software: you can redistribute it and/or
+ *  nornir is free software: you can redistribute it and/or
  *  modify it under the terms of the Lesser GNU General Public
  *  License as published by the Free Software Foundation, either
  *  version 3 of the License, or (at your option) any later version.
 
- *  AdaptiveFastFlow is distributed in the hope that it will be useful,
+ *  nornir is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  Lesser GNU General Public License for more details.
  *
  *  You should have received a copy of the Lesser GNU General Public
- *  License along with AdaptiveFastFlow.
+ *  License along with nornir.
  *  If not, see <http://www.gnu.org/licenses/>.
  *
  * =========================================================================
@@ -33,19 +33,14 @@
 #ifndef NORNIR_FARM_HPP_
 #define NORNIR_FARM_HPP_
 
-//TODO
-//#if !defined(TRACE_FASTFLOW) || !defined(FF_TASK_CALLBACK)
-//#error "TRACE_FASTFLOW and FF_TASK_CALLBACK macros need to be defined."
-//#endif
-
 #include "configuration.hpp"
+#include "ffincs.hpp"
 #include "knob.hpp"
 #include "parameters.hpp"
 #include "predictors.hpp"
 #include "node.hpp"
 #include "utils.hpp"
 
-#include <ff/farm.hpp>
 #include "external/Mammut/mammut/module.hpp"
 #include "external/Mammut/mammut/utils.hpp"
 #include "external/Mammut/mammut/mammut.hpp"

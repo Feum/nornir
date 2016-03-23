@@ -28,9 +28,9 @@
 #ifndef NORNIR_NODE_HPP_
 #define NORNIR_NODE_HPP_
 
+#include "./ffincs.hpp"
 #include "./parameters.hpp"
 
-#include <ff/node.hpp>
 #include "external/Mammut/mammut/mammut.hpp"
 
 #undef DEBUG

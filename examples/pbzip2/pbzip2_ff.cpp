@@ -180,9 +180,6 @@ inline void operator delete[] (void * ptr) {
 }
 #endif
 
-#include <ff/farm.hpp>
-
-
 // FastFlow's task type 
 struct ff_task_t {
     ff_task_t(char * in, unsigned int buffSize, int blockNum):

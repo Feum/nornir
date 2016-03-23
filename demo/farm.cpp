@@ -25,6 +25,7 @@
  * =========================================================================
  */
 
+
 /**
  * Basic test for the nornir farm.
  */
@@ -50,7 +51,7 @@ public:
         int * task = new int(maxTasks);
         --maxTasks;
         if (maxTasks < 0){
-            std::cout << "Emitter finished" << std::endl;
+            std::cout << "Scheduler finished" << std::endl;
             return NULL;
         }
         return task;
@@ -64,8 +65,8 @@ class Worker: public nornir::Worker<int, int>{
 public:
     int * compute(int * task) {
         usleep(MICROSECSSLEEP);
-        std::cout << "Worker " << ff_node::get_my_id()
-                  << " received task " << *task << "\n";
+        std::cout << "Worker " << getId()
+                  << " received task " << *task << std::endl;
         return task;
     }
 };
@@ -76,7 +77,7 @@ public:
 class Collector: public nornir::Gatherer<int> {
 public:
     void gather(int* task) {
-        std::cout << "Collector received task " << *task << "\n";
+        std::cout << "Gatherer received task " << *task << std::endl;
     }
 };
 

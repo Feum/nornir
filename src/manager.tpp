@@ -25,13 +25,13 @@
  * =========================================================================
  */
 
+#include "./ffincs.hpp"
 #include "./manager.hpp"
-#include "parameters.hpp"
-#include "predictors.hpp"
+#include "./parameters.hpp"
+#include "./predictors.hpp"
 #include "./node.hpp"
-#include "utils.hpp"
+#include "./utils.hpp"
 
-#include <ff/farm.hpp>
 #include "external/Mammut/mammut/module.hpp"
 #include "external/Mammut/mammut/utils.hpp"
 #include "external/Mammut/mammut/mammut.hpp"

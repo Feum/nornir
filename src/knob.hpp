@@ -28,8 +28,8 @@
 #ifndef NORNIR_KNOB_HPP_
 #define NORNIR_KNOB_HPP_
 
+#include "ffincs.hpp"
 #include "node.hpp"
-#include <ff/farm.hpp>
 
 namespace nornir{
 

@@ -36,7 +36,6 @@
 #include <string>
 #include <time.h>
 
-#include <ff/lb.hpp>
 
 #undef DEBUG
 #undef DEBUGB
@@ -117,7 +116,9 @@ void AdaptiveNode::move(VirtualCore* vc){
 
 void AdaptiveNode::getSampleResponse(WorkerSample& sample, double avgLatency){
     while(_responseQ.empty()){
-        if(*_terminated){return;}
+        if(*_terminated){
+            return;
+        }
         switch(_p->strategyPolling){
             case STRATEGY_POLLING_SPINNING:{
                 continue;
