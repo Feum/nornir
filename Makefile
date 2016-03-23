@@ -13,12 +13,13 @@ export LDLIBS                =  -lnornir -pthread -lrt -lm -lmlpack -llapack -lb
 export INCS                  = -I$(realpath ./src/external/fastflow) -I/usr/include/libxml2
 export LDFLAGS               = -L$(MAMMUT_ROOT)/mammut -L$(realpath .)/src
 
-.PHONY: all demo clean cleanall install uninstall
+.PHONY: all demo clean cleanall install uninstall microbench
 
 all:
 	python submodules_init.py
 	git submodule foreach git pull -q origin master
 	$(MAKE) -C src
+	$(MAKE) -c microbench
 clean: 
 	$(MAKE) -C src clean
 demo:
@@ -32,3 +33,5 @@ install:
 	$(MAKE) -C src install
 uninstall:
 	$(MAKE) -C src uninstall
+microbench:
+	$(MAKE) -C microbench microbench

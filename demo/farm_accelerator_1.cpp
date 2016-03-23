@@ -1,5 +1,5 @@
 /*
- * farm_ffcompat.hpp
+ * farm_accelerator.hpp
  *
  * Created on: 27/02/2016
  *
@@ -25,9 +25,8 @@
  * =========================================================================
  */
 
-
 /**
- * Basic test for the nornir farm.
+ * Basic test for the nornir accelerator.
  */
 
 #include <vector>
@@ -41,43 +40,17 @@ using namespace ff;
 
 static int maxTasks;
 
-/**
- * Scheduler.
- */
-class Emitter: public nornir::Scheduler<int>{
-public:
-    int* schedule() {
-        usleep(MICROSECSSLEEP);
-        int * task = new int(maxTasks);
-        --maxTasks;
-        if (maxTasks < 0){
-            std::cout << "Scheduler finished" << std::endl;
-            return NULL;
-        }
-        return task;
-    }
-};
 
 /**
  * Worker.
  */
-class Worker: public nornir::Worker<int, int>{
+class Worker: public nornir::Worker<int>{
 public:
-    int * compute(int * task) {
+    void compute(int * task) {
         usleep(MICROSECSSLEEP);
         std::cout << "Worker " << getId()
                   << " received task " << *task << std::endl;
-        return task;
-    }
-};
-
-/**
- * Gatherer.
- */
-class Collector: public nornir::Gatherer<int> {
-public:
-    void gather(int* task) {
-        std::cout << "Gatherer received task " << *task << std::endl;
+        delete task;
     }
 };
 
@@ -86,10 +59,10 @@ int main(int argc, char * argv[]) {
     int streamlen = 10;
 
     if (argc>1) {
-        if (argc!=3) {
+        if (argc!=3 || atoi(argv[1]) <= 0 || atoi(argv[2]) <= 0) {
             std::cerr << "use: " 
                       << argv[0] 
-                      << " nworkers streamlen\n";
+                      << " nworkers(>0) streamlen(>0)\n";
             return -1;
         }   
         nworkers = atoi(argv[1]);
@@ -103,10 +76,24 @@ int main(int argc, char * argv[]) {
 
     maxTasks = streamlen;
 
-    nornir::Farm<int, int> farm("parameters.xml", "archdata.xml");
-    farm.start<Emitter, Worker, Collector>(nworkers);
-    farm.wait();
+    nornir::Parameters p("parameters.xml", "archdata.xml");
+    p.contractType = nornir::CONTRACT_NONE;
+    nornir::Observer o;
+    p.observer = &o;
+    nornir::FarmAccelerator<int> farm(&p);
+    for(size_t i = 0; i < (size_t) nworkers; i++){
+        farm.addWorker(new Worker);
+    }
+    farm.start();
 
+    for(size_t i = 0; i < (size_t) streamlen; i++){
+        farm.offload(new int(i));
+        std::cout << "Sent " << i << std::endl;
+    }
+
+    farm.shutdown();
+    farm.wait();
+    std::cout << "Accelerator terminated." << std::endl;
     return 0;
 }
 
