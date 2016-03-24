@@ -22,3 +22,12 @@ echo "<voltageTableFile>voltage.txt</voltageTableFile>" >> archdata.xml
 
 # Footer
 echo "</archData>" >> archdata.xml
+
+# Copy all
+for i in ../examples/*; do 
+	cp voltage.txt $i; 
+	cp archdata.xml $i;
+done;
+
+cp voltage.txt ../demo
+cp archdata.xml ../demo

@@ -23,7 +23,4 @@ microbench:
 	@echo "| of the applications.                                                  |" 
 	@echo "========================================================================="
 	sudo sh runmicrobenchs.sh
-	@echo "=============================== ATTENTION ==============================="
-	@echo "| archdata.xml file has been produced in the microbench folder. Copy    |" 
-	@echo "| this file to the folders of the applications you want to run.         |"
-	@echo "========================================================================="
+
