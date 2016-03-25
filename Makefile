@@ -19,7 +19,7 @@ all:
 	python submodules_init.py
 	git submodule foreach git pull -q origin master
 	$(MAKE) -C src
-	$(MAKE) -c microbench
+	$(MAKE) -C microbench
 clean: 
 	$(MAKE) -C src clean
 demo:
