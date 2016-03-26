@@ -1,0 +1,13 @@
+TARGET = manager.o interpreter.o mdfg.o mdfi.o
+
+.PHONY: all clean cleanall
+
+all: $(TARGET)
+
+%.o: %.cpp *.hpp
+	$(CXX) $(CXXFLAGS) $(INCS) $(OPTIMIZE_FLAGS) -c -o $@ $<
+clean: 
+	-rm -fr *.o *~
+cleanall:
+	-rm -fr *.o *~ *.a
+
