@@ -28,41 +28,6 @@
 namespace nornir{
 namespace dataflow{
 
-EmitterWorkerCollector::EmitterWorkerCollector(Computable* emitter,
-        Computable* worker, Computable* collector, uint nWorkers,
-        bool deleteAll):
-                nWorkers(nWorkers), emitter(emitter),worker(worker),
-                collector(collector),deleteAll(deleteAll){;}
-
-/**
- * Destructor of the EmitterWorkerCollector.
- * If deleteAll is true, deletes emitter, worker and collector.
- */
-EmitterWorkerCollector::~EmitterWorkerCollector(){
-    if(deleteAll){
-        delete emitter;
-        delete worker;
-        delete collector;
-    }
-}
-
-Task** EmitterWorkerCollector::compute(Task** t){
-    Task **emitterResult,**fromWorker,
-        **result=new Task*[nWorkers],*toWorker[1];
-    emitterResult=emitter->compute(t);
-
-    for(uint i=0; i<nWorkers; i++){
-        toWorker[0]=emitterResult[i];
-        fromWorker=worker->compute(toWorker);
-        result[i]=fromWorker[0];
-    }
-    delete[] emitterResult;
-    Task** fromCollector=collector->compute(result);
-    delete[] result;
-    return fromCollector;
-}
-
-
 template <typename T>
 ReduceEmitter<T>::ReduceEmitter(int cn, bool autoDelete):
     chunkNum(cn),autoDelete(autoDelete){;}

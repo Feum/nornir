@@ -1,4 +1,4 @@
-APPS                 = canneal mandelbrot blackscholes pbzip2 denoiser dataflow
+APPS                 = ffprobe
 
 .PHONY: all clean cleanall
 

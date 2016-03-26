@@ -28,6 +28,9 @@
 #ifndef NORNIR_DF_EWC_HPP_
 #define NORNIR_DF_EWC_HPP_
 
+#include "computable.hpp"
+#include "../stream.hpp"
+
 namespace nornir{
 namespace dataflow{
 
@@ -61,15 +64,23 @@ public:
      * \param deleteAll If true, the destructor deletes the emitter, the worker
      *                  and the collector.
      */
-    EmitterWorkerCollector(Computable* emitter, Computable* worker,
+    inline EmitterWorkerCollector(Computable* emitter, Computable* worker,
                            Computable* collector, uint nWorkers,
-                           bool deleteAll=false);
+                           bool deleteAll=false):
+                               nWorkers(nWorkers), emitter(emitter),worker(worker),
+                               collector(collector),deleteAll(deleteAll){;}
 
     /**
      * Destructor of the EmitterWorkerCollector.
      * If deleteAll is true, deletes emitter, worker and collector.
      */
-    ~EmitterWorkerCollector();
+    inline ~EmitterWorkerCollector(){
+        if(deleteAll){
+            delete emitter;
+            delete worker;
+            delete collector;
+        }
+    }
 
     /**
      * \param t Array of Task*.
@@ -78,7 +89,21 @@ public:
      *
      * This method computes the result sequentially.
     */
-    Task** compute(Task** t);
+    inline Task** compute(Task** t){
+        Task **emitterResult,**fromWorker,
+            **result=new Task*[nWorkers],*toWorker[1];
+        emitterResult=emitter->compute(t);
+
+        for(uint i=0; i<nWorkers; i++){
+            toWorker[0]=emitterResult[i];
+            fromWorker=worker->compute(toWorker);
+            result[i]=fromWorker[0];
+        }
+        delete[] emitterResult;
+        Task** fromCollector=collector->compute(result);
+        delete[] result;
+        return fromCollector;
+    }
 
     /**
      * Returns the number of workers.

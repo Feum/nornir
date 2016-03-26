@@ -74,7 +74,7 @@ public:
     /**
      * Destructor of the interpreter.
      */
-    inline ~Interpreter();
+    ~Interpreter();
 
     /**
      * Computes asynchronously a macro data flow instruction.
