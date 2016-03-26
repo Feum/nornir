@@ -20,6 +20,7 @@ all:
 	git submodule foreach git pull -q origin master
 	$(MAKE) -C src
 	$(MAKE) -C microbench
+	$(MAKE) -C microbench checksupported
 clean: 
 	$(MAKE) -C src clean
 demo:
@@ -29,6 +30,7 @@ cleanall:
 	$(MAKE) -C src cleanall
 	$(MAKE) -C demo cleanall
 	$(MAKE) -C examples cleanall
+	$(MAKE) -C microbench cleanall
 install:
 	$(MAKE) -C src install
 uninstall:

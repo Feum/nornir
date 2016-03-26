@@ -1,5 +1,5 @@
 INCS                 += -I$(realpath ../src/external/fastflow)
-TARGET               = ticksPerNs
+TARGET               = ticksPerNs check
 
 .PHONY: all clean cleanall microbench
 
@@ -12,6 +12,12 @@ clean:
 cleanall:
 	-rm -fr *.o *~ 
 	-rm -fr $(TARGET)
+checksupported:
+	@echo "=============================== ATTENTION ==============================="
+	@echo "| Sudo rights are needed to check if all the mechanisms present on this |"
+	@echo "| machine are supported by nornir.                                      |"
+	@echo "========================================================================="
+	sudo ./check
 microbench:
 	cp ../src/external/Mammut/demo/energy/voltageTable.cpp .
 	$(CXX) $(CXXFLAGS) -o voltageTable voltageTable.cpp $(INCS) -I../src/external/Mammut/  -L../src/external/Mammut/mammut $(LDFLAGS) $(LDLIBS)

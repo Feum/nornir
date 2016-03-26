@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <adaptivityParameters>
-    <samplingInterval>1000</samplingInterval>
+    <contractType>PERF_BANDWIDTH</contractType>
+    <requiredBandwidth>10</requiredBandwidth>
 </adaptivityParameters>
