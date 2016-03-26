@@ -46,8 +46,8 @@
 */
 
 #include <iostream>
-#include <ff/spin-lock.hpp>
 #include "../../src/manager.hpp"
+#include <ff/spin-lock.hpp>
 
 #include "marX2.h"
 #include <math.h>

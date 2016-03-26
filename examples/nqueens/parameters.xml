@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<adaptivityParameters>
-    <strategyPredictionErrorSecondary>COEFFVAR</strategyPredictionErrorSecondary>
-    <numSamples>50</numSamples>
-    <contractType>POWER_BUDGET</contractType>
-    <powerBudget>50</powerBudget>
-    <alphaExpAverage>0.2</alphaExpAverage>
-    <strategyCalibration>HALTON</strategyCalibration>
-</adaptivityParameters>
