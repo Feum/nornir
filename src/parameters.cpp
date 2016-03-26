@@ -136,9 +136,10 @@ void Parameters::setDefault(){
     knobHyperthreading = KNOB_HT_AUTO;
     triggerQBlocking = TRIGGER_Q_BLOCKING_NO;
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_SAME;
+    strategySelection = STRATEGY_SELECTION_LEARNING;
     strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
+    strategyExploration = STRATEGY_EXPLORATION_HALTON;
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
-    strategyCalibration = STRATEGY_CALIBRATION_HALTON;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
     turboBoost = false;
@@ -394,7 +395,8 @@ ParametersValidation Parameters::validateContract(){
         }break;
         case CONTRACT_POWER_BUDGET:{
             if(powerBudget <= 0 ||
-               strategyPrediction == STRATEGY_PREDICTION_SIMPLE){
+               strategySelection == STRATEGY_SELECTION_ANALYTICAL ||
+               strategySelection == STRATEGY_SELECTION_LIMARTINEZ){
                 return VALIDATION_WRONG_CONTRACT_PARAMETERS;
             }
         }break;
@@ -462,10 +464,24 @@ template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
     "OFF"
 };
 
+template<> char const* enumStrings<StrategySelection>::data[] = {
+    "LEARNIG",
+    "ANALYTICAL",
+    "FULLSEARCH",
+    "LIMARTINEZ",
+    "MISHRA"
+};
+
 template<> char const* enumStrings<StrategyPrediction>::data[] = {
-    "SIMPLE",
     "REGRESSION_LINEAR",
-    "LIMARTINEZ"
+};
+
+template<> char const* enumStrings<StrategyExploration>::data[] = {
+    "RANDOM",
+    "NIEDERREITER",
+    "SOBOL",
+    "HALTON",
+    "HALTON_REVERSE"
 };
 
 template<> char const* enumStrings<KnobConfSNodeMapping>::data[] = {
@@ -483,14 +499,6 @@ template<> char const* enumStrings<StrategySmoothing>::data[] = {
 template<> char const* enumStrings<StrategySmoothingFactor>::data[] = {
     "CONST",
     "DYNAMIC"
-};
-
-template<> char const* enumStrings<StrategyCalibration>::data[] = {
-    "RANDOM",
-    "NIEDERREITER",
-    "SOBOL",
-    "HALTON",
-    "HALTON_REVERSE"
 };
 
 template<> char const* enumStrings<StrategyPolling>::data[] = {
@@ -514,9 +522,10 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, knobHyperthreading);
     SETVALUE(xt, Enum, knobFrequencies);
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
+    SETVALUE(xt, Enum, strategySelection);
     SETVALUE(xt, Enum, strategyPrediction);
+    SETVALUE(xt, Enum, strategyExploration);
     SETVALUE(xt, Enum, strategySmoothing);
-    SETVALUE(xt, Enum, strategyCalibration);
     SETVALUE(xt, Enum, strategyPolling);
     SETVALUE(xt, Enum, strategyPersistence);
     SETVALUE(xt, Enum, knobMappingEmitter);

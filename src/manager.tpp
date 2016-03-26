@@ -125,13 +125,13 @@ double ManagerFarm<lb_t, gt_t>::getSecondaryValue() const{
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::changeKnobs(){
-    if(_p.contractType == CONTRACT_NONE || !_configuration.knobsChangeNeeded()){
+    if(!_configuration.knobsChangeNeeded()){
         return;
     }
 
-    KnobsValues values = _calibrator->getNextKnobsValues(getPrimaryValue(),
-                                                         getSecondaryValue(),
-                                                         _totalTasks);
+    KnobsValues values = _selector->getNextKnobsValues(getPrimaryValue(),
+                                                       getSecondaryValue(),
+                                                       _totalTasks);
     if(!_configuration.equal(values)){
         _configuration.setValues(values);
 
@@ -328,31 +328,24 @@ bool ManagerFarm<lb_t, gt_t>::persist() const{
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::initPredictors(){
+void ManagerFarm<lb_t, gt_t>::initSelector(){
     if(_p.contractType == CONTRACT_NONE){
-        _calibrator = new CalibratorDummy(_p, _configuration, _samples);
+        _selector = new SelectorFixed(_p, _configuration, _samples);
     }else{
-        switch(_p.strategyPrediction){
-            case STRATEGY_PREDICTION_SIMPLE:{
-                _calibrator = new CalibratorDummy(_p, _configuration, _samples);
+        switch(_p.strategySelection){
+            case STRATEGY_SELECTION_ANALYTICAL:{
+                _selector = new SelectorAnalytical(_p, _configuration, _samples);
             }break;
-            case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
-                switch(_p.strategyCalibration){
-                    case STRATEGY_CALIBRATION_RANDOM:{
-                        _calibrator = new CalibratorRandom(_p, _configuration, _samples);
-                    }break;
-                    case STRATEGY_CALIBRATION_HALTON:
-                    case STRATEGY_CALIBRATION_HALTON_REVERSE:
-                    case STRATEGY_CALIBRATION_NIEDERREITER:
-                    case STRATEGY_CALIBRATION_SOBOL:{
-                        _calibrator = new CalibratorLowDiscrepancy(_p, _configuration, _samples);
-                    }break;
-                }
+            case STRATEGY_SELECTION_LEARNING:{
+                _selector = new SelectorLearner(_p, _configuration, _samples);
             }break;
-            case STRATEGY_PREDICTION_LIMARTINEZ:{
-                _calibrator = new CalibratorLiMartinez(_p, _configuration, _samples);
+            case STRATEGY_SELECTION_LIMARTINEZ:{
+                _selector = new SelectorLiMartinez(_p, _configuration, _samples);
             }break;
-    }
+            default:{
+                throw std::runtime_error("Selector not yet implemented.");
+            }break;
+        }
     }
 }
 
@@ -392,7 +385,7 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
         _remainingTasks(0),
         _deadline(0),
         _lastStoredSampleMs(0),
-        _calibrator(NULL){
+        _selector(NULL){
     DEBUGB(samplesFile.open("samples.csv"));
 }
 
@@ -400,8 +393,8 @@ template <typename lb_t, typename gt_t>
 ManagerFarm<lb_t, gt_t>::~ManagerFarm(){
     delete _samples;
     delete _variations;
-    if(_calibrator){
-        delete _calibrator;
+    if(_selector){
+        delete _selector;
     }
     DEBUGB(samplesFile.close());
 }
@@ -468,8 +461,7 @@ void ManagerFarm<lb_t, gt_t>::cleanNodes() {
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::run(){
-    initPredictors();
-    assert(_calibrator);
+    initSelector();
 
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
         _remainingTasks = _p.expectedTasksNumber;
@@ -528,7 +520,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
 
     while(!_terminated){
         overheadMs = getMillisecondsTime() - startSample;
-        if(_calibrator->isCalibrating()){
+        if(_selector->isCalibrating()){
             samplingInterval = _p.samplingIntervalCalibration;
             steadySamples = 0;
         }else if(steadySamples < _p.steadyThreshold){
@@ -562,8 +554,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
         observe();
 
         if(!persist()){
-            assert(_calibrator);
-            DEBUG("Changing knobs.");
+            DEBUG("Asking selector.");
             changeKnobs();
             _configuration.trigger();
             startSample = getMillisecondsTime();
@@ -582,9 +573,9 @@ void ManagerFarm<lb_t, gt_t>::run(){
 #endif
     if(_p.observer){
         vector<CalibrationStats> cs;
-        if(_calibrator){
-            _calibrator->stopCalibrationStat(_totalTasks);
-            cs = _calibrator->getCalibrationsStats();
+        if(_selector){
+            _selector->stopCalibration(_totalTasks);
+            cs = _selector->getCalibrationsStats();
             _p.observer->calibrationStats(cs, duration, _totalTasks);
         }
         ReconfigurationStats rs = _configuration.getReconfigurationStats();

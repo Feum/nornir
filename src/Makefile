@@ -1,4 +1,4 @@
-TARGET = knob.o trigger.o node.o parameters.o predictors.o configuration.o utils.o
+TARGET = knob.o trigger.o node.o parameters.o selectors.o predictors.o explorers.o configuration.o utils.o
 
 .PHONY: all clean cleanall install uninstall lib
 

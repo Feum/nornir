@@ -149,19 +149,49 @@ typedef enum{
     STRATEGY_UNUSED_VC_OFF
 }StrategyUnusedVirtualCores;
 
-/// Possible strategies to use to predict power and performance values.
+// Possible strategies for the selection of the best configuration.
 typedef enum{
+    // Applies an online learning algorithm
+    STRATEGY_SELECTION_LEARNING = 0,
+
     // Applies a simple analytical model.
-    STRATEGY_PREDICTION_SIMPLE = 0,
+    STRATEGY_SELECTION_ANALYTICAL,
 
-    // Applies multivariate linear regression.
-    STRATEGY_PREDICTION_REGRESSION_LINEAR,
+    // Tries all the configurations in order to find the best one.
+    STRATEGY_SELECTION_FULLSEARCH,
 
-    // Applies the selection strategy described in:
+    // Applies the algorithm described in:
     // "Dynamic Power-Performance Adaptation of Parallel Computation
     // on Chip Multiprocessors" - Jian Li and Jose F. Martınez
-    STRATEGY_PREDICTION_LIMARTINEZ,
+    STRATEGY_SELECTION_LIMARTINEZ,
+
+    // Applies the algorithm described in:
+    // "A Probabilistic Graphical Model-based Approach for Minimizing
+    // Energy Under Performance Constraints" - Mishra, Nikita and Zhang, Huazhe
+    // and Lafferty, John D. and Hoffmann, Henry
+    STRATEGY_SELECTION_MISHRA
+}StrategySelection;
+
+// Possible prediction strategies. Can only be specified if the selection
+// strategy is "LEARNING".
+typedef enum{
+    STRATEGY_PREDICTION_REGRESSION_LINEAR = 0,
 }StrategyPrediction;
+
+/// Possible ways to select the calibration points. Can only be specified if
+/// the selection strategy is "LEARNING".
+typedef enum{
+    // Random choice of the points.
+    STRATEGY_EXPLORATION_RANDOM = 0,
+    // Bratley, Fox, Niederreiter, ACM Trans. Model. Comp. Sim. 2, 195 (1992)
+    STRATEGY_EXPLORATION_NIEDERREITER,
+    // Antonov, Saleev, USSR Comput. Maths. Math. Phys. 19, 252 (1980)
+    STRATEGY_EXPLORATION_SOBOL,
+    // J.H. Halton, Numerische Mathematik 2, 84-90 (1960) and B. Vandewoestyne
+    // R. Cools Computational and Applied Mathematics 189, 1&2, 341-361 (2006)
+    STRATEGY_EXPLORATION_HALTON,
+    STRATEGY_EXPLORATION_HALTON_REVERSE,
+}StrategyExploration;
 
 /// Service nodes (emitter or collector) mapping knob.
 typedef enum{
@@ -197,20 +227,6 @@ typedef enum{
     // of the data.
     STRATEGY_SMOOTHING_FACTOR_DYNAMIC
 }StrategySmoothingFactor;
-
-/// Possible ways to select the calibration points.
-typedef enum{
-    // Random choice of the points.
-    STRATEGY_CALIBRATION_RANDOM = 0,
-    // Bratley, Fox, Niederreiter, ACM Trans. Model. Comp. Sim. 2, 195 (1992)
-    STRATEGY_CALIBRATION_NIEDERREITER,
-    // Antonov, Saleev, USSR Comput. Maths. Math. Phys. 19, 252 (1980)
-    STRATEGY_CALIBRATION_SOBOL,
-    // J.H. Halton, Numerische Mathematik 2, 84-90 (1960) and B. Vandewoestyne
-    // R. Cools Computational and Applied Mathematics 189, 1&2, 341-361 (2006)
-    STRATEGY_CALIBRATION_HALTON,
-    STRATEGY_CALIBRATION_HALTON_REVERSE,
-}StrategyCalibration;
 
 /// Possible ways to act when the manager finds no response on a queue
 /// from a farm node.
@@ -560,15 +576,22 @@ public:
     // Strategy for unused virtual cores [default = STRATEGY_UNUSED_VC_SAME].
     StrategyUnusedVirtualCores strategyUnusedVirtualCores;
 
-    // Strategy to be used to predict power and performance values
+    // Strategy to be used to select the best configuration according
+    // to the requirements [default = STRATEGY_SELECTION_LEARNING].
+    StrategySelection strategySelection;
+
+    // Strategy to be used to predict power and performance values.
+    // Only valid when strategySelection is LEARNING
     // [default = STRATEGY_PREDICTION_REGRESSION_LINEAR].
     StrategyPrediction strategyPrediction;
 
+    // Strategy to be used to select the points to be explored during
+    // calibration. Only valid when strategySelection is LEARNING
+    // [default = STRATEGY_EXPLORATION_HALTON].
+    StrategyExploration strategyExploration;
+
     // Smoothing strategy [default = STRATEGY_SMOOTHING_EXPONENTIAL].
     StrategySmoothing strategySmoothing;
-
-    // Calibration strategy [default = STRATEGY_CALIBRATION_HALTON].
-    StrategyCalibration strategyCalibration;
 
     // Polling strategy [default = STRATEGY_POLLING_SLEEP_SMALL].
     StrategyPolling strategyPolling;

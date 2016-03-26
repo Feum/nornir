@@ -37,7 +37,7 @@
 #include "ffincs.hpp"
 #include "knob.hpp"
 #include "parameters.hpp"
-#include "predictors.hpp"
+#include "selectors.hpp"
 #include "node.hpp"
 #include "utils.hpp"
 
@@ -72,7 +72,7 @@ struct MonitoredSample;
  */
 template <typename lb_t = ff::ff_loadbalancer, typename gt_t = ff::ff_gatherer>
 class ManagerFarm: public Thread{
-    friend class PredictorSimple;
+    friend class PredictorAnalytical;
     friend class PredictorLinearRegression;
     friend class RegressionData;
     friend class RegressionDataServiceTime;
@@ -151,8 +151,8 @@ private:
     // Milliseconds timestamp of the last store of a sample.
     double _lastStoredSampleMs;
 
-    // The calibrator of the predictors.
-    Calibrator* _calibrator;
+    // The configuration selector.
+    Selector* _selector;
 
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
@@ -247,9 +247,9 @@ private:
     bool persist() const;
 
     /**
-     * Initializes the predictors
+     * Initializes the selector.
      */
-    void initPredictors();
+    void initSelector();
 
     /**
      * Operations that need to take place before running the nodes.

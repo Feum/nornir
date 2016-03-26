@@ -40,11 +40,7 @@
 #include <mlpack/core.hpp>
 #include <mlpack/methods/linear_regression/linear_regression.hpp>
 
-#include <gsl/gsl_qrng.h>
-
 #include <map>
-
-using namespace mlpack::regression;
 
 namespace nornir{
 
@@ -180,13 +176,13 @@ public:
      * @return true if the predictor is ready to make prediction,
      *         false otherwise.
      */
-    virtual bool readyForPredictions(){return true;}
+    virtual bool readyForPredictions() = 0;
 
     /**
      * Clears the predictor removing all the collected
      * data
      */
-    virtual void clear(){;}
+    virtual void clear() = 0;
 
     /**
      * If possible, refines the model with the information
@@ -194,7 +190,7 @@ public:
      * @return True if the current configuration is a new configuration,
      * false if it was already present (existing information will be updated).
      */
-    virtual bool refine(){return false;}
+    virtual bool refine() = 0;
 
     /**
      * Prepare the predictor to accept a set of prediction requests.
@@ -213,7 +209,7 @@ public:
      * predictions.
      * @return The model error.
      */
-    virtual double getModelError(){return _modelError;}
+    double getModelError(){return _modelError;}
 };
 
 
@@ -227,7 +223,7 @@ typedef struct{
  */
 class PredictorLinearRegression: public Predictor{
 private:
-    LinearRegression _lr;
+    mlpack::regression::LinearRegression _lr;
 
     typedef std::map<KnobsValues, Observation> Observations;
     Observations _observations;
@@ -267,7 +263,7 @@ public:
  * configurations but does not give an exact value. Accordingly,
  * it can't be used for power bounded contracts.
  */
-class PredictorSimple: public Predictor{
+class PredictorAnalytical: public Predictor{
 private:
     uint _phyCores;
     uint _phyCoresPerCpu;
@@ -275,253 +271,20 @@ private:
     double getScalingFactor(const KnobsValues& values);
     double getPowerPrediction(const KnobsValues& values);
 public:
-    PredictorSimple(PredictorType type,
+    PredictorAnalytical(PredictorType type,
                     const Parameters& p,
                     const FarmConfiguration& configuration,
                     const Smoother<MonitoredSample>* samples);
 
+    bool readyForPredictions();
+
     void prepareForPredictions();
 
     double predict(const KnobsValues& values);
-};
 
-/**
- * State of calibration.
- * Used to track the process.
- */
-typedef enum{
-    CALIBRATION_SEEDS = 0,
-    CALIBRATION_FINISHED
-}CalibrationState;
-
-/**
- * Used to obtain calibration points.
- */
-class Calibrator{
-protected:
-    const Parameters& _p;
-    const FarmConfiguration& _configuration;
-    const Smoother<MonitoredSample>* _samples;
-    size_t _numCalibrationPoints;
-    CalibrationState _state;
-    Predictor* _primaryPredictor;
-    Predictor* _secondaryPredictor;
-private:
-    std::vector<CalibrationStats> _calibrationStats;
-    uint _calibrationStartMs;
-    uint64_t _calibrationStartTasks;
-    mammut::Mammut _localMammut;
-    mammut::energy::Counter* _joulesCounter;
-    bool _firstPointGenerated;
-    double _primaryPrediction;
-    double _secondaryPrediction;
-    double _primaryError;
-    double _secondaryError;
-    double _thisPrimary;
-    double _thisSecondary;
-    bool _noFeasible;
-    uint _contractViolations;
-    uint _accuracyViolations;
-    KnobsValues _previousConfiguration;
-    double _totalCalibrationTime;
-
-    bool isAccurate(double primaryValue, double secondaryValue);
     bool refine();
 
-    /**
-     * Checks if x is a best suboptimal monitored value than y.
-     * @param x The first monitored value.
-     * @param y The second monitored value.
-     * @return True if x is a best suboptimal monitored value than y,
-     *         false otherwise.
-     */
-    bool isBestSuboptimalValue(double x, double y) const;
-
-    /**
-     * Returns true if x is a best secondary value than y, false otherwise.
-     */
-    bool isBestSecondaryValue(double x, double y) const;
-
-    /**
-     * Checks if a specific primary value respects the required contract.
-     * @param value The value to be checked.
-     * @param conservative If true applies the conservativeValue.
-     */
-    bool isFeasiblePrimaryValue(double value, bool conservative) const;
-
-    /**
-     * Updates the predictions for the next configuration.
-     * @param next The next configuration.
-     */
-    void updatePredictions(const KnobsValues& next);
-
-    double getPrimaryVariation() const;
-
-    double getSecondaryVariation() const;
-protected:
-    /**
-     * Checks if the contract is violated.
-     * @param primaryValue The primary value.
-     * @return true if the contract has been violated, false otherwise.
-     */
-    bool isContractViolated(double primaryValue) const;
-
-    /** 
-     * Checks if the application phase changed.
-     * @param primaryValue The primary value.
-     * @param secondaryValue The secondary value.
-     * @return true if the phase changed, false otherwise.
-     */
-    bool phaseChanged(double primaryValue, double secondaryValue) const;
-
-    /**
-     * Computes the best relative knobs values for the farm.
-     * @param primaryValue The primary value.
-     * @return The best relative knobs values.
-     */
-    KnobsValues getBestKnobsValues(double primaryValue);
-
-    /**
-     * Starts the recording of calibration stats.
-     * @param totalTasks The total number of tasks processed up to now.
-     */
-    void startCalibrationStat(uint64_t totalTasks);
-
-    /**
-     *  Override this method to provide custom ways to generate
-     *  relative knobs values for calibration.
-     *  @return The relative knobs values.
-     **/
-    virtual KnobsValues generateRelativeKnobsValues() const{
-        KnobsValues kv;
-        return kv;
-    }
-    virtual KnobsValues reset(){KnobsValues kv; return kv;}
-public:
-    Calibrator(const Parameters& p,
-               const FarmConfiguration& configuration,
-               const Smoother<MonitoredSample>* samples);
-
-    virtual ~Calibrator(){;}
-
-    /**
-     * Returns the next values to be set for the knobs.
-     * @param primaryValue The primary value.
-     * @param secondaryValue The secondary value.
-     * @param totalTasks The total processed tasks.
-     *
-     * @return The next values to be set for the knobs.
-     */
-    virtual KnobsValues getNextKnobsValues(double primaryValue,
-                                           double secondaryValue,
-                                           u_int64_t totalTasks);
-
-    /**
-     * Returns the calibration statistics.
-     * @return A vector containing the calibration statistics.
-     */
-    std::vector<CalibrationStats> getCalibrationsStats() const;
-
-    /**
-     * Returns true if the calibrator is in the calibration phase,
-     * false otherwise.
-     * @return true if the calibrator is in the calibration phase,
-     * false otherwise.
-     */
-    virtual bool isCalibrating() const;
-
-
-    /**
-     * Stops the recording of calibration stats.
-     * @param totalTasks The total number of tasks processed up to now.
-     */
-    void stopCalibrationStat(uint64_t totalTasks);
-};
-
-/**
- * This calibrator doesn't calibrate. It always tries to make
- * predictions. This should only be used with predictors
- * that do not need to be calibrated (e.g. simple predictor).
- */
-class CalibratorDummy: public Calibrator{
-public:
-    CalibratorDummy(const Parameters& p,
-                    const FarmConfiguration& configuration,
-                    const Smoother<MonitoredSample>* samples):
-                        Calibrator(p, configuration, samples){;}
-public:
-    KnobsValues getNextKnobsValues(double primaryValue,
-                                   double secondaryValue,
-                                   u_int64_t totalTasks);
-
-    virtual bool isCalibrating() const{return false;}
-};
-
-/**
- * This calibrator generates random calibration points.
- */
-class CalibratorRandom: public Calibrator{
-public:
-    CalibratorRandom(const Parameters& p,
-                    const FarmConfiguration& configuration,
-                    const Smoother<MonitoredSample>* samples);
-    KnobsValues reset(){return generateRelativeKnobsValues();}
-protected:
-    KnobsValues generateRelativeKnobsValues() const;
-};
-
-/**
- * It chooses the calibration points using low discrepancy
- * sampling techniques.
- */
-class CalibratorLowDiscrepancy: public Calibrator{
-private:
-    gsl_qrng* _generator;
-    double* _normalizedPoint;
-protected:
-    KnobsValues generateRelativeKnobsValues() const;
-    KnobsValues reset();
-public:
-    CalibratorLowDiscrepancy(const Parameters& p,
-                             const FarmConfiguration& configuration,
-                             const Smoother<MonitoredSample>* samples);
-    ~CalibratorLowDiscrepancy();
-};
-
-/**
- * It chooses the optimal point using the technique described
- * in the paper by Li and Martinez.
- */
-class CalibratorLiMartinez: public Calibrator{
-private:
-    bool _firstPointGenerated;
-    uint _low1, _mid1, _high1;
-    uint _low2, _mid2, _high2;
-    uint _midId;
-    std::vector<mammut::cpufreq::Frequency> _availableFrequencies;
-    double _currentWatts;
-    double _optimalWatts;
-    mammut::cpufreq::Frequency _optimalFrequency;
-    uint _optimalWorkers;
-    double _currentBw, _leftBw, _rightBw;
-    bool _optimalFound;
-    KnobsValues _optimalKv;
-    bool _improved;
-
-    mammut::cpufreq::Frequency findNearestFrequency(mammut::cpufreq::Frequency f) const;
-    void goRight();
-    void goLeft();
-public:
-    CalibratorLiMartinez(const Parameters& p,
-                         const FarmConfiguration& configuration,
-                         const Smoother<MonitoredSample>* samples);
-    ~CalibratorLiMartinez();
-
-    KnobsValues getNextKnobsValues(double primaryValue,
-                                   double secondaryValue,
-                                   u_int64_t totalTasks);
-
-    virtual bool isCalibrating() const{return !_optimalFound;}
+    void clear();
 };
 
 }
