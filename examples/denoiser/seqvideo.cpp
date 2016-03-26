@@ -64,17 +64,13 @@ int main(int argc, char *argv[]) {
     std::cout << "Input file " << argv[1] << " opened" << std::endl;
     
     // filter parameters
-    bool filter1=false, filter2=false;
     if(atoi(argv[2]) == 1) { 
-        filter1 = true;  filter2 = false; 
         std::cout << "Applying enhnace filter only" << std::endl;
     }
     if(atoi(argv[2]) == 2) { 
-        filter1 = false; filter2 = true;     
         std::cout << "Applying emboss filter only" << std::endl;
     }
     if(atoi(argv[2]) == 3) { 
-        filter1 = true;  filter2 = true;     
         std::cout << "Applying both filters" << std::endl;
     }
     

@@ -67,7 +67,7 @@ routing_cost_t netlist::total_routing_cost()
 //*****************************************************************************************
 void netlist::shuffle(Rng* rng)
 {
-	for (int i = 0; i < _max_x * _max_y * 1000; i++){
+	for (unsigned i = 0; i < _max_x * _max_y * 1000; i++){
 		netlist_elem *a, *b;
 		get_random_pair(&a, &b, rng);
 		swap_locations(a, b);
@@ -174,8 +174,8 @@ netlist::netlist(const std::string& filename)
 	
 	//and set each one to its correct value
 	unsigned i_elem = 0;
-	for (int x = 0; x < _max_x; x++){
-		for (int y = 0; y < _max_y; y++){
+	for (unsigned x = 0; x < _max_x; x++){
+		for (unsigned y = 0; y < _max_y; y++){
 			location_t* loc = &_locations.at(x).at(y);
 			loc->x = x;
 			loc->y = y;

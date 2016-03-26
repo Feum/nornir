@@ -53,13 +53,13 @@ routing_cost_t netlist_elem::routing_cost_given_loc(location_t loc)
 	routing_cost_t fanin_cost = 0;
 	routing_cost_t fanout_cost = 0;
 	
-	for (int i = 0; i< fanin.size(); ++i){
+	for (unsigned i = 0; i< fanin.size(); ++i){
 		location_t* fanin_loc = fanin[i]->present_loc.Get();
 		fanin_cost += fabs(loc.x - fanin_loc->x);
 		fanin_cost += fabs(loc.y - fanin_loc->y);
 	}
 
-	for (int i = 0; i< fanout.size(); ++i){
+	for (unsigned i = 0; i< fanout.size(); ++i){
 		location_t* fanout_loc = fanout[i]->present_loc.Get();
 		fanout_cost += fabs(loc.x - fanout_loc->x);
 		fanout_cost += fabs(loc.y - fanout_loc->y);
@@ -77,7 +77,7 @@ routing_cost_t netlist_elem::swap_cost(location_t* old_loc, location_t* new_loc)
 	routing_cost_t no_swap = 0;
 	routing_cost_t yes_swap = 0;
 	
-	for (int i = 0; i< fanin.size(); ++i){
+	for (unsigned i = 0; i< fanin.size(); ++i){
 		location_t* fanin_loc = fanin[i]->present_loc.Get();
 		no_swap += fabs(old_loc->x - fanin_loc->x);
 		no_swap += fabs(old_loc->y - fanin_loc->y);
@@ -86,7 +86,7 @@ routing_cost_t netlist_elem::swap_cost(location_t* old_loc, location_t* new_loc)
 		yes_swap += fabs(new_loc->y - fanin_loc->y);
 	}
 	
-	for (int i = 0; i< fanout.size(); ++i){
+	for (unsigned i = 0; i< fanout.size(); ++i){
 		location_t* fanout_loc = fanout[i]->present_loc.Get();
 		no_swap += fabs(old_loc->x - fanout_loc->x);
 		no_swap += fabs(old_loc->y - fanout_loc->y);

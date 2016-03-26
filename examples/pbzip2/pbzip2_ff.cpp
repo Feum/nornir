@@ -258,7 +258,6 @@ typedef struct
 //
 static int numCPU = 2;
 static int NumBlocks = 0;
-static int NumBufferedBlocks = 0;
 static int Verbosity = 0;
 static int QuietMode = 1;
 static int OutputStdOut = 0;
@@ -393,12 +392,12 @@ public:
 			if (currBlock != task->blockNum) {
 				
 				// make sure output buffer is large enough to handle input data
-				if (task->blockNum > OutputBuffer.size()) {
+                            if ((uint)task->blockNum > OutputBuffer.size()) {
 					//FIX: controllare!!!!!
 					int newsize = task->blockNum;
 					if (newsize<= NumBlocks) newsize = NumBlocks;
 					else 
-						if (OutputBuffer.size()*2 > newsize) 
+                                            if (OutputBuffer.size()*2 > (uint) newsize) 
 							newsize = OutputBuffer.size()*2;
 
 
@@ -407,7 +406,7 @@ public:
                                         #endif
 					
 					OutputBuffer.resize(newsize,(ff_task_t*)0);
-					if (OutputBuffer.size() != newsize) {
+					if (OutputBuffer.size() != (uint) newsize) {
 						fprintf(stderr, "fileWriter:  *ERROR: cannot resize IutputBuffer\n");
 						return;
 					}
@@ -470,7 +469,7 @@ public:
                 close(hOutfile);
             if ((QuietMode != 1))
             {
-                fprintf(stderr, "    Output Size: %" PRIu64 " bytes\n", (unsigned long long)CompressedSize);
+                fprintf(stderr, "    Output Size: %llu bytes\n", (unsigned long long)CompressedSize);
             }
 
             OutputBuffer.clear();
@@ -657,7 +656,7 @@ int directcompress(int hInfile, OFF_T fileSize, int blockSize, char *OutFilename
 		close(hOutfile);
 	if (QuietMode != 1)
 	{
-		fprintf(stderr, "    Output Size: %" PRIu64 " bytes\n", (unsigned long long)CompressedSize);
+		fprintf(stderr, "    Output Size: %llu bytes\n", (unsigned long long)CompressedSize);
 	}
 
 	return 0;
@@ -1031,7 +1030,7 @@ public:
 		ret = lseek(hInfile, 0, SEEK_SET);
 		if (ret != 0)
 		{
-			fprintf(stderr, "pbzip2_ff: *ERROR: Could not seek to beginning of file [%" PRIu64 "]!  Skipping...\n", (unsigned long long)ret);
+			fprintf(stderr, "pbzip2_ff: *ERROR: Could not seek to beginning of file [%llu]!  Skipping...\n", (unsigned long long)ret);
 			close(hInfile);
 			return -1;
 		}
@@ -1188,7 +1187,7 @@ public:
 #endif
 			if (ret != bz2BlockList[i].dataStart)
 			{
-				fprintf(stderr, "pbzip2_ff: *ERROR: Could not seek to beginning of file [%" PRIu64 "]!  Skipping...\n", (unsigned long long)ret);
+				fprintf(stderr, "pbzip2_ff: *ERROR: Could not seek to beginning of file [%llu]!  Skipping...\n", (unsigned long long)ret);
 				close(hInfile);
 				return -1;
 			}
@@ -1205,7 +1204,7 @@ public:
 				// give warning to user if block is larger than 250 million bytes
 				if (inSize > 250000000)
 				{
-					fprintf(stderr, "pbzip2_ff:  *WARNING: Compressed block size is large [%" PRIu64 " bytes].\n", (unsigned long long)inSize);
+					fprintf(stderr, "pbzip2_ff:  *WARNING: Compressed block size is large [%llu bytes].\n", (unsigned long long)inSize);
 					fprintf(stderr, "          If program aborts, use regular BZIP2 to decompress.\n");
 				}
 			}
@@ -1313,13 +1312,11 @@ public:
 			char *CompressedData = NULL;
 			unsigned int inSize = 0;
 			unsigned int outSize = 0;
-			int blockNum = -1;
 			int ret = -1;
 			
 			
 			FileData = task->in;
 			inSize   = task->buffSize;
-			blockNum = task->blockNum;
 			outSize = (int) ((inSize*1.01)+600);
 			WHY_THIS_ONE(pthread_mutex_lock(MemMutex));
 			// allocate memory for compressed data
@@ -1356,13 +1353,14 @@ public:
 			char *DecompressedData = NULL;
 			unsigned int inSize = 0;
 			unsigned int outSize = 0;
-			int blockNum = -1;
+#ifdef PBZIP_DEBUG
+			int blockNum = task->blockNum;
+#endif
 			int ret = -1;
 
 
 			FileData = task->in;
 			inSize   = task->buffSize;
-			blockNum = task->blockNum;
 
 		        #ifdef PBZIP_DEBUG
 			fprintf(stderr, "consumer:  Buffer: %x  Size: %u   Block: %d\n", FileData, inSize, blockNum);
@@ -1511,7 +1509,7 @@ int testCompressedData(char *fileName)
 	unsigned char obuf[5000];
 	unsigned char unused[BZ_MAX_UNUSED];
 	unsigned char *unusedTmp;
-	int bzerr, nread, streamNo;
+	int bzerr, streamNo;
 	int nUnused;
 	int i;
 
@@ -1557,7 +1555,7 @@ int testCompressedData(char *fileName)
 
 		while (bzerr == BZ_OK)
 		{
-			nread = BZ2_bzRead(&bzerr, bzf, obuf, sizeof(obuf));
+			BZ2_bzRead(&bzerr, bzf, obuf, sizeof(obuf));
 			if (bzerr == BZ_DATA_ERROR_MAGIC)
 			{
 				ret = testBZ2ErrorHandling(bzerr, bzf, streamNo);
@@ -1929,7 +1927,7 @@ int main(int argc, char* argv[])
 				switch (argv[i][j])
 				{
 				case 'p': k = j+1; cmdLineTempCount = 0; strcpy(cmdLineTemp, "2");
-					while (argv[i][k] != '\0' && k < sizeof(cmdLineTemp))
+                                    while (argv[i][k] != '\0' && (uint) k < sizeof(cmdLineTemp))
 					{
 						// no more numbers, finish
 						if ((argv[i][k] < '0') || (argv[i][k] > '9'))
@@ -1957,7 +1955,7 @@ int main(int argc, char* argv[])
 					#endif
 					break;
 				case 'b': k = j+1; cmdLineTempCount = 0; strcpy(cmdLineTemp, "9"); blockSize = 900000;
-					while (argv[i][k] != '\0' && k < sizeof(cmdLineTemp))
+                                    while (argv[i][k] != '\0' && (uint) k < sizeof(cmdLineTemp))
 					{
 						// no more numbers, finish
 						if ((argv[i][k] < '0') || (argv[i][k] > '9'))
@@ -2429,7 +2427,7 @@ int main(int argc, char* argv[])
 			if (decompress == 1)
 				fprintf(stderr, " BWT Block Size: %c00k\n", BWTblockSizeChar);
 			if (strcmp(InFilename, "-") != 0) 
-				fprintf(stderr, "     Input Size: %" PRIu64 " bytes\n", (unsigned long long)fileSize);
+				fprintf(stderr, "     Input Size: %llu bytes\n", (unsigned long long)fileSize);
 		}
 
 		if (decompress == 1)
@@ -2493,7 +2491,7 @@ int main(int argc, char* argv[])
 				}
 				if (QuietMode != 1)
 				{
-					fprintf(stderr, "    Output Size: %" PRIu64 " bytes\n", (unsigned long long)sizeof(bz2HeaderZero));
+					fprintf(stderr, "    Output Size: %llu bytes\n", (unsigned long long)sizeof(bz2HeaderZero));
 					fprintf(stderr, "-------------------------------------------\n");
 				}
 				continue;

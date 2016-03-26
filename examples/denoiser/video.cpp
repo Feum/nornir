@@ -66,7 +66,7 @@ struct Source : AdaptiveNode {
     
     void * svc(void *) {
         Mat * frame = new Mat();
-        if(!cap->read(*frame) || (maxFrames && currentFrameId >= maxFrames)){
+        if(!cap->read(*frame) || (maxFrames && currentFrameId >= (uint) maxFrames)){
             std::cout << "End of stream in input" << std::endl; 
             if(currentFileId + 1 < filenames.size()){
                 ++currentFileId;

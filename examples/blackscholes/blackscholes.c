@@ -162,8 +162,8 @@ fptype BlkSchlsEqEuroNoDiv( fptype sptprice,
     fptype OptionPrice;
 
     // local private working variables for the calculation
-    fptype xStockPrice;
-    fptype xStrikePrice;
+    //fptype xStockPrice;
+    //fptype xStrikePrice;
     fptype xRiskFreeRate;
     fptype xVolatility;
     fptype xTime;
@@ -183,8 +183,8 @@ fptype BlkSchlsEqEuroNoDiv( fptype sptprice,
     fptype NegNofXd1;
     fptype NegNofXd2;    
     
-    xStockPrice = sptprice;
-    xStrikePrice = strike;
+    //xStockPrice = sptprice;
+    //xStrikePrice = strike;
     xRiskFreeRate = rate;
     xVolatility = volatility;
 
@@ -332,10 +332,8 @@ public:
 class Worker: public nornir::Worker<fftask_t> {
 public:
     void compute(fftask_t* t){
-        uint j = 0;
-        for(uint i = 0; i < t->numElems; i++){
+        for(uint i = 0; i < (uint) t->numElems; i++){
             fptype price;
-            fptype priceDelta;
             uint id = (t->start + i) % numOptions;
             /* Calling main function to calculate option value based on
              * Black & Scholes's equation.
@@ -346,6 +344,7 @@ public:
             prices[id] = price;
 
 #ifdef ERR_CHK
+            fptype priceDelta;
             priceDelta = data[id].DGrefval - price;
             if( fabs(priceDelta) >= 1e-4 ){
                 printf("Error on %d. Computed=%.5f, Ref=%.5f, Delta=%.5f\n",
@@ -369,7 +368,9 @@ int bs_thread(void *tid_ptr) {
 #endif
     int i, j;
     fptype price;
+#if defined(ENABLE_OPENMP) || defined(ERR_CHK)
     fptype priceDelta;
+#endif
     int tid = *(int *)tid_ptr;
     int start = tid * (numOptions / nThreads);
     int end = start + (numOptions / nThreads);
@@ -506,7 +507,7 @@ int main (int argc, char **argv)
         otime[i]      = data[i].t;
     }
 
-    printf("Size of data: %d\n", numOptions * (sizeof(OptionData) + sizeof(int)));
+    printf("Size of data: %lu\n", numOptions * (sizeof(OptionData) + sizeof(int)));
 
 #ifdef ENABLE_PARSEC_HOOKS
     __parsec_roi_begin();

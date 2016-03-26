@@ -13,7 +13,7 @@ CXXFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 # Where you want pbzip2 installed when you do 'make install'
 PREFIX = /usr
 
-all: pbzip2 pbzip2_ff
+all: pbzip2_ff #pbzip2
 
 # FastFlow version
 pbzip2_ff: pbzip2_ff.cpp

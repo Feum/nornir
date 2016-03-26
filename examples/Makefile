@@ -1,4 +1,4 @@
-APPS                 = canneal mandelbrot blackscholes pbzip2 denoiser quicksort 
+APPS                 = canneal mandelbrot blackscholes pbzip2 denoiser
 
 .PHONY: all clean cleanall
 
