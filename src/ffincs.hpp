@@ -35,7 +35,7 @@
 #ifndef NORNIR_FFINCS_HPP_
 #define NORNIR_FFINCS_HPP_
 
-#ifdef FF_NODE_HPP
+#if defined(FF_NODE_HPP) || defined(FF_CONFIG_HPP)
 #error "Please include nornir headers BEFORE including FastFlow files."
 #endif
 

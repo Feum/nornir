@@ -177,8 +177,8 @@ Manager::Manager(InputStream *i,OutputStream *o, int parDegree,
 #endif
     fireable=new std::deque<Mdfi*>;
     graphs=new hashMap<Mdfg*>;
-    result=new hashMap<Task*>;
-    tempTask=new Task*;
+    result=new hashMap<StreamElem*>;
+    tempTask=new StreamElem*;
 #ifdef COMPUTE_COM_TIME
     acc=0;
 #endif
@@ -192,8 +192,8 @@ Manager::Manager(InputStream *i, OutputStream *o, int parDegree, unsigned long i
 #endif
     fireable=new std::deque<Mdfi*>;
     graphs=new hashMap<Mdfg*>;
-    result=new hashMap<Task*>;
-    tempTask=new Task*;
+    result=new hashMap<StreamElem*>;
+    tempTask=new StreamElem*;
 #ifdef COMPUTE_COM_TIME
     acc=0;
 #endif
@@ -223,7 +223,7 @@ void Manager::stats(std::ostream& out){
 }
 
 void Manager::exec(){
-    Task* temp;
+    StreamElem* temp;
     bool end=false; ///<End becomes \e true when the manager has computed all the tasks.
     ff::squeue<OutputToken> res; ///<Queue of results computed by the interpreter.
     Mdfg **g=new Mdfg*;
@@ -315,7 +315,7 @@ void Manager::exec(){
 void Manager::getFromInput(){
     Mdfg *newGraph;
     Mdfi *first;
-    Task* next;
+    StreamElem* next;
     /**
      * Tries to read from the stream while the number of task submitted to
      * the interpreter is less than \e groupSize

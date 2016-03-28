@@ -1,4 +1,4 @@
-TARGET = manager.o interpreter.o mdfg.o mdfi.o
+TARGET = manager.o interpreter.o stream.o mdfg.o mdfi.o
 
 .PHONY: all clean cleanall
 

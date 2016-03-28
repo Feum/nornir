@@ -39,7 +39,7 @@ public:
      * \param minFlowSize If a TCP flow doesn't have more than minFlowSize bytes isn't exported (0 is unlimited).
      * \param systemStartTime The system start time.
      */
-    inline ProbeOutputStream(FILE* out,uint queueTimeout,char* collector, uint port, uint minFlowSize, uint32_t systemStartTime):out(out),qTimeout(queueTimeout),flowSequence(0),
+    inline ProbeOutputStream(FILE* out,uint queueTimeout,char const* collector, uint port, uint minFlowSize, uint32_t systemStartTime):out(out),qTimeout(queueTimeout),flowSequence(0),
     minFlowSize(minFlowSize),q(new std::queue<hashElement*>),lastEmission(time(NULL)),ex(collector,port,ffalloc,systemStartTime){
         if(out!=NULL)
             fprintf(out,"IPV4_SRC_ADDR|IPV4_DST_ADDR|OUT_PKTS|OUT_BYTES|FIRST_SWITCHED|LAST_SWITCHED|L4_SRC_PORT|L4_DST_PORT|TCP_FLAGS|"
@@ -66,7 +66,7 @@ public:
      * Puts the task into the output stream.
      * \param a The task to put.
      */
-    inline void put(nornir::dataflow::Task* a){
+    inline void put(nornir::dataflow::StreamElem* a){
         ProbeTask* t=(ProbeTask*) a;
         hashElement* f;
         if(a!=NULL){

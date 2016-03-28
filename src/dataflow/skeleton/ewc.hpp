@@ -89,9 +89,9 @@ public:
      *
      * This method computes the result sequentially.
     */
-    inline Task** compute(Task** t){
-        Task **emitterResult,**fromWorker,
-            **result=new Task*[nWorkers],*toWorker[1];
+    inline StreamElem** compute(StreamElem** t){
+        StreamElem **emitterResult,**fromWorker,
+            **result=new StreamElem*[nWorkers],*toWorker[1];
         emitterResult=emitter->compute(t);
 
         for(uint i=0; i<nWorkers; i++){
@@ -100,7 +100,7 @@ public:
             result[i]=fromWorker[0];
         }
         delete[] emitterResult;
-        Task** fromCollector=collector->compute(result);
+        StreamElem** fromCollector=collector->compute(result);
         delete[] result;
         return fromCollector;
     }
@@ -155,7 +155,7 @@ public:
      */
     ReduceEmitter(int cn, bool autoDelete=true);
 
-    Task** compute(Task** t);
+    StreamElem** compute(StreamElem** t);
 };
 
 /**
@@ -166,7 +166,7 @@ public:
  */
 template <typename T, T*(*fun)(T*,T*)> class ReduceWorker:public Computable{
 public:
-    Task** compute(Task** t);
+    StreamElem** compute(StreamElem** t);
 };
 
 
@@ -187,7 +187,7 @@ public:
      */
     ReduceCollector(int cn);
 
-    Task** compute(Task** t);
+    StreamElem** compute(StreamElem** t);
 };
 
 /**
@@ -207,7 +207,7 @@ public:
      */
     MapEmitter(uint numWorkers, bool autoDelete=true);
 
-    Task** compute(Task** t);
+    StreamElem** compute(StreamElem** t);
 };
 
 /**
@@ -220,7 +220,7 @@ public:
  */
 template <typename T, typename V, V*(*fun)(T*) > class MapWorker: public Computable{
 public:
-    Task** compute(Task** t);
+    StreamElem** compute(StreamElem** t);
 };
 
 /**
@@ -236,7 +236,7 @@ private:
 public:
     MapCollector(uint nWorkers);
 
-    Task** compute(Task** t);
+    StreamElem** compute(StreamElem** t);
 };
 
 /**

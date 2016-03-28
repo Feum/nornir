@@ -449,6 +449,13 @@ public:
             }
         }
     }
+
+    /**
+     * Returns the number of workers currently present in the farm.
+     */
+    size_t getCurrentNumWorkers() const{
+        return _farm->getlb()->getnworkers();
+    }
 };
 
 /**

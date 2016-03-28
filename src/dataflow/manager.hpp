@@ -81,7 +81,7 @@ private:
      * the order of the task received from the input stream. The results will
      * be periodically send to the output stream.
      **/
-    hashMap<Task*> *result;
+    hashMap<StreamElem*> *result;
     /**Fireable instructions.**/
     std::deque<Mdfi*> *fireable;
 
@@ -96,7 +96,7 @@ private:
         taskSent,
     /**Index of the last task sent to the output stream.**/
         lastSent;
-    Task** tempTask;
+    StreamElem** tempTask;
 #ifdef COMPUTE_COM_TIME
     unsigned long acc;
 #endif

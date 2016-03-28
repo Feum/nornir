@@ -80,7 +80,7 @@ public:
      * This method computes the result.
      *
      */
-    virtual Task** compute(Task** t) = 0;
+    virtual StreamElem** compute(StreamElem** t) = 0;
 };
 
 }

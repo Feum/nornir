@@ -33,12 +33,12 @@ ReduceEmitter<T>::ReduceEmitter(int cn, bool autoDelete):
     chunkNum(cn),autoDelete(autoDelete){;}
 
 template <typename T>
-Task** ReduceEmitter<T>::compute(Task** t){
+StreamElem** ReduceEmitter<T>::compute(StreamElem** t){
     ArrayWrapper<T*>* task=(ArrayWrapper<T*>*) t[0];
     int dim=task->getSize();
     int mod=dim%chunkNum;
     int size=dim/chunkNum;
-    Task** toRet=new Task*[chunkNum];
+    StreamElem** toRet=new StreamElem*[chunkNum];
 #ifdef NOCOPY
     int l,h=0;
     for(uint i=0; i<chunkNum; i++){
@@ -72,7 +72,7 @@ Task** ReduceEmitter<T>::compute(Task** t){
 
 
 template <typename T, T*(*fun)(T*,T*)>
-Task** ReduceWorker<T, fun>::compute(Task** t){
+StreamElem** ReduceWorker<T, fun>::compute(StreamElem** t){
     ArrayWrapper<T*>* w1;
     int nElem,first;
 #ifdef NOCOPY
@@ -81,7 +81,7 @@ Task** ReduceWorker<T, fun>::compute(Task** t){
     nElem=ai->getj();
     first=ai->geti();
 #else
-    Task* toDelete=t[0];
+    StreamElem* toDelete=t[0];
     w1=(ArrayWrapper<T*>*)t[0];
     nElem=w1->getSize();
     first=0;
@@ -113,8 +113,8 @@ template<typename T, T*(*fun)(T*,T*)>
 ReduceCollector<T, fun>::ReduceCollector(int cn):chunkNum(cn){;}
 
 template<typename T, T*(*fun)(T*,T*)>
-Task** ReduceCollector<T, fun>::compute(Task** t){
-    Task** toRet=new Task*[1];
+StreamElem** ReduceCollector<T, fun>::compute(StreamElem** t){
+    StreamElem** toRet=new StreamElem*[1];
     T *p,*q;
 #ifdef NOCOPY
     ArrayIndexes<T*>* ai;
@@ -150,12 +150,12 @@ template <typename T>
 MapEmitter<T>::MapEmitter(uint numWorkers, bool autoDelete):numWorkers(numWorkers),autoDelete(autoDelete){;}
 
 template <typename T>
-Task** MapEmitter<T>::compute(Task** t){
+StreamElem** MapEmitter<T>::compute(StreamElem** t){
     ArrayWrapper<T*>* task=(ArrayWrapper<T*>*) t[0];
     uint dim=task->getSize();
     uint mod=dim%numWorkers;
     uint size=dim/numWorkers;
-    Task** toRet=new Task*[numWorkers];
+    StreamElem** toRet=new StreamElem*[numWorkers];
 #ifdef NOCOPY
     int l,h=0;
     for(uint i=0; i<numWorkers; i++){
@@ -169,13 +169,13 @@ Task** MapEmitter<T>::compute(Task** t){
     }
 #else
     int k=0;
-    ArrayWrapper<Task*>* toAdd;
+    ArrayWrapper<StreamElem*>* toAdd;
     for(uint i=0; i<numWorkers; i++){
         if(mod && i==numWorkers-mod){
             size+=1;
             mod=0;
         }
-        toAdd=new ArrayWrapper<Task*>(size);
+        toAdd=new ArrayWrapper<StreamElem*>(size);
         for(uint j=0; j<size; j++){
             toAdd->set(j,task->get(k));
             k++;
@@ -188,16 +188,16 @@ Task** MapEmitter<T>::compute(Task** t){
 }
 
 template <typename T, typename V, V*(*fun)(T*) >
-Task** MapWorker<T, V, fun>::compute(Task** t){
-    ArrayWrapper<Task*> *w1;
+StreamElem** MapWorker<T, V, fun>::compute(StreamElem** t){
+    ArrayWrapper<StreamElem*> *w1;
     int nElem,first;
 #ifdef NOCOPY
-    ArrayIndexes<Task*>* ai=(ArrayIndexes<Task*>*)t[0];
+    ArrayIndexes<StreamElem*>* ai=(ArrayIndexes<StreamElem*>*)t[0];
     w1=ai->getArray();
     nElem=ai->getj();
     first=ai->geti();
 #else
-    w1=(ArrayWrapper<Task*>*)t[0];
+    w1=(ArrayWrapper<StreamElem*>*)t[0];
     nElem=w1->getSize();
     first=0;
 #endif
@@ -215,22 +215,22 @@ template <typename V>
 MapCollector<V>::MapCollector(uint nWorkers):nWorkers(nWorkers){;}
 
 template <typename V>
-Task** MapCollector<V>::compute(Task** t){
-    Task** toRet=new Task*[1];
+StreamElem** MapCollector<V>::compute(StreamElem** t){
+    StreamElem** toRet=new StreamElem*[1];
 #ifdef NOCOPY
-    ArrayIndexes<Task*>* ai;
+    ArrayIndexes<StreamElem*>* ai;
     for(uint i=0; i<nWorkers-1; i++){
-        ai=(ArrayIndexes<Task*>*)t[i];
+        ai=(ArrayIndexes<StreamElem*>*)t[i];
         delete ai;
     }
-    ai=(ArrayIndexes<Task*>*)t[nWorkers-1];
+    ai=(ArrayIndexes<StreamElem*>*)t[nWorkers-1];
     toRet[0]=ai->getArray();
     delete ai;
     return toRet;
 #else
     uint size=0;
     for(uint i=0; i<nWorkers; i++)
-        size+=((ArrayWrapper<Task*>*) t[i])->getSize();
+        size+=((ArrayWrapper<StreamElem*>*) t[i])->getSize();
 
 
     ArrayWrapper<V*> *aw=new ArrayWrapper<V*>(size),*tempAw;

@@ -63,7 +63,7 @@ public:
      * \return Array of Task* as result. The array of Task* and its elements must be deallocated using delete[] and delete.
      *
      */
-    Task** compute(Task** t){
+    StreamElem** compute(StreamElem** t){
         return worker->compute(t);
     }
 
@@ -79,7 +79,7 @@ public:
 
 template <typename T,typename V,V*(*fun)(T*)> class StandardFarmWorker:public Computable{
 public:
-    Task** compute(Task** t){
+    StreamElem** compute(StreamElem** t){
         V* result=fun((T*)t[0]);
         t[0]=result;
         return t;

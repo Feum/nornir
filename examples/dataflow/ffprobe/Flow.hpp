@@ -122,7 +122,7 @@ public:
      * \param alloc The fastflow's allocator.
      * \param systemStartTime The system start time.
      */
-    inline Exporter(char* collectorAddress, ushort port,ff::ff_allocator *alloc, uint32_t systemStartTime):ffalloc(alloc),
+    inline Exporter(char const* collectorAddress, ushort port,ff::ff_allocator *alloc, uint32_t systemStartTime):ffalloc(alloc),
     systemStartTime(systemStartTime){
         /* Create socket */
         if ( (sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {

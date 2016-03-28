@@ -15,7 +15,7 @@
 namespace faskelProbe{
 
 class ProbeInputStream: public nornir::dataflow::InputStream{
-private:
+protected:
     int cnt, ///< Maximum number of packet to read from the device (or from the .pcap file)
         pktRcvd; ///< Packet received after a call of 'pcap_dispatch'
     bool offline, ///< True if the device is a .pcap file
@@ -32,7 +32,9 @@ public:
      * \param readTimeout The read timeout when reading from the pcap socket
      * \param alloc A pointer to the fastflow's allocator
      */
-    inline ProbeInputStream(int nw, const char* device, bool noPromisc, char* filter_exp, int cnt, int h, int readTimeout, ff::ff_allocator *alloc):
+    inline ProbeInputStream(int nw, const char* device, bool noPromisc,
+                            char* filter_exp, int cnt, int h, int readTimeout,
+                            ff::ff_allocator *alloc):
     cnt(cnt),pktRcvd(0),end(false){
         ffalloc=alloc;
         nWorkers=nw!=0?nw:1;
@@ -116,11 +118,31 @@ public:
         pcap_close(handle);
     }
 
+    virtual nornir::dataflow::StreamElem* next() = 0;
+
+    /**
+     * Checks if the EndOfStream is arrived.
+     * \return \e True if the EndOfStream is arrived, \e false otherwise.
+     */
+    virtual bool hasNext() = 0;
+
+};
+
+class ProbeInputStreamSteady: public ProbeInputStream{
+public:
+    inline ProbeInputStreamSteady(int nw, const char* device, bool noPromisc,
+                                char* filter_exp, int cnt, int h, int readTimeout,
+                                ff::ff_allocator *alloc):
+            ProbeInputStream(nw, device, noPromisc, filter_exp, cnt, h,
+                             readTimeout, alloc){
+            ;
+        }
+
     /**
      * Returns the next element of the stream.
      * \return The next element of the stream.
      */
-    nornir::dataflow::Task* next(){
+    nornir::dataflow::StreamElem* next(){
         ProbeTask* t=(ProbeTask*) ffalloc->malloc(sizeof(ProbeTask));
         t->init(nWorkers,ffalloc);
         pktRcvd=pcap_dispatch(handle,cnt,dispatchCallback,(u_char*)t);
@@ -142,5 +164,45 @@ public:
         return !end;
     }
 };
+
+class ProbeInputStreamRate: public ProbeInputStream, nornir::dataflow::InputStreamRate{
+public:
+    inline ProbeInputStreamRate(std::string streamFile, int nw, const char* device, bool noPromisc,
+                            char* filter_exp, int cnt, int h, int readTimeout,
+                            ff::ff_allocator *alloc):
+                ProbeInputStream(nw, device, noPromisc, filter_exp, cnt, h,
+                                 readTimeout, alloc), InputStreamRate(streamFile){
+        ;
+    }
+
+
+    std::vector<nornir::dataflow::StreamElem*> loadObjects(){
+        std::vector<nornir::dataflow::StreamElem*>  objects;
+        do{
+            ProbeTask* t = (ProbeTask*) ffalloc->malloc(sizeof(ProbeTask));
+            t->init(nWorkers,ffalloc);
+            pktRcvd = pcap_dispatch(handle,cnt,dispatchCallback,(u_char*)t);
+            if((pktRcvd == 0 && offline) || quit){
+                end = true;
+                t->setEof();
+            }else if(pktRcvd == 0 && !offline){
+                t->setReadTimeoutExpired();
+            }
+            objects.push_back(t);
+        }while((pktRcvd != 0 || !offline) && !quit);
+
+        return objects;
+    }
+
+    nornir::dataflow::StreamElem* next(){
+        return InputStreamRate::next();
+    }
+
+    bool hasNext(){
+        return InputStreamRate::hasNext();
+    }
+};
+
+
 }
 #endif /* PROBEINPUTSTREAM_HPP_ */

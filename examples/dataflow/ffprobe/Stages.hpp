@@ -96,7 +96,7 @@ public:
     /**
      * The function computed by one stage of the pipeline (is computed by an indipendent thread).
      */
-    nornir::dataflow::Task** compute(nornir::dataflow::Task** p){
+    nornir::dataflow::StreamElem** compute(nornir::dataflow::StreamElem** p){
         ProbeTask* t=(ProbeTask*) p[0];
         myList<hashElement*> *flowsToExport=t->getFlowsToExport();
         time_t now;
@@ -356,7 +356,7 @@ public:
      * \param minFlowSize If a TCP flow doesn't have more than minFlowSize bytes isn't exported (0 is unlimited).
      * \param systemStartTime The system start time.
      */
-    inline lastStage(FILE* out,uint queueTimeout,char* collector, uint port, uint minFlowSize, uint32_t systemStartTime):out(out),qTimeout(queueTimeout),flowSequence(0),
+    inline lastStage(FILE* out,uint queueTimeout,char const* collector, uint port, uint minFlowSize, uint32_t systemStartTime):out(out),qTimeout(queueTimeout),flowSequence(0),
     minFlowSize(minFlowSize),q(new std::queue<hashElement*>),lastEmission(time(NULL)),ex(collector,port,ffalloc,systemStartTime){
         if(out!=NULL)
             fprintf(out,"IPV4_SRC_ADDR|IPV4_DST_ADDR|OUT_PKTS|OUT_BYTES|FIRST_SWITCHED|LAST_SWITCHED|L4_SRC_PORT|L4_DST_PORT|TCP_FLAGS|"

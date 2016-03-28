@@ -1,11 +1,14 @@
 # Makefile for parallel simulated annealer
 
+.PHONY = all clean cleanall
 TARGET = canneal
 LDLIBS += $(LIBS) -lm
 
 CXXFLAGS += -DENABLE_FF -DENABLE_THREADS -O3
 
-all: 
+all: $(TARGET)
+
+$(TARGET): *.cpp
 	$(CXX) $(CXXFLAGS) annealer_thread.cpp -c -o annealer_thread.o
 	$(CXX) $(CXXFLAGS) rng.cpp -c -o rng.o
 	$(CXX) $(CXXFLAGS) netlist.cpp -c -o netlist.o

@@ -31,10 +31,10 @@ namespace nornir{
 namespace dataflow{
 
 std::vector<OutputToken>* Mdfi::compute(){
-    Task* args[MAX_INSTRUCTION_INPUTS];
+    StreamElem* args[MAX_INSTRUCTION_INPUTS];
     for(uint i=0; i<dInput; i++)
         args[i]=tInput[i].getTask();
-    Task** result=comp->compute(args);
+    StreamElem** result=comp->compute(args);
     std::vector<OutputToken> *v = new std::vector<OutputToken>(dOutput);
     for(uint i=0; i<dOutput; i++)
         /*Set output tokens.*/

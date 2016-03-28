@@ -111,7 +111,7 @@ public:
      * \param i The position where to set the task.
      * \return \e false if \e i is higher than \e dInput, otherwise returns false.
      */
-    inline bool setInput(Task* t,uint i){
+    inline bool setInput(StreamElem* t,uint i){
         if(i<dInput) {
             tInput[i].setTask(t);
             return true;

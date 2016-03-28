@@ -37,34 +37,34 @@ void WorkerMdf::compute(Mdfi* t){
     _buffer->push(temp);
 }
 
-Interpreter::Interpreter(int parDegree):parDegree(parDegree){
-    p = new nornir::Parameters("parameters.xml", "archdata.xml");
-    o = new nornir::Observer;
-    p->observer = o;
+Interpreter::Interpreter(size_t maxWorkers):_maxWorkers(maxWorkers){
+    _p = new nornir::Parameters("parameters.xml", "archdata.xml");
+    _o = new nornir::Observer;
+    _p->observer = _o;
 
-    accelerator = new nornir::FarmAccelerator<Mdfi>(p);
+    _accelerator = new nornir::FarmAccelerator<Mdfi>(_p);
 
     /**Creates the SPSC queues.**/
-    _buffers = new ff::dynqueue*[parDegree];
-    for(int i=0; i<parDegree; i++){
+    _buffers = new ff::dynqueue*[_maxWorkers];
+    for(size_t i = 0; i < _maxWorkers; i++){
         _buffers[i] = new ff::dynqueue();
     }
     /**Adds the workers to the farm.**/
-    for(int i=0; i<parDegree; ++i){
-        accelerator->addWorker(new WorkerMdf(_buffers[i]));
+    for(size_t i = 0; i < _maxWorkers; ++i){
+        _accelerator->addWorker(new WorkerMdf(_buffers[i]));
     }
 
-    accelerator->start();
+    _accelerator->start();
 }
 
 Interpreter::~Interpreter(){
-     accelerator->wait();
-     for(int i=0; i<parDegree; i++){
+     _accelerator->wait();
+     for(int i = 0; i < _maxWorkers; i++){
          delete _buffers[i];
      }
      delete[] _buffers;
-     delete p;
-     delete o;
+     delete _p;
+     delete _o;
 }
 
 /**
@@ -72,21 +72,21 @@ Interpreter::~Interpreter(){
  * \param r A queue of output tokens. In this queue the interpreter will puts the computed results.
  */
 int Interpreter::wait(ff::squeue<OutputToken>& r){
-    int acc=0;
+    int acc = 0;
     std::vector<OutputToken>* temp;
     void* task;
-    for(int i=0; i<parDegree; i++){
+    for(size_t i = 0; i < _maxWorkers; i++){
 #ifdef COMPUTE_COM_TIME
         unsigned long t1;
         while(true){
-            t1=ff::getusec();
+            t1 = ff::getusec();
             if(!buffers[i]->pop(&task)) break;
-            acc+=ff::getusec()-t1;
+            acc += ff::getusec()-t1;
 #else
         while(_buffers[i]->pop(&task)){
 #endif
-            temp=(std::vector<OutputToken>*) task;
-            for(int j=0; j< (int) temp->size(); j++)
+            temp = (std::vector<OutputToken>*) task;
+            for(int j = 0; j< (int) temp->size(); j++)
                 r.push_back((*temp)[j]);
             delete temp;
         }

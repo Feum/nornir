@@ -62,10 +62,13 @@ fprintf(stderr,"[-p <port>]                | Port of the collector [default 2055
 fprintf(stderr,"[-y <minFlowSize>]         | Minimum TCP flow size (in bytes). If a TCP flow is shorter than the specified size the flow\n"
         "                           | is not emitted. 0 is unlimited [default unlimited]\n");
 fprintf(stderr,"[-r]                       | Put the interface into 'No promiscous' mode\n");
+fprintf(stderr,"[-x]                       | File containing the stream rates.\n");
 fprintf(stderr,"[-h]                       | Prints this help\n");
 }
 
-char *interface=NULL,*collector="127.0.0.1",*bpfFilter=NULL;
+char *interface=NULL,*bpfFilter=NULL;
+char const *collector = "127.0.0.1";
+char const *streamFile = "";
 int version=-1,hashSize=4096,cnt=-1,maxAddCheck=1,maxNullCheck=1,maxReadTOCheck=-1,readTimeout=0;//30000; //TODO ANALIZZARE MEGLIO TIMEOUT
 uint minFlowSize=0,queueTimeout=30,lifetime=120,parDegree=1,idle=30,maxActiveFlows=4294967295;
 ushort port=2055;
@@ -85,16 +88,25 @@ void executeWithFaskel(){
         fprintf(stderr,"Initialization of fastflow's memory allocator fail.");
         return;
     }
-    /**Creates the input stream.**/
-    faskelProbe::ProbeInputStream input(parDegree>1?parDegree:1,interface,noPromisc,bpfFilter,cnt,hashSize,readTimeout,&ffalloc);
+
+    faskelProbe::ProbeInputStream* input = NULL;
+    if(strcmp(streamFile, "") == 0){
+        // No stream file
+        input = new faskelProbe::ProbeInputStreamSteady(parDegree>1?parDegree:1,
+                interface,noPromisc,bpfFilter,cnt,hashSize,readTimeout,&ffalloc);
+    }else{
+        // Stream file
+        input = new faskelProbe::ProbeInputStreamRate(streamFile, parDegree>1?parDegree:1,
+                interface,noPromisc,bpfFilter,cnt,hashSize,readTimeout,&ffalloc);
+    }
     /**Creates the output stream.**/
     faskelProbe::ProbeOutputStream output(outputFile,queueTimeout,collector,port,minFlowSize,sst);
     if(parDegree<=1){
     /**Sequential execution**/
-        nornir::dataflow::Task* toWorker[1];
+        nornir::dataflow::StreamElem* toWorker[1];
         faskelProbe::Stage worker(0,hashSize,maxActiveFlows,idle,lifetime,maxNullCheck,maxAddCheck,maxReadTOCheck);
-        while(input.hasNext()){
-            toWorker[0]=input.next();
+        while(input->hasNext()){
+            toWorker[0]=input->next();
             if(toWorker[0]==NULL) continue;
             output.put((worker.compute(toWorker))[0]);
         }
@@ -108,7 +120,7 @@ void executeWithFaskel(){
         nornir::dataflow::Pipeline *pipe=new nornir::dataflow::Pipeline(stages[0],stages[1]);
         for(uint i=2; i<parDegree; i++)
             pipe = new nornir::dataflow::Pipeline(pipe,stages[i]);
-        nornir::dataflow::Manager m(&input,&output,parDegree,1,pipe);
+        nornir::dataflow::Manager m(input,&output,parDegree,1,pipe);
         m.exec();
         for(uint i=0; i<parDegree; i++)
             delete stages[i];
@@ -180,7 +192,7 @@ void executeWithFastflow(){
 int main(int argc, char** argv){
     /**Args parsing.**/
     int c;
-    while ((c = getopt (argc, argv, "v:i:b:d:l:q:t:w:s:m:c:f:a:z:k:n:p:y:rh")) != -1)
+    while ((c = getopt (argc, argv, "v:i:b:d:l:q:t:w:s:m:c:f:a:z:k:n:p:y:x:rh")) != -1)
         switch (c){
             case 'v':
                 version = atoi(optarg);
@@ -237,6 +249,9 @@ int main(int argc, char** argv){
                 break;
             case 'y':
                 minFlowSize=atoi(optarg);
+                break;
+            case 'x':
+                streamFile = optarg;
                 break;
             case 'r':
                 noPromisc=true;

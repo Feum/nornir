@@ -28,8 +28,8 @@
 #ifndef NORNIR_DF_INTERPRETER_HPP_
 #define NORNIR_DF_INTERPRETER_HPP_
 
-#include "mdfi.hpp"
 #include "../interface.hpp"
+#include "mdfi.hpp"
 #include "../external/fastflow/ff/squeue.hpp"
 #include <vector>
 #include <queue>
@@ -60,16 +60,16 @@ public:
 class Interpreter{
 private:
     ff::dynqueue** _buffers;
-    nornir::FarmAccelerator<Mdfi>* accelerator;
-    int parDegree;
-    nornir::Parameters* p;
-    nornir::Observer* o;
+    nornir::FarmAccelerator<Mdfi>* _accelerator;
+    size_t _maxWorkers;
+    nornir::Parameters* _p;
+    nornir::Observer* _o;
 public:
     /**
      * Constructor of the interpreter.
      * \param parDegree Parallelism degree (number of worker to activate).
      */
-    Interpreter(int parDegree);
+    Interpreter(size_t maxWorkers);
 
     /**
      * Destructor of the interpreter.
@@ -81,7 +81,7 @@ public:
      * \param instr The instruction to compute.
      */
     inline void exec(Mdfi* instr){
-        accelerator->offload(instr);
+        _accelerator->offload(instr);
     }
 
     /**
@@ -100,7 +100,7 @@ public:
 
     /**Stops the farm.**/
     inline void stop(){
-        accelerator->offload(NULL);
+        _accelerator->offload(NULL);
     }
 };
 

@@ -151,14 +151,14 @@ public:
  */
 class InputToken{
 private:
-    Task* task;///<The input task.
+    StreamElem* task;///<The input task.
     bool presence;///<\e True if the task is present, \e false otherwise.
 public:
     /**
      * Costructor of the token.
      * \param t The input task.
      */
-    inline InputToken(Task* t):task(t),presence(true){;}
+    inline InputToken(StreamElem* t):task(t),presence(true){;}
 
     /**
      * Constructor of the token.
@@ -177,7 +177,7 @@ public:
      * Sets the input task.
      * \param t The task to set.
      */
-    inline void setTask(Task* t){
+    inline void setTask(StreamElem* t){
         task=t;
         presence=true;
     }
@@ -186,7 +186,7 @@ public:
      * Returns the input task.
      * \return The input task.
      */
-    inline Task* getTask(){
+    inline StreamElem* getTask(){
         return task;
     }
 
@@ -205,7 +205,7 @@ public:
  */
 class OutputToken{
 private:
-    Task* result;
+    StreamElem* result;
     TokenId dest;
 public:
     /**Default constructor.**/
@@ -216,13 +216,13 @@ public:
      * \param r A pointer to the computed task.
      * \param d The destination of the token.
      */
-    inline OutputToken(Task* r, const TokenId& d):result(r),dest(d){;}
+    inline OutputToken(StreamElem* r, const TokenId& d):result(r),dest(d){;}
 
     /**
      * Returns a pointer to the computed task.
      * \return A pointer to the computed task.
      */
-    inline Task* getResult(){return result;}
+    inline StreamElem* getResult(){return result;}
 
     /**
      * Returns the destination of the token.
