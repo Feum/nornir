@@ -28,9 +28,9 @@ using namespace nornir::dataflow;
  */
 void printHelp(char* progName){
 fprintf(stderr,"\nusage: %s -v <version> -i <captureInterface|pcap> [-b <bpf filter>] [-d <idleTimeout>] [-l <lifetimeTimeout>]\n"
-        "[-q <queueTimeout>] [-t <readTimeout>] [-w <parDegree>] [-s <hashSize>] [-m <maxActiveFlows>] [-c <cnt>]\n"
+        "[-q <queueTimeout>] [-t <readTimeout>] [-w <numStages>] [-s <hashSize>] [-m <maxActiveFlows>] [-c <cnt>]\n"
         "[-f <outputFile>] [-a <maxAddCheck>] [-z <maxNullCheck>] [-k <maxReadTOCheck>] [-n <host>] [-p <port>] [-y <minFlowSize>]\n"
-        "[-r] [-h]\n\n\n", progName);
+        "[-x <ratesFile] [-g <parDegree>] [-r] [-h]\n\n\n", progName);
 fprintf(stderr,"-v <version>               | If 0, executes the fastflow version. If > 0, executes the faskel version.\n");
 fprintf(stderr,"-i <captureInterface|pcap> | Interface name from which packets are captured, or .pcap file.\n");
 fprintf(stderr,"[-b <bpf filter>]          | It specifies a bpf filter.\n");
@@ -39,11 +39,11 @@ fprintf(stderr,"[-l <lifetimeTimeout>]     | It specifies the maximum (seconds) 
 fprintf(stderr,"[-q <queueTimeout>]        | It specifies how long (seconds) expired flows (queued before delivery) are emitted [default 30].\n");
 fprintf(stderr,"[-t <readTimeout>]         | It specifies the read timeout (milliseconds) when reading from\n"
         "                           | the pcap socket [default 30 seconds].\n");
-fprintf(stderr,"[-w <parDegree>]           | It specifies how many thread must be activated [default sequential execution].\n"
-        "                           | HashSize %% parDegree must be equals to 0 if version is > 0. HashSize %% (parDegree-2)\n"
+fprintf(stderr,"[-w <numStages>]           | It specifies how many pipeline stages must be activated [default sequential execution].\n"
+        "                           | HashSize %% numStages must be equals to 0 if version is > 0. HashSize %% (numStages-2)\n"
         "                           | must be equals to 0 if version is 0\n");
 fprintf(stderr,"[-s <hashSize>]            | It specifies the size of the hash table where the flows are stored [default 4096]\n"
-        "                           | HashSize %% parDegree must be equals to 0 if version is > 0. HashSize %% (parDegree-2)\n"
+        "                           | HashSize %% numStages must be equals to 0 if version is > 0. HashSize %% (numStages-2)\n"
         "                           | must be equals to 0 if version is 0\n");
 fprintf(stderr,"[-m <maxActiveFlows>]      | Limit the number of active flows for one worker. This is useful if you want to limit the\n"
         "                           | memory allocated to ffProbe [default 4294967295]\n");
@@ -61,22 +61,24 @@ fprintf(stderr,"[-n <host>]                | Host of the collector [default 127.
 fprintf(stderr,"[-p <port>]                | Port of the collector [default 2055]\n");
 fprintf(stderr,"[-y <minFlowSize>]         | Minimum TCP flow size (in bytes). If a TCP flow is shorter than the specified size the flow\n"
         "                           | is not emitted. 0 is unlimited [default unlimited]\n");
+fprintf(stderr,"[-x <ratesFile>]           | File containing the stream rates.\n");
+fprintf(stderr,"[-g <parDegree>]           | The parallelism degree (only valid for dataflow execution). For  on dataflow execution it will\n"
+        "                           | be equal to the number of stages.\n");
 fprintf(stderr,"[-r]                       | Put the interface into 'No promiscous' mode\n");
-fprintf(stderr,"[-x]                       | File containing the stream rates.\n");
 fprintf(stderr,"[-h]                       | Prints this help\n");
 }
 
 char *interface=NULL,*bpfFilter=NULL;
 char const *collector = "127.0.0.1";
 char const *streamFile = "";
-int version=-1,hashSize=4096,cnt=-1,maxAddCheck=1,maxNullCheck=1,maxReadTOCheck=-1,readTimeout=0;//30000; //TODO ANALIZZARE MEGLIO TIMEOUT
-uint minFlowSize=0,queueTimeout=30,lifetime=120,parDegree=1,idle=30,maxActiveFlows=4294967295;
+int version=-1,hashSize=4096,cnt=-1,maxAddCheck=1,maxNullCheck=1,maxReadTOCheck=-1,readTimeout=0, parDegree=-1;//30000; //TODO ANALIZZARE MEGLIO TIMEOUT
+uint minFlowSize=0,queueTimeout=30,lifetime=120,numStages=1,idle=30,maxActiveFlows=4294967295;
 ushort port=2055;
 bool noPromisc=false;
 FILE* outputFile=NULL;
 
 void executeWithFaskel(){
-    assert(hashSize%parDegree==0);
+    assert(hashSize%numStages==0);
     timeval systemStartTime;
     gettimeofday(&systemStartTime,NULL);
     uint32_t sst=systemStartTime.tv_sec*1000+systemStartTime.tv_usec/1000;
@@ -92,16 +94,16 @@ void executeWithFaskel(){
     faskelProbe::ProbeInputStream* input = NULL;
     if(strcmp(streamFile, "") == 0){
         // No stream file
-        input = new faskelProbe::ProbeInputStreamSteady(parDegree>1?parDegree:1,
+        input = new faskelProbe::ProbeInputStreamSteady(numStages>1?numStages:1,
                 interface,noPromisc,bpfFilter,cnt,hashSize,readTimeout,&ffalloc);
     }else{
         // Stream file
-        input = new faskelProbe::ProbeInputStreamRate(streamFile, parDegree>1?parDegree:1,
+        input = new faskelProbe::ProbeInputStreamRate(streamFile, numStages>1?numStages:1,
                 interface,noPromisc,bpfFilter,cnt,hashSize,readTimeout,&ffalloc);
     }
     /**Creates the output stream.**/
     faskelProbe::ProbeOutputStream output(outputFile,queueTimeout,collector,port,minFlowSize,sst);
-    if(parDegree<=1){
+    if(numStages <= 1){
     /**Sequential execution**/
         nornir::dataflow::StreamElem* toWorker[1];
         faskelProbe::Stage worker(0,hashSize,maxActiveFlows,idle,lifetime,maxNullCheck,maxAddCheck,maxReadTOCheck);
@@ -112,17 +114,17 @@ void executeWithFaskel(){
         }
     }else{
         /**Parallel execution with n pipelined threads.**/
-        faskelProbe::Stage** stages=new faskelProbe::Stage*[parDegree];
-        int workerHs=hashSize/parDegree;
+        faskelProbe::Stage** stages=new faskelProbe::Stage*[numStages];
+        int workerHs=hashSize/numStages;
         /**Add the stages of the pipeline.**/
-        for(uint i=0; i<parDegree; i++)
+        for(uint i=0; i<numStages; i++)
             stages[i]=new faskelProbe::Stage(i,workerHs,maxActiveFlows,idle,lifetime,maxNullCheck,maxAddCheck);
         nornir::dataflow::Pipeline *pipe=new nornir::dataflow::Pipeline(stages[0],stages[1]);
-        for(uint i=2; i<parDegree; i++)
+        for(uint i=2; i<numStages; i++)
             pipe = new nornir::dataflow::Pipeline(pipe,stages[i]);
         nornir::dataflow::Manager m(input,&output,parDegree,1,pipe);
         m.exec();
-        for(uint i=0; i<parDegree; i++)
+        for(uint i=0; i<numStages; i++)
             delete stages[i];
         delete[] stages;
         delete pipe;
@@ -131,9 +133,9 @@ void executeWithFaskel(){
 
 void executeWithFastflow(){
     int nWorkers;
-    if(parDegree>2){
-        assert(hashSize%(parDegree-2)==0);
-        nWorkers=parDegree-2;
+    if(numStages>2){
+        assert(hashSize%(numStages-2)==0);
+        nWorkers=numStages-2;
     }else
         nWorkers=1;
     timeval systemStartTime;
@@ -152,11 +154,11 @@ void executeWithFastflow(){
     /**Creates the last stage of the pipeline (exported).**/
     fastflowProbe::lastStage *last=new fastflowProbe::lastStage(outputFile,queueTimeout,collector,port,minFlowSize,sst);
 
-    if(parDegree<=1){
+    if(numStages<=1){
         /**Sequential execution**/
         fastflowProbe::genericStage worker(0,hashSize,maxActiveFlows,idle,lifetime,maxNullCheck,maxAddCheck,maxReadTOCheck);
         while(last->svc(worker.svc(first->svc(NULL)))==GO_ON);
-    }else if(parDegree==2){
+    }else if(numStages==2){
         /**Parallel execution with two pipelined threads.**/
         fastflowProbe::genericStage worker(0,hashSize,maxActiveFlows,idle,lifetime,maxNullCheck,maxAddCheck,maxReadTOCheck);
         fastflowProbe::workerAndExporter wae(&worker,last);
@@ -192,7 +194,7 @@ void executeWithFastflow(){
 int main(int argc, char** argv){
     /**Args parsing.**/
     int c;
-    while ((c = getopt (argc, argv, "v:i:b:d:l:q:t:w:s:m:c:f:a:z:k:n:p:y:x:rh")) != -1)
+    while ((c = getopt (argc, argv, "v:i:b:d:l:q:t:w:s:m:c:f:a:z:k:n:p:y:x:g:rh")) != -1)
         switch (c){
             case 'v':
                 version = atoi(optarg);
@@ -216,7 +218,7 @@ int main(int argc, char** argv){
                 readTimeout = atoi(optarg);
                 break;
             case 'w':
-                parDegree = atoi(optarg);
+                numStages = atoi(optarg);
                 break;
             case 's':
                 hashSize = atoi(optarg);
@@ -253,6 +255,9 @@ int main(int argc, char** argv){
             case 'x':
                 streamFile = optarg;
                 break;
+            case 'g':
+                parDegree = atoi(optarg);
+                break;
             case 'r':
                 noPromisc=true;
                 break;
@@ -274,6 +279,11 @@ int main(int argc, char** argv){
 
     if(interface==NULL){
         printf("ERROR: -i <interface> required.\n");
+        exit(-1);
+    }
+
+    if(parDegree == -1){
+        printf("ERROR: -g <parDegree> required.\n");
         exit(-1);
     }
 

@@ -27,6 +27,19 @@
 
 #include "stream.hpp"
 
+#include "../external/Mammut/mammut/mammut.hpp"
+
+#undef DEBUG
+#undef DEBUGB
+
+#ifdef DEBUG_DF_STREAM
+#define DEBUG(x) do { cerr << "[Dataflow:Stream] " << x << endl; } while (0)
+#define DEBUGB(x) do {x;} while(0)
+#else
+#define DEBUG(x)
+#define DEBUGB(x)
+#endif
+
 namespace nornir{
 namespace dataflow{
 
@@ -44,11 +57,8 @@ ClockThread::ClockThread(time_t& lastSec, bool& terminated):
 }
 
 void ClockThread::run(){
-    int i = 0;
-    time_t tmp;
     Mammut m;
     TasksManager* pm = m.getInstanceTask();
-    Topology* topology = m.getInstanceTopology();
 
     ProcessHandler* process = pm->getProcessHandler(getpid());
     ThreadHandler* thread = process->getThreadHandler(gettid());
@@ -66,7 +76,8 @@ void ClockThread::run(){
 InputStreamRate::InputStreamRate(const std::string& fileName):
         _currentInterval(0),
         _lastSec(0), _startTime(0), _processedPkts(0), _currIntervalStart(0),
-        _currBurstSize(0), _excess(0), _def(0), _terminated(false){
+        _currBurstSize(0), _excess(0), _def(0), _terminated(false),
+        _nextObject(0){
     _clockThread = new ClockThread(_lastSec, _terminated);
     FILE* f = NULL;
     char line[512];
@@ -98,7 +109,6 @@ InputStreamRate::InputStreamRate(const std::string& fileName):
             exit(-1);
         }
     }
-    _objects = loadObjects();
 }
 
 InputStreamRate::~InputStreamRate(){
@@ -108,6 +118,12 @@ InputStreamRate::~InputStreamRate(){
 #define BURST_SIZE 10.0
 
 StreamElem* InputStreamRate::next(){
+    if(!_objects.size()){
+        _objects = loadObjects();
+        DEBUG("Loaded " << _objects.size() << " objects.");
+        DEBUG(_rates.size() << " rates.");
+    }
+
     StreamElem* obj = NULL;
     if(!_def){
         _def = getticks();
@@ -122,6 +138,7 @@ StreamElem* InputStreamRate::next(){
     if(_currentInterval < _rates.size()){
         obj = _objects.at(_nextObject);
     }else{
+        DEBUG("Stream terminated.");
         obj = NULL;
         _terminated = true;
         _clockThread->join();

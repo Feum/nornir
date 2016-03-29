@@ -172,7 +172,7 @@ public:
                             ff::ff_allocator *alloc):
                 ProbeInputStream(nw, device, noPromisc, filter_exp, cnt, h,
                                  readTimeout, alloc), InputStreamRate(streamFile){
-        ;
+        assert(offline);
     }
 
 
@@ -182,14 +182,11 @@ public:
             ProbeTask* t = (ProbeTask*) ffalloc->malloc(sizeof(ProbeTask));
             t->init(nWorkers,ffalloc);
             pktRcvd = pcap_dispatch(handle,cnt,dispatchCallback,(u_char*)t);
-            if((pktRcvd == 0 && offline) || quit){
-                end = true;
-                t->setEof();
-            }else if(pktRcvd == 0 && !offline){
-                t->setReadTimeoutExpired();
+            assert(pktRcvd >= 0);
+            if(pktRcvd){
+                objects.push_back(t);
             }
-            objects.push_back(t);
-        }while((pktRcvd != 0 || !offline) && !quit);
+        }while(pktRcvd != 0 && !quit);
 
         return objects;
     }

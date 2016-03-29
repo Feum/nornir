@@ -59,7 +59,7 @@ Interpreter::Interpreter(size_t maxWorkers):_maxWorkers(maxWorkers){
 
 Interpreter::~Interpreter(){
      _accelerator->wait();
-     for(int i = 0; i < _maxWorkers; i++){
+     for(size_t i = 0; i < _maxWorkers; i++){
          delete _buffers[i];
      }
      delete[] _buffers;

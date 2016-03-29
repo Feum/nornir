@@ -31,9 +31,9 @@
 #undef DEBUG
 #undef DEBUGB
 
-#ifdef DEBUG_PREDICTORS
+#ifdef DEBUG_SELECTORS
 #define DEBUG(x) do { std::cerr << "[Selectors] " << x << std::endl; } while (0)
-#define DEBUGB(x) do {x} while (0)
+#define DEBUGB(x) do {x;} while (0)
 #else
 #define DEBUG(x)
 #define DEBUGB(x)
@@ -257,8 +257,10 @@ KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
     double primaryPrediction = 0;
     double secondaryPrediction = 0;
 
-    DEBUGB(double bestPrimaryPrediction = 0;)
-    DEBUGB(double suboptimalSecondary = 0;)
+#ifdef DEBUG_SELECTORS
+    double bestPrimaryPrediction = 0;
+    double suboptimalSecondary = 0;
+#endif
     double bestSecondaryPrediction = 0;
     double bestSuboptimalValue = primaryValue;
 
