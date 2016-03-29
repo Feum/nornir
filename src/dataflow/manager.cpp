@@ -166,11 +166,12 @@ Mdfg* compile(Computable* c){
     }
 }
 
-Manager::Manager(InputStream *i,OutputStream *o, int parDegree,
-                 unsigned long int groupSize, Computable *c):
-    in(i),out(o),compiled(true),nextGraphId(0),groupSize(groupSize),executed(0),taskSent(0),lastSent(0){
+Manager::Manager(Computable* c, InputStream *i, OutputStream *o, int parDegree,
+                 unsigned long int groupSize, bool orderedTasks):
+            in(i),out(o),compiled(true),nextGraphId(0),groupSize(groupSize),
+            executed(0),taskSent(0),lastSent(0){
     graph=compile(c);
-    intr=new Interpreter(parDegree);
+    intr=new Interpreter(parDegree, orderedTasks);
 
 #ifdef POOL
     pool=new std::deque<Mdfg*>;
@@ -184,9 +185,11 @@ Manager::Manager(InputStream *i,OutputStream *o, int parDegree,
 #endif
 }
 
-Manager::Manager(InputStream *i, OutputStream *o, int parDegree, unsigned long int groupSize, Mdfg *graph ):
-    in(i),out(o),graph(graph),compiled(false),nextGraphId(0),groupSize(groupSize),executed(0),taskSent(0),lastSent(0){
-    intr=new Interpreter(parDegree);
+Manager::Manager(Mdfg *graph, InputStream *i, OutputStream *o, int parDegree,
+                 unsigned long int groupSize, bool orderedTasks):
+            in(i),out(o),graph(graph),compiled(false),nextGraphId(0),
+            groupSize(groupSize),executed(0),taskSent(0),lastSent(0){
+    intr=new Interpreter(parDegree, orderedTasks);
 #ifdef POOL
     pool=new std::deque<Mdfg*>;
 #endif

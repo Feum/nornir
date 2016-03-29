@@ -122,7 +122,7 @@ void executeWithFaskel(){
         nornir::dataflow::Pipeline *pipe=new nornir::dataflow::Pipeline(stages[0],stages[1]);
         for(uint i=2; i<numStages; i++)
             pipe = new nornir::dataflow::Pipeline(pipe,stages[i]);
-        nornir::dataflow::Manager m(input,&output,parDegree,1,pipe);
+        nornir::dataflow::Manager m(pipe, input, &output, parDegree, 1, true);
         m.exec();
         for(uint i=0; i<numStages; i++)
             delete stages[i];
