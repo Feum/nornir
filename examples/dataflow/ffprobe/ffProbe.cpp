@@ -30,7 +30,7 @@ void printHelp(char* progName){
 fprintf(stderr,"\nusage: %s -v <version> -i <captureInterface|pcap> [-b <bpf filter>] [-d <idleTimeout>] [-l <lifetimeTimeout>]\n"
         "[-q <queueTimeout>] [-t <readTimeout>] [-w <numStages>] [-s <hashSize>] [-m <maxActiveFlows>] [-c <cnt>]\n"
         "[-f <outputFile>] [-a <maxAddCheck>] [-z <maxNullCheck>] [-k <maxReadTOCheck>] [-n <host>] [-p <port>] [-y <minFlowSize>]\n"
-        "[-x <ratesFile] [-g <parDegree>] [-r] [-h]\n\n\n", progName);
+        "[-x <ratesFile] [-g <parDegree>] [-u <groupSize>] [-r] [-h]\n\n\n", progName);
 fprintf(stderr,"-v <version>               | If 0, executes the fastflow version. If > 0, executes the faskel version.\n");
 fprintf(stderr,"-i <captureInterface|pcap> | Interface name from which packets are captured, or .pcap file.\n");
 fprintf(stderr,"[-b <bpf filter>]          | It specifies a bpf filter.\n");
@@ -64,6 +64,7 @@ fprintf(stderr,"[-y <minFlowSize>]         | Minimum TCP flow size (in bytes). I
 fprintf(stderr,"[-x <ratesFile>]           | File containing the stream rates.\n");
 fprintf(stderr,"[-g <parDegree>]           | The parallelism degree (only valid for dataflow execution). For  on dataflow execution it will\n"
         "                           | be equal to the number of stages.\n");
+fprintf(stderr,"[-u <groupSize>]           | The group size (only valid for dataflow execution) [default 1].\n");
 fprintf(stderr,"[-r]                       | Put the interface into 'No promiscous' mode\n");
 fprintf(stderr,"[-h]                       | Prints this help\n");
 }
@@ -73,6 +74,7 @@ char const *collector = "127.0.0.1";
 char const *streamFile = "";
 int version=-1,hashSize=4096,cnt=-1,maxAddCheck=1,maxNullCheck=1,maxReadTOCheck=-1,readTimeout=0, parDegree=-1;//30000; //TODO ANALIZZARE MEGLIO TIMEOUT
 uint minFlowSize=0,queueTimeout=30,lifetime=120,numStages=1,idle=30,maxActiveFlows=4294967295;
+uint groupSize = 1;
 ushort port=2055;
 bool noPromisc=false;
 FILE* outputFile=NULL;
@@ -100,6 +102,7 @@ void executeWithFaskel(){
         // Stream file
         input = new faskelProbe::ProbeInputStreamRate(streamFile, numStages>1?numStages:1,
                 interface,noPromisc,bpfFilter,cnt,hashSize,readTimeout,&ffalloc);
+        //((faskelProbe::ProbeInputStreamRate*)input)->init();
     }
     /**Creates the output stream.**/
     faskelProbe::ProbeOutputStream output(outputFile,queueTimeout,collector,port,minFlowSize,sst);
@@ -122,8 +125,12 @@ void executeWithFaskel(){
         nornir::dataflow::Pipeline *pipe=new nornir::dataflow::Pipeline(stages[0],stages[1]);
         for(uint i=2; i<numStages; i++)
             pipe = new nornir::dataflow::Pipeline(pipe,stages[i]);
-        nornir::dataflow::Manager m(pipe, input, &output, parDegree, 1, true);
+        nornir::dataflow::Manager m(pipe, input, &output, parDegree, groupSize, true);
+        if(strcmp(streamFile, "")){
+            ((faskelProbe::ProbeInputStreamRate*)input)->init();
+        }
         m.exec();
+
         for(uint i=0; i<numStages; i++)
             delete stages[i];
         delete[] stages;
@@ -194,7 +201,7 @@ void executeWithFastflow(){
 int main(int argc, char** argv){
     /**Args parsing.**/
     int c;
-    while ((c = getopt (argc, argv, "v:i:b:d:l:q:t:w:s:m:c:f:a:z:k:n:p:y:x:g:rh")) != -1)
+    while ((c = getopt (argc, argv, "v:i:b:d:l:q:t:w:s:m:c:f:a:z:k:n:p:y:x:g:u:rh")) != -1)
         switch (c){
             case 'v':
                 version = atoi(optarg);
@@ -257,6 +264,9 @@ int main(int argc, char** argv){
                 break;
             case 'g':
                 parDegree = atoi(optarg);
+                break;
+            case 'u':
+                groupSize = atoi(optarg);
                 break;
             case 'r':
                 noPromisc=true;

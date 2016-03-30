@@ -31,7 +31,7 @@
 #undef DEBUG
 #undef DEBUGB
 
-#ifdef DEBUG_PREDICTORS
+#ifdef DEBUG_EXPLORERS
 #define DEBUG(x) do { std::cerr << "[Explorers] " << x << std::endl; } while (0)
 #define DEBUGB(x) do {x} while (0)
 #else

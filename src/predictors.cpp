@@ -35,6 +35,18 @@
 
 #include "external/Mammut/mammut/cpufreq/cpufreq.hpp"
 
+#undef DEBUG
+#undef DEBUGB
+
+#ifdef DEBUG_PREDICTORS
+#define DEBUG(x) do { std::cerr << "[Predictors] " << x << std::endl; } while (0)
+#define DEBUGB(x) do {x;} while (0)
+#else
+#define DEBUG(x)
+#define DEBUGB(x)
+#endif
+
+
 namespace nornir{
 
 using namespace mammut::cpufreq;

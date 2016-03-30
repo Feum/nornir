@@ -105,8 +105,7 @@ InputStreamRate::InputStreamRate(const std::string& fileName):
         if(!_clockFrequency || maxFrequency == _clockFrequency){
             _clockFrequency = maxFrequency;
         }else{
-            cerr << "ERROR: Different max frequencies for different domains." << endl;
-            exit(-1);
+            throw std::runtime_error("ERROR: Different max frequencies for different domains.");
         }
     }
 }
@@ -115,13 +114,17 @@ InputStreamRate::~InputStreamRate(){
     delete _clockThread;
 }
 
+void InputStreamRate::init(){
+    _objects = loadObjects();
+    DEBUG("Loaded " << _objects.size() << " objects.");
+    DEBUG(_rates.size() << " rates.");
+}
+
 #define BURST_SIZE 10.0
 
 StreamElem* InputStreamRate::next(){
     if(!_objects.size()){
-        _objects = loadObjects();
-        DEBUG("Loaded " << _objects.size() << " objects.");
-        DEBUG(_rates.size() << " rates.");
+        throw std::runtime_error("You need to call init() before calling next() for the first time.");
     }
 
     StreamElem* obj = NULL;

@@ -26,6 +26,13 @@
  */
 
 #include "manager.hpp"
+#include "../external/Mammut/mammut/mammut.hpp"
+
+using namespace mammut;
+using namespace mammut::cpufreq;
+using namespace mammut::task;
+using namespace mammut::topology;
+using namespace mammut::utils;
 
 namespace nornir{
 namespace dataflow{
@@ -235,6 +242,15 @@ void Manager::exec(){
     OutputToken ot;
     TokenId dest;
     unsigned long int graphId;
+
+    Mammut m;
+    TasksManager* pm = m.getInstanceTask();
+
+    ProcessHandler* process = pm->getProcessHandler(getpid());
+    ThreadHandler* thread = process->getThreadHandler(gettid());
+    thread->move((VirtualCoreId) 23);
+    process->releaseThreadHandler(thread);
+    pm->releaseProcessHandler(process);
 
     while(!end){
         /**Send the instructions to the interpreter.**/

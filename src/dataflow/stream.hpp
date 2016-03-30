@@ -193,18 +193,13 @@ private:
     std::vector<StreamElem*> _objects;
     uint32_t _nextObject;
 
-public:
-    InputStreamRate(const std::string& fileName);
-
-    ~InputStreamRate();
-
     inline ticks ticksWait(ticks nticks) {
         ticks delta;
         ticks t0 = getticks();
         do { delta = (getticks()) - t0; } while (delta < nticks);
         return delta-nticks;
     }
-public:
+protected:
     /**
      * This function must be implemented in order to load the
      * objects to be produced in the stream.
@@ -212,9 +207,16 @@ public:
      **/
     virtual std::vector<StreamElem*> loadObjects() = 0;
 
+public:
+    InputStreamRate(const std::string& fileName);
+
+    ~InputStreamRate();
+
     StreamElem* next();
 
     bool hasNext();
+
+    void init();
 };
 
 /**

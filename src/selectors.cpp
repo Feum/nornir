@@ -372,28 +372,31 @@ void SelectorPredictive::clearPredictors(){
 }
 
 bool SelectorPredictive::isAccurate(double primaryValue, double secondaryValue){
-     double primaryError = (primaryValue - _primaryPrediction)/
+    double primaryError = (primaryValue - _primaryPrediction)/
                      primaryValue*100.0;
-     double secondaryError = (secondaryValue - _secondaryPrediction)/
+    double secondaryError = (secondaryValue - _secondaryPrediction)/
                        secondaryValue*100.0;
 
-     double performanceError = 100.0, powerError = 100.0;
+    double performanceError = 100.0, powerError = 100.0;
 
-     switch(_p.contractType){
-         case CONTRACT_PERF_UTILIZATION:
-         case CONTRACT_PERF_COMPLETION_TIME:
-         case CONTRACT_PERF_BANDWIDTH:{
-             performanceError = std::abs(primaryError);
-             powerError = std::abs(secondaryError);
-         }break;
-         case CONTRACT_POWER_BUDGET:{
-             performanceError = std::abs(secondaryError);
-             powerError = std::abs(primaryError);
-         }break;
-         default:{
-             ;
-         }break;
-     }
+    switch(_p.contractType){
+        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_COMPLETION_TIME:
+        case CONTRACT_PERF_BANDWIDTH:{
+            performanceError = std::abs(primaryError);
+            powerError = std::abs(secondaryError);
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            performanceError = std::abs(secondaryError);
+            powerError = std::abs(primaryError);
+        }break;
+        default:{
+            ;
+        }break;
+    }
+
+    DEBUG("Perf error: " << performanceError);
+    DEBUG("Power error: " << powerError);
 
     if(performanceError > _p.maxPerformancePredictionError ||
        powerError > _p.maxPowerPredictionError /* ||
@@ -483,19 +486,19 @@ KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
         startCalibration(totalTasks);
     }else if(isCalibrating()){
         refine();
-        ++_numCalibrationPoints;
     }
 
     if(isCalibrating()){
+        ++_numCalibrationPoints;
         if(!predictorsReady()){
             kv = _explorer->nextRelativeKnobsValues();
         }else{
             if(predictionsDone() && accurate){
                 kv = getBestKnobsValues(primaryValue);
                 updatePredictions(kv);
-                stopCalibration(totalTasks);
                 DEBUG("Finished in " << _numCalibrationPoints <<
                       " steps with configuration " << kv);
+                stopCalibration(totalTasks);
             }else{
                 kv = _explorer->nextRelativeKnobsValues();
                 updatePredictions(kv);

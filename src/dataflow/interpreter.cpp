@@ -40,6 +40,8 @@ class OrderedTasksScheduler: public nornir::Scheduler<Mdfi, Mdfi>{
 private:
     size_t _numWorkers;
 public:
+    OrderedTasksScheduler(size_t numWorkers):_numWorkers(numWorkers){;}
+
     void notifyRethreading(size_t oldNumWorkers, size_t newNumWorkers){
         _numWorkers = newNumWorkers;
     }
@@ -64,7 +66,7 @@ Interpreter::Interpreter(size_t maxWorkers, bool orderedTasks):
     _p->observer = _o;
 
     _accelerator = new nornir::FarmAccelerator<Mdfi>(_p);
-    _accelerator->addScheduler(new OrderedTasksScheduler());
+    _accelerator->addScheduler(new OrderedTasksScheduler(maxWorkers));
 
     /**Creates the SPSC queues.**/
     _buffers = new ff::dynqueue*[_maxWorkers];
@@ -75,7 +77,6 @@ Interpreter::Interpreter(size_t maxWorkers, bool orderedTasks):
     for(size_t i = 0; i < _maxWorkers; ++i){
         _accelerator->addWorker(new WorkerMdf(_buffers[i]));
     }
-
     _accelerator->start();
 }
 

@@ -175,7 +175,7 @@ public:
         assert(offline);
     }
 
-
+protected:
     std::vector<nornir::dataflow::StreamElem*> loadObjects(){
         std::vector<nornir::dataflow::StreamElem*>  objects;
         do{
@@ -189,6 +189,10 @@ public:
         }while(pktRcvd != 0 && !quit);
 
         return objects;
+    }
+public:
+    void init(){
+        InputStreamRate::init();
     }
 
     nornir::dataflow::StreamElem* next(){
