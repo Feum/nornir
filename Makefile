@@ -1,17 +1,15 @@
-MAMMUT_ROOT                 = $(realpath ./src/external/Mammut)
-
 export NORNIR_PATH           = /usr/local
 export NORNIR_PATH_LIB       = $(NORNIR_PATH)/lib
 export NORNIR_PATH_INCLUDE   = $(NORNIR_PATH)/include/nornir
 
 export CC                    = gcc
 export CXX                   = g++ 
-export OPTIMIZE_FLAGS        = -finline-functions -O3
-export DEBUG_FLAGS           = #-DDEBUG_PREDICTORS -DDEBUG_NODE -DDEBUG_KNOB -DDEBUG_PREDICTORS -DDEBUG_MANAGER
+export OPTIMIZE_FLAGS        = -finline-functions -DPOOL -O3
+export DEBUG_FLAGS           = #-DDEBUG_PREDICTORS -DDEBUG_SELECTORS #-DDEBUG_DF_STREAM -DDEBUG_NODE -DDEBUG_KNOB -DDEBUG_MANAGER
 export CXXFLAGS              = -Wall -pedantic --std=c++11 $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
 export LDLIBS                =  -lnornir -pthread -lrt -lm -lmlpack -llapack -lblas -lgsl -lgslcblas 
 export INCS                  = -I$(realpath ./src/external/fastflow) -I/usr/include/libxml2
-export LDFLAGS               = -L$(MAMMUT_ROOT)/mammut -L$(realpath .)/src
+export LDFLAGS               = -L$(realpath .)/src
 
 .PHONY: all demo clean cleanall install uninstall microbench
 

@@ -250,6 +250,20 @@ bool SelectorPredictive::isBestSecondaryValue(double x, double y) const{
     return false;
 }
 
+double adjustDerivedValue(ContractType contractType,
+                              const Smoother<MonitoredSample>* samples,
+                              double primaryPrediction){
+    switch(contractType){
+        case CONTRACT_PERF_UTILIZATION:{
+            return (samples->average().bandwidth / primaryPrediction) *
+                    samples->average().utilization;
+        }break;
+        default:{
+            return primaryPrediction;
+        }
+    }
+}
+
 KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
     KnobsValues bestValues(KNOB_VALUE_REAL);
     KnobsValues bestSuboptimalValues = _configuration.getRealValues();
@@ -290,15 +304,10 @@ KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
         KnobsValues currentValues = combinations.at(i);
         primaryPrediction = _primaryPredictor->predict(currentValues);
         secondaryPrediction = _secondaryPredictor->predict(currentValues);
-        switch(_p.contractType){
-            case CONTRACT_PERF_UTILIZATION:{
-                primaryPrediction = (_samples->average().bandwidth / primaryPrediction) *
-                                     _samples->average().utilization;
-            }break;
-            default:{
-                ;
-            }
-        }
+
+        // Adjust derived predictions (e.g. UTILIZATION).
+        primaryPrediction = adjustDerivedValue(_p.contractType, _samples,
+                                                    primaryPrediction);
         //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
             //std::cout << secondaryPrediction;
@@ -372,10 +381,12 @@ void SelectorPredictive::clearPredictors(){
 }
 
 bool SelectorPredictive::isAccurate(double primaryValue, double secondaryValue){
-    double primaryError = (primaryValue - _primaryPrediction)/
-                     primaryValue*100.0;
+    // Adjust derived values (e.g. UTILIZATION).
+    primaryValue = adjustDerivedValue(_p.contractType, _samples, primaryValue);
+
+    double primaryError = (primaryValue - _primaryPrediction)/primaryValue*100.0;
     double secondaryError = (secondaryValue - _secondaryPrediction)/
-                       secondaryValue*100.0;
+                            secondaryValue*100.0;
 
     double performanceError = 100.0, powerError = 100.0;
 
@@ -435,10 +446,8 @@ SelectorLearner::SelectorLearner(const Parameters& p,
              SelectorPredictive(p, configuration, samples,
                                std::unique_ptr<Predictor>(new PredictorLinearRegression(PREDICTION_BANDWIDTH, p, configuration, samples)),
                                std::unique_ptr<Predictor>(new PredictorLinearRegression(PREDICTION_POWER, p, configuration, samples))),
-             _explorer(NULL),
-             _firstPointGenerated(false),
-            _thisPrimary(0), _thisSecondary(0),
-            _contractViolations(0), _accuracyViolations(0){
+             _explorer(NULL), _firstPointGenerated(false),
+             _contractViolations(0), _accuracyViolations(0){
     /***************************************/
     /*              Explorers              */
     /***************************************/
@@ -546,8 +555,6 @@ KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
         }
     }
     _previousConfiguration = _configuration.getRealValues();
-    _thisPrimary = primaryValue;
-    _thisSecondary = secondaryValue;
     return kv;
 }
 

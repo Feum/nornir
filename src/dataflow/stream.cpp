@@ -101,7 +101,7 @@ InputStreamRate::InputStreamRate(const std::string& fileName):
     _clockFrequency = 0;
     for(size_t i = 0; i < domains.size(); i++){
         Domain* domain = domains.at(i);
-        double maxFrequency = domain->getAvailableFrequencies().back();
+        double maxFrequency = domain->getAvailableFrequencies().back() * 1000; // We need the frequency in Hz (mammut returns frequency in kHz)
         if(!_clockFrequency || maxFrequency == _clockFrequency){
             _clockFrequency = maxFrequency;
         }else{
@@ -153,6 +153,8 @@ StreamElem* InputStreamRate::next(){
         double wait_interval_secs = 1.0 / _rates[_currentInterval].rate;
         ticks ticks_to_sleep = (_clockFrequency * wait_interval_secs * (double) BURST_SIZE);
 
+        DEBUG("Rate: " << _rates[_currentInterval].rate << " Wait interval secs: " << wait_interval_secs << " TTS: " << ticks_to_sleep);
+
         _currBurstSize = 0;
 
         _excess += (getticks()-_def);
@@ -180,6 +182,7 @@ StreamElem* InputStreamRate::next(){
     if(_lastSec - _currIntervalStart >= _rates[_currentInterval].duration){
         _currIntervalStart = _lastSec;
         _currentInterval++;
+        DEBUG("Moving to interval: " <<  _currentInterval);
         _excess = 0;
     }
 

@@ -183,9 +183,7 @@ protected:
             t->init(nWorkers,ffalloc);
             pktRcvd = pcap_dispatch(handle,cnt,dispatchCallback,(u_char*)t);
             assert(pktRcvd >= 0);
-            if(pktRcvd){
-                objects.push_back(t);
-            }
+            objects.push_back(t);
         }while(pktRcvd != 0 && !quit);
 
         return objects;

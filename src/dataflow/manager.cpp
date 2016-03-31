@@ -254,17 +254,55 @@ void Manager::exec(){
 
     while(!end){
         /**Send the instructions to the interpreter.**/
-        while(executed<groupSize && fireable->size()){
-            intr->exec(fireable->front());
-            fireable->pop_front();
-            ++executed;
-        }
+        do{
+            if(fireable->size()){
+                intr->exec(fireable->front());
+                fireable->pop_front();
+                ++executed;
+            }
+
+
+            Mdfg *newGraph;
+            Mdfi *first;
+            StreamElem* next;
+
+            if(in->hasNext() && (next=in->next())!=NULL ){
+#ifdef POOL
+                if(pool->size()!=0){
+                    newGraph=pool->front();
+                    pool->pop_front();
+                    newGraph->reset(nextGraphId);
+                }else
+                    newGraph=new Mdfg(*graph,nextGraphId);
+#else
+                newGraph=new Mdfg(*graph,nextGraphId);
+#endif
+                graphs->put(nextGraphId,newGraph);
+                first=newGraph->getFirst();
+                if(!first->setInput(next,0)){
+                    std::cerr << "There is an error in a MDFi link." << std::endl;
+                    exit(-1);
+                }
+                /**Sends the new instruction to the interpreter.*/
+#ifdef COMPUTE_COM_TIME
+                unsigned long t1=ff::getusec();
+#endif
+                intr->exec(first);
+#ifdef COMPUTE_COM_TIME
+                acc+=ff::getusec()-t1;
+#endif
+                ++taskSent;
+                ++executed;
+                ++nextGraphId;
+            }
+        }while(executed < groupSize);
         /**Check if there are new tasks on the input stream.**/
-        getFromInput();
+        //getFromInput();
+
         /**Awaits the results.**/
 #ifdef COMPUTE_COM_TIME
-        int t1=intr->wait(res);
-        acc+=t1;
+        int t1 = intr->wait(res);
+        acc += t1;
 #else
         intr->wait(res);
 #endif
@@ -312,7 +350,7 @@ void Manager::exec(){
                  * fireable instructions.
                  **/
                 if(ins->isFireable()){
-                    if(executed<groupSize){
+                    if(executed < groupSize){
                         intr->exec(ins);
                         ++executed;
                     }else

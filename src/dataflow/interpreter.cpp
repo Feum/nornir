@@ -47,6 +47,7 @@ public:
     }
 
     Mdfi* schedule(Mdfi* i){
+        //std::cout << "Sending to: " << i->getId() % _numWorkers << std::endl;
         sendTo(i, i->getId() % _numWorkers);
         return (Mdfi*) GO_ON;
     }
@@ -98,22 +99,31 @@ int Interpreter::wait(ff::squeue<OutputToken>& r){
     int acc = 0;
     std::vector<OutputToken>* temp;
     void* task;
-    for(size_t i = 0; i < _maxWorkers; i++){
+    uint collected = 0;
+    size_t startId = 0;
+    size_t workerId = 0;
+    do{
+        startId = rand();
+        collected  = 0;        
+        for(size_t i = 0; i < _maxWorkers; i++){
+            workerId = (i + startId) % _maxWorkers;
 #ifdef COMPUTE_COM_TIME
-        unsigned long t1;
-        while(true){
-            t1 = ff::getusec();
-            if(!buffers[i]->pop(&task)) break;
-            acc += ff::getusec()-t1;
+            unsigned long t1;
+            if(true){
+                t1 = ff::getusec();
+                if(!buffers[workerId]->pop(&task)) break;
+                acc += ff::getusec()-t1;
 #else
-        while(_buffers[i]->pop(&task)){
+            if(_buffers[workerId]->pop(&task)){
 #endif
-            temp = (std::vector<OutputToken>*) task;
-            for(int j = 0; j< (int) temp->size(); j++)
-                r.push_back((*temp)[j]);
-            delete temp;
+                ++collected;
+                temp = (std::vector<OutputToken>*) task;
+                for(int j = 0; j < (int) temp->size(); j++)
+                    r.push_back((*temp)[j]);
+                delete temp;
+            }
         }
-    }
+    }while(collected);
     return acc;
 }
 

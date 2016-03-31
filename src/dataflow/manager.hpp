@@ -71,7 +71,7 @@ private:
     /**Pool of usable graphs.**/
     std::deque<Mdfg*> *pool;
 #ifndef MAXPOOLSIZE
-#define MAXPOOLSIZE 25000
+#define MAXPOOLSIZE 2500000
 #endif
 #endif
     /**Instances of the graph.**/

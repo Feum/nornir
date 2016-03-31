@@ -272,8 +272,6 @@ class SelectorLearner: public SelectorPredictive{
 private:
     Explorer* _explorer;
     bool _firstPointGenerated;
-    double _thisPrimary;
-    double _thisSecondary;
     uint _contractViolations;
     uint _accuracyViolations;
     KnobsValues _previousConfiguration;

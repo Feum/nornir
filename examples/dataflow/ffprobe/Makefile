@@ -1,6 +1,5 @@
 LDLIBS               += -lpcap
 TARGET               = ffProbe
-CXXFLAGS             += -DPOOL
 
 .PHONY: all clean cleanall install uninstall
 .SUFFIXES: .cpp .o
