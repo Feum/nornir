@@ -1,6 +1,6 @@
 #include <iostream>
 #include <stdlib.h>
-#include "../../src/dataflow/manager.hpp"
+#include "../../src/dataflow/interpreter.hpp"
 
 namespace mandel{
 
@@ -95,9 +95,10 @@ void exec(int mit,int nWorkers,int groupSize, bool async){
 	MandelInputStream inp(async);
 	MandelOutputStream out;
 	nornir::dataflow::Farm* f = nornir::dataflow::createStandardFarm<ArrayWrapper<float>,Wrapper<float>,iterateTask>();
-	nornir::dataflow::Manager m(f,&inp,&out,nWorkers,groupSize,false);
-	m.exec();
-	std::cout << "Esecuzione con "<<nWorkers<<" workers in: " << time(NULL) - start << std::endl;
+	nornir::dataflow::Interpreter m(f,&inp,&out,nWorkers,groupSize,false);
+	m.start();
+	m.wait();
+	std::cout << "Esecuzione con "<< nWorkers << " workers in: " << time(NULL) - start << std::endl;
 	delete f;
 }
 

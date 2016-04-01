@@ -372,7 +372,7 @@ public:
     /**
      * The destructor of the farm.
      */
-    ~FarmBase(){
+    virtual ~FarmBase(){
         if(_paramsCreated){
             delete _params;
         }

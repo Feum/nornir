@@ -8,7 +8,7 @@
  * The main file.
  */
 
-#include "../../../src/dataflow/manager.hpp"
+#include "../../../src/dataflow/interpreter.hpp"
 #include "ProbeTask.hpp"
 #include "Flow.hpp"
 #include "Stages.hpp"
@@ -125,12 +125,12 @@ void executeWithFaskel(){
         nornir::dataflow::Pipeline *pipe=new nornir::dataflow::Pipeline(stages[0],stages[1]);
         for(uint i=2; i<numStages; i++)
             pipe = new nornir::dataflow::Pipeline(pipe,stages[i]);
-        nornir::dataflow::Manager m(pipe, input, &output, parDegree, groupSize, true);
+        nornir::dataflow::Interpreter m(pipe, input, &output, parDegree, groupSize, true);
         if(strcmp(streamFile, "")){
             ((faskelProbe::ProbeInputStreamRate*)input)->init();
         }
-        m.exec();
-
+        m.start();
+        m.wait();
         for(uint i=0; i<numStages; i++)
             delete stages[i];
         delete[] stages;
