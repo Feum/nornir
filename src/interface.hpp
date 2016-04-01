@@ -480,6 +480,10 @@ public:
     size_t getCurrentNumWorkers() const{
         return _farm->getlb()->getnworkers();
     }
+
+    void stats(std::ostream& o) const{
+        _farm->ffStats(o);
+    }
 };
 
 /**

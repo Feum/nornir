@@ -26,6 +26,7 @@
  */
 
 #include "interpreter.hpp"
+#include <map>
 
 namespace nornir{
 namespace dataflow{
@@ -179,20 +180,19 @@ private:
     /**Pool of usable graphs.**/
     std::deque<Mdfg*> *_pool;
     /**Instances of the graph.**/
-    hashMap<Mdfg*> *_graphs;
+    std::map<ulong, Mdfg*> *_graphs;
     /**
      * Computed results. It's necessary to save them into a map for preserving
      * the order of the task received from the input stream. The results will
      * be periodically send to the output stream.
      **/
-    hashMap<StreamElem*> *_result;
+    std::map<ulong, StreamElem*> *_result;
 
     unsigned long int
     /**Number of results not yet calculated.**/
         _taskSent,
     /**Index of the last task sent to the output stream.**/
         _lastSent;
-    StreamElem** _tempTask;
     size_t _maxWorkers;
     size_t _numWorkers;
     size_t _groupSize;
@@ -203,10 +203,8 @@ private:
 
     ff::uSWSR_Ptr_Buffer** _buffers;
     size_t _lastRcvId;
-    Mdfg ** _tdl;
-    Mdfg **_g;
 
-    void sendToWorkers(Mdfi* instr){
+    inline void sendToWorkers(Mdfi* instr){
         if(_orderedTasks){
             sendTo(instr, instr->getId() % _numWorkers);
         }else{
@@ -214,14 +212,15 @@ private:
         }
     }
 
-    void updateCompleted(){
+    inline void updateCompleted(){
         OutputToken ot;
-        unsigned long int graphId;
+        ulong graphId;
         TokenId dest;
         std::vector<OutputToken>* temp;
         Mdfi *ins;
         void* task;
         uint collected = 0;
+        uint collectedTotal = 0;
         size_t startId = 0;
         size_t workerId = 0;
         startId = rand();
@@ -239,34 +238,44 @@ private:
                 if(_buffers[workerId]->pop(&task)){
 #endif
                     ++collected;
+                    ++collectedTotal;
                     temp = (std::vector<OutputToken>*) task;
                     for(int j = 0; j < (int) temp->size(); j++){
                         ot = temp->at(j);
                         dest = ot.getDest();
                         graphId = dest.getGraphId();
+                        Mdfg* currentGraph = NULL;
                         /**
                          * If was the last instruction of a graph's copy, puts it
                          * into the output vector and delete
                          * the copy of the graph.
                          */
                         if(dest.isOutStream()){
-                            _result->put(graphId, ot.getResult());
-                            _graphs->get(graphId, _tdl);
-                            _graphs->erase(graphId);
+                            assert(_result->emplace(std::piecewise_construct,
+                                   std::forward_as_tuple(graphId),
+                                   std::forward_as_tuple(ot.getResult())).second);
+
+                            auto it = _graphs->find(graphId);
+                            if(it != _graphs->end()){
+                                currentGraph = it->second;
+                                _graphs->erase(it);
+                            }else{
+                                throw std::runtime_error("Graph not found.");
+                            }
 #ifdef POOL
                             if(_pool->size() < MAXPOOLSIZE)
-                                _pool->push_back(*_tdl);
+                                _pool->push_back(currentGraph);
                             else
-                                delete *_tdl;
+                                delete currentGraph;
 #else
-                            delete *_tdl;
+                            delete currentGraph;
 #endif
                             --_taskSent;
                         }else{
                             /**Takes the pointer to the copy of the graph.**/
-                            _graphs->get(graphId, _g);
+                            currentGraph = _graphs->at(graphId);
                             /**Takes the pointer to the instruction.**/
-                            ins = (*_g)->getMdfi(dest.getMdfId());
+                            ins = currentGraph->getMdfi(dest.getMdfId());
                             /**Updates the instruction adding the input token.**/
                             ins->setInput(ot.getResult(), dest.getTokId());
                             /**
@@ -290,10 +299,9 @@ public:
                 _in(i),_out(o),_graph(graph),_compiled(false),_nextGraphId(0),
                 _pool(NULL), _taskSent(0), _lastSent(0), _maxWorkers(parDegree),
                 _numWorkers(parDegree), _groupSize(groupSize), _orderedTasks(orderedTasks),
-                _buffers(buffers), _lastRcvId(0), _tdl(new Mdfg*), _g(new Mdfg*){
-        _graphs = new hashMap<Mdfg*>;
-        _result = new hashMap<StreamElem*>;
-        _tempTask = new StreamElem*;
+                _buffers(buffers), _lastRcvId(0){
+        _graphs = new std::map<ulong, Mdfg*>;
+        _result = new std::map<ulong, StreamElem*>;
 #ifdef COMPUTE_COM_TIME
         _acc = 0;
 #endif
@@ -311,9 +319,6 @@ public:
 #endif
         delete _graphs;
         delete _result;
-        delete _tempTask;
-        delete _tdl;
-        delete _g;
     }
 
     void notifyRethreading(size_t oldNumWorkers, size_t newNumWorkers){
@@ -346,14 +351,17 @@ public:
                     newGraph = _pool->front();
                     _pool->pop_front();
                     newGraph->reset(_nextGraphId);
+                    assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
                 }else{
-                    std::cout << "EmptyPool" << std::endl;
                     newGraph = new Mdfg(*_graph, _nextGraphId);
+                    assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
                 }
 #else
                 newGraph = new Mdfg(*_graph, _nextGraphId);
+                assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
+
 #endif
-                _graphs->put(_nextGraphId, newGraph);
+
                 first = newGraph->getFirst();
                 if(!first->setInput(next, 0)){
                     throw std::runtime_error("There is an error in a MDFi link.");
@@ -395,8 +403,12 @@ public:
              * sends the result to the stream.
              * PRESERVES THE ORDER OF THE TASKS.
              **/
-            while(_result->getAndErase(_lastSent,_tempTask)){
-                _out->put(*_tempTask);
+            StreamElem* se;
+            std::map<ulong, StreamElem*>::iterator it;
+            while((it = _result->find(_lastSent)) != _result->end()){
+                se = it->second;
+                _result->erase(it);
+                _out->put(se);
                 ++_lastSent;
             }
         }/**End of while(!end).**/

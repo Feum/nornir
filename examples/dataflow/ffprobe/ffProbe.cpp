@@ -132,6 +132,7 @@ void executeWithFaskel(){
         }
         m.start();
         m.wait();
+        m.stats();
         for(uint i=0; i<numStages; i++)
             delete stages[i];
         delete[] stages;

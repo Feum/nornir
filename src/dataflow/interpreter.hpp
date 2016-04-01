@@ -34,7 +34,6 @@
 #include "stream.hpp"
 #include "mdfi.hpp"
 #include "mdfg.hpp"
-#include "hashMap.hpp"
 #include "skeleton/computable.hpp"
 #include "skeleton/farm.hpp"
 #include "skeleton/pipeline.hpp"
@@ -125,7 +124,7 @@ public:
      * \param out The stream where print the stats.
      */
     inline void stats(std::ostream& out=std::cout){
-        out << "Stats not available." << std::endl;
+        _farm->stats(out);
     }
 
     inline void start(){
