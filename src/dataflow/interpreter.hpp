@@ -30,9 +30,16 @@
 
 #include "../interface.hpp"
 #include "mdfi.hpp"
+#include "mdfg.hpp"
+#include "hashMap.hpp"
+#include "../external/fastflow/ff/buffer.hpp"
 #include "../external/fastflow/ff/squeue.hpp"
 #include <vector>
 #include <queue>
+
+#ifndef MAXPOOLSIZE
+#define MAXPOOLSIZE 2500000
+#endif
 
 namespace nornir{
 namespace dataflow{
@@ -42,9 +49,9 @@ namespace dataflow{
  */
 class WorkerMdf: public nornir::Worker<Mdfi>{
 private:
-    ff::dynqueue* _buffer;
+    ff::SWSR_Ptr_Buffer* _buffer;
 public:
-    WorkerMdf(ff::dynqueue* buffer);
+    WorkerMdf(ff::SWSR_Ptr_Buffer* buffer);
 
     /**
      * Computes a macro data flow instruction.
@@ -59,11 +66,14 @@ public:
  */
 class Interpreter{
 private:
-    ff::dynqueue** _buffers;
+    ff::SWSR_Ptr_Buffer** _buffers;
     nornir::FarmAccelerator<Mdfi>* _accelerator;
     size_t _maxWorkers;
     nornir::Parameters* _p;
     nornir::Observer* _o;
+    size_t _lastRcvId;
+    Mdfg ** _tdl;
+    Mdfg **_g;
 public:
     /**
      * Constructor of the interpreter.
@@ -97,10 +107,22 @@ public:
     }
 
     /**
+     * Gets a result.
+     * \param ot One result computed by a worker.
+     */
+    int get(std::vector<OutputToken>& ot);
+
+    /**
      * Waits for the results of the instructions passed to the interpreter.
      * \param r A queue of output tokens. In this queue the interpreter will puts the computed results.
      */
-    int wait(ff::squeue<OutputToken>& r);
+    int wait(std::vector<OutputToken>& r);
+
+    /**
+     * Updates the completed MDFI and send the new ones back to the emitter.
+     */
+    int updateCompleted(hashMap<StreamElem*> *result, hashMap<Mdfg*> *graphs,
+                        std::deque<Mdfg*> *pool, unsigned long int& tasksSent);
 
     /**Stops the farm.**/
     inline void stop(){

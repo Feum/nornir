@@ -175,73 +175,62 @@ Mdfg* compile(Computable* c){
 
 Manager::Manager(Computable* c, InputStream *i, OutputStream *o, int parDegree,
                  unsigned long int groupSize, bool orderedTasks):
-            in(i),out(o),compiled(true),nextGraphId(0),groupSize(groupSize),
-            executed(0),taskSent(0),lastSent(0){
-    graph=compile(c);
-    intr=new Interpreter(parDegree, orderedTasks);
+            _in(i),_out(o),_compiled(true),_nextGraphId(0),
+            _taskSent(0),_lastSent(0){
+    _graph=compile(c);
+    _intr=new Interpreter(parDegree, orderedTasks);
 
 #ifdef POOL
-    pool=new std::deque<Mdfg*>;
+    _pool=new std::deque<Mdfg*>;
 #endif
-    fireable=new std::deque<Mdfi*>;
-    graphs=new hashMap<Mdfg*>;
-    result=new hashMap<StreamElem*>;
-    tempTask=new StreamElem*;
+    _graphs=new hashMap<Mdfg*>;
+    _result=new hashMap<StreamElem*>;
+    _tempTask=new StreamElem*;
 #ifdef COMPUTE_COM_TIME
-    acc=0;
+    _acc=0;
 #endif
 }
 
 Manager::Manager(Mdfg *graph, InputStream *i, OutputStream *o, int parDegree,
                  unsigned long int groupSize, bool orderedTasks):
-            in(i),out(o),graph(graph),compiled(false),nextGraphId(0),
-            groupSize(groupSize),executed(0),taskSent(0),lastSent(0){
-    intr=new Interpreter(parDegree, orderedTasks);
+            _in(i),_out(o),_graph(graph),_compiled(false),_nextGraphId(0),
+            _taskSent(0),_lastSent(0){
+    _intr=new Interpreter(parDegree, orderedTasks);
 #ifdef POOL
-    pool=new std::deque<Mdfg*>;
+    _pool=new std::deque<Mdfg*>;
 #endif
-    fireable=new std::deque<Mdfi*>;
-    graphs=new hashMap<Mdfg*>;
-    result=new hashMap<StreamElem*>;
-    tempTask=new StreamElem*;
+    _graphs=new hashMap<Mdfg*>;
+    _result=new hashMap<StreamElem*>;
+    _tempTask=new StreamElem*;
 #ifdef COMPUTE_COM_TIME
-    acc=0;
+    _acc=0;
 #endif
 }
 
 Manager::~Manager(){
-    delete intr;
+    delete _intr;
 #ifdef POOL
     Mdfg* g;
-    while(pool->size()!=0){
-        g=pool->front();
-        pool->pop_front();
+    while(_pool->size()!=0){
+        g=_pool->front();
+        _pool->pop_front();
         delete g;
     }
-    delete pool;
+    delete _pool;
 #endif
-    delete graphs;
-    delete result;
-    delete fireable;
-    if(compiled)
-        delete graph;
-    delete tempTask;
+    delete _graphs;
+    delete _result;
+    if(_compiled)
+        delete _graph;
+    delete _tempTask;
 }
 
 void Manager::stats(std::ostream& out){
-    intr->stats(out);
+    _intr->stats(out);
 }
 
 void Manager::exec(){
-    StreamElem* temp;
     bool end=false; ///<End becomes \e true when the manager has computed all the tasks.
-    ff::squeue<OutputToken> res; ///<Queue of results computed by the interpreter.
-    Mdfg **g=new Mdfg*;
-    Mdfg **tdl=new Mdfg*;
-    Mdfi *ins;
-    OutputToken ot;
-    TokenId dest;
-    unsigned long int graphId;
 
     Mammut m;
     TasksManager* pm = m.getInstanceTask();
@@ -254,160 +243,67 @@ void Manager::exec(){
 
     while(!end){
         /**Send the instructions to the interpreter.**/
-        do{
-            if(fireable->size()){
-                intr->exec(fireable->front());
-                fireable->pop_front();
-                ++executed;
-            }
+        /////////////////////
+        // Get from input. //
+        /////////////////////
+        Mdfg *newGraph;
+        Mdfi *first;
+        StreamElem* next;
 
-
-            Mdfg *newGraph;
-            Mdfi *first;
-            StreamElem* next;
-
-            if(in->hasNext() && (next=in->next())!=NULL ){
+        if(_in->hasNext() && (next=_in->next())!=NULL ){
 #ifdef POOL
-                if(pool->size()!=0){
-                    newGraph=pool->front();
-                    pool->pop_front();
-                    newGraph->reset(nextGraphId);
-                }else
-                    newGraph=new Mdfg(*graph,nextGraphId);
+            if(_pool->size()!=0){
+                newGraph=_pool->front();
+                _pool->pop_front();
+                newGraph->reset(_nextGraphId);
+            }else
+                newGraph=new Mdfg(*_graph,_nextGraphId);
 #else
-                newGraph=new Mdfg(*graph,nextGraphId);
+            newGraph=new Mdfg(*_graph,_nextGraphId);
 #endif
-                graphs->put(nextGraphId,newGraph);
-                first=newGraph->getFirst();
-                if(!first->setInput(next,0)){
-                    std::cerr << "There is an error in a MDFi link." << std::endl;
-                    exit(-1);
-                }
-                /**Sends the new instruction to the interpreter.*/
-#ifdef COMPUTE_COM_TIME
-                unsigned long t1=ff::getusec();
-#endif
-                intr->exec(first);
-#ifdef COMPUTE_COM_TIME
-                acc+=ff::getusec()-t1;
-#endif
-                ++taskSent;
-                ++executed;
-                ++nextGraphId;
+            _graphs->put(_nextGraphId,newGraph);
+            first=newGraph->getFirst();
+            if(!first->setInput(next,0)){
+                std::cerr << "There is an error in a MDFi link." << std::endl;
+                exit(-1);
             }
-        }while(executed < groupSize);
-        /**Check if there are new tasks on the input stream.**/
-        //getFromInput();
-
-        /**Awaits the results.**/
+            /**Sends the new instruction to the interpreter.*/
 #ifdef COMPUTE_COM_TIME
-        int t1 = intr->wait(res);
-        acc += t1;
-#else
-        intr->wait(res);
+            unsigned long t1=ff::getusec();
 #endif
-        executed=0;
-        /**Updates the destinations.**/
-        while(res.size()){
-            ot=res.back();
-            res.pop_back();
-            dest=ot.getDest();
-            graphId=dest.getGraphId();
-            /**
-             * If was the last instruction of a graph's copy, puts it
-             * into the output vector and delete
-             * the copy of the graph.
-             */
-            if(dest.isOutStream()){
-                result->put(graphId,ot.getResult());
-                graphs->get(graphId,tdl);
-                graphs->erase(graphId);
-#ifdef POOL
-                if(pool->size()<MAXPOOLSIZE)
-                    pool->push_back(*tdl);
-                else
-                    delete *tdl;
-#else
-                delete *tdl;
+            _intr->exec(first);
+#ifdef COMPUTE_COM_TIME
+            _acc+=ff::getusec()-t1;
 #endif
-                --taskSent;
-                /**
-                 * If has received the EndOfStream and all the results
-                 * are calculated, then stop the manager.
-                 */
-                if(taskSent == 0 && !in->hasNext())
-                    end=true;
-            }else{
-                /**Takes the pointer to the copy of the graph.**/
-                graphs->get(graphId,g);
-                /**Takes the pointer to the instruction.**/
-                ins=(*g)->getMdfi(dest.getMdfId());
-                /**Updates the instruction adding the input token.**/
-                temp=ot.getResult();
-                ins->setInput(temp,dest.getTokId());
-                /**
-                 * If the instruction is fireable, adds it to the pool of
-                 * fireable instructions.
-                 **/
-                if(ins->isFireable()){
-                    if(executed < groupSize){
-                        intr->exec(ins);
-                        ++executed;
-                    }else
-                        fireable->push_back(ins);
-                }
-            }
+            ++_taskSent;
+            ++_nextGraphId;
         }
-        /**Sends new results to the output stream.**/
+
+        //////////////////////
+        // Get from output. //
+        //////////////////////
+#ifdef COMPUTE_COM_TIME
+        int t1 = _intr->updateCompleted(_result, _graphs, _pool, _taskSent);
+        _acc += t1;
+#else
+        _intr->updateCompleted(_result, _graphs, _pool, _taskSent);
+#endif
+        /**
+         * If has received the EndOfStream and all the results
+         * are calculated, then stop the manager.
+         */
+        if(_taskSent == 0 && !_in->hasNext()){
+            end=true;
+        }
+        ////////////////////
+        // Output stream. //
+        ////////////////////
         flushOnStream();
     }/**End of while(!end).**/
-       intr->stop();
-       delete g;
-       delete tdl;
+   _intr->stop();
 #ifdef COMPUTE_COM_TIME
-       std::cout << "Communication time: " << acc << std::endl;
+   std::cout << "Communication time: " << _acc << std::endl;
 #endif
-}
-
-void Manager::getFromInput(){
-    Mdfg *newGraph;
-    Mdfi *first;
-    StreamElem* next;
-    /**
-     * Tries to read from the stream while the number of task submitted to
-     * the interpreter is less than \e groupSize
-     * and while there are other task on the input stream.
-     */
-
-    while(in->hasNext() &&  executed < groupSize && (next=in->next())!=NULL ){
-#ifdef POOL
-        if(pool->size()!=0){
-            newGraph=pool->front();
-            pool->pop_front();
-            newGraph->reset(nextGraphId);
-        }else
-            newGraph=new Mdfg(*graph,nextGraphId);
-#else
-        newGraph=new Mdfg(*graph,nextGraphId);
-#endif
-        graphs->put(nextGraphId,newGraph);
-        first=newGraph->getFirst();
-        if(!first->setInput(next,0)){
-            std::cerr << "There is an error in a MDFi link." << std::endl;
-            exit(-1);
-        }
-        /**Sends the new instruction to the interpreter.*/
-#ifdef COMPUTE_COM_TIME
-        unsigned long t1=ff::getusec();
-#endif
-        intr->exec(first);
-#ifdef COMPUTE_COM_TIME
-        acc+=ff::getusec()-t1;
-#endif
-        ++taskSent;
-        ++executed;
-        ++nextGraphId;
-    }
 }
 
 void Manager::flushOnStream(){
@@ -415,9 +311,9 @@ void Manager::flushOnStream(){
      * While exist an entry of the map with key equals to \e lastSent,
      * sends the result to the stream.
      **/
-    while(result->getAndErase(lastSent,tempTask)){
-        out->put(*tempTask);
-        ++lastSent;
+    while(_result->getAndErase(_lastSent,_tempTask)){
+        _out->put(*_tempTask);
+        ++_lastSent;
     }
 }
 

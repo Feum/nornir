@@ -53,7 +53,7 @@ public:
     }
 };
 
-WorkerMdf::WorkerMdf(ff::dynqueue* buffer):_buffer(buffer){;}
+WorkerMdf::WorkerMdf(ff::SWSR_Ptr_Buffer* buffer):_buffer(buffer){;}
 
 void WorkerMdf::compute(Mdfi* t){
     std::vector<OutputToken>* temp = t->compute();
@@ -61,7 +61,8 @@ void WorkerMdf::compute(Mdfi* t){
 }
 
 Interpreter::Interpreter(size_t maxWorkers, bool orderedTasks):
-        _maxWorkers(maxWorkers){
+        _maxWorkers(maxWorkers), _lastRcvId(0), _tdl(new Mdfg*),
+        _g(new Mdfg*){
     _p = new nornir::Parameters("parameters.xml", "archdata.xml");
     _o = new nornir::Observer;
     _p->observer = _o;
@@ -70,9 +71,10 @@ Interpreter::Interpreter(size_t maxWorkers, bool orderedTasks):
     _accelerator->addScheduler(new OrderedTasksScheduler(maxWorkers));
 
     /**Creates the SPSC queues.**/
-    _buffers = new ff::dynqueue*[_maxWorkers];
+    _buffers = new ff::SWSR_Ptr_Buffer*[_maxWorkers];
     for(size_t i = 0; i < _maxWorkers; i++){
-        _buffers[i] = new ff::dynqueue();
+        _buffers[i] = new ff::SWSR_Ptr_Buffer(1024);
+        _buffers[i]->init();
     }
     /**Adds the workers to the farm.**/
     for(size_t i = 0; i < _maxWorkers; ++i){
@@ -89,21 +91,132 @@ Interpreter::~Interpreter(){
      delete[] _buffers;
      delete _p;
      delete _o;
+     delete _tdl;
+     delete _g;
+}
+
+int Interpreter::get(std::vector<OutputToken>& ot){
+    int acc = 0;
+    void* task;
+    size_t workerId = 0;
+#if 1
+    size_t maxSize = 0;
+    size_t cSize = 0;
+    for(size_t i = 0; i < _maxWorkers; i++){
+        cSize = _buffers[workerId]->length();
+        if(cSize > maxSize){
+            maxSize = cSize;
+            workerId = i;
+        }
+    }
+#else
+    workerId = (_lastRcvId + 1) % _accelerator->getCurrentNumWorkers();
+    _lastRcvId++;
+#endif
+
+
+#ifdef COMPUTE_COM_TIME
+    unsigned long t1;
+    if(true){
+        t1 = ff::getusec();
+        if(!buffers[workerId]->pop(&task)) break;
+        acc += ff::getusec()-t1;
+#else
+    if(_buffers[workerId]->pop(&task)){
+#endif
+        ot = *((std::vector<OutputToken>*) task);
+        delete ((std::vector<OutputToken>*) task);
+    }
+
+    return acc;
+}
+
+int Interpreter::updateCompleted(hashMap<StreamElem*> *result, hashMap<Mdfg*> *graphs,
+                    std::deque<Mdfg*> *pool, unsigned long int& tasksSent){
+    OutputToken ot;
+    unsigned long int graphId;
+    TokenId dest;
+    int acc = 0;
+    std::vector<OutputToken>* temp;
+    Mdfi *ins;
+    void* task;
+    uint collected = 0;
+    size_t startId = 0;
+    size_t workerId = 0;
+    startId = rand();
+    do{
+        collected  = 0;
+        for(size_t i = 0; i < _maxWorkers; i++){
+            workerId = (i + startId) % _maxWorkers;
+#ifdef COMPUTE_COM_TIME
+            unsigned long t1;
+            if(true){
+                t1 = ff::getusec();
+                if(!buffers[workerId]->pop(&task)) break;
+                acc += ff::getusec()-t1;
+#else
+            if(_buffers[workerId]->pop(&task)){
+#endif
+                ++collected;
+                temp = (std::vector<OutputToken>*) task;
+                for(int j = 0; j < (int) temp->size(); j++){
+                    ot = temp->at(j);
+                    dest = ot.getDest();
+                    graphId = dest.getGraphId();
+                    /**
+                     * If was the last instruction of a graph's copy, puts it
+                     * into the output vector and delete
+                     * the copy of the graph.
+                     */
+                    if(dest.isOutStream()){
+                        result->put(graphId, ot.getResult());
+                        graphs->get(graphId, _tdl);
+                        graphs->erase(graphId);
+        #ifdef POOL
+                        if(pool->size() < MAXPOOLSIZE)
+                            pool->push_back(*_tdl);
+                        else
+                            delete *_tdl;
+        #else
+                        delete *_tdl;
+        #endif
+                        --tasksSent;
+                    }else{
+                        /**Takes the pointer to the copy of the graph.**/
+                        graphs->get(graphId, _g);
+                        /**Takes the pointer to the instruction.**/
+                        ins = (*_g)->getMdfi(dest.getMdfId());
+                        /**Updates the instruction adding the input token.**/
+                        ins->setInput(ot.getResult(), dest.getTokId());
+                        /**
+                         * If the instruction is fireable, adds it to the pool of
+                         * fireable instructions.
+                         **/
+                        if(ins->isFireable()){
+                            exec(ins);
+                        }
+                    }
+                }
+                delete temp;
+            }
+        }
+    }while(false && collected);
+    return acc;
 }
 
 /**
  * Waits for the results of the instructions passed to the interpreter.
  * \param r A queue of output tokens. In this queue the interpreter will puts the computed results.
  */
-int Interpreter::wait(ff::squeue<OutputToken>& r){
+int Interpreter::wait(std::vector<OutputToken>& r){
     int acc = 0;
     std::vector<OutputToken>* temp;
     void* task;
     uint collected = 0;
     size_t startId = 0;
     size_t workerId = 0;
+    startId = rand();
     do{
-        startId = rand();
         collected  = 0;        
         for(size_t i = 0; i < _maxWorkers; i++){
             workerId = (i + startId) % _maxWorkers;
@@ -118,8 +231,9 @@ int Interpreter::wait(ff::squeue<OutputToken>& r){
 #endif
                 ++collected;
                 temp = (std::vector<OutputToken>*) task;
-                for(int j = 0; j < (int) temp->size(); j++)
-                    r.push_back((*temp)[j]);
+                r.insert(r.end(), temp->begin(), temp->end());
+                //                for(int j = 0; j < (int) temp->size(); j++)
+                //                    r.push_back((*temp)[j]);
                 delete temp;
             }
         }

@@ -76,8 +76,8 @@ void ClockThread::run(){
 InputStreamRate::InputStreamRate(const std::string& fileName):
         _currentInterval(0),
         _lastSec(0), _startTime(0), _processedPkts(0), _currIntervalStart(0),
-        _currBurstSize(0), _excess(0), _def(0), _terminated(false),
-        _nextObject(0){
+        _currBurstSize(0), _def(0), _terminated(false),
+        _nextObject(0), _nextBurst(0), _excess(0){
     _clockThread = new ClockThread(_lastSec, _terminated);
     FILE* f = NULL;
     char line[512];
@@ -149,24 +149,27 @@ StreamElem* InputStreamRate::next(){
     }
 
     if(_currBurstSize == BURST_SIZE){
-        /** Sleep to get the rate. **/
-        double wait_interval_secs = 1.0 / _rates[_currentInterval].rate;
-        ticks ticks_to_sleep = (_clockFrequency * wait_interval_secs * (double) BURST_SIZE);
-
-        DEBUG("Rate: " << _rates[_currentInterval].rate << " Wait interval secs: " << wait_interval_secs << " TTS: " << ticks_to_sleep);
-
-        _currBurstSize = 0;
-
-        _excess += (getticks()-_def);
-
-        if(_excess >= ticks_to_sleep){
-            //_excess = 0;
-            _excess -= ticks_to_sleep;
-        }else{
-            _excess = ticksWait(ticks_to_sleep - _excess);
+        ticks now = getticks();
+        if(!_nextBurst){
+            double waitIntervalSecs = 1.0 / _rates[_currentInterval].rate;
+            ticks ticksToSleep = (_clockFrequency * waitIntervalSecs * (double) BURST_SIZE);
+            _excess += (now - _def);
+            if(_excess >= ticksToSleep){
+                _excess -= ticksToSleep;
+                _nextBurst = 0;
+            }else{
+                ticksToSleep -= _excess;
+                _nextBurst = now + ticksToSleep;
+            }
         }
 
-        _def = getticks();
+        if(now >= _nextBurst){
+            _currBurstSize = 0;
+            _def = now;
+            _nextBurst = 0;
+        }else{
+            return NULL;
+        }
     }
 
 

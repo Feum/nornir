@@ -184,14 +184,14 @@ private:
     uint64_t _processedPkts;
     time_t _currIntervalStart;
     uint32_t _currBurstSize;
-    ticks _excess;
     ticks _def;
     ClockThread* _clockThread;
     double _clockFrequency;
     bool _terminated;
-
     std::vector<StreamElem*> _objects;
     uint32_t _nextObject;
+    ticks _nextBurst;
+    ticks _excess;
 
     inline ticks ticksWait(ticks nticks) {
         ticks delta;

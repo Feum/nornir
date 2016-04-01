@@ -57,48 +57,35 @@ Mdfg* compile(Computable* c);
  */
 class Manager{
 private:
-    InputStream *in;
-    OutputStream *out;
+    InputStream *_in;
+    OutputStream *_out;
     /**A pointer to the interpreter.**/
-    Interpreter *intr;
+    Interpreter *_intr;
     /**The macro data flow graph.**/
-    Mdfg *graph;
+    Mdfg *_graph;
     /**True if the graph is a compiled graph.**/
-    const bool compiled;
+    const bool _compiled;
     /**Next free graph identifier.**/
-    unsigned long int nextGraphId;
-#ifdef POOL
+    unsigned long int _nextGraphId;
     /**Pool of usable graphs.**/
-    std::deque<Mdfg*> *pool;
-#ifndef MAXPOOLSIZE
-#define MAXPOOLSIZE 2500000
-#endif
-#endif
+    std::deque<Mdfg*> *_pool;
     /**Instances of the graph.**/
-    hashMap<Mdfg*> *graphs;
+    hashMap<Mdfg*> *_graphs;
     /**
      * Computed results. It's necessary to save them into a map for preserving
      * the order of the task received from the input stream. The results will
      * be periodically send to the output stream.
      **/
-    hashMap<StreamElem*> *result;
-    /**Fireable instructions.**/
-    std::deque<Mdfi*> *fireable;
+    hashMap<StreamElem*> *_result;
 
-    /**
-     * Number of instructions to send to the interpreter before waiting the
-     * results.
-     **/
-    unsigned long int groupSize,
-    /**Number of instructions sent to interpreter.**/
-        executed,
+    unsigned long int
     /**Number of results not yet calculated.**/
-        taskSent,
+        _taskSent,
     /**Index of the last task sent to the output stream.**/
-        lastSent;
-    StreamElem** tempTask;
+        _lastSent;
+    StreamElem** _tempTask;
 #ifdef COMPUTE_COM_TIME
-    unsigned long acc;
+    unsigned long _acc;
 #endif
 public:
     /**
