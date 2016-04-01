@@ -195,12 +195,13 @@ private:
     StreamElem** _tempTask;
     size_t _maxWorkers;
     size_t _numWorkers;
+    size_t _groupSize;
     bool _orderedTasks;
 #ifdef COMPUTE_COM_TIME
     unsigned long _acc;
 #endif
 
-    ff::SWSR_Ptr_Buffer** _buffers;
+    ff::uSWSR_Ptr_Buffer** _buffers;
     size_t _lastRcvId;
     Mdfg ** _tdl;
     Mdfg **_g;
@@ -228,15 +229,15 @@ private:
             collected  = 0;
             for(size_t i = 0; i < _maxWorkers; i++){
                 workerId = (i + startId) % _maxWorkers;
-    #ifdef COMPUTE_COM_TIME
+#ifdef COMPUTE_COM_TIME
                 unsigned long t1;
                 if(true){
                     t1 = ff::getusec();
                     if(!buffers[workerId]->pop(&task)) break;
                     _acc += ff::getusec()-t1;
-    #else
+#else
                 if(_buffers[workerId]->pop(&task)){
-    #endif
+#endif
                     ++collected;
                     temp = (std::vector<OutputToken>*) task;
                     for(int j = 0; j < (int) temp->size(); j++){
@@ -252,14 +253,14 @@ private:
                             _result->put(graphId, ot.getResult());
                             _graphs->get(graphId, _tdl);
                             _graphs->erase(graphId);
-            #ifdef POOL
+#ifdef POOL
                             if(_pool->size() < MAXPOOLSIZE)
                                 _pool->push_back(*_tdl);
                             else
                                 delete *_tdl;
-            #else
+#else
                             delete *_tdl;
-            #endif
+#endif
                             --_taskSent;
                         }else{
                             /**Takes the pointer to the copy of the graph.**/
@@ -280,29 +281,26 @@ private:
                     delete temp;
                 }
             }
-        }while(false && collected);
+        }while(collected);
     }
 
 public:
     Scheduler(Mdfg *graph, InputStream *i, OutputStream *o, int parDegree,
-              unsigned long int groupSize, bool orderedTasks, ff::SWSR_Ptr_Buffer** buffers):
+              unsigned long int groupSize, bool orderedTasks, ff::uSWSR_Ptr_Buffer** buffers):
                 _in(i),_out(o),_graph(graph),_compiled(false),_nextGraphId(0),
                 _pool(NULL), _taskSent(0), _lastSent(0), _maxWorkers(parDegree),
-                _numWorkers(parDegree), _orderedTasks(orderedTasks),
+                _numWorkers(parDegree), _groupSize(groupSize), _orderedTasks(orderedTasks),
                 _buffers(buffers), _lastRcvId(0), _tdl(new Mdfg*), _g(new Mdfg*){
-    #ifdef POOL
-        _pool = new std::deque<Mdfg*>;
-    #endif
         _graphs = new hashMap<Mdfg*>;
         _result = new hashMap<StreamElem*>;
         _tempTask = new StreamElem*;
-    #ifdef COMPUTE_COM_TIME
+#ifdef COMPUTE_COM_TIME
         _acc = 0;
-    #endif
+#endif
     }
 
     ~Scheduler(){
-    #ifdef POOL
+#ifdef POOL
         Mdfg* g;
         while(_pool->size()!=0){
             g = _pool->front();
@@ -310,7 +308,7 @@ public:
             delete g;
         }
         delete _pool;
-    #endif
+#endif
         delete _graphs;
         delete _result;
         delete _tempTask;
@@ -324,7 +322,13 @@ public:
 
 
     Mdfi* schedule(){
-        bool end=false; ///<End becomes \e true when the manager has computed all the tasks.
+        bool end = false; ///<End becomes \e true when the manager has computed all the tasks.
+#ifdef POOL
+        _pool = new std::deque<Mdfg*>;
+        for(size_t i = 0; i < MAXPOOLSIZE; i++){
+            _pool->push_back(new Mdfg(*_graph, 0));
+        }
+#endif
 
         while(!end){
             /**Send the instructions to the interpreter.**/
@@ -334,19 +338,22 @@ public:
             Mdfg *newGraph;
             Mdfi *first;
             StreamElem* next;
+            size_t executed = 0;
 
-            if(_in->hasNext() && (next = _in->next())!=NULL ){
+            while(executed < _groupSize && _in->hasNext() && (next = _in->next()) != NULL){
 #ifdef POOL
-                if(_pool->size() != 0){
+                if(_pool->size()){
                     newGraph = _pool->front();
                     _pool->pop_front();
                     newGraph->reset(_nextGraphId);
-                }else
-                    newGraph = new Mdfg(*_graph,_nextGraphId);
+                }else{
+                    std::cout << "EmptyPool" << std::endl;
+                    newGraph = new Mdfg(*_graph, _nextGraphId);
+                }
 #else
-                newGraph = new Mdfg(*_graph,_nextGraphId);
+                newGraph = new Mdfg(*_graph, _nextGraphId);
 #endif
-                _graphs->put(_nextGraphId,newGraph);
+                _graphs->put(_nextGraphId, newGraph);
                 first = newGraph->getFirst();
                 if(!first->setInput(next, 0)){
                     throw std::runtime_error("There is an error in a MDFi link.");
@@ -357,10 +364,11 @@ public:
 #endif
                 sendToWorkers(first);
 #ifdef COMPUTE_COM_TIME
-                _acc += ff::getusec()-t1;
+                _acc += ff::getusec() - t1;
 #endif
                 ++_taskSent;
                 ++_nextGraphId;
+                ++executed;
             }
 
             //////////////////////
@@ -399,7 +407,7 @@ public:
     }
 };
 
-WorkerMdf::WorkerMdf(ff::SWSR_Ptr_Buffer* buffer):_buffer(buffer){;}
+WorkerMdf::WorkerMdf(ff::uSWSR_Ptr_Buffer* buffer):_buffer(buffer){;}
 
 void WorkerMdf::compute(Mdfi* t){
     std::vector<OutputToken>* temp = t->compute();
@@ -422,9 +430,9 @@ Interpreter::Interpreter(Mdfg *graph, InputStream *i, OutputStream *o, size_t pa
     _p->observer = _o;
 
     /**Creates the SPSC queues.**/
-    _buffers = new ff::SWSR_Ptr_Buffer*[parDegree];
+    _buffers = new ff::uSWSR_Ptr_Buffer*[parDegree];
     for(size_t i = 0; i < parDegree; i++){
-        _buffers[i] = new ff::SWSR_Ptr_Buffer(1024); //TODO Unbounded??
+        _buffers[i] = new ff::uSWSR_Ptr_Buffer(1024);
         _buffers[i]->init();
     }
 

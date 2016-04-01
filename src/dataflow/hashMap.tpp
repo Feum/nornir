@@ -29,7 +29,7 @@ namespace nornir{
 namespace dataflow{
 
 #ifndef HASHSIZE
-#define HASHSIZE 100
+#define HASHSIZE 100000
 #endif
 
 template <class T>

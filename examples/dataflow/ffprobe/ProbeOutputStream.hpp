@@ -21,6 +21,7 @@ private:
     std::queue<hashElement*>* q; ///< Queue of expired flows
     time_t lastEmission; ///< Time of the last export
     Exporter ex;
+    bool _deallocTasks;
     /**
      * Exports the flow to the remote collector (also prints it into the file).
      */
@@ -38,9 +39,12 @@ public:
      * \param port The port where to send the flows.
      * \param minFlowSize If a TCP flow doesn't have more than minFlowSize bytes isn't exported (0 is unlimited).
      * \param systemStartTime The system start time.
+     * \param deallocTasks If true, tasks will be automatically deallocated.
      */
-    inline ProbeOutputStream(FILE* out,uint queueTimeout,char const* collector, uint port, uint minFlowSize, uint32_t systemStartTime):out(out),qTimeout(queueTimeout),flowSequence(0),
-    minFlowSize(minFlowSize),q(new std::queue<hashElement*>),lastEmission(time(NULL)),ex(collector,port,ffalloc,systemStartTime){
+    inline ProbeOutputStream(FILE* out,uint queueTimeout,char const* collector, uint port, uint minFlowSize, uint32_t systemStartTime, bool deallocTasks = true):
+            out(out),qTimeout(queueTimeout),flowSequence(0),
+            minFlowSize(minFlowSize),q(new std::queue<hashElement*>),lastEmission(time(NULL)),
+            ex(collector,port,ffalloc,systemStartTime), _deallocTasks(deallocTasks){
         if(out!=NULL)
             fprintf(out,"IPV4_SRC_ADDR|IPV4_DST_ADDR|OUT_PKTS|OUT_BYTES|FIRST_SWITCHED|LAST_SWITCHED|L4_SRC_PORT|L4_DST_PORT|TCP_FLAGS|"
                     "PROTOCOL|SRC_TOS|\n");
@@ -87,7 +91,9 @@ public:
                 exportFlows();
                 lastEmission=now;
             }
-            ffalloc->free(t);
+            if(_deallocTasks){
+                ffalloc->free(t);
+            }
         }else{
             if(!q->empty())
                 exportFlows();

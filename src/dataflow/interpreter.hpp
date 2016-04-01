@@ -39,7 +39,7 @@
 #include "skeleton/farm.hpp"
 #include "skeleton/pipeline.hpp"
 #include "skeleton/ewc.hpp"
-#include "../external/fastflow/ff/buffer.hpp"
+#include "../external/fastflow/ff/ubuffer.hpp"
 #include "../external/fastflow/ff/squeue.hpp"
 #include <vector>
 #include <queue>
@@ -47,7 +47,7 @@
 #include <errno.h>
 
 #ifndef MAXPOOLSIZE
-#define MAXPOOLSIZE 2500000
+#define MAXPOOLSIZE 500000
 #endif
 
 namespace nornir{
@@ -58,9 +58,9 @@ namespace dataflow{
  */
 class WorkerMdf: public nornir::Worker<Mdfi>{
 private:
-    ff::SWSR_Ptr_Buffer* _buffer;
+    ff::uSWSR_Ptr_Buffer* _buffer;
 public:
-    WorkerMdf(ff::SWSR_Ptr_Buffer* buffer);
+    WorkerMdf(ff::uSWSR_Ptr_Buffer* buffer);
 
     /**
      * Computes a macro data flow instruction.
@@ -75,7 +75,7 @@ public:
  */
 class Interpreter{
 private:
-    ff::SWSR_Ptr_Buffer** _buffers;
+    ff::uSWSR_Ptr_Buffer** _buffers;
     nornir::Scheduler<Mdfi>* _s;
     nornir::Farm<Mdfi>* _farm;
     nornir::Parameters* _p;

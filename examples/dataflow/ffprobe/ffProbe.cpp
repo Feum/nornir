@@ -94,6 +94,7 @@ void executeWithFaskel(){
     }
 
     faskelProbe::ProbeInputStream* input = NULL;
+    bool deallocTasks = true;
     if(strcmp(streamFile, "") == 0){
         // No stream file
         input = new faskelProbe::ProbeInputStreamSteady(numStages>1?numStages:1,
@@ -102,10 +103,10 @@ void executeWithFaskel(){
         // Stream file
         input = new faskelProbe::ProbeInputStreamRate(streamFile, numStages>1?numStages:1,
                 interface,noPromisc,bpfFilter,cnt,hashSize,readTimeout,&ffalloc);
-        //((faskelProbe::ProbeInputStreamRate*)input)->init();
+        deallocTasks = false;
     }
     /**Creates the output stream.**/
-    faskelProbe::ProbeOutputStream output(outputFile,queueTimeout,collector,port,minFlowSize,sst);
+    faskelProbe::ProbeOutputStream output(outputFile,queueTimeout,collector,port,minFlowSize,sst,deallocTasks);
     if(numStages <= 1){
     /**Sequential execution**/
         nornir::dataflow::StreamElem* toWorker[1];

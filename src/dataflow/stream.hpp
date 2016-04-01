@@ -192,6 +192,7 @@ private:
     uint32_t _nextObject;
     ticks _nextBurst;
     ticks _excess;
+    time_t _lastStoredRateTs;
 
     inline ticks ticksWait(ticks nticks) {
         ticks delta;

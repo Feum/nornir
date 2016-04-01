@@ -58,6 +58,15 @@ public:
     }
 
     /**
+     * Sends a task to one of the workers (non blocking).
+     * @param task The task to be sent.
+     * @return true if the task has been sent, false otherwise.
+     */
+    bool sendNonBlocking(O* task) CX11_KEYWORD(final){
+        return ff_send_out((void*) task);
+    }
+
+    /**
      * Sends a task to a specific worker.
      * @param task The task to be sent.
      * @param id The identifier of the worker. Starts from 0.
@@ -69,6 +78,21 @@ public:
                                          "notified when a rethreading occur.");
         }
         while(!_lb->ff_send_out_to(task, id)){;} //TODO: Chiedere a Massimo
+    }
+
+    /**
+     * Sends a task to a specific worker (non blocking).
+     * @param task The task to be sent.
+     * @param id The identifier of the worker. Starts from 0.
+     * @return true if the task has been sent, false otherwise.
+     */
+    void sendToNonBlocking(O* task, uint id) CX11_KEYWORD(final){
+        if(id >= _lb->getnworkers()){
+            throw new std::runtime_error("FATAL: Trying to send to a non running worker."
+                                         "Please ensure that your application is "
+                                         "notified when a rethreading occur.");
+        }
+        return _lb->ff_send_out_to(task, id);
     }
 
     /**

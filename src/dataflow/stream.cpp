@@ -77,7 +77,7 @@ InputStreamRate::InputStreamRate(const std::string& fileName):
         _currentInterval(0),
         _lastSec(0), _startTime(0), _processedPkts(0), _currIntervalStart(0),
         _currBurstSize(0), _def(0), _terminated(false),
-        _nextObject(0), _nextBurst(0), _excess(0){
+        _nextObject(0), _nextBurst(0), _excess(0), _lastStoredRateTs(0){
     _clockThread = new ClockThread(_lastSec, _terminated);
     FILE* f = NULL;
     char line[512];
@@ -120,7 +120,7 @@ void InputStreamRate::init(){
     DEBUG(_rates.size() << " rates.");
 }
 
-#define BURST_SIZE 10.0
+#define BURST_SIZE 1000.0
 
 StreamElem* InputStreamRate::next(){
     if(!_objects.size()){
@@ -128,10 +128,11 @@ StreamElem* InputStreamRate::next(){
     }
 
     StreamElem* obj = NULL;
-    if(!_def){
-        _def = getticks();
+    if(!_startTime){
         _startTime = time(NULL);
         _clockThread->start();
+        _lastStoredRateTs = _startTime;
+        _currIntervalStart = _startTime;
     }
 
     if(_nextObject == _objects.size()){
@@ -153,17 +154,24 @@ StreamElem* InputStreamRate::next(){
         if(!_nextBurst){
             double waitIntervalSecs = 1.0 / _rates[_currentInterval].rate;
             ticks ticksToSleep = (_clockFrequency * waitIntervalSecs * (double) BURST_SIZE);
+            if(!_def){
+                _def = now;
+            }
             _excess += (now - _def);
             if(_excess >= ticksToSleep){
                 _excess -= ticksToSleep;
                 _nextBurst = 0;
             }else{
                 ticksToSleep -= _excess;
+                _excess = 0;
                 _nextBurst = now + ticksToSleep;
             }
         }
 
         if(now >= _nextBurst){
+            if(_nextBurst){
+                _excess += now - _nextBurst;
+            }
             _currBurstSize = 0;
             _def = now;
             _nextBurst = 0;
@@ -172,14 +180,14 @@ StreamElem* InputStreamRate::next(){
         }
     }
 
-
     ++_currBurstSize;
-
-    if(_currIntervalStart == 0){
-        _currIntervalStart = _lastSec;
-    }
-
     ++_processedPkts;
+
+    if(_lastSec != _lastStoredRateTs){
+        _lastStoredRateTs = _lastSec;
+        std::cout << "Rate: " << _processedPkts << std::endl;
+        _processedPkts = 0;
+    }
 
     /** Go to the next rate **/
     if(_lastSec - _currIntervalStart >= _rates[_currentInterval].duration){
