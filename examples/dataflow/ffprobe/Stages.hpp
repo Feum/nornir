@@ -97,7 +97,7 @@ public:
      * The function computed by one stage of the pipeline (is computed by an indipendent thread).
      */
     nornir::dataflow::StreamElem** compute(nornir::dataflow::StreamElem** p){
-        ProbeTask* t=(ProbeTask*) p[0];
+        ProbeTask* t = (ProbeTask*) p[0];
         myList<hashElement*> *flowsToExport=t->getFlowsToExport();
         time_t now;
         myList<hashElement*> *flowsToAdd=t->getFlowsToAdd(id);
@@ -109,19 +109,21 @@ public:
         }
         /**If there isn't flows to add.**/
         else if(ftaSize==0){
-            now=time(NULL);
-            if(t->isEof())
+            now = time(NULL);
+            if(t->isEof()){
                 /**If end of file is arrived checks all the hash table and considers all flows expired.**/
                 h->checkExpiration(-1,idle,lifeTime,flowsToExport,NULL);
-            else
+            }else{
                 h->checkExpiration(maxfNull,idle,lifeTime,flowsToExport,&now);
+            }
         }else{
             now=h->updateFlows(flowsToAdd,flowsToExport);
-            if(t->isEof())
+            if(t->isEof()){
             /**If end of file is arrived checks all the hash table and considers all flows expired.**/
                 h->checkExpiration(-1,idle,lifeTime,flowsToExport,NULL);
-            else
+            }else{
                 h->checkExpiration(maxfAdd*ftaSize,idle,lifeTime,flowsToExport,&now);
+            }
         }
         return p;
     }

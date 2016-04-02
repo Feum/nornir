@@ -203,8 +203,11 @@ private:
 
     ff::uSWSR_Ptr_Buffer** _buffers;
     size_t _lastRcvId;
+    ulong _tasksInside;
+    ulong _graphsInside;
 
     inline void sendToWorkers(Mdfi* instr){
+        ++_tasksInside;
         if(_orderedTasks){
             sendTo(instr, instr->getId() % _numWorkers);
         }else{
@@ -212,11 +215,26 @@ private:
         }
     }
 
+    /**
+     * - When we insert a graph we increase both graphsInside and tasksInside.
+     * - When we pop a task the following situations may occur:
+     *   - Decrease tasksInside and graphsInside.
+     *   - Keep graphsInside untouched and change tasksInside (increase o
+     *     decrease by n according to the specific graph structure).
+     */
+
+    inline bool keepInsertingGraphs() const{
+        return _graphsInside < _groupSize;
+    }
+
+    inline bool keepPoppingTasks() const{
+        return _graphsInside > _groupSize;
+    }
+
     inline void updateCompleted(){
         OutputToken ot;
         ulong graphId;
         TokenId dest;
-        std::vector<OutputToken>* temp;
         Mdfi *ins;
         void* task;
         uint collected = 0;
@@ -237,11 +255,11 @@ private:
 #else
                 if(_buffers[workerId]->pop(&task)){
 #endif
+                    --_tasksInside;
                     ++collected;
                     ++collectedTotal;
-                    temp = (std::vector<OutputToken>*) task;
-                    for(int j = 0; j < (int) temp->size(); j++){
-                        ot = temp->at(j);
+                    for(uint j = 0; j < ((Mdfi*) task)->getNumOutTokens(); j++){
+                        ot = *(((Mdfi*) task)->getOutToken(j));
                         dest = ot.getDest();
                         graphId = dest.getGraphId();
                         Mdfg* currentGraph = NULL;
@@ -271,6 +289,7 @@ private:
                             delete currentGraph;
 #endif
                             --_taskSent;
+                            --_graphsInside;
                         }else{
                             /**Takes the pointer to the copy of the graph.**/
                             currentGraph = _graphs->at(graphId);
@@ -287,19 +306,54 @@ private:
                             }
                         }
                     }
-                    delete temp;
                 }
             }
-        }while(collected);
+        }while(collected && keepPoppingTasks());
     }
 
+
+    void getFromInput(StreamElem* next){
+        Mdfg *newGraph;
+        Mdfi *first;
+#ifdef POOL
+        if(_pool->size()){
+            newGraph = _pool->front();
+            _pool->pop_front();
+            newGraph->reset(_nextGraphId);
+            assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
+        }else{
+            newGraph = new Mdfg(*_graph, _nextGraphId);
+            assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
+        }
+#else
+        newGraph = new Mdfg(*_graph, _nextGraphId);
+        assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
+#endif
+
+        first = newGraph->getFirst();
+        if(!first->setInput(next, 0)){
+            throw std::runtime_error("There is an error in a MDFi link.");
+        }
+        /**Sends the new instruction to the interpreter.*/
+#ifdef COMPUTE_COM_TIME
+        unsigned long t1 = ff::getusec();
+#endif
+        sendToWorkers(first);
+#ifdef COMPUTE_COM_TIME
+        _acc += ff::getusec() - t1;
+#endif
+        ++_taskSent;
+        ++_nextGraphId;
+        ++_graphsInside;
+
+    }
 public:
     Scheduler(Mdfg *graph, InputStream *i, OutputStream *o, int parDegree,
               unsigned long int groupSize, bool orderedTasks, ff::uSWSR_Ptr_Buffer** buffers):
                 _in(i),_out(o),_graph(graph),_compiled(false),_nextGraphId(0),
                 _pool(NULL), _taskSent(0), _lastSent(0), _maxWorkers(parDegree),
                 _numWorkers(parDegree), _groupSize(groupSize), _orderedTasks(orderedTasks),
-                _buffers(buffers), _lastRcvId(0){
+                _buffers(buffers), _lastRcvId(0), _tasksInside(0), _graphsInside(0){
         _graphs = new std::map<ulong, Mdfg*>;
         _result = new std::map<ulong, StreamElem*>;
 #ifdef COMPUTE_COM_TIME
@@ -327,6 +381,7 @@ public:
 
 
     Mdfi* schedule(){
+        StreamElem* next;
         bool end = false; ///<End becomes \e true when the manager has computed all the tasks.
 #ifdef POOL
         _pool = new std::deque<Mdfg*>;
@@ -336,47 +391,21 @@ public:
 #endif
 
         while(!end){
+
+            /*
+            if(_graphsInside){
+                std::cout << _graphsInside << " " << _tasksInside << " " << _tasksInside / _graphsInside << std::endl;
+            }else{
+                std::cout << _graphsInside << " " << _tasksInside << std::endl;
+            }
+            */
+
             /**Send the instructions to the interpreter.**/
             /////////////////////
             // Get from input. //
             /////////////////////
-            Mdfg *newGraph;
-            Mdfi *first;
-            StreamElem* next;
-            size_t executed = 0;
-
-            while(executed < _groupSize && _in->hasNext() && (next = _in->next()) != NULL){
-#ifdef POOL
-                if(_pool->size()){
-                    newGraph = _pool->front();
-                    _pool->pop_front();
-                    newGraph->reset(_nextGraphId);
-                    assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
-                }else{
-                    newGraph = new Mdfg(*_graph, _nextGraphId);
-                    assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
-                }
-#else
-                newGraph = new Mdfg(*_graph, _nextGraphId);
-                assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
-
-#endif
-
-                first = newGraph->getFirst();
-                if(!first->setInput(next, 0)){
-                    throw std::runtime_error("There is an error in a MDFi link.");
-                }
-                /**Sends the new instruction to the interpreter.*/
-#ifdef COMPUTE_COM_TIME
-                unsigned long t1 = ff::getusec();
-#endif
-                sendToWorkers(first);
-#ifdef COMPUTE_COM_TIME
-                _acc += ff::getusec() - t1;
-#endif
-                ++_taskSent;
-                ++_nextGraphId;
-                ++executed;
+            while(keepInsertingGraphs() && _in->hasNext() && (next = _in->next()) != NULL){
+                getFromInput(next);
             }
 
             //////////////////////
@@ -393,7 +422,7 @@ public:
              * are calculated, then stop the manager.
              */
             if(_taskSent == 0 && !_in->hasNext()){
-                end=true;
+                end = true;
             }
             ////////////////////
             // Output stream. //
@@ -422,8 +451,8 @@ public:
 WorkerMdf::WorkerMdf(ff::uSWSR_Ptr_Buffer* buffer):_buffer(buffer){;}
 
 void WorkerMdf::compute(Mdfi* t){
-    std::vector<OutputToken>* temp = t->compute();
-    _buffer->push(temp);
+    t->compute();
+    _buffer->push(t);
 }
 
 

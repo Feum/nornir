@@ -38,13 +38,14 @@
 namespace nornir{
 namespace dataflow{
 
-#define MAX_INSTRUCTION_INPUTS 100
+#define MAX_INSTRUCTION_INPUTS 1
 
 /**Macro data flow instruction.**/
 class Mdfi{
 private:
-    InputToken *tInput; ///<Input tokens. Are numbered from 0 to \e dInput -1.
-    TokenId *dest; ///<Destinations of the output. Are numbered from 0 to \e dOutput -1.
+    InputToken tInput[MAX_INSTRUCTION_INPUTS]; ///<Input tokens. Are numbered from 0 to \e dInput -1.
+    TokenId dest[MAX_INSTRUCTION_INPUTS]; ///<Destinations of the output. Are numbered from 0 to \e dOutput -1.
+    OutputToken tOutput[MAX_INSTRUCTION_INPUTS];
     Computable* comp; ///<\e Computable to compute.
     unsigned int dInput, ///<Input size.
         dOutput, ///<Output size.
@@ -60,9 +61,7 @@ public:
      */
     inline Mdfi(Computable* c, unsigned int i, unsigned int nInput,unsigned int nOutput):
     comp(c),dInput(nInput),dOutput(nOutput),id(i),graphId(0){
-        tInput=new InputToken[nInput];
-        dest=new TokenId[nOutput];
-        assert(dInput <= MAX_INSTRUCTION_INPUTS);
+        assert(dInput <= MAX_INSTRUCTION_INPUTS && dOutput <= MAX_INSTRUCTION_INPUTS);
     }
 
     /**
@@ -70,11 +69,11 @@ public:
      * \param ins Reference to instruction to copy.
      */
     inline Mdfi(const Mdfi& ins):
-            dest(ins.dest),comp(ins.comp),dInput(ins.dInput),dOutput(ins.dOutput),id(ins.id),graphId(ins.graphId){
-        tInput=new InputToken[dInput];
-        dest=new TokenId[dOutput];
-        for(uint i=0; i<dOutput; i++)
-            dest[i]=ins.dest[i];
+            dest(ins.dest), comp(ins.comp), dInput(ins.dInput),
+            dOutput(ins.dOutput), id(ins.id), graphId(ins.graphId){
+        for(uint i = 0; i < dOutput; i++){
+            dest[i] = ins.dest[i];
+        }
         assert(dInput <= MAX_INSTRUCTION_INPUTS);
     }
 
@@ -82,23 +81,30 @@ public:
      * Destructor of the instruction.
      */
     inline ~Mdfi(){
-        delete[] tInput;
-        delete[] dest;
+        ;
     }
 
     /**
      * Computes the result of the instruction.
-     * \return A vector of output tokens.
      */
-    std::vector<OutputToken>* compute();
+    void compute();
+
+    inline uint getNumOutTokens() const{
+        return dOutput;
+    }
+
+    inline OutputToken* getOutToken(uint i){
+        assert(i < dOutput);
+        return &(tOutput[i]);
+    }
 
     /**
      * Checks if the instruction is fireable.
      * \return \e true if the instruction is fireable, otherwise returns \e false.
      */
     inline bool isFireable(){
-        uint i=0;
-        while(i<dInput){
+        uint i = 0;
+        while(i < dInput){
             if(!tInput[i].isPresent()) return false;
             i++;
         }
@@ -111,8 +117,8 @@ public:
      * \param i The position where to set the task.
      * \return \e false if \e i is higher than \e dInput, otherwise returns false.
      */
-    inline bool setInput(StreamElem* t,uint i){
-        if(i<dInput) {
+    inline bool setInput(StreamElem* t, uint i){
+        if(i < dInput) {
             tInput[i].setTask(t);
             return true;
         }else
@@ -124,8 +130,8 @@ public:
      * \param i The destination index.
      * \param d The destination to set.
      */
-    inline void setDestination(unsigned int i,const TokenId& d){
-        dest[i]=d;
+    inline void setDestination(unsigned int i, const TokenId& d){
+        dest[i] = d;
     }
 
     /**
@@ -141,7 +147,7 @@ public:
      * \param i The id of the instruction.
      */
     inline void setId(unsigned int i){
-        id=i;
+        id = i;
     }
 
     /**
@@ -172,9 +178,9 @@ public:
      * Sets the id of the graph.
      * \param newd The new id of the graph.
      */
-    inline void setGid(unsigned long int newd){
-        graphId=newd;
-        for(uint i=0; i<dOutput; i++)
+    inline void setGid(ulong newd){
+        graphId = newd;
+        for(uint i = 0; i < dOutput; i++)
             dest[i].setGraphId(newd);
     }
 
@@ -196,7 +202,7 @@ public:
      * Resets the instruction.
      * \param newId The new id of the graph wich belongs the instruction.
      */
-    void reset(unsigned long int newId);
+    void reset(ulong newId);
 };
 
 }

@@ -30,31 +30,34 @@
 namespace nornir{
 namespace dataflow{
 
-std::vector<OutputToken>* Mdfi::compute(){
+void Mdfi::compute(){
     StreamElem* args[MAX_INSTRUCTION_INPUTS];
-    for(uint i=0; i<dInput; i++)
-        args[i]=tInput[i].getTask();
-    StreamElem** result=comp->compute(args);
-    std::vector<OutputToken> *v = new std::vector<OutputToken>(dOutput);
-    for(uint i=0; i<dOutput; i++)
+    for(uint i = 0; i < dInput; i++){
+        args[i] = tInput[i].getTask();
+    }
+    StreamElem** result = comp->compute(args);
+    for(uint i = 0; i < dOutput; i++){
         /*Set output tokens.*/
-        (*v)[i]=OutputToken(result[i],dest[i]);
-    if(result!=NULL && result!=args)
+        tOutput[i] = OutputToken(result[i], dest[i]);
+    }
+    if(result != NULL && result != args){
         delete[] result;
-    return v;
-}
-
-void Mdfi::updateDestinations(int* v){
-    for(uint i=0; i<dOutput; i++){
-        if(!dest[i].isOutStream()&&!dest[i].isNull())
-            dest[i].setMdfiId(v[dest[i].getMdfId()]);
     }
 }
 
-void Mdfi::reset(unsigned long int newId){
+void Mdfi::updateDestinations(int* v){
+    for(uint i = 0; i < dOutput; i++){
+        if(!dest[i].isOutStream() && !dest[i].isNull()){
+            dest[i].setMdfiId(v[dest[i].getMdfId()]);
+        }
+    }
+}
+
+void Mdfi::reset(ulong newId){
     setGid(newId);
-    for(uint i=0; i<dInput; i++)
+    for(uint i = 0; i < dInput; i++){
         tInput[i].clear();
+    }
 }
 
 }
