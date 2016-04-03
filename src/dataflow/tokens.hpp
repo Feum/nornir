@@ -209,7 +209,7 @@ private:
     TokenId dest;
 public:
     /**Default constructor.**/
-    inline OutputToken():result(NULL),dest(TokenId()){;}
+    inline OutputToken():result(NULL), dest(TokenId()){;}
 
     /**
      * Constructor of the token.
@@ -217,6 +217,8 @@ public:
      * \param d The destination of the token.
      */
     inline OutputToken(StreamElem* r, const TokenId& d):result(r),dest(d){;}
+
+    inline void clear(){result = NULL; dest = TokenId();}
 
     /**
      * Returns a pointer to the computed task.

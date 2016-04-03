@@ -30,47 +30,39 @@
 namespace nornir{
 namespace dataflow{
 
-Mdfg::Mdfg():higherId(10),nextId(0),id(0){
-    instructions=(Mdfi**)malloc(sizeof(Mdfi*)*(higherId));
+Mdfg::Mdfg():_nextId(0), _id(0){
+    ;
 }
 
-Mdfg::Mdfg(Computable* c):higherId(1),nextId(1),id(0){
-    instructions=(Mdfi**)malloc(sizeof(Mdfi*)*(higherId));
-    instructions[0]=new Mdfi(c,0,1,1);
+Mdfg::Mdfg(Computable* c):_nextId(1), _id(0){
+    _instructions.emplace_back(c, 0, 1, 1);
     TokenId d;
     d.setOutputStream();
     /**Set the output stream as instruction's output.**/
-    instructions[0]->setDestination(0,d);
+    _instructions.back().setDestination(0, d);
 }
 
-Mdfg::Mdfg(Computable* c, int dInput, int dOutput):higherId(1),nextId(1),id(0){
-    instructions=(Mdfi**)malloc(sizeof(Mdfi*)*(higherId));
-    instructions[0]=new Mdfi(c,0,dInput,dOutput);
+Mdfg::Mdfg(Computable* c, int dInput, int dOutput):_nextId(1), _id(0){
+    _instructions.emplace_back(c, 0, dInput, dOutput);
 }
 
-Mdfg::Mdfg(const Mdfg& g,unsigned long int gid):higherId(g.higherId),nextId(g.nextId),id(gid){
-    instructions=(Mdfi**)malloc(sizeof(Mdfi*)*(nextId));
-    unsigned int i=0;
-    while(i<nextId){
-        instructions[i]=new Mdfi(*(g.instructions[i]));
-        instructions[i]->setGid(gid);
-        i++;
+Mdfg::Mdfg(const Mdfg& g, ulong gid):_nextId(g._nextId),_id(gid){
+    _instructions.reserve(g._instructions.size());
+    for(size_t i = 0; i < g._instructions.size(); i++){
+        _instructions.emplace_back(g._instructions[i]);
+        _instructions.back().setGid(gid);
     }
 }
 
 Mdfg::~Mdfg(){
-    unsigned int i=0;
-    while(i<nextId){
-        delete instructions[i];
-        i++;
-    }
-    free(instructions);
+    ;
 }
 
-void Mdfg::reset(unsigned long int newId){
-    id=newId;
-    for(unsigned int i=0; i<nextId; i++)
-        instructions[i]->reset(newId);
+void Mdfg::reset(ulong newId){
+    _id = newId;
+    for(size_t i = 0; i < _instructions.size(); i++){
+        _instructions[i].reset(newId);
+    }
 }
 
 }

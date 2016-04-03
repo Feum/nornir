@@ -38,39 +38,44 @@ private:
     ff::ff_allocator* ffalloc; ///< An instance of ff_allocator
     node<T>* head; ///< The head of the list
     node<T>* tail; ///< The tail of the list
-    int nElem; ///< Size of the list
+    ulong nElem; ///< Size of the list
+    bool _deallocOnPop;
+
     /**
      * Dinamically allocates memory (with standard allocator or with ff_allocator)
      */
     inline void* myMalloc(size_t size){
-        if(ffalloc!=NULL)
+        if(ffalloc!=NULL){
             return ffalloc->malloc(size);
-        else
+        }else{
             return malloc(size);
+        }
     }
 
     /**
      * Frees memory dinamically allocated (with standard allocator or with ff_allocator)
      */
     inline void myFree(void* p){
-        if(ffalloc!=NULL)
+        if(ffalloc != NULL){
             ffalloc->free(p);
-        else
+        }else{
             free(p);
+        }
     }
 public:
     /**
      * Constructor of the list.
      * \param alloc An instance of ff_allocator, if it isn't passed, new nodes are allocated with standard allocator.
      */
-    inline myList(ff::ff_allocator *alloc=NULL):ffalloc(alloc),head(NULL),tail(NULL),nElem(0){;}
+    inline myList(ff::ff_allocator *alloc=NULL, bool deallocOnPop = true):
+        ffalloc(alloc), head(NULL), tail(NULL), nElem(0), _deallocOnPop(deallocOnPop){;}
 
     /**
      * Initializes the list.
      * \param alloc An instance of ff_allocator, if it isn't passed, new nodes are allocated with standard allocator.
      */
-    inline void init(ff::ff_allocator *alloc=NULL){
-        ffalloc=alloc;head=tail=NULL;nElem=0;
+    inline void init(ff::ff_allocator *alloc=NULL, bool deallocOnPop = true){
+        ffalloc=alloc;head=tail=NULL;nElem=0;_deallocOnPop = deallocOnPop;
     }
 
     /**
@@ -107,7 +112,9 @@ public:
             tail->next=NULL;
         else
             head=NULL;
-        myFree(toRemove);
+        if(_deallocOnPop){
+            myFree(toRemove);
+        }
         --nElem;
         return 0;
     }
@@ -116,7 +123,7 @@ public:
      * Returns the number of elements of the list.
      * \return The number of elements of the list.
      */
-    inline int size(){
+    inline ulong size(){
         return nElem;
     }
 };

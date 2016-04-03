@@ -74,22 +74,22 @@ public:
         ProbeTask* t=(ProbeTask*) a;
         hashElement* f;
         if(a!=NULL){
-            myList<hashElement*>* l=t->getFlowsToExport();
+            myList<hashElement*>* l = t->getFlowsToExport();
             assert(t->elementsToAddSize() == 0);
-            time_t now=time(NULL);
+            time_t now = time(NULL);
             while(l->size()!=0){
                 assert(l->pop(&f)==0);
                 if(!(f->prot==TCP_PROT_NUM && f->dOctets<minFlowSize))
                     q->push(f);
                 if(q->size()==30){
                     exportFlows();
-                    lastEmission=now;
+                    lastEmission = now;
                 }
             }
             /**Exports flows every qTimeout seconds.**/
-            if((t->isEof() || (now-lastEmission>=qTimeout)) && !q->empty()){
+            if((t->isEof() || (now - lastEmission>=qTimeout)) && !q->empty()){
                 exportFlows();
-                lastEmission=now;
+                lastEmission = now;
             }
             if(_deallocTasks){
                 ffalloc->free(t);

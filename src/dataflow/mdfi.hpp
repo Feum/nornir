@@ -69,7 +69,7 @@ public:
      * \param ins Reference to instruction to copy.
      */
     inline Mdfi(const Mdfi& ins):
-            dest(ins.dest), comp(ins.comp), dInput(ins.dInput),
+            comp(ins.comp), dInput(ins.dInput),
             dOutput(ins.dOutput), id(ins.id), graphId(ins.graphId){
         for(uint i = 0; i < dOutput; i++){
             dest[i] = ins.dest[i];
@@ -130,7 +130,7 @@ public:
      * \param i The destination index.
      * \param d The destination to set.
      */
-    inline void setDestination(unsigned int i, const TokenId& d){
+    inline void setDestination(uint i, const TokenId& d){
         dest[i] = d;
     }
 
@@ -138,7 +138,7 @@ public:
      * Returns the id of the instruction.
      * \return The id of the instruction.
      */
-    inline unsigned int getId(){
+    inline uint getId(){
         return id;
     }
 
@@ -146,7 +146,7 @@ public:
      * Sets the id of the instruction.
      * \param i The id of the instruction.
      */
-    inline void setId(unsigned int i){
+    inline void setId(uint i){
         id = i;
     }
 

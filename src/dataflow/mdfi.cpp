@@ -58,6 +58,10 @@ void Mdfi::reset(ulong newId){
     for(uint i = 0; i < dInput; i++){
         tInput[i].clear();
     }
+
+    for(uint i = 0; i < dOutput; i++){
+        tOutput[i].clear();
+    }
 }
 
 }

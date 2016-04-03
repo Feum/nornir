@@ -118,11 +118,14 @@ void executeWithFaskel(){
         }
     }else{
         /**Parallel execution with n pipelined threads.**/
-        faskelProbe::Stage** stages=new faskelProbe::Stage*[numStages];
-        int workerHs=hashSize/numStages;
+        faskelProbe::Stage** stages = new faskelProbe::Stage*[numStages];
+        int workerHs = hashSize/numStages;
         /**Add the stages of the pipeline.**/
-        for(uint i=0; i<numStages; i++)
-            stages[i]=new faskelProbe::Stage(i,workerHs,maxActiveFlows,idle,lifetime,maxNullCheck,maxAddCheck);
+        for(uint i = 0; i < numStages; i++){
+            stages[i] = new faskelProbe::Stage(i, workerHs, maxActiveFlows, idle,
+                                             lifetime, maxNullCheck, maxAddCheck,
+                                             maxReadTOCheck, strcmp(streamFile, "")?false:true);
+        }
         nornir::dataflow::Pipeline *pipe=new nornir::dataflow::Pipeline(stages[0],stages[1]);
         for(uint i=2; i<numStages; i++)
             pipe = new nornir::dataflow::Pipeline(pipe,stages[i]);

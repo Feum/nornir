@@ -180,8 +180,8 @@ protected:
         std::vector<nornir::dataflow::StreamElem*>  objects;
         do{
             ProbeTask* t = (ProbeTask*) ffalloc->malloc(sizeof(ProbeTask));
-            t->init(nWorkers,ffalloc);
-            pktRcvd = pcap_dispatch(handle,cnt,dispatchCallback,(u_char*)t);
+            t->init(nWorkers, ffalloc, false);
+            pktRcvd = pcap_dispatch(handle, cnt, dispatchCallback, (u_char*)t);
             assert(pktRcvd >= 0);
             objects.push_back(t);
         }while(pktRcvd != 0 && !quit);

@@ -21,8 +21,8 @@
 class ProbeTask: public nornir::dataflow::StreamElem{
 private:
     int numWorkers; ///<Number of workers of the pipeline.
-    myList<hashElement*> **flowsToAdd,///< A list of flows to add.
-        *flowsToExport;///< A list of flows to export.
+    std::vector<std::vector<hashElement*> > flowsToAdd; ///< A list of flows to add.
+    myList<hashElement*> *flowsToExport; ///< A list of flows to export.
     bool eof, ///< True if the eof of a .pcap file is arrived.
         readTimeoutExpired; ///< True if the readTimeout is expired on the pcap socket.
     ff::ff_allocator *ffalloc; ///< The fastflow's memory allocator.
@@ -33,11 +33,7 @@ public:
      * \param ffalloc A pointer to the fastflow's memory allocator.
      */
     inline ProbeTask(int numWorkers, ff::ff_allocator *ffalloc):numWorkers(numWorkers),eof(false),readTimeoutExpired(false),ffalloc(ffalloc){
-        flowsToAdd=(myList<hashElement*>**) ffalloc->malloc(sizeof(myList<hashElement*>)*numWorkers);
-        for(int i=0; i<numWorkers; i++){
-            flowsToAdd[i]=(myList<hashElement*>*)ffalloc->malloc(sizeof(myList<hashElement*>));
-            flowsToAdd[i]->init(ffalloc);
-        }
+        flowsToAdd.resize(numWorkers);
         flowsToExport=(myList<hashElement*>*)ffalloc->malloc(sizeof(myList<hashElement*>));
         flowsToExport->init();
     }
@@ -46,10 +42,8 @@ public:
      * Denstructor of the task.
      */
     inline ~ProbeTask(){
-        if(flowsToExport!=NULL) ffalloc->free(flowsToExport);
-        if(flowsToAdd!=NULL){
-            for(int i=0; i<numWorkers; i++)
-                ffalloc->free(flowsToAdd[i]);
+        if(flowsToExport){
+            ffalloc->free(flowsToExport);
         }
     }
 
@@ -58,13 +52,9 @@ public:
      * \param numWorkers Number of workers of the pipeline.
      * \param ffalloc A pointer to the fastflow's memory allocator.
      */
-    inline void init(int nw, ff::ff_allocator *alloc){
+    inline void init(int nw, ff::ff_allocator *alloc, bool ftaDeallocOnPop = true){
         numWorkers=nw; eof=readTimeoutExpired=false; ffalloc=alloc;
-        flowsToAdd=(myList<hashElement*>**) ffalloc->malloc(sizeof(myList<hashElement*>)*numWorkers);
-        for(int i=0; i<numWorkers; i++){
-            flowsToAdd[i]=(myList<hashElement*>*)ffalloc->malloc(sizeof(myList<hashElement*>));
-            flowsToAdd[i]->init(ffalloc);
-        }
+        flowsToAdd.resize(numWorkers);
         flowsToExport=(myList<hashElement*>*)ffalloc->malloc(sizeof(myList<hashElement*>));
         flowsToExport->init();
     }
@@ -90,7 +80,7 @@ public:
      * Returns a pointer to the list of the flows to add.
      * \return A pointer to the list of the flows to add.
      */
-    inline myList<hashElement*>* getFlowsToAdd(int i){
+    inline std::vector<hashElement*>& getFlowsToAdd(int i){
         return flowsToAdd[i];
     }
 
@@ -100,7 +90,7 @@ public:
      * \param i The worker that have to add the flow.
      */
     inline void setFlowToAdd(hashElement* h, int i){
-        flowsToAdd[i]->push(h);
+        flowsToAdd[i].push_back(h);
     }
 
     /**
@@ -138,10 +128,11 @@ public:
      * Returns the number of elements to add to the hash tables.
      * \return The number of elements to add to the hash tables.
      */
-    inline int elementsToAddSize(){
-        int size=0;
-        for(int i=0; i<numWorkers; i++)
-            size+=flowsToAdd[i]->size();
+    inline ulong elementsToAddSize(){
+        ulong size = 0;
+        for(int i = 0; i < numWorkers; i++){
+            size += flowsToAdd[i].size();
+        }
         return size;
     }
 };

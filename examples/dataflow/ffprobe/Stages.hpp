@@ -36,15 +36,15 @@ pcap_t *handle; ///< Pcap handle
  * \param pdata The packet.
  */
 inline void dispatchCallback(u_char *user, const struct pcap_pkthdr *phdr, const u_char *pdata){
-    ProbeTask* t=(ProbeTask*) user;
-    hashElement* f=getFlow(pdata,datalinkOffset,ffalloc);
-    if(f==NULL) return;
-    f->dOctets=phdr->len-datalinkOffset;
-    f->First=phdr->ts;
-    int hashValue=hashFun(f,hsize);
-    int workerId=hashValue/(hsize/nWorkers);
-    f->hashId=hashValue%(hsize/nWorkers);
-    t->setFlowToAdd(f,workerId);
+    ProbeTask* t = (ProbeTask*) user;
+    hashElement* f = getFlow(pdata, datalinkOffset, ffalloc);
+    if(f== NULL) return;
+    f->dOctets = phdr->len - datalinkOffset;
+    f->First = phdr->ts;
+    int hashValue = hashFun(f, hsize);
+    int workerId = hashValue/(hsize/nWorkers);
+    f->hashId = hashValue%(hsize/nWorkers);
+    t->setFlowToAdd(f, workerId);
 }
 
 /**
@@ -64,6 +64,7 @@ namespace faskelProbe{
 class Stage:public nornir::dataflow::Computable{
 private:
     int id,hs,idle,lifeTime,maxfNull,maxfAdd,maxReadTOCheck;
+    bool _hashElemDealloc;
     Hash* h;
 public:
     /**
@@ -76,10 +77,20 @@ public:
      * \param maxfNull Max number of flows to check when a worker receives a NULL flow (-1 is all), default is 1.
      * \param maxfAdd Max number of flows to check when a worker adds a flow to the hash table (-1 is all), default is 1.
      * \param maxReadTOCheck Max number of flows to check when readTimeout expires (-1 is all), default is -1.
+     * \param hashElemDealloc If true the received hashElement will be deallocated
+     *                        after hash update.
      */
-    inline Stage(int id, int hSize, int maxActiveFlows, int idle=30, int lifeTime=120, int maxfNull=1, int maxfAdd=1, int maxReadTOCheck=-1):
-    id(id),hs(hSize),idle(idle),lifeTime(lifeTime),maxfNull(maxfNull),maxfAdd(maxfAdd),maxReadTOCheck(maxReadTOCheck){
-        h=new Hash(hs,maxActiveFlows,ffalloc);
+    inline Stage(int id, int hSize, int maxActiveFlows, int idle=30,
+                 int lifeTime=120, int maxfNull=1, int maxfAdd=1,
+                 int maxReadTOCheck=-1, bool hashElemDealloc = true):
+            id(id),hs(hSize),idle(idle),lifeTime(lifeTime),maxfNull(maxfNull),
+            maxfAdd(maxfAdd),maxReadTOCheck(maxReadTOCheck),
+            _hashElemDealloc(hashElemDealloc){
+        if(hashElemDealloc){
+            h = new Hash(hs,maxActiveFlows,ffalloc);
+        }else{
+            h = new Hash(hs,maxActiveFlows,NULL);
+        }
         struct sigaction s;
         bzero( &s, sizeof(s) );
         s.sa_handler=handler;
@@ -100,11 +111,11 @@ public:
         ProbeTask* t = (ProbeTask*) p[0];
         myList<hashElement*> *flowsToExport=t->getFlowsToExport();
         time_t now;
-        myList<hashElement*> *flowsToAdd=t->getFlowsToAdd(id);
-        int ftaSize=flowsToAdd->size();
+        std::vector<hashElement*>& flowsToAdd = t->getFlowsToAdd(id);
+        ulong ftaSize=flowsToAdd.size();
         /**If the read timeout is expired.**/
         if(t->isReadTimeoutExpired()){
-            now=time(NULL);
+            now = time(NULL);
             h->checkExpiration(maxReadTOCheck,idle,lifeTime,flowsToExport,&now);
         }
         /**If there isn't flows to add.**/
@@ -112,7 +123,7 @@ public:
             now = time(NULL);
             if(t->isEof()){
                 /**If end of file is arrived checks all the hash table and considers all flows expired.**/
-                h->checkExpiration(-1,idle,lifeTime,flowsToExport,NULL);
+                h->checkExpiration(std::numeric_limits<uint>::max(),idle,lifeTime,flowsToExport,NULL);
             }else{
                 h->checkExpiration(maxfNull,idle,lifeTime,flowsToExport,&now);
             }
@@ -120,10 +131,13 @@ public:
             now=h->updateFlows(flowsToAdd,flowsToExport);
             if(t->isEof()){
             /**If end of file is arrived checks all the hash table and considers all flows expired.**/
-                h->checkExpiration(-1,idle,lifeTime,flowsToExport,NULL);
+                h->checkExpiration(std::numeric_limits<uint>::max(),idle,lifeTime,flowsToExport,NULL);
             }else{
                 h->checkExpiration(maxfAdd*ftaSize,idle,lifeTime,flowsToExport,&now);
             }
+        }
+        if(_hashElemDealloc){
+            flowsToAdd.clear();
         }
         return p;
     }
@@ -263,6 +277,7 @@ public:
 class genericStage:public ff::ff_node{
 private:
     int id,hs,idle,lifeTime,maxfNull,maxfAdd,maxReadTOCheck;
+    bool _hashElemDealloc;
     Hash* h;
 public:
     /**
@@ -276,8 +291,16 @@ public:
      * \param maxfAdd Max number of flows to check when a worker adds a flow to the hash table (-1 is all), default is 1.
      * \param maxReadTOCheck Max number of flows to check when readTimeout expires (-1 is all), default is -1.
      */
-    inline genericStage(int id, int hSize, int maxActiveFlows, int idle=30, int lifeTime=120, int maxfNull=1, int maxfAdd=1, int maxReadTOCheck=-1):
-    id(id),hs(hSize),idle(idle),lifeTime(lifeTime),maxfNull(maxfNull),maxfAdd(maxfAdd),maxReadTOCheck(maxReadTOCheck){
+    inline genericStage(int id, int hSize, int maxActiveFlows, int idle=30,
+                        int lifeTime=120, int maxfNull=1, int maxfAdd=1,
+                        int maxReadTOCheck=-1, bool hashElemDealloc=true):
+            id(id),hs(hSize),idle(idle),lifeTime(lifeTime),maxfNull(maxfNull),
+            maxfAdd(maxfAdd),maxReadTOCheck(maxReadTOCheck),_hashElemDealloc(hashElemDealloc){
+        if(hashElemDealloc){
+            h = new Hash(hs,maxActiveFlows,ffalloc);
+        }else{
+            h = new Hash(hs,maxActiveFlows,NULL);
+        }
         h=new Hash(hs,maxActiveFlows,ffalloc);
         struct sigaction s;
         bzero( &s, sizeof(s) );
@@ -299,10 +322,10 @@ public:
         ProbeTask* t=(ProbeTask*) p;
         if(t==NULL)
             return NULL;
-        myList<hashElement*> *flowsToExport=t->getFlowsToExport();
+        myList<hashElement*> *flowsToExport = t->getFlowsToExport();
         time_t now;
-        myList<hashElement*> *flowsToAdd=t->getFlowsToAdd(id);
-        int ftaSize=flowsToAdd->size();
+        std::vector<hashElement*>& flowsToAdd = t->getFlowsToAdd(id);
+        ulong ftaSize=flowsToAdd.size();
         /**If the read timeout is expired.**/
         if(t->isReadTimeoutExpired()){
             now=time(NULL);
@@ -313,16 +336,19 @@ public:
             now=time(NULL);
             if(t->isEof())
                 /**If end of file is arrived checks all the hash table and considers all flows expired.**/
-                h->checkExpiration(-1,idle,lifeTime,flowsToExport,NULL);
+                h->checkExpiration(std::numeric_limits<uint>::max(),idle,lifeTime,flowsToExport,NULL);
             else
                 h->checkExpiration(maxfNull,idle,lifeTime,flowsToExport,&now);
         }else{
             now=h->updateFlows(flowsToAdd,flowsToExport);
             if(t->isEof())
             /**If end of file is arrived checks all the hash table and considers all flows expired.**/
-                h->checkExpiration(-1,idle,lifeTime,flowsToExport,NULL);
+                h->checkExpiration(std::numeric_limits<uint>::max(),idle,lifeTime,flowsToExport,NULL);
             else
                 h->checkExpiration(maxfAdd*ftaSize,idle,lifeTime,flowsToExport,&now);
+        }
+        if(_hashElemDealloc){
+            flowsToAdd.clear();
         }
         return t;
     }

@@ -37,7 +37,8 @@ public:
      * \param maxActiveFlows Maximum number of active flows.
      * \param ffalloc A pointer to the fastflow's memory allocator.
      */
-    Hash(uint d, uint maxActiveFlows, ff::ff_allocator* ffalloc):h(new node<hashElement*>*[d]),nextNodeToCheck(NULL),size(d),lastRowChecked(0)
+    Hash(uint d, uint maxActiveFlows, ff::ff_allocator* ffalloc):
+        h(new node<hashElement*>*[d]),nextNodeToCheck(NULL),size(d),lastRowChecked(0)
     ,maxActiveFlows(maxActiveFlows),activeFlows(0),ffalloc(ffalloc){
         for(uint i=0; i<d; i++){
             h[i]=NULL;
@@ -67,10 +68,10 @@ public:
      * \param l A pointer to a list of expired flows.
      * \return Returns the capture time (seconds) of the last packet added.
      */
-    int updateFlows(myList<hashElement*>* flowsToAdd, myList<hashElement*>* l){
+    int updateFlows(std::vector<hashElement*>& flowsToAdd, myList<hashElement*>* l){
         hashElement* f=NULL;
-        while(flowsToAdd->size()!=0){
-            flowsToAdd->pop(&f);
+        for(size_t j = 0; j < flowsToAdd.size(); j++){
+            f = flowsToAdd.at(j);
             uint i=f->hashId;
             assert(i<size);
             /**If the flow is the first that have i as value of hash function.**/
@@ -96,7 +97,9 @@ public:
                     examinated->dOctets+=f->dOctets;
                     examinated->Last=f->First;
                     examinated->tcp_flags|=f->tcp_flags;
-                    ffalloc->free(f);
+                    if(ffalloc){
+                        ffalloc->free(f);
+                    }
                 }else{
                     /**Creates new flow and inserts it at the begin of the list.**/
                     f->Last=f->First;
@@ -105,8 +108,9 @@ public:
                     h[i]->prev=newNode;
                     h[i]=newNode;
                     ++activeFlows;
-                    if(activeFlows==maxActiveFlows)
+                    if(activeFlows==maxActiveFlows){
                         checkExpiration(1,0,0,l,NULL);
+                    }
                 }
             }
         }
@@ -122,13 +126,13 @@ public:
      * \param l A pointer to the list where to add the expired flows.
      * \param now A pointer to current time value.
      */
-    void checkExpiration(int n, int idle, int lifetime, myList<hashElement*>* l, time_t* now){
-        if(n==0 || n<-1) return;
-        uint nodeChecked=0,lineChecked=0,limit;
+    void checkExpiration(ulong n, int idle, int lifetime, myList<hashElement*>* l, time_t* now){
+        if(n == 0){
+            return;
+        }
+        uint lineChecked = 0;
+        ulong nodeChecked = 0, limit = n;
         node<hashElement*> *p=nextNodeToCheck,*temp;
-        /**If n==-1 checks all flows in the hash table.**/
-        if(n==-1) limit=std::numeric_limits<uint>::max();
-        else limit=n;
         while(nodeChecked<limit && lineChecked<=size){
             if(p!=NULL){
                 ++nodeChecked;

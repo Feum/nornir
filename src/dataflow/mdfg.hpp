@@ -69,14 +69,12 @@ namespace dataflow{
  */
 class Mdfg{
 private:
-    /**Higher available index (before realloc).**/
-    unsigned int higherId,
     /**Next free index**/
-        nextId;
+    uint _nextId;
     /**Graph's id.**/
-    unsigned long int id;
+    ulong _id;
     /**Instructions of the graph.**/
-    Mdfi** instructions;
+    std::vector<Mdfi> _instructions;
 public:
     /**
      * Constructor of the graph.
@@ -101,7 +99,7 @@ public:
      * \param g Reference to graph to copy
      * \param gid The new id of the graph's copy.
      */
-    Mdfg(const Mdfg& g,unsigned long int gid);
+    Mdfg(const Mdfg& g, ulong gid);
 
     /**
      * Graph's destructor.
@@ -109,8 +107,8 @@ public:
     ~Mdfg();
 
 
-    inline unsigned long int getId(){
-        return id;
+    inline ulong getId(){
+        return _id;
     }
 
 
@@ -118,8 +116,8 @@ public:
      * Returns the number of instructions.
      * \return Number of instructions.
      */
-    inline unsigned int getNumMdfi(){
-        return nextId;
+    inline uint getNumMdfi(){
+        return _instructions.size();
     }
 
     /**
@@ -129,7 +127,7 @@ public:
      * \return A pointer to the created instruction.
      */
     inline Mdfi* createFirstMdfi(Computable* c, unsigned int nOutput){
-        return createMdfi(c,1,nOutput);
+        return createMdfi(c, 1, nOutput);
     }
 
     /**
@@ -138,10 +136,11 @@ public:
      * \return A pointer to the created instruction.
      */
     inline Mdfi* createFirstMdfi(Mdfi* in){
-        if(in->getInputSize()!=1)
+        if(in->getInputSize() != 1){
             return NULL;
-        else
+        }else{
             return createMdfi(in);
+        }
     }
 
     /**
@@ -151,15 +150,10 @@ public:
      * \param nOutput Size of the output.
      * \return A pointer to the created instruction.
      */
-    inline Mdfi* createMdfi(Computable* c, unsigned int nInput,unsigned int nOutput){
-        if(nextId>=higherId){
-            instructions=(Mdfi**)realloc(instructions,sizeof(Mdfi*)*(higherId*2));
-            higherId*=2;
-        }
-        Mdfi* instr=new Mdfi(c,nextId,nInput,nOutput);
-        instructions[nextId]=instr;
-        ++nextId;
-        return instr;
+    inline Mdfi* createMdfi(Computable* c, uint nInput, uint nOutput){
+        _instructions.emplace_back(c, _nextId, nInput, nOutput);
+        ++_nextId;
+        return &(_instructions.back());
     }
 
     /**
@@ -168,15 +162,10 @@ public:
      * \return A pointer to the created instruction.
      */
     inline Mdfi* createMdfi(Mdfi* in){
-        if(nextId>=higherId){
-            instructions=(Mdfi**)realloc(instructions,sizeof(Mdfi*)*(higherId*2));
-            higherId*=2;
-        }
-        Mdfi* instr=new Mdfi(*in);
-        instructions[nextId]=instr;
-        instr->setId(nextId);
-        ++nextId;
-        return instr;
+        _instructions.emplace_back(*in);
+        _instructions.back().setId(_nextId);
+        ++_nextId;
+        return &(_instructions.back());
     }
 
     /**
@@ -186,11 +175,11 @@ public:
      * \return A pointer to the created instruction.
      */
     inline Mdfi* createLastMdfi(Computable* c, unsigned int nInput){
-        Mdfi* tor=createMdfi(c,nInput,1);
+        Mdfi* tor = createMdfi(c, nInput, 1);
         TokenId d;
         d.setOutputStream();
         /**Set the output stream as instruction's output.**/
-        tor->setDestination(0,d);
+        tor->setDestination(0, d);
         return tor;
     }
 
@@ -200,14 +189,14 @@ public:
      * \return A pointer to the created instruction.
      */
     inline Mdfi* createLastMdfi(Mdfi* in){
-        if(in->getOutputSize()!=1)
+        if(in->getOutputSize() != 1){
             return NULL;
-        else{
-            Mdfi* tor=createMdfi(in);
+        }else{
+            Mdfi* tor = createMdfi(in);
             TokenId d;
             d.setOutputStream();
             /**Set the output stream as instruction's output.**/
-            tor->setDestination(0,d);
+            tor->setDestination(0, d);
             return tor;
         }
     }
@@ -217,18 +206,19 @@ public:
      * \return A pointer to the first instruction of the graph.
      */
     inline Mdfi* getFirst(){
-        if(nextId!=0)
-            return instructions[0];
-        else
+        if(_instructions.size()){
+            return &(_instructions.front());
+        }else{
             return NULL;
+        }
     }
 
     /**
      * Returns a pointer to the instruction with identifier equal to \e i.
      * \param i The identifier of the instruction.
      */
-    inline Mdfi* getMdfi(unsigned int i){
-        return instructions[i];
+    inline Mdfi* getMdfi(uint i){
+        return &(_instructions.at(i));
     }
 
     /**
@@ -236,10 +226,11 @@ public:
      * \return A pointer to the last instruction of the graph.
      */
     inline Mdfi* getLast(){
-        if(nextId!=0)
-            return instructions[nextId-1];
-        else
+        if(_instructions.size()){
+            return &(_instructions.back());
+        }else{
             return NULL;
+        }
     }
 
     /**
@@ -250,13 +241,13 @@ public:
      * graph.link(x,0,z,0); <--Link the first output of x to the first input of z.
      * \endcode
      */
-    inline bool link(Mdfi* x, unsigned int y, Mdfi* z, unsigned int w){
-        TokenId tid(z->getId(),w);
+    inline bool link(Mdfi* x, uint y, Mdfi* z, uint w){
+        TokenId tid(z->getId(), w);
         /**Check the indexes.**/
-        if((y>=x->getOutputSize())||(w>=z->getInputSize()))
+        if((y >= x->getOutputSize()) || (w >= z->getInputSize())){
             return false;
-        else{
-            x->setDestination(y,tid);
+        }else{
+            x->setDestination(y, tid);
             return true;
         }
     }
@@ -265,7 +256,7 @@ public:
      * Resets all the instructions.
      * \param newId The new id of the graph.
      */
-    void reset(unsigned long int newId);
+    void reset(ulong newId);
 
 };
 }
