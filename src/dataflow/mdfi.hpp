@@ -102,7 +102,7 @@ public:
      * Checks if the instruction is fireable.
      * \return \e true if the instruction is fireable, otherwise returns \e false.
      */
-    inline bool isFireable(){
+    inline bool isFireable() const{
         uint i = 0;
         while(i < dInput){
             if(!tInput[i].isPresent()) return false;

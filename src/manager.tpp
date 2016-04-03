@@ -210,7 +210,6 @@ void ManagerFarm<lb_t, gt_t>::getWorkersSamples(WorkerSample& sample){
         w = _activeWorkers.at(i);
         w->getSampleResponse(tmp, _samples->average().latency);
         sample += tmp;
-        std::cout << "Worker " << i << " load " << tmp.loadPercentage << std::endl;
     }
     sample.loadPercentage /= numActiveWorkers;
     sample.latency /= numActiveWorkers;

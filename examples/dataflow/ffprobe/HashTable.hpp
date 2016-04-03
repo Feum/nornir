@@ -30,6 +30,7 @@ private:
         maxActiveFlows,   ///<Max number of active flows.
         activeFlows;      ///<Number of active flows.
     ff::ff_allocator* ffalloc;  ///<Fastflow's allocator.
+    bool _exportExp;
 public:
     /**
      * Constructor of the hash table.
@@ -37,9 +38,9 @@ public:
      * \param maxActiveFlows Maximum number of active flows.
      * \param ffalloc A pointer to the fastflow's memory allocator.
      */
-    Hash(uint d, uint maxActiveFlows, ff::ff_allocator* ffalloc):
+    Hash(uint d, uint maxActiveFlows, ff::ff_allocator* ffalloc, bool exportExp = true):
         h(new node<hashElement*>*[d]),nextNodeToCheck(NULL),size(d),lastRowChecked(0)
-    ,maxActiveFlows(maxActiveFlows),activeFlows(0),ffalloc(ffalloc){
+    ,maxActiveFlows(maxActiveFlows),activeFlows(0),ffalloc(ffalloc), _exportExp(exportExp){
         for(uint i=0; i<d; i++){
             h[i]=NULL;
         }
@@ -97,7 +98,7 @@ public:
                     examinated->dOctets+=f->dOctets;
                     examinated->Last=f->First;
                     examinated->tcp_flags|=f->tcp_flags;
-                    if(ffalloc){
+                    if(_exportExp){
                         ffalloc->free(f);
                     }
                 }else{
@@ -138,7 +139,9 @@ public:
                 ++nodeChecked;
                 /**If the flow is expired, adds the flow to the vector.**/
                 if(isExpired(p->elem,idle,lifetime,now)){
-                    l->push(p->elem);
+                    if(_exportExp){
+                        l->push(p->elem);
+                    }
                     if(p->prev!=NULL)
                         p->prev->next=p->next;
                     else{

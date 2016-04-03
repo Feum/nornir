@@ -41,7 +41,9 @@ public:
      * \param systemStartTime The system start time.
      * \param deallocTasks If true, tasks will be automatically deallocated.
      */
-    inline ProbeOutputStream(FILE* out,uint queueTimeout,char const* collector, uint port, uint minFlowSize, uint32_t systemStartTime, bool deallocTasks = true):
+    inline ProbeOutputStream(FILE* out, uint queueTimeout, char const* collector,
+                             uint port, uint minFlowSize, uint32_t systemStartTime,
+                             bool deallocTasks = true):
             out(out),qTimeout(queueTimeout),flowSequence(0),
             minFlowSize(minFlowSize),q(new std::queue<hashElement*>),lastEmission(time(NULL)),
             ex(collector,port,ffalloc,systemStartTime), _deallocTasks(deallocTasks){
@@ -71,6 +73,9 @@ public:
      * \param a The task to put.
      */
     inline void put(nornir::dataflow::StreamElem* a){
+        if(!_deallocTasks){
+            return;
+        }
         ProbeTask* t=(ProbeTask*) a;
         hashElement* f;
         if(a!=NULL){

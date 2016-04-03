@@ -50,57 +50,55 @@ Mdfg* compile(Computable* c){
      * first stage of the pipeline and links it together.
      **/
     }else if(tc==typeid(Pipeline)){
-        Pipeline* p=(Pipeline*) c;
+        Pipeline* p = (Pipeline*) c;
         /**Compiles the two stages.**/
-        Mdfg* g1=compile(p->getFirstStage());
-        Mdfg* g2=compile(p->getSecondStage());
-        bool lastSet=false;
-        int n=g2->getNumMdfi();
-        Mdfi *added,*toInsert,
-            *oldSecondStageFirst,///<The first instruction of the second stage of the pipeline.
-            *oldLast,///<The last instruction of the first stage of the pipeline.
-            *last;///<The last instruction of the new graph (Stage1 & Stage2).
+        Mdfg* g1 = compile(p->getFirstStage());
+        Mdfg* g2 = compile(p->getSecondStage());
+        bool lastSet = false;
+        uint n = g2->getNumMdfi();
+        uint added,
+             oldSecondStageFirst, ///<The first instruction of the second stage of the pipeline.
+             oldLast; ///<The last instruction of the first stage of the pipeline.
 
         /**
          * \e newIds is an array of Mdfi identifiers. \e newIds[i] is the new
          * identifier of the instruction of the second stage, that previously
          * has \e i as identifier.
          **/
-        int *newIds=new int[n];
-        oldLast=g1->getLast();
-        oldSecondStageFirst=g2->getFirst();
+        int *newIds = new int[n];
+        oldLast = g1->getLast();
+        oldSecondStageFirst = g2->getFirst();
         /**
          * Discriminates the case where the second stage has only one
          * instruction.
          **/
-        if(n==1){
-            oldSecondStageFirst=g1->createLastMdfi(oldSecondStageFirst);
-            lastSet=true;
-        }else
-            oldSecondStageFirst=g1->createMdfi(oldSecondStageFirst);
-        newIds[0]=oldSecondStageFirst->getId();
+        if(n == 1){
+            oldSecondStageFirst = g1->createLastMdfi(g2, 0);
+            lastSet = true;
+        }else{
+            oldSecondStageFirst = g1->createMdfi(g2, 0);
+        }
+        newIds[0] = oldSecondStageFirst;
         /**
          * Adds the instructions of the second stage (except first and last
          * instruction).
          **/
-        for(int i=1; i<n-1;i++){
-            toInsert=g2->getMdfi(i);
-            added=g1->createMdfi(toInsert);
-            newIds[i]=added->getId();
+        for(uint i = 1; i < n - 1; i++){
+            added = g1->createMdfi(g2, i);
+            newIds[i] = added;
         }
 
         /**If the last instruction isn't set.**/
         if(!lastSet){
-            last=g2->getLast();
-            last=g1->createLastMdfi(last);
-            newIds[n-1]=last->getId();
+            newIds[n - 1] = g1->createLastMdfi(g2, g2->getLast());
         }
         /**Updates destinations.**/
-        for(int i=0; i<n; i++)
-            g1->getMdfi(newIds[i])->updateDestinations(newIds);
+        for(uint i = 0; i < n; i++){
+            g1->updateDestinations(newIds[i], newIds);
+        }
 
         /**Links the two stages.**/
-        g1->link(oldLast,0,oldSecondStageFirst,0);
+        g1->link(oldLast, 0, oldSecondStageFirst, 0);
 
         delete[] newIds;
         /**
@@ -111,47 +109,51 @@ Mdfg* compile(Computable* c){
         return g1;
     /**Map and reduce compiling.**/
     }else if(tc==typeid(EmitterWorkerCollector)){
-        EmitterWorkerCollector* ewc=(EmitterWorkerCollector*) c;
-        int workersNum=ewc->getNWorkers();
+        EmitterWorkerCollector* ewc = (EmitterWorkerCollector*) c;
+        int workersNum = ewc->getNWorkers();
         /**Compiles worker.**/
-        Mdfg* worker=compile(ewc->getWorker());
-        Mdfg* emitter=new Mdfg(ewc->getEmitter(),1,workersNum);
-        Mdfg* collector=new Mdfg(ewc->getCollector(),workersNum,1);
+        Mdfg* worker = compile(ewc->getWorker());
+        Mdfg* emitter = new Mdfg(ewc->getEmitter(), 1, workersNum);
+        Mdfg* collector = new Mdfg(ewc->getCollector(), workersNum, 1);
 
-        int workerSize=worker->getNumMdfi();
+        int workerSize = worker->getNumMdfi();
         /**
          * \e newWorkerIds is an array of Mdfi identifiers. \e newWorkerIds[i]
          * is the new identifier of the instruction of the worker, that
          * previously has \e i as identifier.
          **/
-        int *newWorkerIds=new int [workerSize];
+        int *newWorkerIds = new int[workerSize];
         /**
          * \e firstWorkerInstr and \e lastWorkerInstrs contain the first and
          * the last instructions of the workers.
          **/
-        int *firstWorkerInstr=new int[workersNum],*lastWorkerInstr=new int[workersNum];
+        int *firstWorkerInstr = new int[workersNum];
+        int *lastWorkerInstr = new int[workersNum];
         /**Adds the workers.**/
-        for(int i=0; i<workersNum; i++){
-            for(int j=0; j<workerSize; j++)
-                newWorkerIds[j]=emitter->createMdfi(worker->getMdfi(j))->getId();
-            firstWorkerInstr[i]=newWorkerIds[0];
-            lastWorkerInstr[i]=newWorkerIds[workerSize-1];
+        for(int i = 0; i < workersNum; i++){
+            for(int j = 0; j < workerSize; j++){
+                newWorkerIds[j] = emitter->createMdfi(worker, j);
+            }
+            firstWorkerInstr[i] = newWorkerIds[0];
+            lastWorkerInstr[i] = newWorkerIds[workerSize - 1];
             /**Updates the destinations.**/
-            for(int j=0; j<workerSize; j++)
-                emitter->getMdfi(newWorkerIds[j])->updateDestinations(newWorkerIds);
+            for(int j = 0; j < workerSize; j++){
+                emitter->updateDestinations(newWorkerIds[j], newWorkerIds);
+            }
         }
         delete[] newWorkerIds;
         /**Links the emitter to the workers.**/
-        for(int i=0; i<workersNum; i++)
-            emitter->link(emitter->getFirst(),i,emitter->getMdfi(firstWorkerInstr[i]),0);
+        for(int i = 0; i < workersNum; i++){
+            emitter->link(emitter->getFirst(), i, firstWorkerInstr[i], 0);
+        }
         delete[] firstWorkerInstr;
         /**Adds the collector.**/
-        Mdfi *added=collector->getFirst(),*firstCollInstr;
-        firstCollInstr=emitter->createLastMdfi(added);
+        uint firstCollInstr = emitter->createLastMdfi(collector, 0);
 
         /**Links the workers to collector.**/
-        for(int i=0; i<workersNum; i++)
-            emitter->link(emitter->getMdfi(lastWorkerInstr[i]),0,firstCollInstr,i);
+        for(int i = 0; i < workersNum; i++){
+            emitter->link(lastWorkerInstr[i], 0, firstCollInstr, i);
+        }
         delete[] lastWorkerInstr;
         /**
          * Deletes the worker and the collector because all their instructions
@@ -235,7 +237,7 @@ private:
         OutputToken ot;
         ulong graphId;
         TokenId dest;
-        Mdfi *ins;
+        Mdfi* ins;
         void* task;
         uint collected = 0;
         uint collectedTotal = 0;
@@ -281,10 +283,11 @@ private:
                                 throw std::runtime_error("Graph not found.");
                             }
 #ifdef POOL
-                            if(_pool->size() < MAXPOOLSIZE)
+                            if(_pool->size() < MAXPOOLSIZE){
                                 _pool->push_back(currentGraph);
-                            else
+                            }else{
                                 delete currentGraph;
+                            }
 #else
                             delete currentGraph;
 #endif
@@ -330,7 +333,7 @@ private:
         assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
 #endif
 
-        first = newGraph->getFirst();
+        first = newGraph->getMdfi(0);
         if(!first->setInput(next, 0)){
             throw std::runtime_error("There is an error in a MDFi link.");
         }

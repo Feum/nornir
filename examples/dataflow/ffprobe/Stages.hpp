@@ -86,11 +86,7 @@ public:
             id(id),hs(hSize),idle(idle),lifeTime(lifeTime),maxfNull(maxfNull),
             maxfAdd(maxfAdd),maxReadTOCheck(maxReadTOCheck),
             _hashElemDealloc(hashElemDealloc){
-        if(hashElemDealloc){
-            h = new Hash(hs,maxActiveFlows,ffalloc);
-        }else{
-            h = new Hash(hs,maxActiveFlows,NULL);
-        }
+        h = new Hash(hs,maxActiveFlows,ffalloc,hashElemDealloc);
         struct sigaction s;
         bzero( &s, sizeof(s) );
         s.sa_handler=handler;

@@ -465,7 +465,7 @@ template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
 };
 
 template<> char const* enumStrings<StrategySelection>::data[] = {
-    "LEARNIG",
+    "LEARNING",
     "ANALYTICAL",
     "FULLSEARCH",
     "LIMARTINEZ",

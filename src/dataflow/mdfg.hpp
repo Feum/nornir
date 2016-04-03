@@ -46,25 +46,25 @@ namespace dataflow{
  *      using namespace nornir;
  *      using namespace nornir::dataflow;
  *      Mdfg* graph = new Mdfg();
- *      Mdfi *i1,*i2,*i3,*i4,*i5,*i6;
+ *      uint i1, i2, i3, i4, i5, i6;
  *
- *      i1=graph->createFirstMdfi(seq1,2); <--Creates the first instruction that compute the sequential skeleton seq1
+ *      i1 = graph->createFirstMdfi(seq1, 2); <--Creates the first instruction that compute the sequential skeleton seq1
  *                                            The instruction have 2 output. (The number of input is implicit one)
- *      i2=graph->createMdfi(seq2,1,1);
- *      i3=graph->createMdfi(seq3,1,1);
- *      i4=graph->createMdfi(seq4,2,1);
- *      i5=graph->createMdfi(seq5,1,1);
- *      i6=graph->createLastMdfi(seq6,1);  <--Creates the last instruction. The instruction have 1 input. (The number
+ *      i2 = graph->createMdfi(seq2, 1, 1);
+ *      i3 = graph->createMdfi(seq3, 1, 1);
+ *      i4 = graph->createMdfi(seq4, 2, 1);
+ *      i5 = graph->createMdfi(seq5, 1, 1);
+ *      i6 = graph->createLastMdfi(seq6, 1);  <--Creates the last instruction. The instruction have 1 input. (The number
  *                                            of output is implicit one)
  * \endcode
  * To link them together:
  * \code
- *      graph->link(i1,0,i2,0);
- *      graph->link(i1,1,i3,0);
- *      graph->link(i2,0,i4,0);
- *      graph->link(i3,0,i4,1);
- *      graph->link(i4,0,i5,0);
- *      graph->link(i5,0,i6,0);//TODO AGGIUNGERE IMG GRAFO.
+ *      graph->link(i1, 0, i2, 0);
+ *      graph->link(i1, 1, i3, 0);
+ *      graph->link(i2, 0, i4, 0);
+ *      graph->link(i3, 0, i4, 1);
+ *      graph->link(i4, 0, i5, 0);
+ *      graph->link(i5, 0, i6, 0);//TODO AGGIUNGERE IMG GRAFO.
  * \endcode
  */
 class Mdfg{
@@ -124,20 +124,20 @@ public:
      * Creates the first instruction of the graph.
      * \param c A pointer to the \e Computable that the instruction have to compute.
      * \param nOutput Size of the output.
-     * \return A pointer to the created instruction.
+     * \return The id of the created instruction.
      */
-    inline Mdfi* createFirstMdfi(Computable* c, unsigned int nOutput){
+    inline uint createFirstMdfi(Computable* c, unsigned int nOutput){
         return createMdfi(c, 1, nOutput);
     }
 
     /**
      * Creates the first instruction of the graph.
      * \param in The instruction to be included into the graph.
-     * \return A pointer to the created instruction.
+     * \return The id of the created instruction.
      */
-    inline Mdfi* createFirstMdfi(Mdfi* in){
+    inline uint createFirstMdfi(Mdfi* in){
         if(in->getInputSize() != 1){
-            return NULL;
+            throw std::runtime_error("First Mdfi must have only 1 input.");
         }else{
             return createMdfi(in);
         }
@@ -148,88 +148,114 @@ public:
      * \param c A pointer to the \e Computable that the instruction have to compute.
      * \param nInput Size of the input.
      * \param nOutput Size of the output.
-     * \return A pointer to the created instruction.
+     * \return The id of the created instruction.
      */
-    inline Mdfi* createMdfi(Computable* c, uint nInput, uint nOutput){
+    inline uint createMdfi(Computable* c, uint nInput, uint nOutput){
         _instructions.emplace_back(c, _nextId, nInput, nOutput);
         ++_nextId;
-        return &(_instructions.back());
+        return _instructions.size() - 1;
     }
 
     /**
      * Creates an instruction of the graph.
      * \param in The instruction to be included into the graph.
-     * \return A pointer to the created instruction.
+     * \return The id of the created instruction.
      */
-    inline Mdfi* createMdfi(Mdfi* in){
+    inline uint createMdfi(Mdfi* in){
         _instructions.emplace_back(*in);
         _instructions.back().setId(_nextId);
         ++_nextId;
-        return &(_instructions.back());
+        return _instructions.size() - 1;
+    }
+
+    /**
+     * Creates an instruction of the graph starting from an
+     * instruction of another graph.
+     * \param g The other graph.
+     * \param id The id of the mdfi to be copied.
+     * \return The id of the created instruction.
+     */
+    inline uint createMdfi(Mdfg* g, uint id){
+        _instructions.emplace_back(g->_instructions.at(id));
+        _instructions.back().setId(_nextId);
+        ++_nextId;
+        return _instructions.size() - 1;
     }
 
     /**
      * Creates the last instruction of the graph.
      * \param c A pointer to the \e Computable that the instruction have to compute.
      * \param nInput Size of the input.
-     * \return A pointer to the created instruction.
+     * \return The id of the created instruction.
      */
-    inline Mdfi* createLastMdfi(Computable* c, unsigned int nInput){
-        Mdfi* tor = createMdfi(c, nInput, 1);
+    inline uint createLastMdfi(Computable* c, unsigned int nInput){
+        uint torid = createMdfi(c, nInput, 1);
         TokenId d;
         d.setOutputStream();
         /**Set the output stream as instruction's output.**/
-        tor->setDestination(0, d);
-        return tor;
+        _instructions.at(torid).setDestination(0, d);
+        return torid;
     }
 
     /**
      * Creates the last instruction of the graph.
      * \param in The instruction to be included into the graph.
-     * \return A pointer to the created instruction.
+     * \return The id of the created instruction.
      */
-    inline Mdfi* createLastMdfi(Mdfi* in){
+    inline uint createLastMdfi(Mdfi* in){
         if(in->getOutputSize() != 1){
-            return NULL;
+            throw std::runtime_error("Last Mdfi must have only 1 output.");
         }else{
-            Mdfi* tor = createMdfi(in);
+            uint torid = createMdfi(in);
             TokenId d;
             d.setOutputStream();
             /**Set the output stream as instruction's output.**/
-            tor->setDestination(0, d);
-            return tor;
+            _instructions.at(torid).setDestination(0, d);
+            return torid;
         }
     }
 
     /**
-     * Returns a pointer to the first instruction of the graph.
-     * \return A pointer to the first instruction of the graph.
+     * Creates the last instruction of the graph starting
+     * from the instruction of another graph.
+     * \param g The other graph.
+     * \param id The id of the instruction in the other graph.
+     * \return The id of the created instruction.
      */
-    inline Mdfi* getFirst(){
-        if(_instructions.size()){
-            return &(_instructions.front());
+    inline uint createLastMdfi(Mdfg* g, uint id){
+        if(g->_instructions.at(id).getOutputSize() != 1){
+            throw std::runtime_error("Last Mdfi must have only 1 output.");
         }else{
-            return NULL;
+            uint torid = createMdfi(g, id);
+            TokenId d;
+            d.setOutputStream();
+            /**Set the output stream as instruction's output.**/
+            _instructions.at(torid).setDestination(0, d);
+            return torid;
         }
     }
 
     /**
-     * Returns a pointer to the instruction with identifier equal to \e i.
-     * \param i The identifier of the instruction.
+     * Returns the id of the first instruction of the graph.
+     * \return The id of the created instruction.
      */
-    inline Mdfi* getMdfi(uint i){
-        return &(_instructions.at(i));
+    inline uint getFirst(){
+        if(_instructions.size()){
+            return 0;
+        }else{
+            throw std::runtime_error("No Mdfi in the graph.");
+        }
     }
 
     /**
-     * Returns a pointer to the last instruction of the graph.
-     * \return A pointer to the last instruction of the graph.
+     * Returns the id of the last instruction of the graph.
+     * \return The id of the created instruction.
      */
-    inline Mdfi* getLast(){
+    inline uint getLast(){
         if(_instructions.size()){
-            return &(_instructions.back());
+            return _instructions.size() - 1;
         }else{
-            return NULL;
+            throw std::runtime_error("No Mdfi in the graph.");
         }
     }
 
@@ -238,18 +264,44 @@ public:
      * the \e w-th output of the instruction \e z.
      * e.g.:
      * \code
-     * graph.link(x,0,z,0); <--Link the first output of x to the first input of z.
+     * graph.link(2, 0, 3, 0); <--Link the first output of mdfi with id 2 to the first input of mdfi with id 3.
      * \endcode
      */
-    inline bool link(Mdfi* x, uint y, Mdfi* z, uint w){
-        TokenId tid(z->getId(), w);
+    inline bool link(uint x, uint y, uint z, uint w){
+        TokenId tid(z, w);
         /**Check the indexes.**/
-        if((y >= x->getOutputSize()) || (w >= z->getInputSize())){
+        if((y >= _instructions.at(x).getOutputSize()) ||
+           (w >= _instructions.at(z).getInputSize())){
             return false;
         }else{
-            x->setDestination(y, tid);
+            _instructions.at(x).setDestination(y, tid);
             return true;
         }
+    }
+
+    /**
+     * Updates the destinations of an instruction.
+     * \param id The id of the Mdfi.
+     * \param v The new destinations.
+     */
+    inline void updateDestinations(uint id, int* v){
+        if(id >= _instructions.size()){
+            throw std::runtime_error("Non existing mdfi.");
+        }
+        _instructions.at(id).updateDestinations(v);
+    }
+
+    inline bool isFireable(uint id) const{
+        return _instructions.at(id).isFireable();
+    }
+
+    /**
+     * ATTENTION: SHOULD ONLY BE CALLED AFTER THE GRAPH HAS BEEN CREATED.
+     *            If instructions are added/removed, this pointer will be
+     *            invalidated.
+     */
+    inline Mdfi* getMdfi(uint id){
+        return &(_instructions.at(id));
     }
 
     /**

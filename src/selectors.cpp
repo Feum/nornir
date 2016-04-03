@@ -436,8 +436,12 @@ KnobsValues SelectorAnalytical::getNextKnobsValues(double primaryValue,
                                                double secondaryValue,
                                                u_int64_t totalTasks){
     // Best must be returned only when violated or too distant from prediction
-    throw std::runtime_error("SelectorSimple not yet implemented."); //TODO
-    return getBestKnobsValues(primaryValue);
+    //throw std::runtime_error("SelectorSimple not yet implemented."); //TODO
+    if(isContractViolated(primaryValue) || !isAccurate(primaryValue, secondaryValue)){
+        return getBestKnobsValues(primaryValue);
+    }else{
+        return _configuration.getRealValues();
+    }
 }
 
 SelectorLearner::SelectorLearner(const Parameters& p,

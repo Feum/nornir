@@ -169,7 +169,7 @@ public:
      * Checks the presence of the task.
      * \return \e True if the task is present, otherwise returns \e false.
      */
-    inline bool isPresent(){
+    inline bool isPresent() const{
         return presence;
     }
 

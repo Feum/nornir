@@ -120,7 +120,7 @@ void InputStreamRate::init(){
     DEBUG(_rates.size() << " rates.");
 }
 
-#define BURST_SIZE 1000.0
+#define BURST_SIZE 10.0
 
 StreamElem* InputStreamRate::next(){
     if(!_objects.size()){
