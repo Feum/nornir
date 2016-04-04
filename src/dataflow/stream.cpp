@@ -185,7 +185,7 @@ StreamElem* InputStreamRate::next(){
 
     if(_lastSec != _lastStoredRateTs){
         _lastStoredRateTs = _lastSec;
-        std::cout << "Rate: " << _processedPkts << std::endl;
+        DEBUG("Ts: " << _lastStoredRateTs << " Rate: " << _processedPkts);
         _processedPkts = 0;
     }
 

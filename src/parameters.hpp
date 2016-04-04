@@ -176,6 +176,7 @@ typedef enum{
 // strategy is "LEARNING".
 typedef enum{
     STRATEGY_PREDICTION_REGRESSION_LINEAR = 0,
+    STRATEGY_PREDICTION_MISHRA
 }StrategyPrediction;
 
 /// Possible ways to select the calibration points. Can only be specified if

@@ -438,7 +438,7 @@ double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
     double usedPhysicalCores = values[KNOB_TYPE_WORKERS];
     return (double)(values[KNOB_TYPE_FREQUENCY] * usedPhysicalCores) /
            (double)(_configuration.getRealValue(KNOB_TYPE_FREQUENCY) *
-                    usedPhysicalCores);
+                    _configuration.getRealValue(KNOB_TYPE_WORKERS));
 }
 
 double PredictorAnalytical::getPowerPrediction(const KnobsValues& values){

@@ -255,6 +255,8 @@ public:
  * Selector described in PDP2015 paper.
  */
 class SelectorAnalytical: public SelectorPredictive{
+private:
+    uint _violations;
 public:
     SelectorAnalytical(const Parameters& p,
                    const FarmConfiguration& configuration,

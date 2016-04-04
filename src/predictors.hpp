@@ -258,7 +258,7 @@ public:
 
 /*
  * Represents a simple predictor. It works only for application that
- * exhibits good scalability e do not use hyperthreading.
+ * exhibits good scalability and do not use hyperthreading.
  * For power, the prediction preserves the relative order between
  * configurations but does not give an exact value. Accordingly,
  * it can't be used for power bounded contracts.
@@ -285,6 +285,31 @@ public:
     bool refine();
 
     void clear();
+};
+
+/**
+ * Applies the algorithm described in:
+ * "A Probabilistic Graphical Model-based Approach for Minimizing
+ * Energy Under Performance Constraints" - Mishra, Nikita and Zhang, Huazhe
+ * and Lafferty, John D. and Hoffmann, Henry
+ */
+class PredictorMishra: public Predictor{
+    PredictorMishra(PredictorType type,
+              const Parameters& p,
+              const FarmConfiguration& configuration,
+              const Smoother<MonitoredSample>* samples);
+
+    ~PredictorMishra();
+
+    bool readyForPredictions();
+
+    void clear();
+
+    bool refine();
+
+    void prepareForPredictions();
+
+    double predict(const KnobsValues& realValues);
 };
 
 }

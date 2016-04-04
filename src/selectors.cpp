@@ -307,7 +307,7 @@ KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
 
         // Adjust derived predictions (e.g. UTILIZATION).
         primaryPrediction = adjustDerivedValue(_p.contractType, _samples,
-                                                    primaryPrediction);
+                                               primaryPrediction);
         //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
             //std::cout << secondaryPrediction;
@@ -381,9 +381,6 @@ void SelectorPredictive::clearPredictors(){
 }
 
 bool SelectorPredictive::isAccurate(double primaryValue, double secondaryValue){
-    // Adjust derived values (e.g. UTILIZATION).
-    primaryValue = adjustDerivedValue(_p.contractType, _samples, primaryValue);
-
     double primaryError = (primaryValue - _primaryPrediction)/primaryValue*100.0;
     double secondaryError = (secondaryValue - _secondaryPrediction)/
                             secondaryValue*100.0;
@@ -428,18 +425,25 @@ SelectorAnalytical::SelectorAnalytical(const Parameters& p,
                const Smoother<MonitoredSample>* samples):
     SelectorPredictive(p, configuration, samples,
                        std::unique_ptr<Predictor>(new PredictorAnalytical(PREDICTION_BANDWIDTH, p, configuration, samples)),
-                       std::unique_ptr<Predictor>(new PredictorAnalytical(PREDICTION_POWER, p, configuration, samples))){
+                       std::unique_ptr<Predictor>(new PredictorAnalytical(PREDICTION_POWER, p, configuration, samples))),
+    _violations(0){
     ;
 }
 
 KnobsValues SelectorAnalytical::getNextKnobsValues(double primaryValue,
-                                               double secondaryValue,
-                                               u_int64_t totalTasks){
-    // Best must be returned only when violated or too distant from prediction
-    //throw std::runtime_error("SelectorSimple not yet implemented."); //TODO
-    if(isContractViolated(primaryValue) || !isAccurate(primaryValue, secondaryValue)){
-        return getBestKnobsValues(primaryValue);
+                                                   double secondaryValue,
+                                                   u_int64_t totalTasks){
+    if(isContractViolated(primaryValue)){
+        if(_violations > _p.tolerableSamples){
+            return getBestKnobsValues(primaryValue);
+        }else{
+            ++_violations;
+            return _configuration.getRealValues();
+        }
     }else{
+        if(_violations){
+            --_violations;
+        }
         return _configuration.getRealValues();
     }
 }

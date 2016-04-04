@@ -226,11 +226,19 @@ private:
      */
 
     inline bool keepInsertingGraphs() const{
-        return _graphsInside < _groupSize;
+        if(_groupSize){
+            return _graphsInside < _groupSize;
+        }else{
+            return true;
+        }
     }
 
     inline bool keepPoppingTasks() const{
-        return _graphsInside > _groupSize;
+        if(_groupSize){
+            return _graphsInside > _groupSize;
+        }else{
+            return false;
+        }
     }
 
     inline void updateCompleted(){
