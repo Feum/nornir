@@ -64,7 +64,7 @@ fprintf(stderr,"[-y <minFlowSize>]         | Minimum TCP flow size (in bytes). I
 fprintf(stderr,"[-x <ratesFile>]           | File containing the stream rates.\n");
 fprintf(stderr,"[-g <parDegree>]           | The parallelism degree (only valid for dataflow execution). For  on dataflow execution it will\n"
         "                           | be equal to the number of stages.\n");
-fprintf(stderr,"[-u <groupSize>]           | The group size (only valid for dataflow execution) [default 1].\n");
+fprintf(stderr,"[-u <groupSize>]           | The group size (only valid for dataflow execution) [default 0].\n");
 fprintf(stderr,"[-r]                       | Put the interface into 'No promiscous' mode\n");
 fprintf(stderr,"[-h]                       | Prints this help\n");
 }
@@ -74,7 +74,7 @@ char const *collector = "127.0.0.1";
 char const *streamFile = "";
 int version=-1,hashSize=4096,cnt=-1,maxAddCheck=1,maxNullCheck=1,maxReadTOCheck=-1,readTimeout=0, parDegree=-1;//30000; //TODO ANALIZZARE MEGLIO TIMEOUT
 uint minFlowSize=0,queueTimeout=30,lifetime=120,numStages=1,idle=30,maxActiveFlows=4294967295;
-uint groupSize = 1;
+uint groupSize = 0;
 ushort port=2055;
 bool noPromisc=false;
 FILE* outputFile=NULL;
