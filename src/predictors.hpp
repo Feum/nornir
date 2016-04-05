@@ -319,6 +319,33 @@ public:
     double predict(const KnobsValues& realValues);
 };
 
+/**
+ * Applies a full search strategy in order to find
+ * the best configuration.
+ */
+class PredictorFullSearch: public Predictor{
+private:
+    const std::vector<KnobsValues>& _allConfigurations;
+    std::map<KnobsValues, double> _values;
+public:
+    PredictorFullSearch(PredictorType type,
+              const Parameters& p,
+              const FarmConfiguration& configuration,
+              const Smoother<MonitoredSample>* samples);
+
+    ~PredictorFullSearch();
+
+    bool readyForPredictions();
+
+    void clear();
+
+    void refine();
+
+    void prepareForPredictions();
+
+    double predict(const KnobsValues& realValues);
+};
+
 }
 
 

@@ -291,6 +291,57 @@ public:
 };
 
 /**
+ * Explores a fixed number of configurations before starting
+ * making predictions.
+ * Configuration is never changed once it has been found.
+ */
+class SelectorFixedExploration: public SelectorPredictive{
+private:
+    std::vector<KnobsValues> _confToExplore;
+public:
+    SelectorFixedExploration(const Parameters& p,
+                   const FarmConfiguration& configuration,
+                   const Smoother<MonitoredSample>* samples,
+                   std::unique_ptr<Predictor> bandwidthPredictor,
+                   std::unique_ptr<Predictor> powerPredictor,
+                   size_t numSamples);
+
+    ~SelectorFixedExploration();
+
+
+    KnobsValues getNextKnobsValues(double primaryValue,
+                                   double secondaryValue,
+                                   u_int64_t totalTasks);
+};
+
+/**
+ * Applies the algorithm described in:
+ * "A Probabilistic Graphical Model-based Approach for Minimizing
+ * Energy Under Performance Constraints" - Mishra, Nikita and Zhang, Huazhe
+ * and Lafferty, John D. and Hoffmann, Henry
+ */
+class SelectorMishra: public SelectorFixedExploration{
+public:
+    SelectorMishra(const Parameters& p,
+                   const FarmConfiguration& configuration,
+                   const Smoother<MonitoredSample>* samples);
+
+    ~SelectorMishra();
+};
+
+/**
+ * This selector does a full exploration of the search space.
+ */
+class SelectorFullSearch: public SelectorFixedExploration{
+public:
+    SelectorFullSearch(const Parameters& p,
+                   const FarmConfiguration& configuration,
+                   const Smoother<MonitoredSample>* samples);
+
+    ~SelectorFullSearch();
+};
+
+/**
  * A selector that implements the algorithm described in:
  * "Dynamic Power-Performance Adaptation of Parallel Computation
  * on Chip Multiprocessors" - Jian Li and Jose F. Martınez

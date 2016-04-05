@@ -342,6 +342,12 @@ void ManagerFarm<lb_t, gt_t>::initSelector(){
             case STRATEGY_SELECTION_LIMARTINEZ:{
                 _selector = new SelectorLiMartinez(_p, _configuration, _samples);
             }break;
+            case STRATEGY_SELECTION_MISHRA:{
+                _selector = new SelectorMishra(_p, _configuration, _samples);
+            }break;
+            case STRATEGY_SELECTION_FULLSEARCH:{
+                _selector = new SelectorFullSearch(_p, _configuration, _samples);
+            }break;
             default:{
                 throw std::runtime_error("Selector not yet implemented.");
             }break;

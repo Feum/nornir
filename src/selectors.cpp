@@ -565,6 +565,74 @@ KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
     return kv;
 }
 
+SelectorFixedExploration::SelectorFixedExploration(const Parameters& p,
+               const FarmConfiguration& configuration,
+               const Smoother<MonitoredSample>* samples,
+               std::unique_ptr<Predictor> bandwidthPredictor,
+               std::unique_ptr<Predictor> powerPredictor,
+               size_t numSamples):
+            SelectorPredictive(p, configuration, samples, std::move(bandwidthPredictor), std::move(powerPredictor)){
+    const std::vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
+    size_t numConfigurations = combinations.size();
+    for(size_t i = 0; i < numConfigurations; i += (numConfigurations/numSamples + 1)){
+        _confToExplore.push_back(combinations.at(i));
+    }
+}
+
+SelectorFixedExploration::~SelectorFixedExploration(){
+    ;
+}
+
+KnobsValues SelectorFixedExploration::getNextKnobsValues(double primaryValue,
+                                               double secondaryValue,
+                                               u_int64_t totalTasks){
+    if(_confToExplore.size()){
+        if(!isCalibrating()){
+            startCalibration(totalTasks);
+        }else{
+            refine();
+        }
+        KnobsValues r = _confToExplore.back();
+        _confToExplore.pop_back();
+        return r;
+    }else{
+        if(isCalibrating()){
+            stopCalibration(totalTasks);
+            return getBestKnobsValues(primaryValue);
+        }else{
+            return _configuration.getRealValues();
+        }
+    }
+}
+
+SelectorMishra::SelectorMishra(const Parameters& p,
+               const FarmConfiguration& configuration,
+               const Smoother<MonitoredSample>* samples):
+        SelectorFixedExploration(p, configuration, samples,
+                       std::unique_ptr<Predictor>(new PredictorMishra(PREDICTION_BANDWIDTH, p, configuration, samples)),
+                       std::unique_ptr<Predictor>(new PredictorMishra(PREDICTION_POWER, p, configuration, samples)),
+                       20){
+    ;
+}
+
+SelectorMishra::~SelectorMishra(){
+    ;
+}
+
+SelectorFullSearch::SelectorFullSearch(const Parameters& p,
+               const FarmConfiguration& configuration,
+               const Smoother<MonitoredSample>* samples):
+        SelectorFixedExploration(p, configuration, samples,
+                       std::unique_ptr<Predictor>(new PredictorFullSearch(PREDICTION_BANDWIDTH, p, configuration, samples)),
+                       std::unique_ptr<Predictor>(new PredictorFullSearch(PREDICTION_POWER, p, configuration, samples)),
+                       _configuration.getAllRealCombinations().size()){
+    ;
+}
+
+SelectorFullSearch::~SelectorFullSearch(){
+    ;
+}
+
 Frequency SelectorLiMartinez::findNearestFrequency(Frequency f) const{
     Frequency bestDistance = _availableFrequencies.back();
     Frequency bestFrequency = _availableFrequencies.back();

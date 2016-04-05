@@ -560,5 +560,54 @@ double PredictorMishra::predict(const KnobsValues& realValues){
     return _predictions.at(confId);
 }
 
+PredictorFullSearch::PredictorFullSearch(PredictorType type,
+          const Parameters& p,
+          const FarmConfiguration& configuration,
+          const Smoother<MonitoredSample>* samples):
+      Predictor(type, p, configuration, samples),
+      _allConfigurations(_configuration.getAllRealCombinations()){
+    ;
+}
+
+PredictorFullSearch::~PredictorFullSearch(){
+    ;
+}
+
+bool PredictorFullSearch::readyForPredictions(){
+    return _values.size() == _allConfigurations.size();
+}
+
+void PredictorFullSearch::clear(){
+    _values.clear();
+}
+
+void PredictorFullSearch::refine(){
+    double value = 0;
+    switch(_type){
+        case PREDICTION_BANDWIDTH:{
+            value = _samples->average().bandwidth;
+        }break;
+        case PREDICTION_POWER:{
+            value = _samples->average().watts;
+        }break;
+        default:{
+            throw std::runtime_error("Unknown predictor type.");
+        }
+    }
+    _values.at(_configuration.getRealValues()) = value;
+}
+
+void PredictorFullSearch::prepareForPredictions(){
+    ;
+}
+
+double PredictorFullSearch::predict(const KnobsValues& realValues){
+    if(!readyForPredictions()){
+        throw std::runtime_error("prepareForPredictions: Not enough "
+                                 "points are present");
+    }
+    return _values.at(realValues);
+}
+
 }
 
