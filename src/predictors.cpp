@@ -55,6 +55,8 @@ using namespace mammut::topology;
 
 using namespace mlpack::regression;
 
+using namespace arma;
+
 static double getVoltage(VoltageTable table, uint workers, Frequency frequency){
     VoltageTableKey key(workers, frequency);
     VoltageTableIterator it = table.find(key);
@@ -223,7 +225,10 @@ void RegressionDataPower::init(const KnobsValues& values){
         _dynamicPowerModel = dynamicPowerProp;
         ++_numPredictors;
     }else{
-        //TODO: No, moltiplicare comunque per frequenza corrente e v^2, se possibile
+        /**
+         * Since I do not control the frequency, this model can be very
+         * inaccurate.
+         */
         _dynamicPowerModel = usedPhysicalCores;
         ++_numPredictors;
     }
@@ -281,7 +286,7 @@ PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
                                                      const Parameters& p,
                                                      const FarmConfiguration& configuration,
                                                      const Smoother<MonitoredSample>* samples):
-        Predictor(type, p, configuration, samples){
+        Predictor(type, p, configuration, samples), _preparationNeeded(true){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
             _predictionInput = new RegressionDataServiceTime(p, configuration, samples);
@@ -329,8 +334,9 @@ double PredictorLinearRegression::getCurrentResponse() const{
     return r;
 }
 
-bool PredictorLinearRegression::refine(){
+void PredictorLinearRegression::refine(){
     KnobsValues currentValues = _configuration.getRealValues();
+    _preparationNeeded = true;
     if(_type == PREDICTION_POWER){
         // Add service nodes
         currentValues[KNOB_TYPE_WORKERS] = currentValues[KNOB_TYPE_WORKERS] + _configuration.getNumServiceNodes();
@@ -353,7 +359,6 @@ bool PredictorLinearRegression::refine(){
         DEBUG("Replacing " << currentValues);
         lb->second.data->init();
         lb->second.response = getCurrentResponse();
-        return false;
     }else{
         // The key does not exist in the map
         Observation o;
@@ -367,43 +372,45 @@ bool PredictorLinearRegression::refine(){
         }
         o.response = getCurrentResponse();
         _observations.insert(lb, Observations::value_type(currentValues, o));
-        return true;
     }
 }
 
 void PredictorLinearRegression::prepareForPredictions(){
-    if(!readyForPredictions()){
-        throw std::runtime_error("prepareForPredictions: Not enough " 
-                                 "points are present");
-    }
-
-    // One observation per column.
-    arma::mat dataMl(_observations.begin()->second.data->getNumPredictors(),
-                     _observations.size());
-    arma::vec responsesMl(_observations.size());
-
-    size_t i = 0;
-    for(obs_it iterator = _observations.begin();
-               iterator != _observations.end();
-               iterator++){
-        const Observation& obs = iterator->second;
-
-        if(!_p.regressionAging || contains(_agingVector, iterator->first)){
-            obs.data->toArmaRow(i, dataMl);
-            responsesMl(i) = obs.response;
-            ++i;
+    if(_preparationNeeded){
+        if(!readyForPredictions()){
+            throw std::runtime_error("prepareForPredictions: Not enough "
+                                     "points are present");
         }
-    }
-   
-    if(_p.regressionAging && _agingVector.size() != _observations.size()){
-        dataMl.resize(_observations.begin()->second.data->getNumPredictors(),
-                      _agingVector.size());
-        responsesMl.resize(_agingVector.size());
-    }
 
-    _lr = LinearRegression(dataMl, responsesMl);
-    _modelError =  _lr.ComputeError(dataMl, responsesMl);
-    DEBUG("Error in model: " << _modelError);
+        // One observation per column.
+        arma::mat dataMl(_observations.begin()->second.data->getNumPredictors(),
+                         _observations.size());
+        arma::vec responsesMl(_observations.size());
+
+        size_t i = 0;
+        for(obs_it iterator = _observations.begin();
+                   iterator != _observations.end();
+                   iterator++){
+            const Observation& obs = iterator->second;
+
+            if(!_p.regressionAging || contains(_agingVector, iterator->first)){
+                obs.data->toArmaRow(i, dataMl);
+                responsesMl(i) = obs.response;
+                ++i;
+            }
+        }
+
+        if(_p.regressionAging && _agingVector.size() != _observations.size()){
+            dataMl.resize(_observations.begin()->second.data->getNumPredictors(),
+                          _agingVector.size());
+            responsesMl.resize(_agingVector.size());
+        }
+
+        _lr = LinearRegression(dataMl, responsesMl);
+        _modelError =  _lr.ComputeError(dataMl, responsesMl);
+        DEBUG("Error in model: " << _modelError);
+        _preparationNeeded = false;
+    }
 }
 
 double PredictorLinearRegression::predict(const KnobsValues& values){
@@ -458,8 +465,8 @@ bool PredictorAnalytical::readyForPredictions(){
     return true;
 }
 
-bool PredictorAnalytical::refine(){
-    return false;
+void PredictorAnalytical::refine(){
+    ;
 }
 
 void PredictorAnalytical::clear(){
@@ -476,6 +483,81 @@ double PredictorAnalytical::predict(const KnobsValues& values){
         }break;
     }
     return 0.0;
+}
+
+
+PredictorMishra::PredictorMishra(PredictorType type,
+              const Parameters& p,
+              const FarmConfiguration& configuration,
+              const Smoother<MonitoredSample>* samples):
+                  Predictor(type, p, configuration, samples),
+                  _preparationNeeded(true){
+    const std::vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
+    DEBUG("Found: " << combinations.size() << " combinations.");
+    for(size_t i = 0; i < combinations.size(); i++){
+        _confIndexes.at(combinations.at(i)) = i;
+    }
+    _values.resize(combinations.size());
+    _values.zeros();
+}
+
+PredictorMishra::~PredictorMishra(){
+    ;
+}
+
+bool PredictorMishra::readyForPredictions(){
+    return true;
+}
+
+void PredictorMishra::clear(){
+    _values.zeros();
+    _predictions.zeros();
+}
+
+void PredictorMishra::refine(){
+    _preparationNeeded = true;
+    size_t confId = _confIndexes.at(_configuration.getRealValues());
+    switch(_type){
+        case PREDICTION_BANDWIDTH:{
+            _values.at(confId) = _samples->average().bandwidth;
+        }break;
+        case PREDICTION_POWER:{
+            _values.at(confId) = _samples->average().watts;
+        }break;
+        default:{
+            throw std::runtime_error("Unknown predictor type.");
+        }
+    }
+}
+
+void PredictorMishra::prepareForPredictions(){
+    if(_preparationNeeded){
+        if(!readyForPredictions()){
+            throw std::runtime_error("prepareForPredictions: Not enough "
+                                     "points are present");
+        }
+
+        string dataFile = NULL;
+        switch(_type){
+            case PREDICTION_BANDWIDTH:{
+                dataFile = _p.mishra.bandwidthData;
+            }break;
+            case PREDICTION_POWER:{
+                dataFile = _p.mishra.powerData;
+            }break;
+            default:{
+                throw std::runtime_error("Unknown predictor type.");
+            }
+        }
+
+        leo::PredictionResults pr = leo::compute(_p.mishra.appId, dataFile, &_values, false);
+        _preparationNeeded = false;
+    }
+}
+
+double PredictorMishra::predict(const KnobsValues& realValues){
+    size_t confId = _confIndexes.at(realValues);
+    return _predictions.at(confId);
 }
 
 }

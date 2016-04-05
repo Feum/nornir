@@ -39,6 +39,7 @@
 
 #include <mlpack/core.hpp>
 #include <mlpack/methods/linear_regression/linear_regression.hpp>
+#include "external/leo/leo.h" // Must be included after mlpack
 
 #include <map>
 
@@ -187,10 +188,8 @@ public:
     /**
      * If possible, refines the model with the information
      * obtained on the current configuration.
-     * @return True if the current configuration is a new configuration,
-     * false if it was already present (existing information will be updated).
      */
-    virtual bool refine() = 0;
+    virtual void refine() = 0;
 
     /**
      * Prepare the predictor to accept a set of prediction requests.
@@ -236,6 +235,8 @@ private:
     // Input to be used for predicting a value.
     RegressionData* _predictionInput;
 
+    bool _preparationNeeded;
+
     double getCurrentResponse() const;
 public:
     PredictorLinearRegression(PredictorType type,
@@ -249,7 +250,7 @@ public:
 
     bool readyForPredictions();
 
-    bool refine();
+    void refine();
 
     void prepareForPredictions();
 
@@ -282,7 +283,7 @@ public:
 
     double predict(const KnobsValues& values);
 
-    bool refine();
+    void refine();
 
     void clear();
 };
@@ -294,6 +295,12 @@ public:
  * and Lafferty, John D. and Hoffmann, Henry
  */
 class PredictorMishra: public Predictor{
+private:
+    std::map<KnobsValues, size_t> _confIndexes;
+    arma::vec _values;
+    arma::vec _predictions;
+    bool _preparationNeeded;
+public:
     PredictorMishra(PredictorType type,
               const Parameters& p,
               const FarmConfiguration& configuration,
@@ -305,7 +312,7 @@ class PredictorMishra: public Predictor{
 
     void clear();
 
-    bool refine();
+    void refine();
 
     void prepareForPredictions();
 

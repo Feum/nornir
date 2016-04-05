@@ -339,10 +339,9 @@ KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
     }
 }
 
-bool SelectorPredictive::refine(){
-    bool p = _primaryPredictor->refine();
-    bool s = _secondaryPredictor->refine();
-    return p & s;
+void SelectorPredictive::refine(){
+    _primaryPredictor->refine();
+    _secondaryPredictor->refine();
 }
 
 void SelectorPredictive::updatePredictions(const KnobsValues& next){

@@ -186,7 +186,7 @@ protected:
     /**
      * Refines the models with current data.
      */
-    bool refine();
+    void refine();
 
     /**
      * Updates the predictions for the next configuration.

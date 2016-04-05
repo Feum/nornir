@@ -1,4 +1,5 @@
 OPEN libnornir.a
 ADDLIB external/Mammut/mammut/libmammut.a
+ADDMOD external/leo/leo.o
 SAVE
 END

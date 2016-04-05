@@ -61,49 +61,58 @@ XmlTree::~XmlTree(){
     delete[] _fileContentChars;
 }
 
+rapidxml::xml_node<>* XmlTree::getNode(const char* valueName) const{
+    rapidxml::xml_node<> *node = _root;
+    string vName(valueName);
+    size_t i = 0;
+    vector<string> tokens = mammut::utils::split(vName, '.');
+    if(!tokens.size()){
+        return NULL;
+    }
+    while(i < tokens.size() && node != NULL){
+        node = node->first_node(tokens.at(i).c_str());
+        i++;
+    }
+    return node;
+}
+
 void XmlTree::getBool(const char* valueName, bool& value){
-    rapidxml::xml_node<> *node = NULL;
-    node = _root->first_node(valueName);
+    rapidxml::xml_node<> *node = getNode(valueName);
     if(node){
         value = string(node->value()).compare("true")?false:true;
     }
 }
 
 void XmlTree::getInt(const char* valueName, int& value){
-    rapidxml::xml_node<> *node = NULL;
-    node = _root->first_node(valueName);
+    rapidxml::xml_node<> *node = getNode(valueName);
     if(node){
         value = stringToInt(node->value());
     }
 }
 
 void XmlTree::getUint(const char* valueName, uint& value){
-    rapidxml::xml_node<> *node = NULL;
-    node = _root->first_node(valueName);
+    rapidxml::xml_node<> *node = getNode(valueName);
     if(node){
         value = stringToUint(node->value());
     }
 }
 
 void XmlTree::getUlong(const char* valueName, ulong& value){
-    rapidxml::xml_node<> *node = NULL;
-    node = _root->first_node(valueName);
+    rapidxml::xml_node<> *node = getNode(valueName);
     if(node){
         value = stringToUlong(node->value());
     }
 }
 
 void XmlTree::getDouble(const char* valueName, double& value){
-    rapidxml::xml_node<> *node = NULL;
-    node = _root->first_node(valueName);
+    rapidxml::xml_node<> *node = getNode(valueName);
     if(node){
         value = stringToDouble(node->value());
     }
 }
 
 void XmlTree::getString(const char* valueName, string& value){
-    rapidxml::xml_node<> *node = NULL;
-    node = _root->first_node(valueName);
+    rapidxml::xml_node<> *node = getNode(valueName);
     if(node){
         value = node->value();
     }
@@ -111,8 +120,7 @@ void XmlTree::getString(const char* valueName, string& value){
 
 template<typename T>
 void XmlTree::getEnum(const char* valueName, T& value){
-    rapidxml::xml_node<> *node = NULL;
-    node = _root->first_node(valueName);
+    rapidxml::xml_node<> *node = getNode(valueName);
     if(node){
         stringstream line(node->value());
         line >> enumFromStringInternal(value);
@@ -142,6 +150,9 @@ void Parameters::setDefault(){
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
+    mishra.appId = numeric_limits<uint>::max();
+    mishra.bandwidthData = "";
+    mishra.powerData = "";
     turboBoost = false;
     fastReconfiguration = true;
     migrateCollector = false;
@@ -416,6 +427,16 @@ ParametersValidation Parameters::validateContract(){
     return VALIDATION_OK;
 }
 
+ParametersValidation Parameters::validatePredictor(){
+    if(strategyPrediction == STRATEGY_PREDICTION_MISHRA &&
+         (mishra.bandwidthData.compare("") == 0 ||
+          mishra.powerData.compare("") == 0 ||
+          mishra.appId == numeric_limits<uint>::max())){
+            return VALIDATION_NO_MISHRA_PARAMETERS;
+    }
+    return VALIDATION_OK;
+}
+
 template<> char const* enumStrings<ContractType>::data[] = {
     "NONE",
     "PERF_UTILIZATION",
@@ -561,6 +582,10 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Ulong, qSize);
     SETVALUE(xt, Double, conservativeValue);
     SETVALUE(xt, Bool, statsReconfiguration);
+
+    SETVALUE(xt, Uint, mishra.appId);
+    SETVALUE(xt, String, mishra.bandwidthData);
+    SETVALUE(xt, String, mishra.powerData);
 }
 
 Parameters::Parameters(Communicator* const communicator):
@@ -618,6 +643,10 @@ ParametersValidation Parameters::validate(){
 
     /** Validate contract parameters. **/
     r = validateContract();
+    if(r != VALIDATION_OK){return r;}
+
+    /** Validate selectors. **/
+    r = validatePredictor();
     if(r != VALIDATION_OK){return r;}
 
     /** Validate unsupported strategies. **/

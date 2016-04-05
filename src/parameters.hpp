@@ -307,7 +307,10 @@ typedef enum{
     VALIDATION_VOLTAGE_FILE_NEEDED,
 
     // Blocking threshold needs to be specified.
-    VALIDATION_NO_BLOCKING_THRESHOLD
+    VALIDATION_NO_BLOCKING_THRESHOLD,
+
+    // Parameters for Mishra predictors not specified.
+    VALIDATION_NO_MISHRA_PARAMETERS
 }ParametersValidation;
 
 /**
@@ -327,6 +330,15 @@ public:
     XmlTree(const std::string& fileName, const std::string& rootName);
 
     ~XmlTree();
+
+
+    /**
+     * Returns a node with name valueName.
+     * @param valueName The name of the node. It can be of the form
+     *        field.subfield.subsubfield. ... (similar to a C struct).
+     * @return The node with name valueName.
+     */
+    rapidxml::xml_node<>* getNode(const char* valueName) const;
 
     /**
      * If an element named 'valueName' is present, its value is
@@ -422,6 +434,25 @@ typedef struct ArchData{
 
     void loadXml(const std::string& archFileName);
 }ArchData;
+
+typedef struct{
+    /**
+     * Application id [0, N-1]. N is the number of applications for which
+     * we collected offline data (equal to the number of columns in the
+     * data files).
+     */
+    uint appId;
+    /**
+     * File containing the data about the bandwidth. One column per application,
+     * one row per configuration. Data doesn't need to be normalized.
+     */
+    std::string bandwidthData;
+    /**
+     * File containing the data about the power. One column per application,
+     * one row per configuration. Data doesn't need to be normalized.
+     */
+    std::string powerData;
+}MishraParameters;
 
 /*!
  * \class AdaptivityParameters
@@ -534,6 +565,12 @@ private:
     ParametersValidation validateContract();
 
     /**
+     * Validates the predictor.
+     * @return The result of the validation.
+     */
+    ParametersValidation validatePredictor();
+
+    /**
      * Loads the content of the parameters with the content
      * of an XML file.
      * @param fileName The name of the XML file.
@@ -599,6 +636,9 @@ public:
 
     // Persistence strategy [default = STRATEGY_PERSISTENCE_SAMPLES].
     StrategyPersistence strategyPersistence;
+
+    // Parameters for Mishra predictor.
+    MishraParameters mishra;
 
     // Flag to enable/disable cores turbo boosting [default = false].
     bool turboBoost;

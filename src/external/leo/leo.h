@@ -26,17 +26,31 @@
 #define INF 1000000000
 /* Function Declarations */
 
+namespace leo{
+
 typedef struct{
-    arma::vec bandwidthPredictions;
-    arma::vec powerPredictions;
-    double bandwidthError;
-    double powerError;
+    arma::vec predictions;
+    double accuracy; // Between 0 and 100
 }PredictionResults;
 
 /**
  * @param appId Between [0, N - 1] (N = number of applications in the file).
+ * @param dataFile The name of the file containing the data profiles
+ *        for all the configurations and for all the applications (not
+ *        normalized).
+ * @param sampledData A vector with a length equal to the number of
+ *        possible configurations. The value in a specific position is 0 if the
+ *        corresponding configuration was not sampled. If it is != 0, it is the
+ *        data (power or bandwidth) in the corresponding sampled configuration.
+ * @param computeError If true computes the model error (comparing with the case 
+ *        where all the values for all the configurations are known.
+ *        
  **/
-PredictionResults compute(int appId, char* powerFile, char* bandwidthFile, arma::vec* sampledPower, arma::vec* sampledPerformance);
+PredictionResults compute(uint appId, std::string dataFile,
+                          const arma::vec* sampledData,
+                          bool computeError = false);
+
+}
 
 #endif
-/* End of code generation (runEM.h) */
+

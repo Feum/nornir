@@ -11,9 +11,11 @@ all:
 clean: 
 	-rm -fr *.o *~
 	$(MAKE) -C dataflow clean
+	$(MAKE) -C external clean
 cleanall:
 	-rm -fr *.o *~ *.a
 	$(MAKE) -C dataflow cleanall
+	$(MAKE) -C external cleanall
 lib: $(TARGET)
 	ar rc libnornir.a $(TARGET) dataflow/*.o
 	ranlib libnornir.a

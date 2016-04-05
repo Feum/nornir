@@ -174,7 +174,7 @@ uint KnobWorkers::getWorkersPhysicalCores() const{
         }break;
         case KNOB_WORKERS_MAPPING:{
             // _activeWorkers.size() is the number of active threads.
-            // However, it never changes since we should map more threads
+            // However, it never changes since we map more threads
             // to fewer cores, so we return the real value of the knob.
             return getRealValue();
         }break;
