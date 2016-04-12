@@ -199,11 +199,8 @@ private:
     size_t _numWorkers;
     size_t _groupSize;
     bool _orderedTasks;
-#ifdef COMPUTE_COM_TIME
-    unsigned long _acc;
-#endif
-
-    ff::uSWSR_Ptr_Buffer** _buffers;
+    bool _orderedOut;
+    QUEUE& _q;
     size_t _lastRcvId;
     ulong _tasksInside;
     ulong _graphsInside;
@@ -215,111 +212,6 @@ private:
         }else{
             send(instr);
         }
-    }
-
-    /**
-     * - When we insert a graph we increase both graphsInside and tasksInside.
-     * - When we pop a task the following situations may occur:
-     *   - Decrease tasksInside and graphsInside.
-     *   - Keep graphsInside untouched and change tasksInside (increase o
-     *     decrease by n according to the specific graph structure).
-     */
-
-    inline bool keepInsertingGraphs() const{
-        if(_groupSize){
-            return _graphsInside < _groupSize;
-        }else{
-            return true;
-        }
-    }
-
-    inline bool keepPoppingTasks() const{
-        if(_groupSize){
-            return _graphsInside > _groupSize;
-        }else{
-            return false;
-        }
-    }
-
-    inline void updateCompleted(){
-        OutputToken ot;
-        ulong graphId;
-        TokenId dest;
-        Mdfi* ins;
-        void* task;
-        uint collected = 0;
-        uint collectedTotal = 0;
-        size_t startId = 0;
-        size_t workerId = 0;
-        startId = rand();
-        do{
-            collected  = 0;
-            for(size_t i = 0; i < _maxWorkers; i++){
-                workerId = (i + startId) % _maxWorkers;
-#ifdef COMPUTE_COM_TIME
-                unsigned long t1;
-                if(true){
-                    t1 = ff::getusec();
-                    if(!buffers[workerId]->pop(&task)) break;
-                    _acc += ff::getusec()-t1;
-#else
-                if(_buffers[workerId]->pop(&task)){
-#endif
-                    --_tasksInside;
-                    ++collected;
-                    ++collectedTotal;
-                    for(uint j = 0; j < ((Mdfi*) task)->getNumOutTokens(); j++){
-                        ot = *(((Mdfi*) task)->getOutToken(j));
-                        dest = ot.getDest();
-                        graphId = dest.getGraphId();
-                        Mdfg* currentGraph = NULL;
-                        /**
-                         * If was the last instruction of a graph's copy, puts it
-                         * into the output vector and delete
-                         * the copy of the graph.
-                         */
-                        if(dest.isOutStream()){
-                            assert(_result->emplace(std::piecewise_construct,
-                                   std::forward_as_tuple(graphId),
-                                   std::forward_as_tuple(ot.getResult())).second);
-
-                            auto it = _graphs->find(graphId);
-                            if(it != _graphs->end()){
-                                currentGraph = it->second;
-                                _graphs->erase(it);
-                            }else{
-                                throw std::runtime_error("Graph not found.");
-                            }
-#ifdef POOL
-                            if(_pool->size() < MAXPOOLSIZE){
-                                _pool->push_back(currentGraph);
-                            }else{
-                                delete currentGraph;
-                            }
-#else
-                            delete currentGraph;
-#endif
-                            --_taskSent;
-                            --_graphsInside;
-                        }else{
-                            /**Takes the pointer to the copy of the graph.**/
-                            currentGraph = _graphs->at(graphId);
-                            /**Takes the pointer to the instruction.**/
-                            ins = currentGraph->getMdfi(dest.getMdfId());
-                            /**Updates the instruction adding the input token.**/
-                            ins->setInput(ot.getResult(), dest.getTokId());
-                            /**
-                             * If the instruction is fireable, adds it to the pool of
-                             * fireable instructions.
-                             **/
-                            if(ins->isFireable()){
-                                sendToWorkers(ins);
-                            }
-                        }
-                    }
-                }
-            }
-        }while(collected && keepPoppingTasks());
     }
 
 
@@ -346,13 +238,7 @@ private:
             throw std::runtime_error("There is an error in a MDFi link.");
         }
         /**Sends the new instruction to the interpreter.*/
-#ifdef COMPUTE_COM_TIME
-        unsigned long t1 = ff::getusec();
-#endif
         sendToWorkers(first);
-#ifdef COMPUTE_COM_TIME
-        _acc += ff::getusec() - t1;
-#endif
         ++_taskSent;
         ++_nextGraphId;
         ++_graphsInside;
@@ -360,16 +246,15 @@ private:
     }
 public:
     Scheduler(Mdfg *graph, InputStream *i, OutputStream *o, int parDegree,
-              unsigned long int groupSize, bool orderedTasks, ff::uSWSR_Ptr_Buffer** buffers):
+              unsigned long int groupSize, bool orderedTasks, bool orderedOut,
+              QUEUE& q):
                 _in(i),_out(o),_graph(graph),_compiled(false),_nextGraphId(0),
                 _pool(NULL), _taskSent(0), _lastSent(0), _maxWorkers(parDegree),
                 _numWorkers(parDegree), _groupSize(groupSize), _orderedTasks(orderedTasks),
-                _buffers(buffers), _lastRcvId(0), _tasksInside(0), _graphsInside(0){
+                _orderedOut(orderedOut), _q(q), _lastRcvId(0),
+                _tasksInside(0), _graphsInside(0){
         _graphs = new std::map<ulong, Mdfg*>;
         _result = new std::map<ulong, StreamElem*>;
-#ifdef COMPUTE_COM_TIME
-        _acc = 0;
-#endif
     }
 
     ~Scheduler(){
@@ -394,6 +279,13 @@ public:
     Mdfi* schedule(){
         StreamElem* next;
         bool end = false; ///<End becomes \e true when the manager has computed all the tasks.
+        OutputToken ot;
+        ulong graphId;
+        TokenId dest;
+        Mdfi* ins;
+        void* task;
+        _q.registerq(0);
+
 #ifdef POOL
         _pool = new std::deque<Mdfg*>;
         for(size_t i = 0; i < MAXPOOLSIZE; i++){
@@ -401,33 +293,92 @@ public:
         }
 #endif
 
-        while(!end){
-
-            /*
-            if(_graphsInside){
-                std::cout << _graphsInside << " " << _tasksInside << " " << _tasksInside / _graphsInside << std::endl;
-            }else{
-                std::cout << _graphsInside << " " << _tasksInside << std::endl;
+        /** Bootstrap. **/
+        size_t inserted = 0;
+        size_t totalSent = 0;
+        while(inserted < 1000 && _in->hasNext()){
+            next = _in->next();
+            if(next){
+                getFromInput(next);
+                ++inserted;
+                ++totalSent;
             }
-            */
-
-            /**Send the instructions to the interpreter.**/
+        }
+        uint popped = 0;
+        while(!end){
             /////////////////////
             // Get from input. //
-            /////////////////////
-            while(keepInsertingGraphs() && _in->hasNext() && (next = _in->next()) != NULL){
+            ///////////////////// 
+            if(_graphsInside < 1000 &&
+               _in->hasNext() && (next = _in->next()) != NULL){
                 getFromInput(next);
+                //popped = 0;
+                ++inserted;
+                ++totalSent;
             }
 
             //////////////////////
             // Get from output. //
             //////////////////////
-#ifdef COMPUTE_COM_TIME
-            int t1 = updateCompleted();
-            _acc += t1;
+            if(_q.pop((void**) &task, 0)){
+                popped++;
+                --_tasksInside;
+                for(uint j = 0; j < ((Mdfi*) task)->getNumOutTokens(); j++){
+                    ot = *(((Mdfi*) task)->getOutToken(j));
+                    dest = ot.getDest();
+                    graphId = dest.getGraphId();
+                    Mdfg* currentGraph = NULL;
+                    /**
+                     * If was the last instruction of a graph's copy, puts it
+                     * into the output vector and delete
+                     * the copy of the graph.
+                     */
+                    if(dest.isOutStream()){
+                        if(!_orderedOut || graphId == _lastSent){
+                            _out->put(ot.getResult());
+                            ++_lastSent;
+                        }else{
+                            assert(_result->emplace(std::piecewise_construct,
+                                   std::forward_as_tuple(graphId),
+                                   std::forward_as_tuple(ot.getResult())).second);
+                        }
+                        auto it = _graphs->find(graphId);
+                        if(it != _graphs->end()){
+                            currentGraph = it->second;
+                            _graphs->erase(it);
+                        }else{
+                            throw std::runtime_error("Graph not found.");
+                        }
+#ifdef POOL
+                        if(_pool->size() < MAXPOOLSIZE){
+                            _pool->push_back(currentGraph);
+                        }else{
+                            delete currentGraph;
+                        }
 #else
-            updateCompleted();
+                        delete currentGraph;
 #endif
+                        --_taskSent;
+                        --_graphsInside;
+                    }else{
+                        /**Takes the pointer to the copy of the graph.**/
+                        currentGraph = _graphs->at(graphId);
+                        /**Takes the pointer to the instruction.**/
+                        ins = currentGraph->getMdfi(dest.getMdfId());
+                        /**Updates the instruction adding the input token.**/
+                        ins->setInput(ot.getResult(), dest.getTokId());
+                        /**
+                         * If the instruction is fireable, adds it to the pool of
+                         * fireable instructions.
+                         **/
+                        if(ins->isFireable()){
+                            sendToWorkers(ins);
+                            ++totalSent;
+                        }
+                    }
+                }
+            }
+
             /**
              * If has received the EndOfStream and all the results
              * are calculated, then stop the manager.
@@ -443,38 +394,43 @@ public:
              * sends the result to the stream.
              * PRESERVES THE ORDER OF THE TASKS.
              **/
-            StreamElem* se;
-            std::map<ulong, StreamElem*>::iterator it;
-            while((it = _result->find(_lastSent)) != _result->end()){
-                se = it->second;
-                _result->erase(it);
-                _out->put(se);
-                ++_lastSent;
+            if(_orderedOut){
+                StreamElem* se;
+                std::map<ulong, StreamElem*>::iterator it;
+                while((it = _result->find(_lastSent)) != _result->end()){
+                    se = it->second;
+                    _result->erase(it);
+                    _out->put(se);
+                    ++_lastSent;
+                }
             }
         }/**End of while(!end).**/
-       return NULL;
-#ifdef COMPUTE_COM_TIME
-   std::cout << "Communication time: " << _acc << std::endl;
-#endif
+        _q.deregisterq(0);
+        return NULL;
     }
 };
 
-WorkerMdf::WorkerMdf(ff::uSWSR_Ptr_Buffer* buffer):_buffer(buffer){;}
+WorkerMdf::WorkerMdf(QUEUE& q):_q(q), _init(false), _qId(-1){;}
 
 void WorkerMdf::compute(Mdfi* t){
+    if(!_init){
+        _qId = getId() + 1;
+        _init = true;
+        _q.registerq(_qId);
+    }
     t->compute();
-    _buffer->push(t);
+    _q.push((void*) t, _qId);
 }
 
 
 Interpreter::Interpreter(Computable* c, InputStream *i, OutputStream *o, size_t parDegree,
-                 unsigned long int groupSize, bool orderedTasks):
-            Interpreter(compile(c), i, o, parDegree, groupSize, orderedTasks){
+                 unsigned long int groupSize, bool orderedTasks, bool orderedOut):
+            Interpreter(compile(c), i, o, parDegree, groupSize, orderedTasks, orderedOut){
     //TODO Set compiledgraph
 }
 
 Interpreter::Interpreter(Mdfg *graph, InputStream *i, OutputStream *o, size_t parDegree,
-                 unsigned long int groupSize, bool orderedTasks):
+                 unsigned long int groupSize, bool orderedTasks, bool orderedOut):
         _compiledGraph(NULL), _maxWorkers(parDegree){
 
     _p = new nornir::Parameters("parameters.xml", "archdata.xml");
@@ -482,26 +438,18 @@ Interpreter::Interpreter(Mdfg *graph, InputStream *i, OutputStream *o, size_t pa
     _p->observer = _o;
 
     /**Creates the SPSC queues.**/
-    _buffers = new ff::uSWSR_Ptr_Buffer*[parDegree];
-    for(size_t i = 0; i < parDegree; i++){
-        _buffers[i] = new ff::uSWSR_Ptr_Buffer(1024);
-        _buffers[i]->init();
-    }
+    _q.init(parDegree + 1); /* +1 for the scheduler. */
 
-    _s = new Scheduler(graph, i, o, parDegree, groupSize, orderedTasks, _buffers);
+    _s = new Scheduler(graph, i, o, parDegree, groupSize, orderedTasks, orderedOut, _q);
     _farm = new nornir::Farm<Mdfi>(_p);
     _farm->addScheduler(_s);
     /**Adds the workers to the farm.**/
     for(size_t i = 0; i < parDegree; ++i){
-        _farm->addWorker(new WorkerMdf(_buffers[i]));
+        _farm->addWorker(new WorkerMdf(_q));
     }
 }
 
 Interpreter::~Interpreter(){
-     for(size_t i = 0; i < _maxWorkers; i++){
-         delete _buffers[i];
-     }
-     delete[] _buffers;
      delete _p;
      delete _o;
      if(_compiledGraph)

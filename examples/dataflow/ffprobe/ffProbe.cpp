@@ -129,7 +129,7 @@ void executeWithFaskel(){
         nornir::dataflow::Pipeline *pipe=new nornir::dataflow::Pipeline(stages[0],stages[1]);
         for(uint i=2; i<numStages; i++)
             pipe = new nornir::dataflow::Pipeline(pipe,stages[i]);
-        nornir::dataflow::Interpreter m(pipe, input, &output, parDegree, groupSize, true);
+        nornir::dataflow::Interpreter m(pipe, input, &output, parDegree, groupSize, true, false);
         if(strcmp(streamFile, "")){
             ((faskelProbe::ProbeInputStreamRate*)input)->init();
         }
