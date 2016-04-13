@@ -47,7 +47,7 @@ FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
     /************************************************************/
     /*                           KNOBS                          */
     /************************************************************/
-    _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p.knobWorkers, emitter,
+    _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p, emitter,
                                                 collector, gt, workers,
                                                 terminated);
     _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p.knobMapping,

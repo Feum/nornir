@@ -118,6 +118,18 @@ void XmlTree::getString(const char* valueName, string& value){
     }
 }
 
+void XmlTree::getArrayUint(const char* valueName, std::vector<uint>& value){
+    rapidxml::xml_node<> *node = getNode(valueName);
+    value.clear();
+    if(node){
+        vector<string> strValues = mammut::utils::split(node->value(), ':');
+        for(size_t i = 0; i < strValues.size(); i++){
+            value.push_back(stringToUint(strValues.at(i)));
+        }
+    }
+}
+
+
 template<typename T>
 void XmlTree::getEnum(const char* valueName, T& value){
     rapidxml::xml_node<> *node = getNode(valueName);
@@ -581,6 +593,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Uint, tolerableSamples);
     SETVALUE(xt, Ulong, qSize);
     SETVALUE(xt, Double, conservativeValue);
+    SETVALUE(xt, ArrayUint, disallowedNumCores);
     SETVALUE(xt, Bool, statsReconfiguration);
 
     SETVALUE(xt, Uint, mishra.appId);

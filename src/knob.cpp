@@ -120,17 +120,19 @@ std::ostream& operator<< (std::ostream& out, const std::vector<AdaptiveNode*>& v
 }
 #endif
 
-KnobWorkers::KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
+KnobWorkers::KnobWorkers(Parameters p, AdaptiveNode* emitter,
                          AdaptiveNode* collector, ff::ff_gatherer* gt,
                          const std::vector<AdaptiveNode*> workers,
                          const volatile bool* terminated):
-        _confWorkers(confWorkers), _emitter(emitter), _collector(collector),
+        _confWorkers(p.knobWorkers), _emitter(emitter), _collector(collector),
         _gt(gt), _allWorkers(workers), _terminated(terminated){
     _realValue = _allWorkers.size();
 
     if(needsCalibration()){
         for(size_t i = 0; i < _allWorkers.size(); i++){
-            _knobValues.push_back(i + 1);
+            if(!utils::contains(p.disallowedNumCores, (uint) i + 1)){
+                _knobValues.push_back(i + 1);
+            }
         }
     }else{
         _knobValues.push_back(_allWorkers.size());

@@ -204,16 +204,42 @@ private:
     size_t _lastRcvId;
     ulong _tasksInside;
     ulong _graphsInside;
+    size_t* _scheduling;
+    size_t* _numMdfi;
+    size_t* _mdfiSent;
+    std::vector<WorkerMdf*>& _workers;
 
     inline void sendToWorkers(Mdfi* instr){
+        size_t destination;
         ++_tasksInside;
         if(_orderedTasks){
-            sendTo(instr, instr->getId() % _numWorkers);
+            destination = _scheduling[instr->getId()];
+            ++_mdfiSent[destination];
+            sendTo(instr, destination);
         }else{
             send(instr);
         }
     }
 
+    void updateScheduling(size_t insId){
+#if 0
+        size_t minId = 0;
+        size_t minLoad = std::numeric_limits<size_t>::max();
+        size_t load;
+        size_t baseId = _scheduling[insId];
+        size_t workerId = 0;
+        for(size_t i = 0; i < _numWorkers; i++){
+            workerId = (baseId + i) % _numWorkers;
+            load = _mdfiSent[workerId] - _workers.at(workerId)->getProcessedTasks(); // Approximates the number of tasks in the input Q of worker i.
+            //std::cout << "Load of " << workerId << ": " << load << std::endl;
+            if(load < minLoad){
+                minLoad = load;
+                minId = workerId;
+            }
+        }
+        _scheduling[insId] = minId;
+#endif
+    }
 
     void getFromInput(StreamElem* next){
         Mdfg *newGraph;
@@ -237,6 +263,7 @@ private:
         if(!first->setInput(next, 0)){
             throw std::runtime_error("There is an error in a MDFi link.");
         }
+        ++_numMdfi[first->getId()];
         /**Sends the new instruction to the interpreter.*/
         sendToWorkers(first);
         ++_taskSent;
@@ -245,16 +272,26 @@ private:
 
     }
 public:
-    Scheduler(Mdfg *graph, InputStream *i, OutputStream *o, int parDegree,
+    Scheduler(Mdfg *graph, InputStream *i, OutputStream *o, size_t parDegree,
               unsigned long int groupSize, bool orderedTasks, bool orderedOut,
-              QUEUE& q):
-                _in(i),_out(o),_graph(graph),_compiled(false),_nextGraphId(0),
+              QUEUE& q, std::vector<WorkerMdf*>& workers):
+                _in(i), _out(o), _graph(graph), _compiled(false), _nextGraphId(0),
                 _pool(NULL), _taskSent(0), _lastSent(0), _maxWorkers(parDegree),
                 _numWorkers(parDegree), _groupSize(groupSize), _orderedTasks(orderedTasks),
                 _orderedOut(orderedOut), _q(q), _lastRcvId(0),
-                _tasksInside(0), _graphsInside(0){
+                _tasksInside(0), _graphsInside(0), _workers(workers){
         _graphs = new std::map<ulong, Mdfg*>;
         _result = new std::map<ulong, StreamElem*>;
+        _scheduling = new size_t[_graph->getNumMdfi()];
+        _numMdfi = new size_t[_graph->getNumMdfi()];
+        for(size_t i = 0; i < _graph->getNumMdfi(); i++){
+            _scheduling[i] = i % parDegree;
+            _numMdfi[i] = 0;
+        }
+        _mdfiSent = new size_t[parDegree];
+        for(size_t i = 0; i < parDegree; i++){
+            _mdfiSent[i] = 0;
+        }
     }
 
     ~Scheduler(){
@@ -269,10 +306,17 @@ public:
 #endif
         delete _graphs;
         delete _result;
+        delete[] _scheduling;
+        delete[] _numMdfi;
+        delete[] _mdfiSent;
     }
 
     void notifyRethreading(size_t oldNumWorkers, size_t newNumWorkers){
         _numWorkers = newNumWorkers;
+        for(size_t i = 0; i < _graph->getNumMdfi(); i++){
+            _scheduling[i] = i % _numWorkers;
+            _numMdfi[i] = 0;
+        }
     }
 
 
@@ -282,8 +326,10 @@ public:
         OutputToken ot;
         ulong graphId;
         TokenId dest;
+        Mdfi* poppedIns;
         Mdfi* ins;
         void* task;
+        uint poppedId;
         _q.registerq(0);
 
 #ifdef POOL
@@ -296,7 +342,7 @@ public:
         /** Bootstrap. **/
         size_t inserted = 0;
         size_t totalSent = 0;
-        while(inserted < 1000 && _in->hasNext()){
+        while(inserted < _groupSize && _in->hasNext()){
             next = _in->next();
             if(next){
                 getFromInput(next);
@@ -309,7 +355,7 @@ public:
             /////////////////////
             // Get from input. //
             ///////////////////// 
-            if(_graphsInside < 1000 &&
+            if(_graphsInside < _groupSize &&
                _in->hasNext() && (next = _in->next()) != NULL){
                 getFromInput(next);
                 //popped = 0;
@@ -323,8 +369,15 @@ public:
             if(_q.pop((void**) &task, 0)){
                 popped++;
                 --_tasksInside;
-                for(uint j = 0; j < ((Mdfi*) task)->getNumOutTokens(); j++){
-                    ot = *(((Mdfi*) task)->getOutToken(j));
+                poppedIns = ((Mdfi*) task);
+                for(uint j = 0; j < poppedIns->getNumOutTokens(); j++){
+                    ot = *(poppedIns->getOutToken(j));
+                    poppedId = poppedIns->getId();
+                    --_numMdfi[poppedId];
+                    if(_numMdfi[poppedId] == 0){
+                        // Can change the scheduling.
+                        updateScheduling(poppedId);
+                    }
                     dest = ot.getDest();
                     graphId = dest.getGraphId();
                     Mdfg* currentGraph = NULL;
@@ -373,6 +426,7 @@ public:
                          **/
                         if(ins->isFireable()){
                             sendToWorkers(ins);
+                            ++_numMdfi[ins->getId()];
                             ++totalSent;
                         }
                     }
@@ -410,7 +464,7 @@ public:
     }
 };
 
-WorkerMdf::WorkerMdf(QUEUE& q):_q(q), _init(false), _qId(-1){;}
+WorkerMdf::WorkerMdf(QUEUE& q):_q(q), _init(false), _qId(-1), _processedTasks(0){;}
 
 void WorkerMdf::compute(Mdfi* t){
     if(!_init){
@@ -420,6 +474,11 @@ void WorkerMdf::compute(Mdfi* t){
     }
     t->compute();
     _q.push((void*) t, _qId);
+    ++_processedTasks;
+}
+
+size_t WorkerMdf::getProcessedTasks() const{
+    return _processedTasks;
 }
 
 
@@ -440,22 +499,28 @@ Interpreter::Interpreter(Mdfg *graph, InputStream *i, OutputStream *o, size_t pa
     /**Creates the SPSC queues.**/
     _q.init(parDegree + 1); /* +1 for the scheduler. */
 
-    _s = new Scheduler(graph, i, o, parDegree, groupSize, orderedTasks, orderedOut, _q);
+    _s = new Scheduler(graph, i, o, parDegree, groupSize, orderedTasks,
+                       orderedOut, _q, _workers);
     _farm = new nornir::Farm<Mdfi>(_p);
     _farm->addScheduler(_s);
     /**Adds the workers to the farm.**/
     for(size_t i = 0; i < parDegree; ++i){
-        _farm->addWorker(new WorkerMdf(_q));
+        _workers.push_back(new WorkerMdf(_q));
+        _farm->addWorker(_workers.back());
     }
 }
 
 Interpreter::~Interpreter(){
      delete _p;
      delete _o;
-     if(_compiledGraph)
+     if(_compiledGraph){
          delete _compiledGraph;
+     }
      delete _s;
      delete _farm;
+     for(size_t i = 0; i < _workers.size(); i++){
+         delete _workers.at(i);
+     }
 }
 
 }

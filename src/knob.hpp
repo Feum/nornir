@@ -103,7 +103,7 @@ protected:
 
 class KnobWorkers: public Knob{
 public:
-    KnobWorkers(KnobConfWorkers confWorkers, AdaptiveNode* emitter,
+    KnobWorkers(Parameters p, AdaptiveNode* emitter,
                 AdaptiveNode* collector, ff::ff_gatherer* gt,
                 const std::vector<AdaptiveNode*> workers,
                 const volatile bool* terminated);

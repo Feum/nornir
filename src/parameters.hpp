@@ -396,6 +396,16 @@ public:
 
     /**
      * If an element named 'valueName' is present, its value is
+     * copied into 'value' and interpreted as an array of uint
+     * (separated by ':').
+     * @param valueName The name of the XML element.
+     * @param value The value that will contain the element
+     *              valueName (if present).
+     */
+    void getArrayUint(const char* valueName, std::vector<uint>& value);
+
+    /**
+     * If an element named 'valueName' is present, its value is
      * copied into 'value' and interpreted as an enumeration.
      * @param T The type of the enumeration.
      * @param valueName The name of the XML element.
@@ -769,6 +779,12 @@ public:
     //        which consumes conservativeValue% less power than the requirement.
     // This is done to amortize fluctuations. [default = 0.0]
     double conservativeValue;
+
+    // A vector containing the number of cores not allowed to be used.
+    // E.g. if it contains the number 3, then the runtime will
+    // never use  3 cores. It can only be specified when
+    // knobWorkers is different from KNOB_WORKERS_NO [default = empty].
+    std::vector<uint> disallowedNumCores;
 
     // If true, computes the statistics about the cost
     // of the reconfigurations [default = false].

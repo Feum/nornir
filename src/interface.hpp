@@ -77,7 +77,7 @@ public:
                                          "Please ensure that your application is "
                                          "notified when a rethreading occur.");
         }
-        while(!_lb->ff_send_out_to(task, id)){;} //TODO: Chiedere a Massimo
+        while(!_lb->ff_send_out_to(task, id)){;}
     }
 
     /**

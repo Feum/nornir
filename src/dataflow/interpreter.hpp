@@ -64,6 +64,7 @@ private:
     QUEUE& _q;
     bool _init;
     size_t _qId;
+    size_t _processedTasks;
 public:
     WorkerMdf(QUEUE& q);
 
@@ -73,6 +74,8 @@ public:
      * \return The result of the computation.
      */
     void compute(Mdfi* t);
+
+    size_t getProcessedTasks() const;
 };
 
 /**
@@ -82,6 +85,7 @@ class Interpreter{
 private:
     QUEUE _q;
     nornir::Scheduler<Mdfi>* _s;
+    std::vector<WorkerMdf*> _workers;
     nornir::Farm<Mdfi>* _farm;
     nornir::Parameters* _p;
     nornir::Observer* _o;
