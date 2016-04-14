@@ -1,4 +1,4 @@
-APPS                 = ffprobe
+APPS                 = ffprobe blackscholes
 
 .PHONY: all clean cleanall
 

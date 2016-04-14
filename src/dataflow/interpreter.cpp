@@ -387,13 +387,15 @@ public:
                      * the copy of the graph.
                      */
                     if(dest.isOutStream()){
-                        if(!_orderedOut || graphId == _lastSent){
-                            _out->put(ot.getResult());
-                            ++_lastSent;
-                        }else{
-                            assert(_result->emplace(std::piecewise_construct,
-                                   std::forward_as_tuple(graphId),
-                                   std::forward_as_tuple(ot.getResult())).second);
+                        if(_out){
+                            if(!_orderedOut || graphId == _lastSent){
+                                _out->put(ot.getResult());
+                                ++_lastSent;
+                            }else{
+                                assert(_result->emplace(std::piecewise_construct,
+                                       std::forward_as_tuple(graphId),
+                                       std::forward_as_tuple(ot.getResult())).second);
+                            }
                         }
                         auto it = _graphs->find(graphId);
                         if(it != _graphs->end()){
@@ -448,7 +450,7 @@ public:
              * sends the result to the stream.
              * PRESERVES THE ORDER OF THE TASKS.
              **/
-            if(_orderedOut){
+            if(_out && _orderedOut){
                 StreamElem* se;
                 std::map<ulong, StreamElem*>::iterator it;
                 while((it = _result->find(_lastSent)) != _result->end()){

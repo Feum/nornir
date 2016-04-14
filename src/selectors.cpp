@@ -434,6 +434,7 @@ KnobsValues SelectorAnalytical::getNextKnobsValues(double primaryValue,
                                                    u_int64_t totalTasks){
     if(isContractViolated(primaryValue)){
         if(_violations > _p.tolerableSamples){
+            _violations = 0;
             return getBestKnobsValues(primaryValue);
         }else{
             ++_violations;

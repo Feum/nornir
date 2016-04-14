@@ -46,7 +46,7 @@ public:
      * each time that a task is submitted to the farm.
      * \param deleteWorker If true, the destructor of the farm deletes the worker.
      */
-    Farm(Computable* w, bool deleteWorker=false):worker(w),deleteWorker(deleteWorker){;}
+    Farm(Computable* w, bool deleteWorker = false):worker(w),deleteWorker(deleteWorker){;}
 
     /**
      * Destructor of the farm.
@@ -80,7 +80,7 @@ public:
 template <typename T,typename V,V*(*fun)(T*)> class StandardFarmWorker:public Computable{
 public:
     StreamElem** compute(StreamElem** t){
-        V* result=fun((T*)t[0]);
+        V* result = fun((T*)t[0]);
         t[0]=result;
         return t;
     }
@@ -97,7 +97,7 @@ public:
  */
 
 template<typename T, typename V, V*(*fun)(T*)> Farm* createStandardFarm(){
-    return new Farm(new StandardFarmWorker<T,V,fun>,true);
+    return new Farm(new StandardFarmWorker<T,V,fun>, true);
 }
 
 }
