@@ -464,6 +464,27 @@ typedef struct{
     std::string powerData;
 }MishraParameters;
 
+typedef struct{
+    /**
+     * If true, the interpreter will ensure that instructions belonging
+     * to different stream elements will be processed in the same order
+     * they are received [default = false].
+     */
+    bool orderedProcessing;
+
+    /**
+     * If true, the interpreter will ensure that the output will be produced
+     * in the same order of the received data [default = false]. If
+     * orderedProcessing is true, this property is automatically guaranteed.
+     */
+    bool orderedOutput;
+
+    /**
+     * Maximum number of graphs to keep in the system [default = 1000].
+     */
+    uint maxGraphs;
+}DataflowParameters;
+
 /*!
  * \class AdaptivityParameters
  * \brief This class contains parameters for adaptivity choices.
@@ -789,6 +810,9 @@ public:
     // If true, computes the statistics about the cost
     // of the reconfigurations [default = false].
     bool statsReconfiguration;
+
+    // Parameters for dataflow applications.
+    DataflowParameters dataflow;
 
     // The observer object. It will be called every samplingInterval
     // milliseconds to monitor the adaptivity behaviour [default = NULL].

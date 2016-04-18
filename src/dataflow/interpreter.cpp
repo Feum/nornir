@@ -26,7 +26,11 @@
  */
 
 #include "interpreter.hpp"
+#include "../external/Mammut/mammut/mammut.hpp"
 #include <map>
+
+using namespace mammut;
+using namespace mammut::topology;
 
 namespace nornir{
 namespace dataflow{
@@ -197,8 +201,8 @@ private:
         _lastSent;
     size_t _maxWorkers;
     size_t _numWorkers;
-    size_t _groupSize;
-    bool _orderedTasks;
+    size_t _maxGraphs;
+    bool _orderedProc;
     bool _orderedOut;
     QUEUE& _q;
     size_t _lastRcvId;
@@ -212,7 +216,7 @@ private:
     inline void sendToWorkers(Mdfi* instr){
         size_t destination;
         ++_tasksInside;
-        if(_orderedTasks){
+        if(_orderedProc){
             destination = _scheduling[instr->getId()];
             ++_mdfiSent[destination];
             sendTo(instr, destination);
@@ -273,12 +277,12 @@ private:
     }
 public:
     Scheduler(Mdfg *graph, InputStream *i, OutputStream *o, size_t parDegree,
-              unsigned long int groupSize, bool orderedTasks, bool orderedOut,
-              QUEUE& q, std::vector<WorkerMdf*>& workers):
+              QUEUE& q, std::vector<WorkerMdf*>& workers, Parameters* p):
                 _in(i), _out(o), _graph(graph), _compiled(false), _nextGraphId(0),
                 _pool(NULL), _taskSent(0), _lastSent(0), _maxWorkers(parDegree),
-                _numWorkers(parDegree), _groupSize(groupSize), _orderedTasks(orderedTasks),
-                _orderedOut(orderedOut), _q(q), _lastRcvId(0),
+                _numWorkers(parDegree), _maxGraphs(p->dataflow.maxGraphs),
+                _orderedProc(p->dataflow.orderedProcessing),
+                _orderedOut(p->dataflow.orderedOutput), _q(q), _lastRcvId(0),
                 _tasksInside(0), _graphsInside(0), _workers(workers){
         _graphs = new std::map<ulong, Mdfg*>;
         _result = new std::map<ulong, StreamElem*>;
@@ -342,7 +346,7 @@ public:
         /** Bootstrap. **/
         size_t inserted = 0;
         size_t totalSent = 0;
-        while(inserted < _groupSize && _in->hasNext()){
+        while(inserted < _maxGraphs && _in->hasNext()){
             next = _in->next();
             if(next){
                 getFromInput(next);
@@ -355,7 +359,7 @@ public:
             /////////////////////
             // Get from input. //
             ///////////////////// 
-            if(_graphsInside < _groupSize &&
+            if(_graphsInside < _maxGraphs &&
                _in->hasNext() && (next = _in->next()) != NULL){
                 getFromInput(next);
                 //popped = 0;
@@ -484,29 +488,25 @@ size_t WorkerMdf::getProcessedTasks() const{
 }
 
 
-Interpreter::Interpreter(Computable* c, InputStream *i, OutputStream *o, size_t parDegree,
-                 unsigned long int groupSize, bool orderedTasks, bool orderedOut):
-            Interpreter(compile(c), i, o, parDegree, groupSize, orderedTasks, orderedOut){
+Interpreter::Interpreter(Parameters* p, Computable* c, InputStream *i, OutputStream *o):
+            Interpreter(p, compile(c), i, o){
     //TODO Set compiledgraph
 }
 
-Interpreter::Interpreter(Mdfg *graph, InputStream *i, OutputStream *o, size_t parDegree,
-                 unsigned long int groupSize, bool orderedTasks, bool orderedOut):
-        _compiledGraph(NULL), _maxWorkers(parDegree){
-
-    _p = new nornir::Parameters("parameters.xml", "archdata.xml");
-    _o = new nornir::Observer;
-    _p->observer = _o;
+Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStream *o):
+        _p(p), _compiledGraph(NULL){
+    Mammut m;
+    /** -2: One for the dataflow scheduler and one for nornir manager. **/
+    _maxWorkers = m.getInstanceTopology()->getPhysicalCores().size() - 2;
 
     /**Creates the SPSC queues.**/
-    _q.init(parDegree + 1); /* +1 for the scheduler. */
+    _q.init(_maxWorkers + 1); /* +1 for the scheduler. */
 
-    _s = new Scheduler(graph, i, o, parDegree, groupSize, orderedTasks,
-                       orderedOut, _q, _workers);
+    _s = new Scheduler(graph, i, o, _maxWorkers, _q, _workers, p);
     _farm = new nornir::Farm<Mdfi>(_p);
     _farm->addScheduler(_s);
     /**Adds the workers to the farm.**/
-    for(size_t i = 0; i < parDegree; ++i){
+    for(size_t i = 0; i < _maxWorkers; ++i){
         _workers.push_back(new WorkerMdf(_q));
         _farm->addWorker(_workers.back());
     }
@@ -514,7 +514,6 @@ Interpreter::Interpreter(Mdfg *graph, InputStream *i, OutputStream *o, size_t pa
 
 Interpreter::~Interpreter(){
      delete _p;
-     delete _o;
      if(_compiledGraph){
          delete _compiledGraph;
      }

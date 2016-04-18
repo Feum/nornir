@@ -193,6 +193,9 @@ void Parameters::setDefault(){
     qSize = 1;
     conservativeValue = 0;
     statsReconfiguration = false;
+    dataflow.orderedProcessing = false;
+    dataflow.orderedOutput = false;
+    dataflow.maxGraphs = 1000;
     observer = NULL;
 }
 
@@ -599,6 +602,10 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Uint, mishra.appId);
     SETVALUE(xt, String, mishra.bandwidthData);
     SETVALUE(xt, String, mishra.powerData);
+
+    SETVALUE(xt, Bool, dataflow.orderedProcessing);
+    SETVALUE(xt, Bool, dataflow.orderedOutput);
+    SETVALUE(xt, Uint, dataflow.maxGraphs);
 }
 
 Parameters::Parameters(Communicator* const communicator):

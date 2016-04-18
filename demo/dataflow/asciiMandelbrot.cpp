@@ -95,7 +95,10 @@ void exec(int mit,int nWorkers,int groupSize, bool async){
 	MandelInputStream inp(async);
 	MandelOutputStream out;
 	nornir::dataflow::Farm* f = nornir::dataflow::createStandardFarm<ArrayWrapper<float>,Wrapper<float>,iterateTask>();
-	nornir::dataflow::Interpreter m(f,&inp,&out,nWorkers,groupSize,false,false);
+    nornir::Parameters p("parameters.xml", "archdata.xml");
+    nornir::Observer o;
+    p.observer = &o;
+	nornir::dataflow::Interpreter m(&p, f, &inp, &out);
 	m.start();
 	m.wait();
 	std::cout << "Esecuzione con "<< nWorkers << " workers in: " << time(NULL) - start << std::endl;

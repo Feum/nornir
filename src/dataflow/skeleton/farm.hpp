@@ -81,7 +81,7 @@ template <typename T,typename V,V*(*fun)(T*)> class StandardFarmWorker:public Co
 public:
     StreamElem** compute(StreamElem** t){
         V* result = fun((T*)t[0]);
-        t[0]=result;
+        t[0] = result;
         return t;
     }
 };

@@ -12,8 +12,6 @@
 #include <math.h>
 #include <string.h>
 
-#define ENABLE_FF
-
 #ifdef ENABLE_PARSEC_HOOKS
 #include <hooks.h>
 #endif
@@ -556,8 +554,13 @@ int main (int argc, char **argv)
     nornir::Parameters ap("parameters.xml", "archdata.xml");
     ap.observer = &obs;
     OptionsStreamRate oss(rateFile);
+    oss.init();
     dataflow::Computable* farm = dataflow::createStandardFarm<fftask_t, fftask_t, compute>();
-    dataflow::Interpreter inter(farm, &oss, NULL, nThreads, 1000, false, false);
+
+    Parameters p("parameters.xml", "archdata.xml");
+    Observer o;
+    p.observer = &o;
+    dataflow::Interpreter inter(&p, farm, &oss);
     inter.start();
     inter.wait();
     inter.stats();
