@@ -122,12 +122,12 @@ void InputStreamRate::init(){
 
 #define BURST_SIZE 10.0
 
-StreamElem* InputStreamRate::next(){
+void* InputStreamRate::next(){
     if(!_objects.size()){
         throw std::runtime_error("You need to call init() before calling next() for the first time.");
     }
 
-    StreamElem* obj = NULL;
+    void* obj = NULL;
     if(!_startTime){
         _startTime = time(NULL);
         _clockThread->start();

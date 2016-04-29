@@ -37,43 +37,9 @@ namespace nornir{
 namespace dataflow{
 
 /**
- * A generic task. The task of the skeleton (and also of the macro data flow graphs) must extend this class.
- */
-class StreamElem{
-public:
-    virtual ~StreamElem(){};
-};
-
-/**
- * A generic wrapper. T is the type contained by the wrapper.
- */
-template<typename T> class Wrapper: public StreamElem{
-private:
-    T x;
-public:
-    /**
-     * Constructor of the wrapper.
-     * \param x The element wrapped.
-     */
-    inline Wrapper(T x):x(x){;}
-
-    /**
-     * Sets the element.
-     * \param t The element to set.
-     */
-    inline void set(T t){x=t;}
-
-    /**
-     * Returns the element wrapped.
-     * \return The element wrapped.
-     */
-    inline T get(){return x;}
-};
-
-/**
  * A generic array wrapper. T is the type of the elements of the array.
  */
-template<typename T> class ArrayWrapper:public StreamElem{
+template<typename T> class ArrayWrapper{
 private:
     T *a;
     uint dim;
@@ -122,7 +88,7 @@ public:
     inline void set(int i,T x){a[i]=x;}
 };
 
-template<typename T> class ArrayIndexes:public StreamElem{
+template<typename T> class ArrayIndexes{
 private:
     ArrayWrapper<T>* aw;
     int i,j;
@@ -150,7 +116,7 @@ public:
      * \return The next element of the stream. NULL if no elements are presents
      * and EOS is not arrived.
      */
-    virtual StreamElem* next() = 0;
+    virtual void* next() = 0;
 
     /**
      * Checks if the EndOfStream is arrived.
@@ -188,7 +154,7 @@ private:
     ClockThread* _clockThread;
     double _clockFrequency;
     bool _terminated;
-    std::vector<StreamElem*> _objects;
+    std::vector<void*> _objects;
     uint32_t _nextObject;
     ticks _nextBurst;
     ticks _excess;
@@ -206,14 +172,14 @@ protected:
      * objects to be produced in the stream.
      * @return A std::vector of objects.
      **/
-    virtual std::vector<StreamElem*> loadObjects() = 0;
+    virtual std::vector<void*> loadObjects() = 0;
 
 public:
     InputStreamRate(const std::string& fileName);
 
     ~InputStreamRate();
 
-    StreamElem* next();
+    void* next();
 
     bool hasNext();
 
@@ -231,7 +197,7 @@ public:
      * Puts the task into the output stream.
      * \param a The task to put.
      */
-    inline virtual void put(StreamElem* a){delete a;}
+    virtual void put(void* a) = 0;
 };
 
 }

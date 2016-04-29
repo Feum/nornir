@@ -40,7 +40,10 @@ namespace dataflow{
 /**
  * A token's destination identifier is a triple <Graph identifier, Instruction identifier, Input slot identifier>
  */
+class Mdfi;
+
 class TokenId{
+    friend class Mdfi;
 private:
     unsigned long int graphId;///<The id of the graph.
     unsigned int mdfiId,///<The id of the instruction.
@@ -151,14 +154,15 @@ public:
  */
 class InputToken{
 private:
-    StreamElem* task;///<The input task.
+    friend class Mdfi;
+    void* task;///<The input task.
     bool presence;///<\e True if the task is present, \e false otherwise.
 public:
     /**
      * Costructor of the token.
      * \param t The input task.
      */
-    inline InputToken(StreamElem* t):task(t),presence(true){;}
+    inline InputToken(void* t):task(t),presence(true){;}
 
     /**
      * Constructor of the token.
@@ -177,7 +181,7 @@ public:
      * Sets the input task.
      * \param t The task to set.
      */
-    inline void setTask(StreamElem* t){
+    inline void setTask(void* t){
         task=t;
         presence=true;
     }
@@ -186,7 +190,7 @@ public:
      * Returns the input task.
      * \return The input task.
      */
-    inline StreamElem* getTask(){
+    inline void* getTask(){
         return task;
     }
 
@@ -205,7 +209,8 @@ public:
  */
 class OutputToken{
 private:
-    StreamElem* result;
+    friend class Mdfi;
+    void* result;
     TokenId dest;
 public:
     /**Default constructor.**/
@@ -216,7 +221,7 @@ public:
      * \param r A pointer to the computed task.
      * \param d The destination of the token.
      */
-    inline OutputToken(StreamElem* r, const TokenId& d):result(r),dest(d){;}
+    inline OutputToken(void* r, const TokenId& d):result(r),dest(d){;}
 
     inline void clear(){result = NULL; dest = TokenId();}
 
@@ -224,7 +229,7 @@ public:
      * Returns a pointer to the computed task.
      * \return A pointer to the computed task.
      */
-    inline StreamElem* getResult(){return result;}
+    inline void* getResult(){return result;}
 
     /**
      * Returns the destination of the token.

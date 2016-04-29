@@ -50,7 +50,11 @@
 #define MAXPOOLSIZE 500000
 #endif
 
+PUSH_WARNING
+GCC_DISABLE_WARNING(vla)
 #include "../external/queues/MSqueue.hpp"
+POP_WARNING
+
 #define QUEUE MSQueue
 
 namespace nornir{

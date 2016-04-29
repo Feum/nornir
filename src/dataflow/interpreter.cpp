@@ -46,23 +46,25 @@ Mdfg* compile(Computable* c){
      * Farm compiling. Creates a graph containing the instructions
      * of the worker.
      **/
-    if(tc==typeid(Farm)){
+    if(tc == typeid(Farm)){
         Farm* f=(Farm*) c;
-        return compile(f->getWorker());
+        Mdfg* g = compile(f->getWorker());
+        g->init();
+        return g;
     /**
      * Pipeline compiling. Adds all istructions of the second stage in the
      * first stage of the pipeline and links it together.
      **/
-    }else if(tc==typeid(Pipeline)){
+    }else if(tc == typeid(Pipeline)){
         Pipeline* p = (Pipeline*) c;
         /**Compiles the two stages.**/
         Mdfg* g1 = compile(p->getFirstStage());
         Mdfg* g2 = compile(p->getSecondStage());
         bool lastSet = false;
         uint n = g2->getNumMdfi();
-        uint added,
-             oldSecondStageFirst, ///<The first instruction of the second stage of the pipeline.
-             oldLast; ///<The last instruction of the first stage of the pipeline.
+        uint added, oldSecondStageFirstId;
+        Computable *oldSecondStageFirst, ///<The first instruction of the second stage of the pipeline.
+                   *oldLast; ///<The last instruction of the first stage of the pipeline.
 
         /**
          * \e newIds is an array of Mdfi identifiers. \e newIds[i] is the new
@@ -72,17 +74,16 @@ Mdfg* compile(Computable* c){
         int *newIds = new int[n];
         oldLast = g1->getLast();
         oldSecondStageFirst = g2->getFirst();
+        oldSecondStageFirstId = g1->createMdfi(g2, g2->getFirstId());
+        oldSecondStageFirst = g1->getMdfi(oldSecondStageFirstId)->getComputable();
         /**
          * Discriminates the case where the second stage has only one
          * instruction.
          **/
         if(n == 1){
-            oldSecondStageFirst = g1->createLastMdfi(g2, 0);
             lastSet = true;
-        }else{
-            oldSecondStageFirst = g1->createMdfi(g2, 0);
         }
-        newIds[0] = oldSecondStageFirst;
+        newIds[0] = oldSecondStageFirstId;
         /**
          * Adds the instructions of the second stage (except first and last
          * instruction).
@@ -94,7 +95,7 @@ Mdfg* compile(Computable* c){
 
         /**If the last instruction isn't set.**/
         if(!lastSet){
-            newIds[n - 1] = g1->createLastMdfi(g2, g2->getLast());
+            newIds[n - 1] = g1->createMdfi(g2, g2->getLastId());
         }
         /**Updates destinations.**/
         for(uint i = 0; i < n; i++){
@@ -102,7 +103,7 @@ Mdfg* compile(Computable* c){
         }
 
         /**Links the two stages.**/
-        g1->link(oldLast, 0, oldSecondStageFirst, 0);
+        g1->link(oldLast, oldSecondStageFirst);
 
         delete[] newIds;
         /**
@@ -110,15 +111,17 @@ Mdfg* compile(Computable* c){
          * instructions were copied in the graph of the first stage.
          **/
         delete g2;
+
+        g1->init();
         return g1;
     /**Map and reduce compiling.**/
-    }else if(tc==typeid(EmitterWorkerCollector)){
+    }else if(tc == typeid(EmitterWorkerCollector)){
         EmitterWorkerCollector* ewc = (EmitterWorkerCollector*) c;
         int workersNum = ewc->getNWorkers();
         /**Compiles worker.**/
         Mdfg* worker = compile(ewc->getWorker());
-        Mdfg* emitter = new Mdfg(ewc->getEmitter(), 1, workersNum);
-        Mdfg* collector = new Mdfg(ewc->getCollector(), workersNum, 1);
+        Mdfg* emitter = new Mdfg(ewc->getEmitter());
+        Mdfg* collector = new Mdfg(ewc->getCollector());
 
         int workerSize = worker->getNumMdfi();
         /**
@@ -148,15 +151,17 @@ Mdfg* compile(Computable* c){
         delete[] newWorkerIds;
         /**Links the emitter to the workers.**/
         for(int i = 0; i < workersNum; i++){
-            emitter->link(emitter->getFirst(), i, firstWorkerInstr[i], 0);
+            emitter->link(emitter->getFirst(),
+                          emitter->getMdfi(firstWorkerInstr[i])->getComputable());
         }
         delete[] firstWorkerInstr;
         /**Adds the collector.**/
-        uint firstCollInstr = emitter->createLastMdfi(collector, 0);
+        uint firstCollInstr = emitter->createMdfi(collector, 0);
 
         /**Links the workers to collector.**/
         for(int i = 0; i < workersNum; i++){
-            emitter->link(lastWorkerInstr[i], 0, firstCollInstr, i);
+            emitter->link(emitter->getMdfi(lastWorkerInstr[i])->getComputable(),
+                          emitter->getMdfi(firstCollInstr)->getComputable());
         }
         delete[] lastWorkerInstr;
         /**
@@ -166,10 +171,13 @@ Mdfg* compile(Computable* c){
         delete worker;
         delete collector;
 
+        emitter->init();
         return emitter;
     /**If c is an unknown skeleton, then it is a sequential skeleton.**/
     }else{
-        return new Mdfg(c);
+        Mdfg* g = new Mdfg(c);
+        g->init();
+        return g;
     }
 }
 
@@ -192,7 +200,7 @@ private:
      * the order of the task received from the input stream. The results will
      * be periodically send to the output stream.
      **/
-    std::map<ulong, StreamElem*> *_result;
+    std::map<ulong, void*> *_result;
 
     unsigned long int
     /**Number of results not yet calculated.**/
@@ -245,7 +253,7 @@ private:
 #endif
     }
 
-    void getFromInput(StreamElem* next){
+    void getFromInput(void* next){
         Mdfg *newGraph;
         Mdfi *first;
 #ifdef POOL
@@ -285,7 +293,7 @@ public:
                 _orderedOut(p->dataflow.orderedOutput), _q(q), _lastRcvId(0),
                 _tasksInside(0), _graphsInside(0), _workers(workers){
         _graphs = new std::map<ulong, Mdfg*>;
-        _result = new std::map<ulong, StreamElem*>;
+        _result = new std::map<ulong, void*>;
         _scheduling = new size_t[_graph->getNumMdfi()];
         _numMdfi = new size_t[_graph->getNumMdfi()];
         for(size_t i = 0; i < _graph->getNumMdfi(); i++){
@@ -325,7 +333,7 @@ public:
 
 
     Mdfi* schedule(){
-        StreamElem* next;
+        void* next;
         bool end = false; ///<End becomes \e true when the manager has computed all the tasks.
         OutputToken ot;
         ulong graphId;
@@ -455,8 +463,8 @@ public:
              * PRESERVES THE ORDER OF THE TASKS.
              **/
             if(_out && _orderedOut){
-                StreamElem* se;
-                std::map<ulong, StreamElem*>::iterator it;
+                void* se;
+                std::map<ulong, void*>::iterator it;
                 while((it = _result->find(_lastSent)) != _result->end()){
                     se = it->second;
                     _result->erase(it);
@@ -495,6 +503,7 @@ Interpreter::Interpreter(Parameters* p, Computable* c, InputStream *i, OutputStr
 
 Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStream *o):
         _p(p), _compiledGraph(NULL){
+    graph->init();
     Mammut m;
     /** -2: One for the dataflow scheduler and one for nornir manager. **/
     _maxWorkers = m.getInstanceTopology()->getPhysicalCores().size() - 2;
@@ -513,7 +522,6 @@ Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStrea
 }
 
 Interpreter::~Interpreter(){
-     delete _p;
      if(_compiledGraph){
          delete _compiledGraph;
      }

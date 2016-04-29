@@ -118,7 +118,7 @@ public:
         pcap_close(handle);
     }
 
-    virtual nornir::dataflow::StreamElem* next() = 0;
+    virtual void* next() = 0;
 
     /**
      * Checks if the EndOfStream is arrived.
@@ -142,7 +142,7 @@ public:
      * Returns the next element of the stream.
      * \return The next element of the stream.
      */
-    nornir::dataflow::StreamElem* next(){
+    void* next(){
         ProbeTask* t=(ProbeTask*) ffalloc->malloc(sizeof(ProbeTask));
         t->init(nWorkers,ffalloc);
         pktRcvd=pcap_dispatch(handle,cnt,dispatchCallback,(u_char*)t);
@@ -176,8 +176,8 @@ public:
     }
 
 protected:
-    std::vector<nornir::dataflow::StreamElem*> loadObjects(){
-        std::vector<nornir::dataflow::StreamElem*>  objects;
+    std::vector<void*> loadObjects(){
+        std::vector<void*>  objects;
         do{
             ProbeTask* t = (ProbeTask*) ffalloc->malloc(sizeof(ProbeTask));
             t->init(nWorkers, ffalloc, false);
@@ -193,7 +193,7 @@ public:
         InputStreamRate::init();
     }
 
-    nornir::dataflow::StreamElem* next(){
+    void* next(){
         return InputStreamRate::next();
     }
 

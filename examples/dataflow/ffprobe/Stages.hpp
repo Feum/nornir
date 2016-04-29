@@ -103,7 +103,7 @@ public:
     /**
      * The function computed by one stage of the pipeline (is computed by an indipendent thread).
      */
-    nornir::dataflow::StreamElem** compute(nornir::dataflow::StreamElem** p){
+    void** compute(void** p){
         ProbeTask* t = (ProbeTask*) p[0];
         myList<hashElement*> *flowsToExport=t->getFlowsToExport();
         time_t now;

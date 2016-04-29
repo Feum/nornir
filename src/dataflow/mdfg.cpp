@@ -30,23 +30,19 @@
 namespace nornir{
 namespace dataflow{
 
-Mdfg::Mdfg():_nextId(0), _id(0){
+Mdfg::Mdfg():_nextId(0), _id(0), _firstId(std::numeric_limits<ulong>::max()),
+             _lastId(std::numeric_limits<ulong>::max()), _init(false){
     ;
 }
 
-Mdfg::Mdfg(Computable* c):_nextId(1), _id(0){
-    _instructions.emplace_back(c, 0, 1, 1);
-    TokenId d;
-    d.setOutputStream();
-    /**Set the output stream as instruction's output.**/
-    _instructions.back().setDestination(0, d);
+Mdfg::Mdfg(Computable* c):_nextId(1), _id(0), _firstId(std::numeric_limits<ulong>::max()),
+                          _lastId(std::numeric_limits<ulong>::max()), _init(false){
+    _instructions.emplace_back(c, 0);
 }
 
-Mdfg::Mdfg(Computable* c, int dInput, int dOutput):_nextId(1), _id(0){
-    _instructions.emplace_back(c, 0, dInput, dOutput);
-}
-
-Mdfg::Mdfg(const Mdfg& g, ulong gid):_nextId(g._nextId),_id(gid){
+Mdfg::Mdfg(const Mdfg& g, ulong gid):_nextId(g._nextId),_id(gid),
+        _firstId(g._firstId),
+        _lastId(g._lastId), _init(g._init){
     _instructions.reserve(g._instructions.size());
     for(size_t i = 0; i < g._instructions.size(); i++){
         _instructions.emplace_back(g._instructions[i]);

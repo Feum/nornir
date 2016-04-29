@@ -107,7 +107,7 @@ void executeWithFaskel(){
     faskelProbe::ProbeOutputStream output(outputFile,queueTimeout,collector,port,minFlowSize,sst,deallocTasks);
     if(numStages <= 1){
     /**Sequential execution**/
-        nornir::dataflow::StreamElem* toWorker[1];
+        void* toWorker[1];
         faskelProbe::Stage worker(0,hashSize,maxActiveFlows,idle,lifetime,maxNullCheck,maxAddCheck,maxReadTOCheck);
         while(input->hasNext()){
             toWorker[0]=input->next();

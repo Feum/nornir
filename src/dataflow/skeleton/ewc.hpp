@@ -83,26 +83,33 @@ public:
     }
 
     /**
-     * \param t Array of Task*.
-     * \return Array of Task* as result. The array of Task* and its elements
-     *        must be deallocated using delete[] and delete.
-     *
      * This method computes the result sequentially.
-    */
-    inline StreamElem** compute(StreamElem** t){
-        StreamElem **emitterResult,**fromWorker,
-            **result=new StreamElem*[nWorkers],*toWorker[1];
-        emitterResult=emitter->compute(t);
+     */
+    inline void compute(){
+        void **emitterResult = new void*[nWorkers],
+            **result=new void*[nWorkers], *fromWorker,
+            *fromCollector;
+
+        emitter->setSourceData(receiveData());
+        for(uint i=0; i<nWorkers; i++){
+            emitter->setDestinationData(&(emitterResult[i]), (Computable*) i);
+        }
+        emitter->compute();
 
         for(uint i=0; i<nWorkers; i++){
-            toWorker[0]=emitterResult[i];
-            fromWorker=worker->compute(toWorker);
-            result[i]=fromWorker[0];
+            worker->setSourceData(emitterResult[i]);
+            worker->setDestinationData(&fromWorker);
+            worker->compute();
+            result[i] = fromWorker;
         }
         delete[] emitterResult;
-        StreamElem** fromCollector=collector->compute(result);
+        for(uint i=0; i<nWorkers; i++){
+            collector->setSourceData(result[i], (Computable*) i);
+        }
+        collector->setDestinationData(&fromCollector);
+        collector->compute();
         delete[] result;
-        return fromCollector;
+        sendData(fromCollector);
     }
 
     /**
@@ -155,7 +162,7 @@ public:
      */
     ReduceEmitter(int cn, bool autoDelete=true);
 
-    StreamElem** compute(StreamElem** t);
+    void compute(void);
 };
 
 /**
@@ -166,7 +173,7 @@ public:
  */
 template <typename T, T*(*fun)(T*,T*)> class ReduceWorker:public Computable{
 public:
-    StreamElem** compute(StreamElem** t);
+    void compute(void);
 };
 
 
@@ -187,7 +194,7 @@ public:
      */
     ReduceCollector(int cn);
 
-    StreamElem** compute(StreamElem** t);
+    void compute(void);
 };
 
 /**
@@ -207,7 +214,7 @@ public:
      */
     MapEmitter(uint numWorkers, bool autoDelete=true);
 
-    StreamElem** compute(StreamElem** t);
+    void compute(void);
 };
 
 /**
@@ -220,7 +227,7 @@ public:
  */
 template <typename T, typename V, V*(*fun)(T*) > class MapWorker: public Computable{
 public:
-    StreamElem** compute(StreamElem** t);
+    void compute(void);
 };
 
 /**
@@ -236,7 +243,7 @@ private:
 public:
     MapCollector(uint nWorkers);
 
-    StreamElem** compute(StreamElem** t);
+    void compute(void);
 };
 
 /**

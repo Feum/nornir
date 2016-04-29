@@ -31,18 +31,23 @@ namespace nornir{
 namespace dataflow{
 
 void Mdfi::compute(){
-    StreamElem* args[MAX_INSTRUCTION_INPUTS];
-    for(uint i = 0; i < dInput; i++){
-        args[i] = tInput[i].getTask();
+    auto sm = sourcesMap.begin();
+    while(sm != sourcesMap.end()){
+        comp->setSourceData(tInput[sm->second].task, sm->first);
+        sm++;
     }
-    StreamElem** result = comp->compute(args);
+
     for(uint i = 0; i < dOutput; i++){
-        /*Set output tokens.*/
-        tOutput[i] = OutputToken(result[i], dest[i]);
+        tOutput[i] = OutputToken(NULL, dest[i]);
     }
-    if(result != NULL && result != args){
-        delete[] result;
+
+    auto dm = destinationsMap.begin();
+    while(dm != destinationsMap.end()){
+        comp->setSourceData(&(tOutput[dm->second].result), dm->first);
+        dm++;
     }
+
+    comp->compute();
 }
 
 void Mdfi::updateDestinations(int* v){

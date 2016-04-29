@@ -677,6 +677,36 @@ std::ostream& operator<< (std::ostream& out, const std::vector<T>& v){
     return out;
 }
 
+/*****************************************************************************************/
+/* To disable compiler warnings.                                                         */
+/* Code obtained from: https://github.com/facebook/folly/blob/master/folly/Portability.h */
+/*****************************************************************************************/
+
+// Generalize warning push/pop.
+#if defined(_MSC_VER)
+# define PUSH_WARNING __pragma(warning(push))
+# define POP_WARNING __pragma(warning(pop))
+// Disable the GCC warnings.
+# define GCC_DISABLE_WARNING(warningName)
+# define MSVC_DISABLE_WARNING(warningNumber) __pragma(warning(disable: warningNumber))
+#elif defined(__clang__) || __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+# define PUSH_WARNING _Pragma("GCC diagnostic push")
+# define POP_WARNING _Pragma("GCC diagnostic pop")
+#define GCC_DISABLE_WARNING_INTERNAL3(warningName) #warningName
+#define GCC_DISABLE_WARNING_INTERNAL2(warningName) \
+  GCC_DISABLE_WARNING_INTERNAL3(warningName)
+#define GCC_DISABLE_WARNING(warningName)                       \
+  _Pragma(GCC_DISABLE_WARNING_INTERNAL2(GCC diagnostic ignored \
+          GCC_DISABLE_WARNING_INTERNAL3(-W##warningName)))
+// Disable the MSVC warnings.
+# define MSVC_DISABLE_WARNING(warningNumber)
+#else
+# define PUSH_WARNING
+# define POP_WARNING
+# define GCC_DISABLE_WARNING(warningName)
+# define MSVC_DISABLE_WARNING(warningNumber)
+#endif
+
 }
 
 #endif /* NORNIR_UTILS_HPP_ */

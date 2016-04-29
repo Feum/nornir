@@ -35,14 +35,20 @@
 #include <iostream>
 #include <vector>
 
+
 namespace nornir{
 namespace dataflow{
+
+const uint sourceInput = std::numeric_limits<uint>::max();
 
 #define MAX_INSTRUCTION_INPUTS 1
 
 /**Macro data flow instruction.**/
 class Mdfi{
 private:
+    std::map<Computable*, uint> sourcesMap; // Map between computable and its position in the sources vector
+    std::map<Computable*, uint> destinationsMap;
+    uint sources[MAX_INSTRUCTION_INPUTS];
     InputToken tInput[MAX_INSTRUCTION_INPUTS]; ///<Input tokens. Are numbered from 0 to \e dInput -1.
     TokenId dest[MAX_INSTRUCTION_INPUTS]; ///<Destinations of the output. Are numbered from 0 to \e dOutput -1.
     OutputToken tOutput[MAX_INSTRUCTION_INPUTS];
@@ -50,18 +56,16 @@ private:
     unsigned int dInput, ///<Input size.
         dOutput, ///<Output size.
         id; ///<Instruction's identifier.
-    unsigned long int graphId; ///<Id of the graph wich belongs the instruction.
+    unsigned long int graphId; ///<Id of the graph to which the instruction belongs.
 public:
     /**
      * Constructor of the instruction.
      * \param c A pointer to the \e Computable that the instruction have to compute.
      * \param i Instruction's identifier.
-     * \param nInput Size of the input.
-     * \param nOutput Size of the output.
      */
-    inline Mdfi(Computable* c, unsigned int i, unsigned int nInput,unsigned int nOutput):
-    comp(c),dInput(nInput),dOutput(nOutput),id(i),graphId(0){
-        assert(dInput <= MAX_INSTRUCTION_INPUTS && dOutput <= MAX_INSTRUCTION_INPUTS);
+    inline Mdfi(Computable* c, unsigned int i):
+        comp(c),dInput(0),dOutput(0),id(i),graphId(0){
+        ;
     }
 
     /**
@@ -69,8 +73,12 @@ public:
      * \param ins Reference to instruction to copy.
      */
     inline Mdfi(const Mdfi& ins):
+            sourcesMap(ins.sourcesMap), destinationsMap(ins.destinationsMap),
             comp(ins.comp), dInput(ins.dInput),
             dOutput(ins.dOutput), id(ins.id), graphId(ins.graphId){
+        for(uint i = 0; i < dInput; i++){
+            sources[i] = ins.sources[i];
+        }
         for(uint i = 0; i < dOutput; i++){
             dest[i] = ins.dest[i];
         }
@@ -117,7 +125,7 @@ public:
      * \param i The position where to set the task.
      * \return \e false if \e i is higher than \e dInput, otherwise returns false.
      */
-    inline bool setInput(StreamElem* t, uint i){
+    inline bool setInput(void* t, uint i){
         if(i < dInput) {
             tInput[i].setTask(t);
             return true;
@@ -125,13 +133,34 @@ public:
             return false;
     }
 
-    /**
-     * Sets the \e i-th destination. Overwrites it if is present.
-     * \param i The destination index.
-     * \param d The destination to set.
-     */
-    inline void setDestination(uint i, const TokenId& d){
-        dest[i] = d;
+    inline void setSourceInStream(){
+        sources[dInput] = sourceInput;
+        ++dInput;
+        assert(dInput <= MAX_INSTRUCTION_INPUTS);
+    }
+
+    inline void setSource(uint s, Computable* c = NULL){
+        sources[dInput] = s;
+        if(c){
+            sourcesMap.emplace(c, dInput);
+        }
+        ++dInput;
+        assert(dInput <= MAX_INSTRUCTION_INPUTS);
+    }
+
+    inline void setDestination(uint d, Computable* c = NULL){
+        dest[dOutput] = TokenId(d, dOutput);
+        if(c){
+            sourcesMap.emplace(c, dOutput);
+        }
+        ++dOutput;
+        assert(dOutput <= MAX_INSTRUCTION_INPUTS);
+    }
+
+    inline void setDestinationOutStream(){
+        dest[dOutput].setOutputStream();
+        ++dOutput;
+        assert(dOutput <= MAX_INSTRUCTION_INPUTS);
     }
 
     /**

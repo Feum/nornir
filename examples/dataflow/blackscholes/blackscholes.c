@@ -282,7 +282,7 @@ int bs_thread(void *tid_ptr) {
 #ifdef ENABLE_FF
 
 // [start, end[
-class fftask_t: public dataflow::StreamElem{
+class fftask_t{
 public:
     int start;
     int numElems;
@@ -301,8 +301,8 @@ public:
     }
 
 protected:
-    std::vector<dataflow::StreamElem*> loadObjects(){
-        std::vector<dataflow::StreamElem*>  objects;
+    std::vector<void*> loadObjects(){
+        std::vector<void*>  objects;
         while(currentIteration < NUM_RUNS){
             fftask_t* outTask = new fftask_t;
             outTask->start = currentOption;

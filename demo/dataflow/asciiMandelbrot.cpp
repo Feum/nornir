@@ -14,7 +14,7 @@ private:
 public:
 	inline MandelInputStream(bool asy):x(-39),y(-39),eos(false),testAsync(asy),t(clock()){;}
 
-       inline nornir::dataflow::StreamElem* next(){
+       inline void* next(){
 		if(testAsync && clock()-t<=2000)
 			return NULL;
 		else{
@@ -42,16 +42,16 @@ public:
 
 class MandelOutputStream:public nornir::dataflow::OutputStream{
 public:
-        void put(nornir::dataflow::StreamElem* a){
-		Wrapper<float> *dt=(Wrapper<float>*) a;
-		float x=dt->get();
+    void put(void* a){
+		float* dt = (float*) a;
+		float x = *dt;
 		if(x==0)
 			std::cout << "*";
 		else if(x==-1)
 			std::cout << std::endl;
 		else
 			std::cout << " ";
-		delete a;
+		delete dt;
 	}
 };
 
@@ -61,12 +61,13 @@ int MAX_ITERATIONS;
 
 
 /**Function taken from http://www.timestretch.com/FractalBenchmark.html#67b4f5a3200c7b7e900c38ff21321741 **/
-Wrapper<float>* iterateTask(ArrayWrapper<float>* t){
+float* iterateTask(ArrayWrapper<float>* t){
 	float f1=t->get(1);
 	float f2=t->get(0);
 	delete t;
-	if(f2==-100000)
-		return new Wrapper<float>(-1);
+	if(f2 == -100000){
+		return new float(-1);
+	}
 
 	float cr = f1-0.5f;
 	float ci = f2;
@@ -81,10 +82,10 @@ Wrapper<float>* iterateTask(ArrayWrapper<float>* t){
 		zr = zr2 - zi2 + cr;
 		zi = temp + temp + ci;
 		if (zi2 + zr2 > BAILOUT)
-			return new Wrapper<float>(i);
+			return new float(i);
 
 		if (i > MAX_ITERATIONS)
-			return new Wrapper<float>(0);
+			return new float(0);
 
 	}
 }
@@ -94,7 +95,7 @@ void exec(int mit,int nWorkers,int groupSize, bool async){
 	time_t start=time(NULL);
 	MandelInputStream inp(async);
 	MandelOutputStream out;
-	nornir::dataflow::Farm* f = nornir::dataflow::createStandardFarm<ArrayWrapper<float>,Wrapper<float>,iterateTask>();
+	nornir::dataflow::Farm* f = nornir::dataflow::createStandardFarm<ArrayWrapper<float>, float, iterateTask>();
     nornir::Parameters p("parameters.xml", "archdata.xml");
     nornir::Observer o;
     p.observer = &o;

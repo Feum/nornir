@@ -33,12 +33,11 @@ ReduceEmitter<T>::ReduceEmitter(int cn, bool autoDelete):
     chunkNum(cn),autoDelete(autoDelete){;}
 
 template <typename T>
-StreamElem** ReduceEmitter<T>::compute(StreamElem** t){
-    ArrayWrapper<T*>* task=(ArrayWrapper<T*>*) t[0];
+void ReduceEmitter<T>::compute(void){
+    ArrayWrapper<T*>* task=(ArrayWrapper<T*>*) receiveData();
     int dim=task->getSize();
     int mod=dim%chunkNum;
     int size=dim/chunkNum;
-    StreamElem** toRet=new StreamElem*[chunkNum];
 #ifdef NOCOPY
     int l,h=0;
     for(uint i=0; i<chunkNum; i++){
@@ -63,32 +62,32 @@ StreamElem** ReduceEmitter<T>::compute(StreamElem** t){
             toAdd->set(j,task->get(k));
             k++;
         }
-        toRet[i]=toAdd;
+        sendData(toAdd, (Computable*) i);
     }
     if(autoDelete) delete task;
 #endif
-    return toRet;
 }
 
 
 template <typename T, T*(*fun)(T*,T*)>
-StreamElem** ReduceWorker<T, fun>::compute(StreamElem** t){
+void ReduceWorker<T, fun>::compute(void){
+    void* t = receiveData();
     ArrayWrapper<T*>* w1;
     int nElem,first;
 #ifdef NOCOPY
-    ArrayIndexes<T*>* ai=(ArrayIndexes<T*>*)t[0];
+    ArrayIndexes<T*>* ai=(ArrayIndexes<T*>*)t;
     w1=ai->getArray();
     nElem=ai->getj();
     first=ai->geti();
 #else
-    StreamElem* toDelete=t[0];
-    w1=(ArrayWrapper<T*>*)t[0];
+    void* toDelete = t;
+    w1=(ArrayWrapper<T*>*)t;
     nElem=w1->getSize();
     first=0;
 #endif
     if(nElem-first==1){
 #ifndef NOCOPY
-        t[0]=w1->get(first);
+        t = w1->get(first);
         delete toDelete;
 #endif
     }else{
@@ -101,11 +100,11 @@ StreamElem** ReduceWorker<T, fun>::compute(StreamElem** t){
 #ifdef NOCOPY
     w1->set(first,x);
 #else
-    t[0]=x;
+    t = x;
     delete toDelete;
 #endif
     }
-    return t;
+    sendData(t);
 }
 
 
@@ -113,20 +112,19 @@ template<typename T, T*(*fun)(T*,T*)>
 ReduceCollector<T, fun>::ReduceCollector(int cn):chunkNum(cn){;}
 
 template<typename T, T*(*fun)(T*,T*)>
-StreamElem** ReduceCollector<T, fun>::compute(StreamElem** t){
-    StreamElem** toRet=new StreamElem*[1];
+void ReduceCollector<T, fun>::compute(void){
     T *p,*q;
 #ifdef NOCOPY
     ArrayIndexes<T*>* ai;
-    ai=(ArrayIndexes<T*>*)t[0];
+    ai=(ArrayIndexes<T*>*)receiveData(0);
     p=ai->getArray()->get(ai->geti());
     delete ai;
-    ai=(ArrayIndexes<T*>*)t[1];
+    ai=(ArrayIndexes<T*>*)receiveData(1);
     q=ai->getArray()->get(ai->geti());
     delete ai;
 #else
-    p=(T*)t[0];
-    q=(T*)t[1];
+    p=(T*)receiveData(0);
+    q=(T*)receiveData((Computable*) 1);
 #endif
     T* x=fun(p,q);
     T* a;
@@ -138,24 +136,22 @@ StreamElem** ReduceCollector<T, fun>::compute(StreamElem** t){
         if(i==chunkNum-1) delete ai->getArray();
         delete ai;
 #else
-        a=(T*)t[i];
+        a=(T*)receiveData((Computable*) i);
 #endif
         x=fun(x,a);
     }
-    toRet[0]=x;
-    return toRet;
+    sendData(x);
 }
 
 template <typename T>
 MapEmitter<T>::MapEmitter(uint numWorkers, bool autoDelete):numWorkers(numWorkers),autoDelete(autoDelete){;}
 
 template <typename T>
-StreamElem** MapEmitter<T>::compute(StreamElem** t){
-    ArrayWrapper<T*>* task=(ArrayWrapper<T*>*) t[0];
+void MapEmitter<T>::compute(void){
+    ArrayWrapper<T*>* task=(ArrayWrapper<T*>*) receiveData();
     uint dim=task->getSize();
     uint mod=dim%numWorkers;
     uint size=dim/numWorkers;
-    StreamElem** toRet=new StreamElem*[numWorkers];
 #ifdef NOCOPY
     int l,h=0;
     for(uint i=0; i<numWorkers; i++){
@@ -169,35 +165,35 @@ StreamElem** MapEmitter<T>::compute(StreamElem** t){
     }
 #else
     int k=0;
-    ArrayWrapper<StreamElem*>* toAdd;
+    ArrayWrapper<void*>* toAdd;
     for(uint i=0; i<numWorkers; i++){
         if(mod && i==numWorkers-mod){
             size+=1;
             mod=0;
         }
-        toAdd=new ArrayWrapper<StreamElem*>(size);
+        toAdd=new ArrayWrapper<void*>(size);
         for(uint j=0; j<size; j++){
             toAdd->set(j,task->get(k));
             k++;
         }
-        toRet[i]=toAdd;
+        sendData(toAdd, (Computable*) i);
     }
     if(autoDelete) delete task;
 #endif
-    return toRet;
 }
 
 template <typename T, typename V, V*(*fun)(T*) >
-StreamElem** MapWorker<T, V, fun>::compute(StreamElem** t){
-    ArrayWrapper<StreamElem*> *w1;
+void MapWorker<T, V, fun>::compute(void){
+    ArrayWrapper<void*> *w1;
     int nElem,first;
+    void* t = receiveData();
 #ifdef NOCOPY
-    ArrayIndexes<StreamElem*>* ai=(ArrayIndexes<StreamElem*>*)t[0];
+    ArrayIndexes<void*>* ai=(ArrayIndexes<void*>*) t;
     w1=ai->getArray();
     nElem=ai->getj();
     first=ai->geti();
 #else
-    w1=(ArrayWrapper<StreamElem*>*)t[0];
+    w1=(ArrayWrapper<void*>*) t;
     nElem=w1->getSize();
     first=0;
 #endif
@@ -208,35 +204,33 @@ StreamElem** MapWorker<T, V, fun>::compute(StreamElem** t){
         y=fun(x);
         w1->set(i,y);
     }
-    return t;
+    sendData(t);
 }
 
 template <typename V>
 MapCollector<V>::MapCollector(uint nWorkers):nWorkers(nWorkers){;}
 
 template <typename V>
-StreamElem** MapCollector<V>::compute(StreamElem** t){
-    StreamElem** toRet=new StreamElem*[1];
+void MapCollector<V>::compute(void){
 #ifdef NOCOPY
-    ArrayIndexes<StreamElem*>* ai;
+    ArrayIndexes<void*>* ai;
     for(uint i=0; i<nWorkers-1; i++){
-        ai=(ArrayIndexes<StreamElem*>*)t[i];
+        ai=(ArrayIndexes<void*>*)receiveData((Computable*) i);
         delete ai;
     }
-    ai=(ArrayIndexes<StreamElem*>*)t[nWorkers-1];
-    toRet[0]=ai->getArray();
+    ai = (ArrayIndexes<void*>*)receiveData((Computable*) (nWorkers-1));
+    sendData(ai->getArray());
     delete ai;
-    return toRet;
 #else
     uint size=0;
     for(uint i=0; i<nWorkers; i++)
-        size+=((ArrayWrapper<StreamElem*>*) t[i])->getSize();
+        size+=((ArrayWrapper<void*>*) receiveData((Computable*) i))->getSize();
 
 
     ArrayWrapper<V*> *aw=new ArrayWrapper<V*>(size),*tempAw;
     uint tempSize,k=0;
     for(uint i=0; i<nWorkers; i++){
-        tempAw=((ArrayWrapper<V*>*) t[i]);
+        tempAw=((ArrayWrapper<V*>*) receiveData((Computable*) i));
         tempSize=tempAw->getSize();
         for(uint j=0; j<tempSize; j++){
             aw->set(k,tempAw->get(j));
@@ -244,8 +238,7 @@ StreamElem** MapCollector<V>::compute(StreamElem** t){
         }
         delete tempAw;
     }
-    toRet[0]=aw;
-    return toRet;
+    sendData(aw);
 #endif
 }
 

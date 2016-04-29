@@ -29,6 +29,7 @@
 #define NORNIR_DF_COMPUTABLE_HPP_
 
 #include "../stream.hpp"
+#include <map>
 
 namespace nornir{
 namespace dataflow{
@@ -66,12 +67,59 @@ namespace dataflow{
  * \endcode
  */
 
+class Mdfi;
+class Farm;
+class Pipeline;
+class EmitterWorkerCollector;
+
 class Computable{
+private:
+    friend class Mdfi;
+    friend class Farm;
+    friend class Pipeline;
+    friend class EmitterWorkerCollector;
+    std::map<Computable*, void*> _sources;
+    std::map<Computable*, void**> _destinations;
+
+    /**
+     * NULL = Input stream.
+     */
+    void setSourceData(void* s, Computable* c = NULL){
+        _sources[c] = s;
+    }
+
+    /**
+     * NULL = Output stream.
+     */
+    void setDestinationData(void** d, Computable* c = NULL){
+        _destinations[c] = d;
+    }
 public:
     /**
      * Destructor of the computable.
      */
     virtual ~Computable(){;}
+
+    /**
+     * Retreive the data received from a specific computable.
+     * @param c The computable from which the data should be received.
+     *          If NULL, the data is received from the input stream.
+     *          For map computations, c is the index of the worker
+     *          (cast from int to Computable*).
+     */
+    void* receiveData(Computable* c = NULL){
+        return _sources[c];
+    }
+
+    /**
+     * Sends a result to a specific computable.
+     * @param c The computable to which the data should be sent. If NULL,
+     *          the data is sent to the output stream. For map computations,
+     *          c is the index of the worker (cast from int to Computable*).
+     */
+    void sendData(void* x, Computable* c = NULL){
+        *(_destinations[c]) = x;
+    }
 
     /**
      * \param t Array of Task*.
@@ -80,7 +128,7 @@ public:
      * This method computes the result.
      *
      */
-    virtual StreamElem** compute(StreamElem** t) = 0;
+    virtual void compute(void) = 0;
 };
 
 }

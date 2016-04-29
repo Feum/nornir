@@ -72,7 +72,7 @@ public:
      * Puts the task into the output stream.
      * \param a The task to put.
      */
-    inline void put(nornir::dataflow::StreamElem* a){
+    inline void put(void* a){
         if(!_deallocTasks){
             return;
         }
