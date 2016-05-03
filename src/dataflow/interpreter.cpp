@@ -387,7 +387,8 @@ public:
                 popped++;
                 --_tasksInside;
                 poppedIns = ((Mdfi*) task);
-                for(uint j = 0; j < poppedIns->getNumOutTokens(); j++){
+                size_t numOutTokens = poppedIns->getNumOutTokens();
+                for(uint j = 0; j < numOutTokens; j++){
                     ot = *(poppedIns->getOutToken(j));
                     poppedId = poppedIns->getId();
                     --_numMdfi[poppedId];
@@ -404,6 +405,7 @@ public:
                      * the copy of the graph.
                      */
                     if(dest.isOutStream()){
+                        assert(numOutTokens == 1);
                         if(_out){
                             if(!_orderedOut || graphId == _lastSent){
                                 _out->put(ot.getResult());
@@ -503,7 +505,7 @@ size_t WorkerMdf::getProcessedTasks() const{
 
 Interpreter::Interpreter(Parameters* p, Computable* c, InputStream *i, OutputStream *o):
             Interpreter(p, compile(c), i, o){
-    //TODO Set compiledgraph
+    ;
 }
 
 Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStream *o):
@@ -511,6 +513,9 @@ Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStrea
     graph->init();
     Mammut m;
     size_t numPhysicalCores = m.getInstanceTopology()->getPhysicalCores().size();
+
+    numPhysicalCores = 5; //TODO Remove
+
     if(numPhysicalCores < 3){
         throw std::runtime_error("Not enough cores available (you need at least "
                                  "3 physical cores).");
