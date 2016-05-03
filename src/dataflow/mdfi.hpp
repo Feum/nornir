@@ -41,7 +41,7 @@ namespace dataflow{
 
 const uint sourceInput = std::numeric_limits<uint>::max();
 
-#define MAX_INSTRUCTION_INPUTS 1
+#define MAX_INSTRUCTION_INPUTS 2
 
 /**Macro data flow instruction.**/
 class Mdfi{
@@ -53,18 +53,18 @@ private:
     TokenId dest[MAX_INSTRUCTION_INPUTS]; ///<Destinations of the output. Are numbered from 0 to \e dOutput -1.
     OutputToken tOutput[MAX_INSTRUCTION_INPUTS];
     Computable* comp; ///<\e Computable to compute.
-    unsigned int dInput, ///<Input size.
+    uint dInput, ///<Input size.
         dOutput, ///<Output size.
         id; ///<Instruction's identifier.
-    unsigned long int graphId; ///<Id of the graph to which the instruction belongs.
+    ulong graphId; ///<Id of the graph to which the instruction belongs.
 public:
     /**
      * Constructor of the instruction.
      * \param c A pointer to the \e Computable that the instruction have to compute.
      * \param i Instruction's identifier.
      */
-    inline Mdfi(Computable* c, unsigned int i):
-        comp(c),dInput(0),dOutput(0),id(i),graphId(0){
+    inline Mdfi(Computable* c, uint i):
+        comp(c), dInput(0), dOutput(0), id(i), graphId(0){
         ;
     }
 
@@ -122,19 +122,17 @@ public:
     /**
      * Sets an input task.
      * \param t The task to set.
-     * \param i The position where to set the task.
-     * \return \e false if \e i is higher than \e dInput, otherwise returns false.
      */
-    inline bool setInput(void* t, uint i){
-        if(i < dInput) {
-            tInput[i].setTask(t);
-            return true;
-        }else
-            return false;
+    inline void setInput(void* t, Computable* c){
+        if(sourcesMap.find(c) == sourcesMap.end()){
+            throw std::runtime_error("Computable non existing.");
+        }
+        tInput[sourcesMap[c]].setTask(t);
     }
 
     inline void setSourceInStream(){
         sources[dInput] = sourceInput;
+        sourcesMap.emplace((Computable*) NULL, dInput);
         ++dInput;
         assert(dInput <= MAX_INSTRUCTION_INPUTS);
     }
@@ -149,9 +147,9 @@ public:
     }
 
     inline void setDestination(uint d, Computable* c = NULL){
-        dest[dOutput] = TokenId(d, dOutput);
+        dest[dOutput] = TokenId(d);
         if(c){
-            sourcesMap.emplace(c, dOutput);
+            destinationsMap.emplace(c, dOutput);
         }
         ++dOutput;
         assert(dOutput <= MAX_INSTRUCTION_INPUTS);
@@ -159,6 +157,7 @@ public:
 
     inline void setDestinationOutStream(){
         dest[dOutput].setOutputStream();
+        destinationsMap.emplace((Computable*) NULL, dOutput);
         ++dOutput;
         assert(dOutput <= MAX_INSTRUCTION_INPUTS);
     }
@@ -191,7 +190,7 @@ public:
      * Returns the size of the output.
      * \return The size of the output.
      */
-    inline unsigned int getOutputSize(){
+    inline uint getOutputSize(){
         return dOutput;
     }
 
@@ -199,7 +198,7 @@ public:
      * Returns the id of the graph.
      * \return The id of the graph.
      */
-    inline unsigned long int getGid(){
+    inline ulong getGid(){
         return graphId;
     }
 
@@ -214,8 +213,10 @@ public:
     }
 
     /**
-     * Returns a pointer to the \e Computable that the instruction have to compute.
-     * \return A pointer to the \e Computable that the instruction have to compute.
+     * Returns a pointer to the \e Computable that the instruction have to
+     * compute.
+     * \return A pointer to the \e Computable that the instruction have to
+     *         compute.
      */
     inline Computable* getComputable(){
         return comp;
@@ -223,7 +224,8 @@ public:
 
     /**
      * Updates the destinations of the instructions.
-     * \param v \e v[i] is the new identifier of the instruction that previously has \e i as identifier.
+     * \param v \e v[i] is the new identifier of the instruction that
+     *        previously has \e i as identifier.
      */
     void updateDestinations(int* v);
 

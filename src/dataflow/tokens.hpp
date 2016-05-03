@@ -38,49 +38,46 @@ namespace dataflow{
 #define MAXUNSINT __INT_MAX__ * 2U + 1
 
 /**
- * A token's destination identifier is a triple <Graph identifier, Instruction identifier, Input slot identifier>
+ * A token's destination identifier is a triple <Graph identifier, Instruction identifier>
  */
 class Mdfi;
 
 class TokenId{
     friend class Mdfi;
 private:
-    unsigned long int graphId;///<The id of the graph.
-    unsigned int mdfiId,///<The id of the instruction.
-        tokenId;///<The id of the input slot.
+    ulong graphId;///<The id of the graph.
+    uint mdfiId;///<The id of the instruction.
     bool isOutputStream;///<True if the destination is the output stream.
 public:
     /**
      * Constructor of the identifier.
      */
-    inline TokenId():graphId(MAXUNSLONGINT),mdfiId(MAXUNSINT),
-    tokenId(MAXUNSINT),isOutputStream(false){;}
+    inline TokenId():graphId(MAXUNSLONGINT), mdfiId(MAXUNSINT),
+    isOutputStream(false){;}
 
     /**
      * Constructor of the identifier.
      * \param gid Identifier of the graph.
      * \param instrid Identifier of the instruction.
-     * \param tokid Identifier of the input slot.
      */
-    inline TokenId(unsigned long int gid, unsigned int instrid, unsigned int tokid):
-            graphId(gid),mdfiId(instrid),tokenId(tokid),isOutputStream(false){;}
+    inline TokenId(ulong gid, uint instrid):
+            graphId(gid), mdfiId(instrid), isOutputStream(false){;}
 
     /**
      * Constructor of the identifier.
      * \param instrid Identifier of the instruction.
-     * \param tokid Identifier of the input slot.
      */
-    inline TokenId(unsigned int instrid,unsigned int tokid):
-            graphId(MAXUNSLONGINT),mdfiId(instrid),tokenId(tokid),isOutputStream(false){;}
+    inline TokenId(uint instrid):
+            graphId(MAXUNSLONGINT), mdfiId(instrid), isOutputStream(false){;}
 
     /**Sets the destination to the output stream.**/
     inline void setOutputStream(){
-        isOutputStream=true;
+        isOutputStream = true;
     }
 
     /**Unsets the destination to the output stream.**/
     inline void unsetOutputStream(){
-        isOutputStream=false;
+        isOutputStream = false;
     }
 
     /**
@@ -88,8 +85,7 @@ public:
      * \return \e True if the destination isn't present, \e false otherwise.
      */
     inline bool const isNull(){
-        return graphId==MAXUNSLONGINT  && mdfiId==MAXUNSINT
-                && tokenId==MAXUNSINT;
+        return graphId==MAXUNSLONGINT && mdfiId==MAXUNSINT;
     }
 
     /**
@@ -117,14 +113,6 @@ public:
     }
 
     /**
-     * Returns the destination instruction's slot.
-     * \return The destination instruction's slot.
-     */
-    inline unsigned int getTokId(){
-        return tokenId;
-    }
-
-    /**
      * Sets the identifier of the destination graph.
      * \param id The identifier of the destination graph.
      */
@@ -138,14 +126,6 @@ public:
      */
     inline void setMdfiId(unsigned int id){
         mdfiId=id;
-    }
-
-    /**
-     * Sets the identifier of the token.
-     * \return The identifier of the token.
-     */
-    inline void setTokId(unsigned int id){
-        tokenId=id;
     }
 };
 
@@ -182,8 +162,8 @@ public:
      * \param t The task to set.
      */
     inline void setTask(void* t){
-        task=t;
-        presence=true;
+        task = t;
+        presence = true;
     }
 
     /**

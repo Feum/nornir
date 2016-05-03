@@ -43,7 +43,7 @@ void Mdfi::compute(){
 
     auto dm = destinationsMap.begin();
     while(dm != destinationsMap.end()){
-        comp->setSourceData(&(tOutput[dm->second].result), dm->first);
+        comp->setDestinationData(&(tOutput[dm->second].result), dm->first);
         dm++;
     }
 

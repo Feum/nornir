@@ -103,8 +103,8 @@ public:
     /**
      * The function computed by one stage of the pipeline (is computed by an indipendent thread).
      */
-    void** compute(void** p){
-        ProbeTask* t = (ProbeTask*) p[0];
+    void compute(){
+        ProbeTask* t = (ProbeTask*) receiveData();
         myList<hashElement*> *flowsToExport=t->getFlowsToExport();
         time_t now;
         std::vector<hashElement*>& flowsToAdd = t->getFlowsToAdd(id);
@@ -135,7 +135,7 @@ public:
         if(_hashElemDealloc){
             flowsToAdd.clear();
         }
-        return p;
+        sendData(t);
     }
 };
 }

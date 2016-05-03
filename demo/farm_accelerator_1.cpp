@@ -1,5 +1,5 @@
 /*
- * farm_accelerator.hpp
+ * farm_accelerator_1.cpp
  *
  * Created on: 27/02/2016
  *

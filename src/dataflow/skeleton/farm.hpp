@@ -46,15 +46,16 @@ public:
      * each time that a task is submitted to the farm.
      * \param deleteWorker If true, the destructor of the farm deletes the worker.
      */
-    Farm(Computable* w, bool deleteWorker = false):worker(w),deleteWorker(deleteWorker){;}
+    Farm(Computable* w, bool deleteWorker = false):worker(w), deleteWorker(deleteWorker){;}
 
     /**
      * Destructor of the farm.
      * If deleteAll is true, deletes the worker of the farm.
      */
     ~Farm(){
-        if(deleteWorker)
+        if(deleteWorker){
             delete worker;
+        }
     }
     /**
      * This method computes the result sequentially.
@@ -77,10 +78,10 @@ public:
 };
 
 
-template <typename T,typename V,V*(*fun)(T*)> class StandardFarmWorker:public Computable{
+template <typename T, typename V, V*(*fun)(T*)> class StandardFarmWorker: public Computable{
 public:
     void compute(void){
-        V* result = fun((T*)receiveData());
+        V* result = fun((T*) receiveData());
         sendData(result);
     }
 };
@@ -96,7 +97,7 @@ public:
  */
 
 template<typename T, typename V, V*(*fun)(T*)> Farm* createStandardFarm(){
-    return new Farm(new StandardFarmWorker<T,V,fun>, true);
+    return new Farm(new StandardFarmWorker<T, V, fun>, true);
 }
 
 }

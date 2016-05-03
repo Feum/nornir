@@ -47,7 +47,7 @@ Mdfg* compile(Computable* c){
      * of the worker.
      **/
     if(tc == typeid(Farm)){
-        Farm* f=(Farm*) c;
+        Farm* f = (Farm*) c;
         Mdfg* g = compile(f->getWorker());
         g->init();
         return g;
@@ -75,6 +75,11 @@ Mdfg* compile(Computable* c){
         oldLast = g1->getLast();
         oldSecondStageFirst = g2->getFirst();
         oldSecondStageFirstId = g1->createMdfi(g2, g2->getFirstId());
+        /**
+         *  Ok to call getMdfi(...) even if the graph will me modified. Indeed
+         *  we will not store the Mdfi itself but only the computable associated
+         *  to it.
+         */
         oldSecondStageFirst = g1->getMdfi(oldSecondStageFirstId)->getComputable();
         /**
          * Discriminates the case where the second stage has only one
@@ -271,10 +276,8 @@ private:
         assert(_graphs->insert(std::pair<ulong, Mdfg*>(_nextGraphId, newGraph)).second);
 #endif
 
-        first = newGraph->getMdfi(0);
-        if(!first->setInput(next, 0)){
-            throw std::runtime_error("There is an error in a MDFi link.");
-        }
+        first = newGraph->getMdfi(newGraph->getFirstId());
+        first->setInput(next, NULL);
         ++_numMdfi[first->getId()];
         /**Sends the new instruction to the interpreter.*/
         sendToWorkers(first);
@@ -433,7 +436,7 @@ public:
                         /**Takes the pointer to the instruction.**/
                         ins = currentGraph->getMdfi(dest.getMdfId());
                         /**Updates the instruction adding the input token.**/
-                        ins->setInput(ot.getResult(), dest.getTokId());
+                        ins->setInput(ot.getResult(), poppedIns->getComputable());
                         /**
                          * If the instruction is fireable, adds it to the pool of
                          * fireable instructions.
@@ -505,8 +508,13 @@ Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStrea
         _p(p), _compiledGraph(NULL){
     graph->init();
     Mammut m;
+    size_t numPhysicalCores = m.getInstanceTopology()->getPhysicalCores().size();
+    if(numPhysicalCores < 3){
+        throw std::runtime_error("Not enough cores available (you need at least "
+                                 "3 physical cores).");
+    }
     /** -2: One for the dataflow scheduler and one for nornir manager. **/
-    _maxWorkers = m.getInstanceTopology()->getPhysicalCores().size() - 2;
+    _maxWorkers = numPhysicalCores - 2;
 
     /**Creates the SPSC queues.**/
     _q.init(_maxWorkers + 1); /* +1 for the scheduler. */

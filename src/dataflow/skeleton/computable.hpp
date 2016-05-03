@@ -46,6 +46,7 @@ namespace dataflow{
  * \code
  * #include "nornir/dataflow/skeleton/computable.hpp"
  *
+ * TODO: FIX documentation
  * class myCompute: public skel::Computable{
  * public:
  * Task** compute(Task** input){
@@ -108,6 +109,9 @@ public:
      *          (cast from int to Computable*).
      */
     void* receiveData(Computable* c = NULL){
+        if(_sources.find(c) == _sources.end()){
+            throw std::runtime_error("Impossible to receive from computable.");
+        }
         return _sources[c];
     }
 
@@ -118,15 +122,14 @@ public:
      *          c is the index of the worker (cast from int to Computable*).
      */
     void sendData(void* x, Computable* c = NULL){
+        if(_destinations.find(c) == _destinations.end()){
+            throw std::runtime_error("Impossible to send to computable.");
+        }
         *(_destinations[c]) = x;
     }
 
     /**
-     * \param t Array of Task*.
-     * \return Array of Task* as result.
-     *
      * This method computes the result.
-     *
      */
     virtual void compute(void) = 0;
 };

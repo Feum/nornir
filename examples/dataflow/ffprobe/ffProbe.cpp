@@ -107,13 +107,20 @@ void executeWithFaskel(){
     faskelProbe::ProbeOutputStream output(outputFile,queueTimeout,collector,port,minFlowSize,sst,deallocTasks);
     if(numStages <= 1){
     /**Sequential execution**/
-        void* toWorker[1];
-        faskelProbe::Stage worker(0,hashSize,maxActiveFlows,idle,lifetime,maxNullCheck,maxAddCheck,maxReadTOCheck);
+        throw std::runtime_error("Sequential execution not implemented yet.");
+#if 0
+        void *toWorker, *fromWorker;
+        faskelProbe::Stage worker(0, hashSize, maxActiveFlows, idle, lifetime,
+                                  maxNullCheck, maxAddCheck, maxReadTOCheck);
         while(input->hasNext()){
-            toWorker[0]=input->next();
-            if(toWorker[0]==NULL) continue;
-            output.put((worker.compute(toWorker))[0]);
+            toWorker = input->next();
+            if(!toWorker) continue;
+            worker.setSourceData(toWorker);
+            worker.setDestinationData(&fromWorker);
+            worker.compute();
+            output.put(fromWorker);
         }
+#endif
     }else{
         /**Parallel execution with n pipelined threads.**/
         faskelProbe::Stage** stages = new faskelProbe::Stage*[numStages];

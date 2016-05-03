@@ -48,11 +48,11 @@ public:
      * Constructor of the wrapper.
      * \param d Size of the array.
      */
-    inline ArrayWrapper(uint d):a(new T[d]),dim(d){;}
+    inline ArrayWrapper(uint d):a(new T[d]), dim(d){;}
 
-    ArrayWrapper (const ArrayWrapper& aw):a(new T[aw.dim]),dim(aw.dim){
-        for(uint i=0; i<dim; i++){
-            a[i]=aw.a[i];
+    ArrayWrapper(const ArrayWrapper& aw):a(new T[aw.dim]), dim(aw.dim){
+        for(uint i = 0; i < dim; i++){
+            a[i] = aw.a[i];
         }
     }
     /**

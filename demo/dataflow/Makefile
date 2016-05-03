@@ -1,4 +1,4 @@
-TARGET               = asciiMandelbrot
+TARGET               = asciiMandelbrot graph
 
 .PHONY: clean cleanall
 

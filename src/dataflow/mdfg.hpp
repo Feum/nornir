@@ -35,25 +35,23 @@ namespace dataflow{
 
 /**
  * Macro data flow graph.
- * Accessory methods are provided to interact with and use the graph.
- *
- * The Input Mdfi must have an unique input token.
- *
- * The Output Mdfi must have an unique destination.
+ * Accessory methods are provided to interact with and use the graph..
  *
  * Usage example:
  * \code
  *      using namespace nornir;
  *      using namespace nornir::dataflow;
  *
- *      Computable* A, B, C, D, E;
+ *      Computable *A, *B, *C, *D, *E;
  *      A = new ACode(...);
  *      B = new BCode(...);
  *      C = new CCode(...);
  *      D = new DCode(...);
  *      E = new ECode(...);
  * \endcode
+ *
  * To link them together:
+ *
  * \code
  *      Mdfg graph;
  *      graph.link(A, B);
@@ -84,16 +82,10 @@ public:
 
     /**
      * Builds a graph with only one instruction.
-     * \param c A pointer to the \e Computable that the instruction have to compute.
+     * \param c A pointer to the \e Computable that the instruction have to
+     *        compute.
      */
     Mdfg(Computable* c);
-
-    /**
-     * Builds a graph with only one instruction. It's used for the construction of the emitter and
-     * the collector of a map/reduce.
-     * \param c A pointer to the \e Computable that the instruction have to compute.
-     */
-    Mdfg(Computable* c, int dInput, int dOutput);
 
     /**
      * Copy constructor.
@@ -123,7 +115,8 @@ public:
 
     /**
      * Creates an instruction of the graph.
-     * \param c A pointer to the \e Computable that the instruction have to compute.
+     * \param c A pointer to the \e Computable that the instruction have to
+     *        compute.
      * \return The id of the created instruction.
      */
     inline uint createMdfi(Computable* c){
@@ -244,7 +237,8 @@ public:
                         _instructions.at(i).setSourceInStream();
                         _firstId = i;
                     }else{
-                        throw std::runtime_error("More than 1 instruction have no input links.");
+                        throw std::runtime_error("More than 1 instruction have "
+                                                 "no input links.");
                     }
                 }
 
@@ -254,17 +248,20 @@ public:
                         _instructions.at(i).setDestinationOutStream();
                         _lastId = i;
                     }else{
-                        throw std::runtime_error("More than 1 instruction have no output links.");
+                        throw std::runtime_error("More than 1 instruction have "
+                                                 "no output links.");
                     }
                 }
             }
             _init = true;
             if(!inFound){
-                throw std::runtime_error("Impossible to find the first instruction of the graph (Must have only 1 input).");
+                throw std::runtime_error("Impossible to find the first instruction "
+                                         "of the graph (Must have only 1 input).");
             }
 
             if(!outFound){
-                throw std::runtime_error("Impossible to find the last instruction of the graph (Must have only 1 output).");
+                throw std::runtime_error("Impossible to find the last instruction "
+                                         "of the graph (Must have only 1 output).");
             }
         }
     }
