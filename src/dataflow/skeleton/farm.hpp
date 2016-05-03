@@ -42,8 +42,9 @@ private:
 public:
     /**
      * The constructor of the farm.
-     * \param w Is the skeleton used to implement the farm workers. This computation is indipendently performed
-     * each time that a task is submitted to the farm.
+     * \param w Is the skeleton used to implement the farm workers.
+     *          This computation is indipendently performed each time that a
+     *          task is submitted to the farm.
      * \param deleteWorker If true, the destructor of the farm deletes the worker.
      */
     Farm(Computable* w, bool deleteWorker = false):worker(w), deleteWorker(deleteWorker){;}
@@ -59,13 +60,13 @@ public:
     }
     /**
      * This method computes the result sequentially.
-     *
-     * \param t Array of Task*.
-     * \return Array of Task* as result. The array of Task* and its elements must be deallocated using delete[] and delete.
-     *
      */
     void compute(void){
+        void* result;
+        worker->setSourceData(receiveData());
+        worker->setDestinationData(&result);
         worker->compute();
+        sendData(result);
     }
 
     /**
@@ -89,8 +90,8 @@ public:
 /**
  * Creates a standard farm.
  *
- * \tparam T* is the type of the input elements. T must be a subclass of Task.
- * \tparam V* is the type of the output elements. V must be a subclass of Task.
+ * \tparam T* is the type of the input elements.
+ * \tparam V* is the type of the output elements.
  * \tparam fun is the function to compute over the elements.
  *
  * \return A pointer to a standard farm.

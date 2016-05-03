@@ -38,7 +38,7 @@ namespace dataflow{
  * \class Computable
  * This class represents a generic computation.
  * If a class extends \e Computable, its "compute" function can be computed sequentially in a Macro Data Flow Instruction.
- * \e Compute is a function that takes an array of Task* and returns an array of Task*. The array must be dinamically
+ * \e Compute is a function that takes an array of Task* and returns an array of Task*. The array must be dynamically
  * allocated using new[].
  *
  * This is an example of a function that takes \e n values as input and returns \e m values.

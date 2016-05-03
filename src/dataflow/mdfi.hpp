@@ -39,7 +39,6 @@
 namespace nornir{
 namespace dataflow{
 
-const uint sourceInput = std::numeric_limits<uint>::max();
 
 #define MAX_INSTRUCTION_INPUTS 2
 
@@ -48,9 +47,7 @@ class Mdfi{
 private:
     std::map<Computable*, uint> sourcesMap; // Map between computable and its position in the sources vector
     std::map<Computable*, uint> destinationsMap;
-    uint sources[MAX_INSTRUCTION_INPUTS];
     InputToken tInput[MAX_INSTRUCTION_INPUTS]; ///<Input tokens. Are numbered from 0 to \e dInput -1.
-    TokenId dest[MAX_INSTRUCTION_INPUTS]; ///<Destinations of the output. Are numbered from 0 to \e dOutput -1.
     OutputToken tOutput[MAX_INSTRUCTION_INPUTS];
     Computable* comp; ///<\e Computable to compute.
     uint dInput, ///<Input size.
@@ -76,11 +73,8 @@ public:
             sourcesMap(ins.sourcesMap), destinationsMap(ins.destinationsMap),
             comp(ins.comp), dInput(ins.dInput),
             dOutput(ins.dOutput), id(ins.id), graphId(ins.graphId){
-        for(uint i = 0; i < dInput; i++){
-            sources[i] = ins.sources[i];
-        }
         for(uint i = 0; i < dOutput; i++){
-            dest[i] = ins.dest[i];
+            tOutput[i] = ins.tOutput[i];
         }
         assert(dInput <= MAX_INSTRUCTION_INPUTS);
     }
@@ -131,14 +125,12 @@ public:
     }
 
     inline void setSourceInStream(){
-        sources[dInput] = sourceInput;
         sourcesMap.emplace((Computable*) NULL, dInput);
         ++dInput;
         assert(dInput <= MAX_INSTRUCTION_INPUTS);
     }
 
-    inline void setSource(uint s, Computable* c = NULL){
-        sources[dInput] = s;
+    inline void setSource(Computable* c = NULL){
         if(c){
             sourcesMap.emplace(c, dInput);
         }
@@ -146,8 +138,9 @@ public:
         assert(dInput <= MAX_INSTRUCTION_INPUTS);
     }
 
-    inline void setDestination(uint d, Computable* c = NULL){
-        dest[dOutput] = TokenId(d);
+    inline void setDestination(uint id, Computable* c = NULL){
+        TokenId ti(graphId, id);
+        tOutput[dOutput] = OutputToken(NULL, ti);
         if(c){
             destinationsMap.emplace(c, dOutput);
         }
@@ -156,7 +149,9 @@ public:
     }
 
     inline void setDestinationOutStream(){
-        dest[dOutput].setOutputStream();
+        TokenId ti;
+        ti.setOutputStream();
+        tOutput[dOutput] = OutputToken(NULL, ti);
         destinationsMap.emplace((Computable*) NULL, dOutput);
         ++dOutput;
         assert(dOutput <= MAX_INSTRUCTION_INPUTS);
@@ -208,8 +203,6 @@ public:
      */
     inline void setGid(ulong newd){
         graphId = newd;
-        for(uint i = 0; i < dOutput; i++)
-            dest[i].setGraphId(newd);
     }
 
     /**

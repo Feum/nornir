@@ -46,7 +46,7 @@ Mdfg::Mdfg(const Mdfg& g, ulong gid):_nextId(g._nextId),_id(gid),
     _instructions.reserve(g._instructions.size());
     for(size_t i = 0; i < g._instructions.size(); i++){
         _instructions.emplace_back(g._instructions[i]);
-        _instructions.back().setGid(gid);
+        _instructions.back().reset(gid);
     }
 }
 

@@ -37,10 +37,6 @@ void Mdfi::compute(){
         sm++;
     }
 
-    for(uint i = 0; i < dOutput; i++){
-        tOutput[i] = OutputToken(NULL, dest[i]);
-    }
-
     auto dm = destinationsMap.begin();
     while(dm != destinationsMap.end()){
         comp->setDestinationData(&(tOutput[dm->second].result), dm->first);
@@ -51,11 +47,7 @@ void Mdfi::compute(){
 }
 
 void Mdfi::updateDestinations(int* v){
-    for(uint i = 0; i < dOutput; i++){
-        if(!dest[i].isOutStream() && !dest[i].isNull()){
-            dest[i].setMdfiId(v[dest[i].getMdfId()]);
-        }
-    }
+    throw std::runtime_error("updateDestinations not implemented.");
 }
 
 void Mdfi::reset(ulong newId){
@@ -65,7 +57,9 @@ void Mdfi::reset(ulong newId){
     }
 
     for(uint i = 0; i < dOutput; i++){
-        tOutput[i].clear();
+        TokenId ti = tOutput[i].getDest();
+        ti.setGraphId(newId);
+        tOutput[i] = OutputToken(NULL, ti);
     }
 }
 

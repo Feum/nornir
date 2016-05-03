@@ -161,7 +161,7 @@ Mdfg* compile(Computable* c){
         }
         delete[] firstWorkerInstr;
         /**Adds the collector.**/
-        uint firstCollInstr = emitter->createMdfi(collector, 0);
+        uint firstCollInstr = emitter->createMdfi(collector, collector->getFirstId());
 
         /**Links the workers to collector.**/
         for(int i = 0; i < workersNum; i++){
@@ -229,6 +229,7 @@ private:
     inline void sendToWorkers(Mdfi* instr){
         size_t destination;
         ++_tasksInside;
+        std::cout << "Sending " << instr->getGid() << ", " << instr->getId() << std::endl;
         if(_orderedProc){
             destination = _scheduling[instr->getId()];
             ++_mdfiSent[destination];
@@ -277,6 +278,7 @@ private:
 #endif
 
         first = newGraph->getMdfi(newGraph->getFirstId());
+        std::cout << "Read: " << next << std::endl;
         first->setInput(next, NULL);
         ++_numMdfi[first->getId()];
         /**Sends the new instruction to the interpreter.*/

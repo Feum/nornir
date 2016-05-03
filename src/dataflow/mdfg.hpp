@@ -221,7 +221,7 @@ public:
             idB = createMdfi(b);
         }
         _instructions.at(idA).setDestination(idB, b);
-        _instructions.at(idB).setSource(idA, a);
+        _instructions.at(idB).setSource(a);
     }
 
     /**

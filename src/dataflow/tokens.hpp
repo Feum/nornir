@@ -203,8 +203,6 @@ public:
      */
     inline OutputToken(void* r, const TokenId& d):result(r),dest(d){;}
 
-    inline void clear(){result = NULL; dest = TokenId();}
-
     /**
      * Returns a pointer to the computed task.
      * \return A pointer to the computed task.

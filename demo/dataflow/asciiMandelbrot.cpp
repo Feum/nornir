@@ -84,6 +84,7 @@ int MAX_ITERATIONS;
 
 /**Function taken from http://www.timestretch.com/FractalBenchmark.html#67b4f5a3200c7b7e900c38ff21321741 **/
 float* iterateTask(ArrayWrapper<float>* t){
+    std::cout << "Received " << t << std::endl;
 	float f1 = t->get(1);
 	float f2 = t->get(0);
 	delete t;
