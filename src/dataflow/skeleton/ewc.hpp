@@ -34,114 +34,44 @@
 namespace nornir{
 namespace dataflow{
 
-/**
- * This class represents a standard pattern with an Emitter, N workers and a Collector.
- * This pattern is used in Map and Reduce skeletons.
- */
-class EmitterWorkerCollector: public Computable{
+class EmitterWorkerCollector;
+
+class Scatterer: public Computable{
+    friend Mdfg* compile(Computable* c);
 private:
-    uint nWorkers;
-    Computable *emitter,
-        *worker,
-        *collector;
-    bool deleteAll;
+    std::vector<Computable*> _workers;
+protected:
+    size_t _numPartitions;
 public:
-    /**
-     * Constructor skeleton.
-     * \param emitter The skeleton used to implement the map emitter\n.
-     *                Emitter can be an instance of the generic emitter
-     *                (MapEmitter or ReduceEmitter) or can be redefined for the
-     *                purpose simply extending the \e Computable class.
-     * \param worker The skeleton used to implement the map worker.\n
-     *               Worker can be an instance of the generic worker
-     *               (MapWorker or ReduceWorker) or can be redefined for the
-     *               purpose simply extending the \e Computable class.
-     * \param collector The skeleton used to implement the map collector.\n
-     *                  Collector can be an instance of the generic collector
-     *                  (MapCollector or ReduceCollector) or can be redefined
-     *                  for the purpose simply extending the \e Computable class.
-     * \param nWorkers Number of workers.
-     * \param deleteAll If true, the destructor deletes the emitter, the worker
-     *                  and the collector.
-     */
-    inline EmitterWorkerCollector(Computable* emitter, Computable* worker,
-                           Computable* collector, uint nWorkers,
-                           bool deleteAll=false):
-                               nWorkers(nWorkers), emitter(emitter),worker(worker),
-                               collector(collector),deleteAll(deleteAll){;}
+    Scatterer(size_t numPartitions):_numPartitions(numPartitions){;}
 
-    /**
-     * Destructor of the EmitterWorkerCollector.
-     * If deleteAll is true, deletes emitter, worker and collector.
-     */
-    inline ~EmitterWorkerCollector(){
-        if(deleteAll){
-            delete emitter;
-            delete worker;
-            delete collector;
+    virtual std::vector<void*> compute(void* in) = 0;
+
+    void compute(Data* d){
+        std::vector<void*> r = compute(d->getInput());
+        for(size_t i = 0; i < _numPartitions; i++){
+            d->setOutput(r.at(i), _workers.at(i));
         }
     }
+};
 
-    /**
-     * This method computes the result sequentially.
-     */
-    inline void compute(){
-        void **emitterResult = new void*[nWorkers],
-            **result=new void*[nWorkers], *fromWorker,
-            *fromCollector;
+class Gatherer: public Computable{
+    friend Mdfg* compile(Computable* c);
+private:
+    std::vector<Computable*> _workers;
+protected:
+    size_t _numPartitions;
+public:
+    Gatherer(size_t numPartitions):_numPartitions(numPartitions){;}
 
-        emitter->setSourceData(receiveData());
-        for(uint i=0; i<nWorkers; i++){
-            emitter->setDestinationData(&(emitterResult[i]), (Computable*) i);
+    virtual void* compute(std::vector<void*> in) = 0;
+
+    void compute(Data* d){
+        std::vector<void*> inputs;
+        for(size_t i = 0; i < _numPartitions; i++){
+            inputs.push_back(d->getInput(_workers.at(i)));
         }
-        emitter->compute();
-
-        for(uint i=0; i<nWorkers; i++){
-            worker->setSourceData(emitterResult[i]);
-            worker->setDestinationData(&fromWorker);
-            worker->compute();
-            result[i] = fromWorker;
-        }
-        delete[] emitterResult;
-        for(uint i=0; i<nWorkers; i++){
-            collector->setSourceData(result[i], (Computable*) i);
-        }
-        collector->setDestinationData(&fromCollector);
-        collector->compute();
-        delete[] result;
-        sendData(fromCollector);
-    }
-
-    /**
-     * Returns the number of workers.
-     * \return Number of workers.
-     */
-    inline uint getNWorkers(){
-        return nWorkers;
-    }
-
-    /**
-     * Returns a pointer to the emitter.
-     * \return A pointer to the emitter.
-     */
-    inline Computable* getEmitter(){
-        return emitter;
-    }
-
-    /**
-     * Returns a pointer to the worker.
-     * \return A pointer to the worker.
-     */
-    inline Computable* getWorker(){
-        return worker;
-    }
-
-    /**
-     * Returns a pointer to the collector.
-     * \return A pointer to the collector.
-     */
-    inline Computable* getCollector(){
-        return collector;
+        d->setOutput(compute(inputs));
     }
 };
 
@@ -150,19 +80,18 @@ public:
  * \tparam T* is the type of the elements of the array (The input stream must produce ArrayWrapper<T*>).\n
  *         T must be a subclass of Task.
  */
-template <typename T> class ReduceEmitter:public Computable{
+template <typename T> class ReduceScatterer: public Scatterer{
 private:
-    uint chunkNum;
     bool autoDelete;
 public:
     /**
      * Constructor of the emitter of the reduce.
-     * \param cn Number of workers of the reduce.
+     * \param numPartitions The number of partitions.
      * \param autoDelete If true, the elements received from the input stream (ArrayWrapper<T*>) are automatically deleted.
      */
-    ReduceEmitter(int cn, bool autoDelete=true);
+    ReduceScatterer(size_t numPartitions, bool autoDelete=true);
 
-    void compute(void);
+    std::vector<void*> compute(void* in);
 };
 
 /**
@@ -171,9 +100,9 @@ public:
  * \tparam T* is the type of the elements of the array.
  * \tparam fun Is a binary, associative and commutative function to compute over the elements.
  */
-template <typename T, T*(*fun)(T*,T*)> class ReduceWorker:public Computable{
+template <typename T, T*(*fun)(T*,T*)> class ReduceWorker: public Computable{
 public:
-    void compute(void);
+    void compute(Data* d);
 };
 
 
@@ -184,17 +113,15 @@ public:
  * \tparam fun Is a binary, associative and commutative function to compute over the elements.
  * The map returns a T*.
  */
-template <typename T, T*(*fun)(T*,T*)> class ReduceCollector:public Computable{
-private:
-    int chunkNum;
+template <typename T, T*(*fun)(T*,T*)> class ReduceGatherer: public Gatherer{
 public:
     /**
      * Constructor of the collector of the reduce.
-     * \param cn Number of workers of the reduce.
+     * \param numPartitions The number of partitions.
      */
-    ReduceCollector(int cn);
+    ReduceGatherer(size_t numPartitions);
 
-    void compute(void);
+    void* compute(std::vector<void*> in);
 };
 
 /**
@@ -202,19 +129,18 @@ public:
  *
  * \tparam T* is the type of the elements of the array.(The input stream must produce ArrayWrapper<T*>).
  */
-template <typename T> class MapEmitter: public Computable{
+template <typename T> class MapScatterer: public Scatterer{
 private:
-    uint numWorkers;
     bool autoDelete;
 public:
     /**
      * Constructor of the emitter of the map.
-     * \param numWorkers Number of workers of the map.
+     * \param numPartitions The number of partitions.
      * \param autoDelete If true, the elements received from the input stream (ArrayWrapper<T*>) are automatically deleted.
      */
-    MapEmitter(uint numWorkers, bool autoDelete=true);
+    MapScatterer(size_t numPartitions, bool autoDelete = true);
 
-    void compute(void);
+    std::vector<void*> compute(void* in);
 };
 
 /**
@@ -227,7 +153,7 @@ public:
  */
 template <typename T, typename V, V*(*fun)(T*) > class MapWorker: public Computable{
 public:
-    void compute(void);
+    void compute(Data* d);
 };
 
 /**
@@ -237,13 +163,116 @@ public:
  *
  * The \e map returns an ArrayWrapper<V*>
  */
-template <typename V> class MapCollector: public Computable{
-private:
-    uint nWorkers;
+template <typename V> class MapGatherer: public Gatherer{
 public:
-    MapCollector(uint nWorkers);
+    MapGatherer(size_t numPartitions);
 
-    void compute(void);
+    void* compute(std::vector<void*> in);
+};
+
+
+/**
+ * This class represents a standard pattern with an Emitter, N workers and a Collector.
+ * This pattern is used in Map and Reduce skeletons.
+ */
+class EmitterWorkerCollector: public Computable{
+private:
+    size_t _nWorkers;
+    Scatterer *_scatterer;
+    Computable* _worker;
+    Gatherer *_gatherer;
+    bool deleteAll;
+public:
+    /**
+     * Constructor skeleton.
+     * \param scatterer The skeleton used to implement the splitting of the data\n.
+     *                Scatterer can be an instance of the generic scatterers
+     *                (MapScatterer or ReduceScatterer) or can be redefined for the
+     *                purpose simply extending the Scatterer
+     *                class.
+     * \param worker The skeleton used to implement the map worker.\n
+     *               Worker can be an instance of the generic worker
+     *               (MapWorker or ReduceWorker) or can be redefined for the
+     *               purpose simply extending the \e Computable class.
+     * \param gatherer The skeleton used to implement the merging of the data.\n
+     *                  Gatherer can be an instance of the generic collector
+     *                  (MapGatherer or ReduceGatherer) or can be redefined
+     *                  for the purpose simply extending the Gatherer class.
+     * \param nWorkers Number of workers.
+     * \param deleteAll If true, the destructor deletes the emitter, the worker
+     *                  and the collector.
+     */
+    inline EmitterWorkerCollector(Scatterer* scatterer, Computable* worker,
+                                  Gatherer* gatherer, uint nWorkers,
+                                  bool deleteAll = false):
+                               _nWorkers(nWorkers), _scatterer(scatterer), _worker(worker),
+                               _gatherer(gatherer), deleteAll(deleteAll){
+        ;
+    }
+
+    /**
+     * Destructor of the EmitterWorkerCollector.
+     * If deleteAll is true, deletes emitter, worker and collector.
+     */
+    inline ~EmitterWorkerCollector(){
+        if(deleteAll){
+            delete _scatterer;
+            delete _worker;
+            delete _gatherer;
+        }
+    }
+
+    /**
+     * This method computes the result sequentially.
+     */
+    inline void compute(Data* d){
+        void *fromWorker;
+
+        std::vector<void*> eRes = _scatterer->compute(d->getInput());
+        std::vector<void*> cInput;
+
+        Data dw;
+        for(uint i = 0; i < _nWorkers; i++){
+            dw.setSource(eRes.at(i));
+            dw.setDestination(&fromWorker);
+            _worker->compute(&dw);
+            cInput.push_back(fromWorker);
+        }
+
+        d->setOutput(_gatherer->compute(cInput));
+    }
+
+    /**
+     * Returns the number of workers.
+     * \return Number of workers.
+     */
+    inline uint getNWorkers(){
+        return _nWorkers;
+    }
+
+    /**
+     * Returns a pointer to the scatterer.
+     * \return A pointer to the scatterer.
+     */
+    inline Scatterer* getScatterer(){
+        return _scatterer;
+    }
+
+    /**
+     * Returns a pointer to the worker.
+     * \return A pointer to the worker.
+     */
+    inline Computable* getWorker(){
+        return _worker;
+    }
+
+    /**
+     * Returns a pointer to the gatherer.
+     * \return A pointer to the gatherer.
+     */
+    inline Gatherer* getGatherer(){
+        return _gatherer;
+    }
 };
 
 /**
@@ -252,15 +281,15 @@ public:
  * \tparam T is the type of the elements of the array (The input stream must produce ArrayWrapper<T*>)
  * \tparam fun Is a binary, associative and commutative function to compute over the elements.
  *
- * \param nWorkers Number of workers of the reduce.
+ * \param numPartitions Number of partitions.
  * \param autoDelete If true, the elements received from the input stream (ArrayWrapper<T*>) are automatically deleted by the emitter.
  *
  * \return A pointer to a standard reduce.
  */
 
-template<typename T, T*(*fun)(T*,T*)> EmitterWorkerCollector* createStandardReduce(int nWorkers, bool autoDelete=true){
-    return new EmitterWorkerCollector(new ReduceEmitter<T>(nWorkers,autoDelete),new ReduceWorker<T,fun>,
-            new ReduceCollector<T,fun>(nWorkers),nWorkers,true);
+template<typename T, T*(*fun)(T*,T*)> EmitterWorkerCollector* createStandardReduce(size_t numPartitions, bool autoDelete = true){
+    return new EmitterWorkerCollector(new ReduceScatterer<T>(numPartitions, autoDelete), new ReduceWorker<T,fun>,
+            new ReduceGatherer<T,fun>(numPartitions), numPartitions, true);
 }
 
 /**
@@ -270,7 +299,7 @@ template<typename T, T*(*fun)(T*,T*)> EmitterWorkerCollector* createStandardRedu
  * \tparam V is the type of the output elements (The map returns ArrayWrapper<V*>).
  * \tparam fun is the function to compute over the elements.
  *
- * \param nWorkers Number of workers of the reduce.
+ * \param numPartitions Number of partitions.
  * \param autoDelete If true, the elements received from the input stream (ArrayWrapper<T*>) are automatically deleted by the emitter.
  *
  * Input array (single element of the input stream): [x1,x2,...,xn] where typeof(x1)==typeof(x2)==...==typeof(xn)==T\n
@@ -280,8 +309,8 @@ template<typename T, T*(*fun)(T*,T*)> EmitterWorkerCollector* createStandardRedu
  * \return A pointer to a standard map.
  */
 
-template<typename T, typename V, V*(*fun)(T*)> EmitterWorkerCollector* createStandardMap(int nWorkers, bool autoDelete=true){
-    return new EmitterWorkerCollector(new MapEmitter<T>(nWorkers,autoDelete),new MapWorker<T,V,fun>,new MapCollector<T>(nWorkers),nWorkers,true);
+template<typename T, typename V, V*(*fun)(T*)> EmitterWorkerCollector* createStandardMap(size_t numPartitions, bool autoDelete=true){
+    return new EmitterWorkerCollector(new MapScatterer<T>(numPartitions,autoDelete),new MapWorker<T,V,fun>,new MapGatherer<T>(numPartitions),numPartitions,true);
 }
 
 }

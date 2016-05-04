@@ -31,23 +31,20 @@ namespace nornir{
 namespace dataflow{
 
 void Mdfi::compute(){
+    Data d;
     auto sm = sourcesMap.begin();
     while(sm != sourcesMap.end()){
-        comp->setSourceData(tInput[sm->second].task, sm->first);
+        d.setSource(tInput[sm->second].task, sm->first);
         sm++;
     }
 
     auto dm = destinationsMap.begin();
     while(dm != destinationsMap.end()){
-        comp->setDestinationData(&(tOutput[dm->second].result), dm->first);
+        d.setDestination(&(tOutput[dm->second].result), dm->first);
         dm++;
     }
 
-    comp->compute();
-}
-
-void Mdfi::updateDestinations(int* v){
-    throw std::runtime_error("updateDestinations not implemented.");
+    comp->compute(&d);
 }
 
 void Mdfi::reset(ulong newId){

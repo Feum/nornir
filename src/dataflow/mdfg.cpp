@@ -42,7 +42,7 @@ Mdfg::Mdfg(Computable* c):_nextId(1), _id(0), _firstId(std::numeric_limits<ulong
 
 Mdfg::Mdfg(const Mdfg& g, ulong gid):_nextId(g._nextId),_id(gid),
         _firstId(g._firstId),
-        _lastId(g._lastId), _init(g._init){
+        _lastId(g._lastId), _init(false){
     _instructions.reserve(g._instructions.size());
     for(size_t i = 0; i < g._instructions.size(); i++){
         _instructions.emplace_back(g._instructions[i]);

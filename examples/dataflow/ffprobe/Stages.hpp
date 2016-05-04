@@ -103,8 +103,8 @@ public:
     /**
      * The function computed by one stage of the pipeline (is computed by an indipendent thread).
      */
-    void compute(){
-        ProbeTask* t = (ProbeTask*) receiveData();
+    void compute(nornir::dataflow::Data* d){
+        ProbeTask* t = (ProbeTask*) d->getInput();
         myList<hashElement*> *flowsToExport=t->getFlowsToExport();
         time_t now;
         std::vector<hashElement*>& flowsToAdd = t->getFlowsToAdd(id);
@@ -135,7 +135,7 @@ public:
         if(_hashElemDealloc){
             flowsToAdd.clear();
         }
-        sendData(t);
+        d->setOutput(t);
     }
 };
 }

@@ -77,19 +77,20 @@ public:
      * \return Array of Task* as result. The array of Task* and its elements must be deallocated using delete[] and delete.
      *
      */
-    void compute(void){
+    void compute(Data* d){
         void* stage1Result;
         void* stage2Result;
 
-        s1->setSourceData(receiveData());
-        s1->setDestinationData(&stage1Result);
-        s1->compute();
+        Data d1, d2;
+        d1.setSource(d->getInput());
+        d1.setDestination(&stage1Result);
+        s1->compute(&d1);
 
-        s2->setSourceData(stage1Result);
-        s2->setDestinationData(&stage2Result);
-        s2->compute();
+        d2.setSource(stage1Result);
+        d2.setDestination(&stage2Result);
+        s2->compute(&d2);
 
-        sendData(stage2Result);
+        d->setOutput(stage2Result);
     }
 
     /**
@@ -112,10 +113,9 @@ public:
 
 template <typename In, typename Out, Out*(*fun)(In*)> class PipelineStage: public Computable{
 public:
-    void** compute(void** p){
-        In* x=(In*) p[0];
-        p[0]=fun(x);
-        return p;
+    void compute(Data* d){
+        In* x = (In*) d->getInput();
+        d->setOutput((void*) fun(x));
     }
 };
 

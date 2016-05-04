@@ -133,6 +133,8 @@ public:
     inline void setSource(Computable* c = NULL){
         if(c){
             sourcesMap.emplace(c, dInput);
+        }else{
+            throw std::runtime_error("Impossible to set NULL source.");
         }
         ++dInput;
         assert(dInput <= MAX_INSTRUCTION_INPUTS);
@@ -143,6 +145,8 @@ public:
         tOutput[dOutput] = OutputToken(NULL, ti);
         if(c){
             destinationsMap.emplace(c, dOutput);
+        }else{
+            throw std::runtime_error("Impossible to set NULL destination.");
         }
         ++dOutput;
         assert(dOutput <= MAX_INSTRUCTION_INPUTS);
@@ -177,7 +181,7 @@ public:
      * Returns the size of the input.
      * \return The size of the input.
      */
-    inline unsigned int getInputSize(){
+    inline uint getInputSize(){
         return dInput;
     }
 
@@ -227,6 +231,16 @@ public:
      * \param newId The new id of the graph wich belongs the instruction.
      */
     void reset(ulong newId);
+
+    void clearInput(){
+        dInput = 0;
+        sourcesMap.clear();
+    }
+
+    void clearOutput(){
+        dOutput = 0;
+        destinationsMap.clear();
+    }
 };
 
 }

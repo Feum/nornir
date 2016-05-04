@@ -72,8 +72,9 @@ class Mdfi;
 class Farm;
 class Pipeline;
 class EmitterWorkerCollector;
+class Computable;
 
-class Computable{
+class Data{
 private:
     friend class Mdfi;
     friend class Farm;
@@ -85,22 +86,17 @@ private:
     /**
      * NULL = Input stream.
      */
-    void setSourceData(void* s, Computable* c = NULL){
+    void setSource(void* s, Computable* c = NULL){
         _sources[c] = s;
     }
 
     /**
      * NULL = Output stream.
      */
-    void setDestinationData(void** d, Computable* c = NULL){
+    void setDestination(void** d, Computable* c = NULL){
         _destinations[c] = d;
     }
 public:
-    /**
-     * Destructor of the computable.
-     */
-    virtual ~Computable(){;}
-
     /**
      * Retreive the data received from a specific computable.
      * @param c The computable from which the data should be received.
@@ -108,7 +104,7 @@ public:
      *          For map computations, c is the index of the worker
      *          (cast from int to Computable*).
      */
-    void* receiveData(Computable* c = NULL){
+    void* getInput(Computable* c = NULL){
         if(_sources.find(c) == _sources.end()){
             throw std::runtime_error("Impossible to receive from computable.");
         }
@@ -121,17 +117,27 @@ public:
      *          the data is sent to the output stream. For map computations,
      *          c is the index of the worker (cast from int to Computable*).
      */
-    void sendData(void* x, Computable* c = NULL){
+    void setOutput(void* x, Computable* c = NULL){
         if(_destinations.find(c) == _destinations.end()){
             throw std::runtime_error("Impossible to send to computable.");
         }
         *(_destinations[c]) = x;
     }
 
+};
+
+class Computable{
+
+public:
+    /**
+     * Destructor of the computable.
+     */
+    virtual ~Computable(){;}
+
     /**
      * This method computes the result.
      */
-    virtual void compute(void) = 0;
+    virtual void compute(Data* d) = 0;
 };
 
 }

@@ -230,6 +230,12 @@ public:
     inline void init(){
         if(!_init){
             bool inFound = false, outFound = false;
+            if(_firstId != std::numeric_limits<ulong>::max()){
+                inFound = true;
+            }
+            if(_lastId != std::numeric_limits<ulong>::max()){
+                outFound = true;
+            }
             for(size_t i = 0; i < _instructions.size(); i++){
                 if(!_instructions.at(i).getInputSize()){
                     if(!inFound){
@@ -265,17 +271,6 @@ public:
             }
         }
     }
-    /**
-     * Updates the destinations of an instruction.
-     * \param id The id of the Mdfi.
-     * \param v The new destinations.
-     */
-    inline void updateDestinations(uint id, int* v){
-        if(id >= _instructions.size()){
-            throw std::runtime_error("Non existing mdfi.");
-        }
-        _instructions.at(id).updateDestinations(v);
-    }
 
     inline bool isFireable(uint id) const{
         return _instructions.at(id).isFireable();
@@ -295,6 +290,20 @@ public:
      * \param newId The new id of the graph.
      */
     void reset(ulong newId);
+
+    inline void clearInputInstruction(){
+        std::cout << "Clearing Input " << _firstId << std::endl;
+        _instructions.at(_firstId).clearInput();
+        std::cout << "Size " << _instructions.at(_firstId).getInputSize() << std::endl;
+        _firstId = std::numeric_limits<ulong>::max();
+    }
+
+    inline void clearOutputInstruction(){
+        std::cout << "Clearing Output " << _lastId << std::endl;
+        _instructions.at(_lastId).clearOutput();
+        std::cout << "Size " << _instructions.at(_lastId).getOutputSize() << std::endl;
+        _lastId = std::numeric_limits<ulong>::max();
+    }
 
 };
 }

@@ -1,4 +1,4 @@
-TARGET               = asciiMandelbrot graph
+TARGET               = asciiMandelbrot graph map pipeline
 
 .PHONY: clean cleanall
 

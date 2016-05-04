@@ -61,12 +61,13 @@ public:
     /**
      * This method computes the result sequentially.
      */
-    void compute(void){
+    void compute(Data* d){
         void* result;
-        worker->setSourceData(receiveData());
-        worker->setDestinationData(&result);
-        worker->compute();
-        sendData(result);
+        Data dw;
+        dw.setSource(d->getInput());
+        dw.setDestination(&result);
+        worker->compute(&dw);
+        d->setOutput(result);
     }
 
     /**
@@ -81,9 +82,9 @@ public:
 
 template <typename T, typename V, V*(*fun)(T*)> class StandardFarmWorker: public Computable{
 public:
-    void compute(void){
-        V* result = fun((T*) receiveData());
-        sendData(result);
+    void compute(Data* d){
+        V* result = fun((T*) d->getInput());
+        d->setOutput(result);
     }
 };
 

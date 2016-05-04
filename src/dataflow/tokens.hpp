@@ -178,8 +178,8 @@ public:
      * Resets this input task.
      */
     inline void clear(){
-        task=NULL;
-        presence=false;
+        task = NULL;
+        presence = false;
     }
 
 };

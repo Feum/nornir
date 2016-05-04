@@ -49,7 +49,6 @@ Mdfg* compile(Computable* c){
     if(tc == typeid(Farm)){
         Farm* f = (Farm*) c;
         Mdfg* g = compile(f->getWorker());
-        g->init();
         return g;
     /**
      * Pipeline compiling. Adds all istructions of the second stage in the
@@ -60,27 +59,29 @@ Mdfg* compile(Computable* c){
         /**Compiles the two stages.**/
         Mdfg* g1 = compile(p->getFirstStage());
         Mdfg* g2 = compile(p->getSecondStage());
+        Mdfg* combined = new Mdfg(*g1, 0);
         bool lastSet = false;
         uint n = g2->getNumMdfi();
-        uint added, oldSecondStageFirstId;
-        Computable *oldSecondStageFirst, ///<The first instruction of the second stage of the pipeline.
-                   *oldLast; ///<The last instruction of the first stage of the pipeline.
+        uint oldSecondStageFirstId;
+        Computable *oldSecondStageFirst; ///<The first instruction of the second stage of the pipeline.
+        uint g1LastId, g2LastId;
 
-        /**
-         * \e newIds is an array of Mdfi identifiers. \e newIds[i] is the new
-         * identifier of the instruction of the second stage, that previously
-         * has \e i as identifier.
-         **/
-        int *newIds = new int[n];
-        oldLast = g1->getLast();
+        g1LastId = g1->getLastId();
+        g2LastId = g2->getLastId();
         oldSecondStageFirst = g2->getFirst();
-        oldSecondStageFirstId = g1->createMdfi(g2, g2->getFirstId());
+        oldSecondStageFirstId = combined->createMdfi(g2, g2->getFirstId());
+
+        g1->clearOutputInstruction();
+        g1->clearInputInstruction();
+        g2->clearOutputInstruction();
+        g2->clearInputInstruction();
+
         /**
          *  Ok to call getMdfi(...) even if the graph will me modified. Indeed
          *  we will not store the Mdfi itself but only the computable associated
          *  to it.
          */
-        oldSecondStageFirst = g1->getMdfi(oldSecondStageFirstId)->getComputable();
+        oldSecondStageFirst = combined->getMdfi(oldSecondStageFirstId)->getComputable();
         /**
          * Discriminates the case where the second stage has only one
          * instruction.
@@ -88,47 +89,40 @@ Mdfg* compile(Computable* c){
         if(n == 1){
             lastSet = true;
         }
-        newIds[0] = oldSecondStageFirstId;
         /**
          * Adds the instructions of the second stage (except first and last
          * instruction).
          **/
         for(uint i = 1; i < n - 1; i++){
-            added = g1->createMdfi(g2, i);
-            newIds[i] = added;
+            combined->createMdfi(g2, i);
         }
 
         /**If the last instruction isn't set.**/
         if(!lastSet){
-            newIds[n - 1] = g1->createMdfi(g2, g2->getLastId());
-        }
-        /**Updates destinations.**/
-        for(uint i = 0; i < n; i++){
-            g1->updateDestinations(newIds[i], newIds);
+            combined->createMdfi(g2, g2LastId);
         }
 
         /**Links the two stages.**/
-        g1->link(oldLast, oldSecondStageFirst);
+        combined->link(combined->getMdfi(g1LastId)->getComputable(),
+                       oldSecondStageFirst);
 
-        delete[] newIds;
-        /**
-         * Deletes the old graph of the second stage because all its
-         * instructions were copied in the graph of the first stage.
-         **/
+        delete g1;
         delete g2;
 
-        g1->init();
-        return g1;
+        combined->init();
+        return combined;
     /**Map and reduce compiling.**/
     }else if(tc == typeid(EmitterWorkerCollector)){
         EmitterWorkerCollector* ewc = (EmitterWorkerCollector*) c;
         int workersNum = ewc->getNWorkers();
         /**Compiles worker.**/
         Mdfg* worker = compile(ewc->getWorker());
-        Mdfg* emitter = new Mdfg(ewc->getEmitter());
-        Mdfg* collector = new Mdfg(ewc->getCollector());
+        worker->clearInputInstruction();
+        worker->clearOutputInstruction();
+        Mdfg* scatterer = new Mdfg(ewc->getScatterer());
+        Mdfg* gatherer = new Mdfg(ewc->getGatherer());
 
-        int workerSize = worker->getNumMdfi();
+        uint workerSize = worker->getNumMdfi();
         /**
          * \e newWorkerIds is an array of Mdfi identifiers. \e newWorkerIds[i]
          * is the new identifier of the instruction of the worker, that
@@ -143,30 +137,28 @@ Mdfg* compile(Computable* c){
         int *lastWorkerInstr = new int[workersNum];
         /**Adds the workers.**/
         for(int i = 0; i < workersNum; i++){
-            for(int j = 0; j < workerSize; j++){
-                newWorkerIds[j] = emitter->createMdfi(worker, j);
+            for(size_t j = 0; j < workerSize; j++){
+                newWorkerIds[j] = scatterer->createMdfi(worker, j);
             }
             firstWorkerInstr[i] = newWorkerIds[0];
             lastWorkerInstr[i] = newWorkerIds[workerSize - 1];
-            /**Updates the destinations.**/
-            for(int j = 0; j < workerSize; j++){
-                emitter->updateDestinations(newWorkerIds[j], newWorkerIds);
-            }
         }
         delete[] newWorkerIds;
         /**Links the emitter to the workers.**/
         for(int i = 0; i < workersNum; i++){
-            emitter->link(emitter->getFirst(),
-                          emitter->getMdfi(firstWorkerInstr[i])->getComputable());
+            Computable* wc = scatterer->getMdfi(firstWorkerInstr[i])->getComputable();
+            scatterer->link(scatterer->getMdfi(0)->getComputable(), wc);
+            ewc->getScatterer()->_workers.push_back(wc);
         }
         delete[] firstWorkerInstr;
         /**Adds the collector.**/
-        uint firstCollInstr = emitter->createMdfi(collector, collector->getFirstId());
+        uint firstCollInstr = scatterer->createMdfi(gatherer, 0);
 
         /**Links the workers to collector.**/
         for(int i = 0; i < workersNum; i++){
-            emitter->link(emitter->getMdfi(lastWorkerInstr[i])->getComputable(),
-                          emitter->getMdfi(firstCollInstr)->getComputable());
+            Computable* wc = scatterer->getMdfi(lastWorkerInstr[i])->getComputable();
+            scatterer->link(wc, scatterer->getMdfi(firstCollInstr)->getComputable());
+            ewc->getGatherer()->_workers.push_back(wc);
         }
         delete[] lastWorkerInstr;
         /**
@@ -174,10 +166,10 @@ Mdfg* compile(Computable* c){
          *  were copied in the graph of the emitter.
          **/
         delete worker;
-        delete collector;
+        delete gatherer;
 
-        emitter->init();
-        return emitter;
+        scatterer->init();
+        return scatterer;
     /**If c is an unknown skeleton, then it is a sequential skeleton.**/
     }else{
         Mdfg* g = new Mdfg(c);
@@ -195,7 +187,7 @@ private:
     /**True if the graph is a compiled graph.**/
     const bool _compiled;
     /**Next free graph identifier.**/
-    unsigned long int _nextGraphId;
+    ulong _nextGraphId;
     /**Pool of usable graphs.**/
     std::deque<Mdfg*> *_pool;
     /**Instances of the graph.**/
@@ -207,7 +199,7 @@ private:
      **/
     std::map<ulong, void*> *_result;
 
-    unsigned long int
+    ulong
     /**Number of results not yet calculated.**/
         _taskSent,
     /**Index of the last task sent to the output stream.**/
@@ -229,7 +221,6 @@ private:
     inline void sendToWorkers(Mdfi* instr){
         size_t destination;
         ++_tasksInside;
-        std::cout << "Sending " << instr->getGid() << ", " << instr->getId() << std::endl;
         if(_orderedProc){
             destination = _scheduling[instr->getId()];
             ++_mdfiSent[destination];
@@ -278,7 +269,6 @@ private:
 #endif
 
         first = newGraph->getMdfi(newGraph->getFirstId());
-        std::cout << "Read: " << next << std::endl;
         first->setInput(next, NULL);
         ++_numMdfi[first->getId()];
         /**Sends the new instruction to the interpreter.*/

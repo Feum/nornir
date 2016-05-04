@@ -29,15 +29,16 @@ namespace nornir{
 namespace dataflow{
 
 template <typename T>
-ReduceEmitter<T>::ReduceEmitter(int cn, bool autoDelete):
-    chunkNum(cn),autoDelete(autoDelete){;}
+ReduceScatterer<T>::ReduceScatterer(size_t numPartitions, bool autoDelete):
+    Scatterer(numPartitions), autoDelete(autoDelete){;}
 
 template <typename T>
-void ReduceEmitter<T>::compute(void){
-    ArrayWrapper<T*>* task=(ArrayWrapper<T*>*) receiveData();
-    int dim=task->getSize();
-    int mod=dim%chunkNum;
-    int size=dim/chunkNum;
+std::vector<void*> ReduceScatterer<T>::compute(void* in){
+    ArrayWrapper<T*>* task = (ArrayWrapper<T*>*) in;
+    std::vector<void*> r;
+    int dim = task->getSize();
+    int mod = dim%_numPartitions;
+    int size = dim/_numPartitions;
 #ifdef NOCOPY
     int l,h=0;
     for(uint i=0; i<chunkNum; i++){
@@ -52,8 +53,8 @@ void ReduceEmitter<T>::compute(void){
 #else
     ArrayWrapper<T*>* toAdd;
     int k=0;
-    for(uint i=0; i<chunkNum; i++){
-        if(mod && i==chunkNum-mod){
+    for(uint i=0; i<_numPartitions; i++){
+        if(mod && i==_numPartitions-mod){
             size+=1;
             mod=0;
         }
@@ -62,16 +63,17 @@ void ReduceEmitter<T>::compute(void){
             toAdd->set(j,task->get(k));
             k++;
         }
-        sendData(toAdd, (Computable*) i);
+        r.push_back(toAdd);
     }
     if(autoDelete) delete task;
 #endif
+    return r;
 }
 
 
 template <typename T, T*(*fun)(T*,T*)>
-void ReduceWorker<T, fun>::compute(void){
-    void* t = receiveData();
+void ReduceWorker<T, fun>::compute(Data* d){
+    void* t = d->getInput();
     ArrayWrapper<T*>* w1;
     int nElem,first;
 #ifdef NOCOPY
@@ -104,31 +106,32 @@ void ReduceWorker<T, fun>::compute(void){
     delete toDelete;
 #endif
     }
-    sendData(t);
+    d->setOutput(t);
 }
 
 
 template<typename T, T*(*fun)(T*,T*)>
-ReduceCollector<T, fun>::ReduceCollector(int cn):chunkNum(cn){;}
+ReduceGatherer<T, fun>::ReduceGatherer(size_t numPartitions):
+    Gatherer(numPartitions){;}
 
 template<typename T, T*(*fun)(T*,T*)>
-void ReduceCollector<T, fun>::compute(void){
-    T *p,*q;
+void* ReduceGatherer<T, fun>::compute(std::vector<void*> in){
+    T *p, *q;
 #ifdef NOCOPY
     ArrayIndexes<T*>* ai;
-    ai=(ArrayIndexes<T*>*)receiveData(0);
-    p=ai->getArray()->get(ai->geti());
+    ai = (ArrayIndexes<T*>*) d->getInput((Computable*)0);
+    p = ai->getArray()->get(ai->geti());
     delete ai;
-    ai=(ArrayIndexes<T*>*)receiveData(1);
-    q=ai->getArray()->get(ai->geti());
+    ai = (ArrayIndexes<T*>*) d->getInput((Computable*)1);
+    q = ai->getArray()->get(ai->geti());
     delete ai;
 #else
-    p=(T*)receiveData(0);
-    q=(T*)receiveData((Computable*) 1);
+    p = (T*) in.at(0);
+    q = (T*) in.at(1);
 #endif
     T* x=fun(p,q);
     T* a;
-    for(int i=2; i<chunkNum; i++){
+    for(int i = 2; i < _numPartitions; i++){
 #ifdef NOCOPY
         ArrayIndexes<T*>* ai;
         ai=(ArrayIndexes<T*>*)t[i];
@@ -136,38 +139,40 @@ void ReduceCollector<T, fun>::compute(void){
         if(i==chunkNum-1) delete ai->getArray();
         delete ai;
 #else
-        a=(T*)receiveData((Computable*) i);
+        a = (T*) in.at(i);
 #endif
-        x=fun(x,a);
+        x = fun(x, a);
     }
-    sendData(x);
+    return x;
 }
 
 template <typename T>
-MapEmitter<T>::MapEmitter(uint numWorkers, bool autoDelete):numWorkers(numWorkers),autoDelete(autoDelete){;}
+MapScatterer<T>::MapScatterer(size_t numPartitions, bool autoDelete):
+    Scatterer(numPartitions), autoDelete(autoDelete){;}
 
 template <typename T>
-void MapEmitter<T>::compute(void){
-    ArrayWrapper<T*>* task=(ArrayWrapper<T*>*) receiveData();
-    uint dim=task->getSize();
-    uint mod=dim%numWorkers;
-    uint size=dim/numWorkers;
+std::vector<void*> MapScatterer<T>::compute(void* in){
+    ArrayWrapper<T*>* task = (ArrayWrapper<T*>*) in;
+    std::vector<void*> r;
+    uint dim = task->getSize();
+    uint mod = dim % _numPartitions;
+    uint size = dim / _numPartitions;
 #ifdef NOCOPY
-    int l,h=0;
-    for(uint i=0; i<numWorkers; i++){
-        l=h;
-        if(mod && i==numWorkers-mod){
-            size+=1;
-            mod=0;
+    int l, h = 0;
+    for(uint i = 0; i < numWorkers; i++){
+        l = h;
+        if(mod && i == numWorkers-mod){
+            size += 1;
+            mod = 0;
         }
-        h=l+size;
-        toRet[i]=new ArrayIndexes<T*>(task,l,h);
+        h = l+size;
+        toRet[i] = new ArrayIndexes<T*>(task,l,h);
     }
 #else
     int k=0;
     ArrayWrapper<void*>* toAdd;
-    for(uint i=0; i<numWorkers; i++){
-        if(mod && i==numWorkers-mod){
+    for(uint i=0; i<_numPartitions; i++){
+        if(mod && i==_numPartitions-mod){
             size+=1;
             mod=0;
         }
@@ -176,17 +181,18 @@ void MapEmitter<T>::compute(void){
             toAdd->set(j,task->get(k));
             k++;
         }
-        sendData(toAdd, (Computable*) i);
+        r.push_back(toAdd);
     }
     if(autoDelete) delete task;
 #endif
+    return r;
 }
 
 template <typename T, typename V, V*(*fun)(T*) >
-void MapWorker<T, V, fun>::compute(void){
+void MapWorker<T, V, fun>::compute(Data* d){
     ArrayWrapper<void*> *w1;
     int nElem,first;
-    void* t = receiveData();
+    void* t = d->getInput();
 #ifdef NOCOPY
     ArrayIndexes<void*>* ai=(ArrayIndexes<void*>*) t;
     w1=ai->getArray();
@@ -204,41 +210,42 @@ void MapWorker<T, V, fun>::compute(void){
         y=fun(x);
         w1->set(i,y);
     }
-    sendData(t);
+    d->setOutput(t);
 }
 
 template <typename V>
-MapCollector<V>::MapCollector(uint nWorkers):nWorkers(nWorkers){;}
+MapGatherer<V>::MapGatherer(size_t numPartitions):Gatherer(numPartitions){;}
 
 template <typename V>
-void MapCollector<V>::compute(void){
+void* MapGatherer<V>::compute(std::vector<void*> in){
 #ifdef NOCOPY
     ArrayIndexes<void*>* ai;
-    for(uint i=0; i<nWorkers-1; i++){
+    for(uint i=0; i<_numPartitions-1; i++){
         ai=(ArrayIndexes<void*>*)receiveData((Computable*) i);
         delete ai;
     }
-    ai = (ArrayIndexes<void*>*)receiveData((Computable*) (nWorkers-1));
+    ai = (ArrayIndexes<void*>*)receiveData((Computable*) (_numPartitions-1));
     sendData(ai->getArray());
     delete ai;
 #else
-    uint size=0;
-    for(uint i=0; i<nWorkers; i++)
-        size+=((ArrayWrapper<void*>*) receiveData((Computable*) i))->getSize();
+    uint size = 0;
+    for(uint i = 0; i < _numPartitions; i++){
+        size += ((ArrayWrapper<void*>*) in.at(i))->getSize();
+    }
 
 
-    ArrayWrapper<V*> *aw=new ArrayWrapper<V*>(size),*tempAw;
-    uint tempSize,k=0;
-    for(uint i=0; i<nWorkers; i++){
-        tempAw=((ArrayWrapper<V*>*) receiveData((Computable*) i));
-        tempSize=tempAw->getSize();
-        for(uint j=0; j<tempSize; j++){
+    ArrayWrapper<V*> *aw = new ArrayWrapper<V*>(size), *tempAw;
+    uint tempSize, k = 0;
+    for(uint i = 0; i < _numPartitions; i++){
+        tempAw = ((ArrayWrapper<V*>*) in.at(i));
+        tempSize = tempAw->getSize();
+        for(uint j = 0; j < tempSize; j++){
             aw->set(k,tempAw->get(j));
             ++k;
         }
         delete tempAw;
     }
-    sendData(aw);
+    return aw;
 #endif
 }
 

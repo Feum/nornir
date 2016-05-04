@@ -73,52 +73,52 @@ Computable *A, *B, *C, *D, *E;
 
 class ACode: public Computable{
 public:
-    void compute(){
-        int* x = (int*) receiveData();
+    void compute(Data* d){
+        int* x = (int*) d->getInput();
         int* toB = new int(*x + 1);
         int* toC = new int(*x + 2);
         delete x;
-        sendData(toB, B);
-        sendData(toC, C);
+        d->setOutput(toB, B);
+        d->setOutput(toC, C);
     }
 };
 
 class BCode: public Computable{
-    void compute(){
-        int* x = (int*) receiveData(A);
+    void compute(Data* d){
+        int* x = (int*) d->getInput(A);
         (*x) = (*x) * 2;
-        sendData(x, D);
+        d->setOutput(x, D);
     }
 };
 
 class CCode: public Computable{
-    void compute(){
-        int* x = (int*) receiveData(A);
+    void compute(Data* d){
+        int* x = (int*) d->getInput(A);
         int* toD = new int((*x) + 10);
         int* toE = new int((*x) + 20);
         delete x;
-        sendData(toD, D);
-        sendData(toE, E);
+        d->setOutput(toD, D);
+        d->setOutput(toE, E);
     }
 };
 
 class DCode: public Computable{
-    void compute(){
-        int* fromB = (int*) receiveData(B);
-        int* fromC = (int*) receiveData(C);
+    void compute(Data* d){
+        int* fromB = (int*) d->getInput(B);
+        int* fromC = (int*) d->getInput(C);
         *fromC = *fromC + *fromB + 2;
         delete fromB;
-        sendData(fromC, E);
+        d->setOutput(fromC, E);
     }
 };
 
 class ECode: public Computable{
-    void compute(){
-        int* fromC = (int*) receiveData(C);
-        int* fromD = (int*) receiveData(D);
+    void compute(Data* d){
+        int* fromC = (int*) d->getInput(C);
+        int* fromD = (int*) d->getInput(D);
         *fromC = *fromC * *fromD;
         delete fromD;
-        sendData(fromC);
+        d->setOutput(fromC);
     }
 };
 
