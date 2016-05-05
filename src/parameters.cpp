@@ -162,9 +162,6 @@ void Parameters::setDefault(){
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
-    mishra.appId = numeric_limits<uint>::max();
-    mishra.bandwidthData = "";
-    mishra.powerData = "";
     turboBoost = false;
     fastReconfiguration = true;
     migrateCollector = false;
@@ -194,9 +191,16 @@ void Parameters::setDefault(){
     conservativeValue = 0;
     isolateManager = false;
     statsReconfiguration = false;
+
+    mishra.appId = numeric_limits<uint>::max();
+    mishra.bandwidthData = "";
+    mishra.powerData = "";
+
     dataflow.orderedProcessing = false;
     dataflow.orderedOutput = false;
     dataflow.maxGraphs = 1000;
+    dataflow.maxInterpreters = 0;
+
     observer = NULL;
 }
 
@@ -608,6 +612,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, dataflow.orderedProcessing);
     SETVALUE(xt, Bool, dataflow.orderedOutput);
     SETVALUE(xt, Uint, dataflow.maxGraphs);
+    SETVALUE(xt, Uint, dataflow.maxInterpreters);
 }
 
 Parameters::Parameters(Communicator* const communicator):

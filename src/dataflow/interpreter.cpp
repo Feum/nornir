@@ -488,20 +488,24 @@ Interpreter::Interpreter(Parameters* p, Computable* c, InputStream *i, OutputStr
 Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStream *o):
         _p(p), _compiledGraph(NULL){
     graph->init();
-    Mammut m;
-    size_t numPhysicalCores = m.getInstanceTopology()->getPhysicalCores().size();
-    if(numPhysicalCores < 3){
-        throw std::runtime_error("Not enough cores available (you need at least "
-                                 "3 physical cores).");
+    if(_p->dataflow.maxInterpreters){
+        _maxWorkers = _p->dataflow.maxInterpreters;
+    }else{
+        Mammut m;
+        size_t numPhysicalCores = m.getInstanceTopology()->getPhysicalCores().size();
+        if(numPhysicalCores < 3){
+            throw std::runtime_error("Not enough cores available (you need at least "
+                                     "3 physical cores).");
+        }
+        /** -2: One for the dataflow scheduler and one for nornir manager. **/
+        _maxWorkers = numPhysicalCores - 2;
     }
-    /** -2: One for the dataflow scheduler and one for nornir manager. **/
-    _maxWorkers = numPhysicalCores - 2;
 
     /**Creates the SPSC queues.**/
     _q.init(_maxWorkers + 1); /* +1 for the scheduler. */
 
-    _s = new Scheduler(graph, i, o, _maxWorkers, _q, _workers, &(_p->dataflow));
     _p->isolateManager = true;
+    _s = new Scheduler(graph, i, o, _maxWorkers, _q, _workers, &(_p->dataflow));
     _farm = new nornir::Farm<Mdfi>(_p);
     _farm->addScheduler(_s);
     /**Adds the workers to the farm.**/

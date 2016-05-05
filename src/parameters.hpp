@@ -485,6 +485,12 @@ typedef struct{
      * Maximum number of graphs to keep in the system [default = 1000].
      */
     uint maxGraphs;
+
+    /**
+     * Maximum number of interpreters to be used [default = #Physical cores
+     * in the system - 2].
+     */
+    uint maxInterpreters;
 }DataflowParameters;
 
 /*!
