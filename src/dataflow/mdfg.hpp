@@ -74,6 +74,18 @@ private:
     ulong _firstId;
     ulong _lastId;
     bool _init;
+
+    friend Mdfg* compile(Computable* c);
+
+    inline void clearInputInstruction(){
+        _instructions.at(_firstId).clearInput();
+        _firstId = std::numeric_limits<ulong>::max();
+    }
+
+    inline void clearOutputInstruction(){
+        _instructions.at(_lastId).clearOutput();
+        _lastId = std::numeric_limits<ulong>::max();
+    }
 public:
     /**
      * Constructor of the graph.
@@ -237,7 +249,6 @@ public:
                         _instructions.at(i).setSourceInStream();
                         _firstId = i;
                     }else{
-                        std::cout << "Firstid: " << _firstId << " i: " << i << std::endl;
                         throw std::runtime_error("More than 1 instruction have "
                                                  "no input links.");
                     }
@@ -286,18 +297,9 @@ public:
      */
     void reset(ulong newId);
 
-    inline void clearInputInstruction(){
-        std::cout << "Clearing Input " << _firstId << std::endl;
-        _instructions.at(_firstId).clearInput();
-        std::cout << "Size " << _instructions.at(_firstId).getInputSize() << std::endl;
-        _firstId = std::numeric_limits<ulong>::max();
-    }
-
-    inline void clearOutputInstruction(){
-        std::cout << "Clearing Output " << _lastId << std::endl;
-        _instructions.at(_lastId).clearOutput();
-        std::cout << "Size " << _instructions.at(_lastId).getOutputSize() << std::endl;
-        _lastId = std::numeric_limits<ulong>::max();
+    inline void deinit(){
+        clearInputInstruction();
+        clearOutputInstruction();
     }
 
 };

@@ -75,8 +75,8 @@ public:
     void put(void* a){
         ArrayWrapper<float*>* aw = (ArrayWrapper<float*>*) a;
         std::cout << "Result: ";
-        for(size_t i = 0; i < aw->getSize(); i++){
-            std::cout << aw->get(i) << ", ";
+        for(size_t i = 0; i < aw->size(); i++){
+            std::cout << *(aw->get(i)) << ", ";
         }
         std::cout << std::endl;
     }

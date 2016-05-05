@@ -64,7 +64,7 @@ public:
      * Returns the size of the array.
      * \return The size of the array.
      */
-    inline uint getSize(){return dim;}
+    inline uint size(){return dim;}
 
     /**
      * Returns the array.

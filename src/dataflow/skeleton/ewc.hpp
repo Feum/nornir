@@ -179,7 +179,7 @@ class EmitterWorkerCollector: public Computable{
 private:
     size_t _nWorkers;
     Scatterer *_scatterer;
-    Computable* _worker;
+    std::vector<Computable*> _workers;
     Gatherer *_gatherer;
     bool deleteAll;
 public:
@@ -190,34 +190,34 @@ public:
      *                (MapScatterer or ReduceScatterer) or can be redefined for the
      *                purpose simply extending the Scatterer
      *                class.
-     * \param worker The skeleton used to implement the map worker.\n
-     *               Worker can be an instance of the generic worker
-     *               (MapWorker or ReduceWorker) or can be redefined for the
-     *               purpose simply extending the \e Computable class.
+     * \param workers The computables used to implement the map workers.\n
+      *               Each worker can be an instance of the generic worker
+     *                (MapWorker or ReduceWorker) or can be redefined for the
+     *                purpose simply extending the \e Computable class.
      * \param gatherer The skeleton used to implement the merging of the data.\n
      *                  Gatherer can be an instance of the generic collector
      *                  (MapGatherer or ReduceGatherer) or can be redefined
      *                  for the purpose simply extending the Gatherer class.
-     * \param nWorkers Number of workers.
      * \param deleteAll If true, the destructor deletes the emitter, the worker
      *                  and the collector.
      */
-    inline EmitterWorkerCollector(Scatterer* scatterer, Computable* worker,
-                                  Gatherer* gatherer, uint nWorkers,
-                                  bool deleteAll = false):
-                               _nWorkers(nWorkers), _scatterer(scatterer), _worker(worker),
-                               _gatherer(gatherer), deleteAll(deleteAll){
+    inline EmitterWorkerCollector(Scatterer* scatterer, std::vector<Computable*> workers,
+                                  Gatherer* gatherer, bool deleteAll = false):
+                               _nWorkers(workers.size()), _scatterer(scatterer),
+                               _workers(workers), _gatherer(gatherer), deleteAll(deleteAll){
         ;
     }
 
     /**
      * Destructor of the EmitterWorkerCollector.
-     * If deleteAll is true, deletes emitter, worker and collector.
+     * If deleteAll is true, deletes emitter, workers and collector.
      */
     inline ~EmitterWorkerCollector(){
         if(deleteAll){
             delete _scatterer;
-            delete _worker;
+            for(size_t i = 0; i < _workers.size(); i++){
+                delete _workers.at(i);
+            }
             delete _gatherer;
         }
     }
@@ -235,7 +235,7 @@ public:
         for(uint i = 0; i < _nWorkers; i++){
             dw.setSource(eRes.at(i));
             dw.setDestination(&fromWorker);
-            _worker->compute(&dw);
+            _workers.at(i)->compute(&dw);
             cInput.push_back(fromWorker);
         }
 
@@ -262,8 +262,8 @@ public:
      * Returns a pointer to the worker.
      * \return A pointer to the worker.
      */
-    inline Computable* getWorker(){
-        return _worker;
+    inline std::vector<Computable*>& getWorkers(){
+        return _workers;
     }
 
     /**
@@ -287,9 +287,15 @@ public:
  * \return A pointer to a standard reduce.
  */
 
-template<typename T, T*(*fun)(T*,T*)> EmitterWorkerCollector* createStandardReduce(size_t numPartitions, bool autoDelete = true){
-    return new EmitterWorkerCollector(new ReduceScatterer<T>(numPartitions, autoDelete), new ReduceWorker<T,fun>,
-            new ReduceGatherer<T,fun>(numPartitions), numPartitions, true);
+template<typename T, T*(*fun)(T*,T*)>
+EmitterWorkerCollector* createStandardReduce(size_t numPartitions, bool autoDelete = true){
+    std::vector<Computable*> workers;
+    for(size_t i = 0; i < numPartitions; i++){
+        workers.push_back(new ReduceWorker<T,fun>);
+    }
+    return new EmitterWorkerCollector(new ReduceScatterer<T>(numPartitions, autoDelete),
+                                      workers,
+                                      new ReduceGatherer<T,fun>(numPartitions), true);
 }
 
 /**
@@ -309,8 +315,15 @@ template<typename T, T*(*fun)(T*,T*)> EmitterWorkerCollector* createStandardRedu
  * \return A pointer to a standard map.
  */
 
-template<typename T, typename V, V*(*fun)(T*)> EmitterWorkerCollector* createStandardMap(size_t numPartitions, bool autoDelete=true){
-    return new EmitterWorkerCollector(new MapScatterer<T>(numPartitions,autoDelete),new MapWorker<T,V,fun>,new MapGatherer<T>(numPartitions),numPartitions,true);
+template<typename T, typename V, V*(*fun)(T*)>
+EmitterWorkerCollector* createStandardMap(size_t numPartitions, bool autoDelete=true){
+    std::vector<Computable*> workers;
+    for(size_t i = 0; i < numPartitions; i++){
+        workers.push_back(new MapWorker<T, V, fun>);
+    }
+    return new EmitterWorkerCollector(new MapScatterer<T>(numPartitions, autoDelete),
+                                      workers,
+                                      new MapGatherer<T>(numPartitions), true);
 }
 
 }
