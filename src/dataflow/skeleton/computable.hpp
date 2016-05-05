@@ -105,10 +105,20 @@ public:
      *          (cast from int to Computable*).
      */
     void* getInput(Computable* c = NULL){
-        if(_sources.find(c) == _sources.end()){
-            throw std::runtime_error("Impossible to receive from computable.");
+        if(!c){
+            if(_sources.size() != 1){
+                throw std::runtime_error("You can avoid to specify the instruction from" \
+                                         "which you want to receive the data only if this" \
+                                         "instruction has only 1 input.");
+            }else{
+                return _sources.begin()->second;
+            }
+        }else{
+            if(_sources.find(c) == _sources.end()){
+                throw std::runtime_error("Impossible to receive from computable.");
+            }
+            return _sources[c];
         }
-        return _sources[c];
     }
 
     /**
@@ -118,10 +128,20 @@ public:
      *          c is the index of the worker (cast from int to Computable*).
      */
     void setOutput(void* x, Computable* c = NULL){
-        if(_destinations.find(c) == _destinations.end()){
-            throw std::runtime_error("Impossible to send to computable.");
+        if(!c){
+            if(_destinations.size() != 1){
+                throw std::runtime_error("You can avoid to specify the instruction to" \
+                                         "which you want to send the data only if this" \
+                                         "instruction has only 1 output.");
+            }else{
+                *(_destinations.begin()->second) = x;
+            }
+        }else{
+            if(_destinations.find(c) == _destinations.end()){
+                throw std::runtime_error("Impossible to send to computable.");
+            }
+            *(_destinations[c]) = x;
         }
-        *(_destinations[c]) = x;
     }
 
 };

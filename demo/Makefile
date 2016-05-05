@@ -10,7 +10,9 @@ all: $(TARGET)
 	$(CXX) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
 clean: 
 	-rm -fr *.o *~
+	$(MAKE) -C dataflow clean
 cleanall:
 	-rm -fr *.o *~ 
 	-rm -fr $(TARGET)
+	$(MAKE) -C dataflow cleanall
 

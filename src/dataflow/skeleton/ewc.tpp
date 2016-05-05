@@ -116,6 +116,7 @@ ReduceGatherer<T, fun>::ReduceGatherer(size_t numPartitions):
 
 template<typename T, T*(*fun)(T*,T*)>
 void* ReduceGatherer<T, fun>::compute(std::vector<void*> in){
+    assert(in.size() > 1);
     T *p, *q;
 #ifdef NOCOPY
     ArrayIndexes<T*>* ai;

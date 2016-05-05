@@ -230,12 +230,6 @@ public:
     inline void init(){
         if(!_init){
             bool inFound = false, outFound = false;
-            if(_firstId != std::numeric_limits<ulong>::max()){
-                inFound = true;
-            }
-            if(_lastId != std::numeric_limits<ulong>::max()){
-                outFound = true;
-            }
             for(size_t i = 0; i < _instructions.size(); i++){
                 if(!_instructions.at(i).getInputSize()){
                     if(!inFound){
@@ -243,6 +237,7 @@ public:
                         _instructions.at(i).setSourceInStream();
                         _firstId = i;
                     }else{
+                        std::cout << "Firstid: " << _firstId << " i: " << i << std::endl;
                         throw std::runtime_error("More than 1 instruction have "
                                                  "no input links.");
                     }
