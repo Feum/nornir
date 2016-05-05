@@ -36,7 +36,7 @@ template <typename T>
 std::vector<void*> ReduceScatterer<T>::compute(void* in){
     ArrayWrapper<T*>* task = (ArrayWrapper<T*>*) in;
     std::vector<void*> r;
-    int dim = task->getSize();
+    int dim = task->size();
     int mod = dim%_numPartitions;
     int size = dim/_numPartitions;
 #ifdef NOCOPY
@@ -84,7 +84,7 @@ void ReduceWorker<T, fun>::compute(Data* d){
 #else
     void* toDelete = t;
     w1=(ArrayWrapper<T*>*)t;
-    nElem=w1->getSize();
+    nElem=w1->size();
     first=0;
 #endif
     if(nElem-first==1){
@@ -155,7 +155,7 @@ template <typename T>
 std::vector<void*> MapScatterer<T>::compute(void* in){
     ArrayWrapper<T*>* task = (ArrayWrapper<T*>*) in;
     std::vector<void*> r;
-    uint dim = task->getSize();
+    uint dim = task->size();
     uint mod = dim % _numPartitions;
     uint size = dim / _numPartitions;
 #ifdef NOCOPY
@@ -201,7 +201,7 @@ void MapWorker<T, V, fun>::compute(Data* d){
     first=ai->geti();
 #else
     w1=(ArrayWrapper<void*>*) t;
-    nElem=w1->getSize();
+    nElem=w1->size();
     first=0;
 #endif
     V* y;
@@ -231,7 +231,7 @@ void* MapGatherer<V>::compute(std::vector<void*> in){
 #else
     uint size = 0;
     for(uint i = 0; i < _numPartitions; i++){
-        size += ((ArrayWrapper<void*>*) in.at(i))->getSize();
+        size += ((ArrayWrapper<void*>*) in.at(i))->size();
     }
 
 
@@ -239,7 +239,7 @@ void* MapGatherer<V>::compute(std::vector<void*> in){
     uint tempSize, k = 0;
     for(uint i = 0; i < _numPartitions; i++){
         tempAw = ((ArrayWrapper<V*>*) in.at(i));
-        tempSize = tempAw->getSize();
+        tempSize = tempAw->size();
         for(uint j = 0; j < tempSize; j++){
             aw->set(k,tempAw->get(j));
             ++k;

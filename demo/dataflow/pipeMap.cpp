@@ -1,5 +1,5 @@
 /*
- * map.cpp
+ * pipeMap.cpp
  *
  * Created on: 04/05/2016
  *
@@ -87,6 +87,19 @@ int* fun(float* x){
     return (int*) x;
 }
 
+class FirstStage: public Computable{
+public:
+    void compute(Data* d){
+        ArrayWrapper<float*>* aw = (ArrayWrapper<float*>*) d->getInput();
+        for(size_t i = 0; i < aw->size(); i++){
+            float* x = aw->get(i);
+            *x = *x + 1;
+            aw->set(i, x);
+        }
+        d->setOutput((void*) aw);
+    }
+};
+
 int main(int argc, char** argv){
     if(argc < 2){
         std::cerr << "Usage: " << argv[0] << " streamSize [numWorkers]" << std::endl;
@@ -103,9 +116,11 @@ int main(int argc, char** argv){
     }
 
     Computable* map = createStandardMap<float, int, fun>(nWorkers);
+    FirstStage f;
+    Pipeline pipe(&f, map);
 
     nornir::Parameters p("parameters.xml", "archdata.xml");
-    nornir::dataflow::Interpreter m(&p, map, &inp, &out);
+    nornir::dataflow::Interpreter m(&p, &pipe, &inp, &out);
     m.start();
     m.wait();
 }

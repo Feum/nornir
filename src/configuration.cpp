@@ -50,11 +50,7 @@ FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
     _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p, emitter,
                                                 collector, gt, workers,
                                                 terminated);
-    _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p.knobMapping,
-                                                p.knobMappingEmitter,
-                                                p.knobMappingCollector,
-                                                p.knobHyperthreading,
-                                                p.mammut,
+    _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p,
                                                 emitter,
                                                 collector,
                                                 *((KnobWorkers*)_knobs[KNOB_TYPE_WORKERS]));

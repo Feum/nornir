@@ -1,5 +1,5 @@
 /*
- * map.cpp
+ * pipeMap2.cpp
  *
  * Created on: 04/05/2016
  *
@@ -82,10 +82,17 @@ public:
     }
 };
 
-int* fun(float* x){
+float* fun1(float* x){
+    *x = *x + 1;
+    return (float*) x;
+}
+
+int* fun2(float* x){
     *x = floor(*x);
     return (int*) x;
 }
+
+
 
 int main(int argc, char** argv){
     if(argc < 2){
@@ -102,10 +109,12 @@ int main(int argc, char** argv){
         nWorkers = atoi(argv[2]);
     }
 
-    Computable* map = createStandardMap<float, int, fun>(nWorkers);
+    Computable* map1 = createStandardMap<float, float, fun1>(nWorkers);
+    Computable* map2 = createStandardMap<float, int, fun2>(nWorkers);
+    Pipeline pipe(map1, map2);
 
     nornir::Parameters p("parameters.xml", "archdata.xml");
-    nornir::dataflow::Interpreter m(&p, map, &inp, &out);
+    nornir::dataflow::Interpreter m(&p, &pipe, &inp, &out);
     m.start();
     m.wait();
 }

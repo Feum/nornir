@@ -166,11 +166,7 @@ private:
 
 class KnobMapping: public Knob{
 public:
-    KnobMapping(KnobConfMapping confMapping,
-                KnobConfSNodeMapping confEmitterMapping,
-                KnobConfSNodeMapping confCollectorMapping,
-                KnobConfHyperthreading confHyperthreading,
-                const mammut::Mammut& mammut,
+    KnobMapping(const Parameters& p,
                 AdaptiveNode* emitter,
                 AdaptiveNode* collector,
                 const KnobWorkers& knobWorkers);
@@ -208,6 +204,7 @@ private:
      */
     void performLinearMapping();
 
+    const Parameters& _p;
     KnobConfMapping _confMapping;
     KnobConfSNodeMapping _confEmitterMapping;
     KnobConfSNodeMapping _confCollectorMapping;

@@ -192,6 +192,7 @@ void Parameters::setDefault(){
     tolerableSamples = 0;
     qSize = 1;
     conservativeValue = 0;
+    isolateManager = false;
     statsReconfiguration = false;
     dataflow.orderedProcessing = false;
     dataflow.orderedOutput = false;
@@ -597,6 +598,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Ulong, qSize);
     SETVALUE(xt, Double, conservativeValue);
     SETVALUE(xt, ArrayUint, disallowedNumCores);
+    SETVALUE(xt, Bool, isolateManager);
     SETVALUE(xt, Bool, statsReconfiguration);
 
     SETVALUE(xt, Uint, mishra.appId);

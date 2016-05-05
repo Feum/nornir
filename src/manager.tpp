@@ -515,7 +515,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
     changeKnobs();
 
     ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
-    thisThread->move((VirtualCoreId) 0);
+    thisThread->move(MANAGER_VIRTUAL_CORE);
 
     double microsecsSleep = 0;
     double startSample = getMillisecondsTime();

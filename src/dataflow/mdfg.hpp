@@ -74,6 +74,18 @@ private:
     ulong _firstId;
     ulong _lastId;
     bool _init;
+
+    friend Mdfg* compile(Computable* c);
+
+    inline void clearInputInstruction(){
+        _instructions.at(_firstId).clearInput();
+        _firstId = std::numeric_limits<ulong>::max();
+    }
+
+    inline void clearOutputInstruction(){
+        _instructions.at(_lastId).clearOutput();
+        _lastId = std::numeric_limits<ulong>::max();
+    }
 public:
     /**
      * Constructor of the graph.
@@ -149,6 +161,10 @@ public:
         _instructions.back().setId(_nextId);
         ++_nextId;
         return _instructions.size() - 1;
+    }
+
+    inline void addOffset(size_t id, size_t offset){
+        _instructions.at(id).addOffset(offset);
     }
 
     /**
@@ -237,7 +253,6 @@ public:
                         _instructions.at(i).setSourceInStream();
                         _firstId = i;
                     }else{
-                        std::cout << "Firstid: " << _firstId << " i: " << i << std::endl;
                         throw std::runtime_error("More than 1 instruction have "
                                                  "no input links.");
                     }
@@ -280,24 +295,19 @@ public:
         return &(_instructions.at(id));
     }
 
+    inline Computable* getComputable(uint id){
+        return _instructions.at(id).getComputable();
+    }
+
     /**
      * Resets all the instructions.
      * \param newId The new id of the graph.
      */
     void reset(ulong newId);
 
-    inline void clearInputInstruction(){
-        std::cout << "Clearing Input " << _firstId << std::endl;
-        _instructions.at(_firstId).clearInput();
-        std::cout << "Size " << _instructions.at(_firstId).getInputSize() << std::endl;
-        _firstId = std::numeric_limits<ulong>::max();
-    }
-
-    inline void clearOutputInstruction(){
-        std::cout << "Clearing Output " << _lastId << std::endl;
-        _instructions.at(_lastId).clearOutput();
-        std::cout << "Size " << _instructions.at(_lastId).getOutputSize() << std::endl;
-        _lastId = std::numeric_limits<ulong>::max();
+    inline void deinit(){
+        clearInputInstruction();
+        clearOutputInstruction();
     }
 
 };

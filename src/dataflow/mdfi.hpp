@@ -161,6 +161,12 @@ public:
         assert(dOutput <= MAX_INSTRUCTION_INPUTS);
     }
 
+    inline void addOffset(size_t offset){
+        for(size_t i = 0; i < dOutput; i++){
+            tOutput[i].dest.mdfiId += offset;
+        }
+    }
+
     /**
      * Returns the id of the instruction.
      * \return The id of the instruction.

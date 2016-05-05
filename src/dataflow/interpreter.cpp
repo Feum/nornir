@@ -59,52 +59,33 @@ Mdfg* compile(Computable* c){
         /**Compiles the two stages.**/
         Mdfg* g1 = compile(p->getFirstStage());
         Mdfg* g2 = compile(p->getSecondStage());
-        bool lastSet = false;
         uint n = g2->getNumMdfi();
         uint oldSecondStageFirstId;
         Computable *oldSecondStageFirst; ///<The first instruction of the second stage of the pipeline.
-        uint g1LastId, g2LastId, g2FirstId;
+        uint g1LastId, g2FirstId;
 
         g1LastId = g1->getLastId();
-        g2LastId = g2->getLastId();
         g2FirstId = g2->getFirstId();
 
-        g1->clearOutputInstruction();
-        g1->clearInputInstruction();
-        g2->clearOutputInstruction();
-        g2->clearInputInstruction();
+        g1->deinit();
+        g2->deinit();
+
         Mdfg* combined = new Mdfg(*g1, 0);
 
         oldSecondStageFirstId = combined->createMdfi(g2, g2FirstId);
+        combined->addOffset(oldSecondStageFirstId, g1->getNumMdfi());
+        oldSecondStageFirst = combined->getComputable(oldSecondStageFirstId);
 
         /**
-         *  Ok to call getMdfi(...) even if the graph will me modified. Indeed
-         *  we will not store the Mdfi itself but only the computable associated
-         *  to it.
-         */
-        oldSecondStageFirst = combined->getMdfi(oldSecondStageFirstId)->getComputable();
-        /**
-         * Discriminates the case where the second stage has only one
-         * instruction.
+         * Adds the instructions of the second stage (except first instruction).
          **/
-        if(n == 1){
-            lastSet = true;
-        }
-        /**
-         * Adds the instructions of the second stage (except first and last
-         * instruction).
-         **/
-        for(uint i = 1; i < n - 1; i++){
-            combined->createMdfi(g2, i);
-        }
-
-        /**If the last instruction isn't set.**/
-        if(!lastSet){
-            combined->createMdfi(g2, g2LastId);
+        for(uint i = 1; i < n; i++){
+            size_t id = combined->createMdfi(g2, i);
+            combined->addOffset(id, g1->getNumMdfi());
         }
 
         /**Links the two stages.**/
-        combined->link(combined->getMdfi(g1LastId)->getComputable(),
+        combined->link(combined->getComputable(g1LastId),
                        oldSecondStageFirst);
 
         delete g1;
@@ -117,58 +98,61 @@ Mdfg* compile(Computable* c){
         EmitterWorkerCollector* ewc = (EmitterWorkerCollector*) c;
         int workersNum = ewc->getNWorkers();
         /**Compiles worker.**/
-        Mdfg* worker = compile(ewc->getWorker());
-        uint workerFirstId = worker->getFirstId();
-        uint workerLastId = worker->getLastId();
-        worker->clearInputInstruction();
-        worker->clearOutputInstruction();
+        std::vector<Computable*>& workersC = ewc->getWorkers();
+        std::vector<Mdfg*> workers;
+        for(size_t i = 0; i < workersC.size(); i++){
+            workers.push_back(compile(workersC.at(i)));
+        }
+        uint workerFirstId = workers.at(0)->getFirstId(); // All workers will have same identifiers.
+        uint workerLastId = workers.at(0)->getLastId();
+        for(size_t i = 0; i < workers.size(); i++){
+            workers.at(i)->deinit();
+        }
         Mdfg* scatterer = new Mdfg(ewc->getScatterer());
         Mdfg* gatherer = new Mdfg(ewc->getGatherer());
 
-        uint workerSize = worker->getNumMdfi();
-        /**
-         * \e firstWorkerInstr and \e lastWorkerInstrs contain the first and
-         * the last instructions of the workers.
-         **/
+        uint workerSize = workers.at(0)->getNumMdfi();
+
         int *firstWorkerInstr = new int[workersNum];
         int *lastWorkerInstr = new int[workersNum];
         /**Adds the workers.**/
         for(int i = 0; i < workersNum; i++){
             for(size_t j = 0; j < workerSize; j++){
-                size_t id = scatterer->createMdfi(worker, j);
-                if(worker->getMdfi(j)->getId() == workerLastId){
+                size_t id = scatterer->createMdfi(workers.at(i), j);
+                scatterer->addOffset(id, 1);
+                if(j == workerLastId){
                     lastWorkerInstr[i] = id;
                 }
-                if(worker->getMdfi(j)->getId() == workerFirstId){
+                if(j == workerFirstId){
                     firstWorkerInstr[i] = id;
-                    std::cout << "fwi: " << i << ": " << id << std::endl;
                 }
             }
         }
         /**Links the emitter to the workers.**/
         for(int i = 0; i < workersNum; i++){
-            Computable* wc = scatterer->getMdfi(firstWorkerInstr[i])->getComputable();
-            scatterer->link(scatterer->getMdfi(0)->getComputable(), wc);
-            std::cout << "Linking " << scatterer->getMdfi(0)->getComputable() << " to " << wc << std::endl;
+            Computable* wc = scatterer->getComputable(firstWorkerInstr[i]);
+            scatterer->link(scatterer->getComputable(0), wc);
             ewc->getScatterer()->_workers.push_back(wc);
         }
         delete[] firstWorkerInstr;
         /**Adds the collector.**/
-        uint firstCollInstr = scatterer->createMdfi(gatherer, 0);
+        uint gathererInstrId = scatterer->createMdfi(gatherer, 0);
+        scatterer->addOffset(gathererInstrId, 1);
 
-        /**Links the workers to collector.**/
+        /**Links the workers to gatherer.**/
         for(int i = 0; i < workersNum; i++){
-            Computable* wc = scatterer->getMdfi(lastWorkerInstr[i])->getComputable();
-            scatterer->link(wc, scatterer->getMdfi(firstCollInstr)->getComputable());
-            std::cout << "Linking " << wc << " to " << scatterer->getMdfi(firstCollInstr)->getComputable() << std::endl;
+            Computable* wc = scatterer->getComputable(lastWorkerInstr[i]);
+            scatterer->link(wc, scatterer->getComputable(gathererInstrId));
             ewc->getGatherer()->_workers.push_back(wc);
         }
         delete[] lastWorkerInstr;
         /**
-         * Deletes the worker and the collector because all their instructions
-         *  were copied in the graph of the emitter.
+         * Deletes the workers and the gatherer because all their instructions
+         * were copied in the graph of the scatterer.
          **/
-        delete worker;
+        for(size_t i = 0; i < workers.size(); i++){
+            delete workers.at(i);
+        }
         delete gatherer;
 
         scatterer->init();
@@ -283,12 +267,12 @@ private:
     }
 public:
     Scheduler(Mdfg *graph, InputStream *i, OutputStream *o, size_t parDegree,
-              QUEUE& q, std::vector<WorkerMdf*>& workers, Parameters* p):
+              QUEUE& q, std::vector<WorkerMdf*>& workers, DataflowParameters* p):
                 _in(i), _out(o), _graph(graph), _compiled(false), _nextGraphId(0),
                 _pool(NULL), _taskSent(0), _lastSent(0), _maxWorkers(parDegree),
-                _numWorkers(parDegree), _maxGraphs(p->dataflow.maxGraphs),
-                _orderedProc(p->dataflow.orderedProcessing),
-                _orderedOut(p->dataflow.orderedOutput), _q(q), _lastRcvId(0),
+                _numWorkers(parDegree), _maxGraphs(p->maxGraphs),
+                _orderedProc(p->orderedProcessing),
+                _orderedOut(p->orderedOutput), _q(q), _lastRcvId(0),
                 _tasksInside(0), _graphsInside(0), _workers(workers){
         _graphs = new std::map<ulong, Mdfg*>;
         _result = new std::map<ulong, void*>;
@@ -506,7 +490,6 @@ Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStrea
     graph->init();
     Mammut m;
     size_t numPhysicalCores = m.getInstanceTopology()->getPhysicalCores().size();
-
     if(numPhysicalCores < 3){
         throw std::runtime_error("Not enough cores available (you need at least "
                                  "3 physical cores).");
@@ -517,7 +500,8 @@ Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStrea
     /**Creates the SPSC queues.**/
     _q.init(_maxWorkers + 1); /* +1 for the scheduler. */
 
-    _s = new Scheduler(graph, i, o, _maxWorkers, _q, _workers, p);
+    _s = new Scheduler(graph, i, o, _maxWorkers, _q, _workers, &(_p->dataflow));
+    _p->isolateManager = true;
     _farm = new nornir::Farm<Mdfi>(_p);
     _farm->addScheduler(_s);
     /**Adds the workers to the farm.**/

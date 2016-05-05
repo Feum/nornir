@@ -38,6 +38,8 @@
 
 namespace nornir{
 
+#define MANAGER_VIRTUAL_CORE (VirtualCoreId) 0
+
 class Observer;
 
 /// Possible contracts requested by the user.
@@ -806,6 +808,11 @@ public:
     // never use  3 cores. It can only be specified when
     // knobWorkers is different from KNOB_WORKERS_NO [default = empty].
     std::vector<uint> disallowedNumCores;
+
+    // If true, the manager will run on a physical core by itself.
+    // If false, it will run on the same physical core used by the emitter
+    // of the farm [default = false].
+    bool isolateManager;
 
     // If true, computes the statistics about the cost
     // of the reconfigurations [default = false].
