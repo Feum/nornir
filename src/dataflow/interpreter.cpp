@@ -267,12 +267,12 @@ private:
     }
 public:
     Scheduler(Mdfg *graph, InputStream *i, OutputStream *o, size_t parDegree,
-              QUEUE& q, std::vector<WorkerMdf*>& workers, Parameters* p):
+              QUEUE& q, std::vector<WorkerMdf*>& workers, DataflowParameters* p):
                 _in(i), _out(o), _graph(graph), _compiled(false), _nextGraphId(0),
                 _pool(NULL), _taskSent(0), _lastSent(0), _maxWorkers(parDegree),
-                _numWorkers(parDegree), _maxGraphs(p->dataflow.maxGraphs),
-                _orderedProc(p->dataflow.orderedProcessing),
-                _orderedOut(p->dataflow.orderedOutput), _q(q), _lastRcvId(0),
+                _numWorkers(parDegree), _maxGraphs(p->maxGraphs),
+                _orderedProc(p->orderedProcessing),
+                _orderedOut(p->orderedOutput), _q(q), _lastRcvId(0),
                 _tasksInside(0), _graphsInside(0), _workers(workers){
         _graphs = new std::map<ulong, Mdfg*>;
         _result = new std::map<ulong, void*>;
@@ -500,7 +500,8 @@ Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStrea
     /**Creates the SPSC queues.**/
     _q.init(_maxWorkers + 1); /* +1 for the scheduler. */
 
-    _s = new Scheduler(graph, i, o, _maxWorkers, _q, _workers, p);
+    _s = new Scheduler(graph, i, o, _maxWorkers, _q, _workers, &(_p->dataflow));
+    _p->isolateManager = true;
     _farm = new nornir::Farm<Mdfi>(_p);
     _farm->addScheduler(_s);
     /**Adds the workers to the farm.**/

@@ -60,6 +60,9 @@ POP_WARNING
 namespace nornir{
 namespace dataflow{
 
+// TODO: ArrayWrapper<T> -> std::vector<T>
+// TODO: Use arma::vec and arma::mat for Map and Reduce computations
+
 /**
  * This is the worker of the fastflow's farm.
  */

@@ -257,31 +257,24 @@ void KnobWorkers::notifyNewConfiguration(uint numWorkers){
     }
 }
 
-KnobMapping::KnobMapping(KnobConfMapping confMapping,
-                         KnobConfSNodeMapping confEmitterMapping,
-                         KnobConfSNodeMapping confCollectorMapping,
-                         KnobConfHyperthreading confHyperthreading,
-                         const Mammut& mammut,
+KnobMapping::KnobMapping(const Parameters& p,
                          AdaptiveNode* emitter,
                          AdaptiveNode* collector,
                          const KnobWorkers& knobWorkers):
-                             _confMapping(confMapping),
-                             _confEmitterMapping(confEmitterMapping),
-                             _confCollectorMapping(confCollectorMapping),
-                             _confHyperthreading(confHyperthreading),
+                             _p(p),
                              _vcOrder(_vcOrderCacheEfficient),
                              _emitterVirtualCore(NULL),
                              _collectorVirtualCore(NULL),
                              _emitter(emitter),
                              _collector(collector),
                              _knobWorkers(knobWorkers),
-                             _topologyHandler(mammut.getInstanceTopology()){
+                             _topologyHandler(p.mammut.getInstanceTopology()){
     computeVcOrderLinear();
     _realValue = KNOB_MAPPING_LINEAR;
 }
 
 bool KnobMapping::needsCalibration() const{
-    return _confMapping == KNOB_MAPPING_AUTO;
+    return _p.knobMapping == KNOB_MAPPING_AUTO;
 }
 
 #ifdef DEBUG_KNOB
@@ -325,7 +318,7 @@ void KnobMapping::changeValueReal(double v){
 
 std::vector<double> KnobMapping::getAllowedValues() const{
     std::vector<double> r;
-    switch(_confMapping){
+    switch(_p.knobMapping){
         case KNOB_MAPPING_NO:{
             ;
         }break;
@@ -375,7 +368,7 @@ void KnobMapping::computeVcOrderLinear(){
 
     size_t virtualUsed = 0;
     size_t virtualPerPhysical;
-    if(_confHyperthreading != KNOB_HT_NO){
+    if(_p.knobHyperthreading != KNOB_HT_NO){
         virtualPerPhysical = _topologyHandler->getVirtualCores().size() /
                              _topologyHandler->getPhysicalCores().size();
     }else{
@@ -386,8 +379,10 @@ void KnobMapping::computeVcOrderLinear(){
             vector<PhysicalCore*> phyCores = cpus.at(i)->
                                              getPhysicalCores();
             for(size_t j = 0; j < phyCores.size(); j++){
-                _vcOrderLinear.push_back(phyCores.at(j)->getVirtualCores().
-                                              at(virtualUsed));
+                if(!_p.isolateManager || !phyCores.at(j)->getVirtualCore(MANAGER_VIRTUAL_CORE)){
+                    _vcOrderLinear.push_back(phyCores.at(j)->getVirtualCores().
+                                               at(virtualUsed));
+                }
             }
         }
         ++virtualUsed;
@@ -400,14 +395,14 @@ void KnobMapping::getMappingIndexes(size_t& emitterIndex,
     size_t nextIndex = 0;
     if(_emitter){
         emitterIndex = nextIndex;
-        if(_confEmitterMapping == KNOB_SNODE_MAPPING_ALONE){
+        if(_p.knobMappingEmitter == KNOB_SNODE_MAPPING_ALONE){
             nextIndex = (nextIndex + 1) % _vcOrder.size();
         }
     }
 
     if(_collector){
         collectorIndex = nextIndex;
-        if(_confCollectorMapping == KNOB_SNODE_MAPPING_ALONE){
+        if(_p.knobMappingCollector == KNOB_SNODE_MAPPING_ALONE){
             nextIndex = (nextIndex + 1) % _vcOrder.size();
         }
     }
@@ -426,7 +421,7 @@ void KnobMapping::performLinearMapping(){
     _activeVirtualCores.clear();
     _workersVirtualCores.clear();
 
-    if(_emitter && _confEmitterMapping != KNOB_SNODE_MAPPING_NO){
+    if(_emitter && _p.knobMappingEmitter != KNOB_SNODE_MAPPING_NO){
         _emitterVirtualCore = _vcOrderLinear.at(emitterIndex);
         _activeVirtualCores.push_back(_emitterVirtualCore);
         if(!_emitterVirtualCore->isHotPlugged()){
@@ -463,7 +458,7 @@ void KnobMapping::performLinearMapping(){
         }
     }
 
-    if(_collector && _confCollectorMapping != KNOB_SNODE_MAPPING_NO){
+    if(_collector && _p.knobMappingCollector != KNOB_SNODE_MAPPING_NO){
         _collectorVirtualCore = _vcOrderLinear.at(collectorIndex);
         _activeVirtualCores.push_back(_collectorVirtualCore);
         if(!_collectorVirtualCore->isHotPlugged()){
