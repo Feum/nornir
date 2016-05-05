@@ -558,6 +558,7 @@ int main (int argc, char **argv)
     dataflow::Computable* farm = dataflow::createStandardFarm<fftask_t, fftask_t, compute>();
 
     Parameters p("parameters.xml", "archdata.xml");
+    p.dataflow.maxInterpreters = nThreads;
     Observer o;
     p.observer = &o;
     dataflow::Interpreter inter(&p, farm, &oss);

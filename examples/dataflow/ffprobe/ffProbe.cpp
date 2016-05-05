@@ -30,7 +30,7 @@ void printHelp(char* progName){
 fprintf(stderr,"\nusage: %s -v <version> -i <captureInterface|pcap> [-b <bpf filter>] [-d <idleTimeout>] [-l <lifetimeTimeout>]\n"
         "[-q <queueTimeout>] [-t <readTimeout>] [-w <numStages>] [-s <hashSize>] [-m <maxActiveFlows>] [-c <cnt>]\n"
         "[-f <outputFile>] [-a <maxAddCheck>] [-z <maxNullCheck>] [-k <maxReadTOCheck>] [-n <host>] [-p <port>] [-y <minFlowSize>]\n"
-        "[-x <ratesFile] [-g <parDegree>] [-r] [-h]\n\n\n", progName);
+        "[-x <ratesFile] [-r] [-h]\n\n\n", progName);
 fprintf(stderr,"-v <version>               | If 0, executes the fastflow version. If > 0, executes the faskel version.\n");
 fprintf(stderr,"-i <captureInterface|pcap> | Interface name from which packets are captured, or .pcap file.\n");
 fprintf(stderr,"[-b <bpf filter>]          | It specifies a bpf filter.\n");
@@ -62,8 +62,6 @@ fprintf(stderr,"[-p <port>]                | Port of the collector [default 2055
 fprintf(stderr,"[-y <minFlowSize>]         | Minimum TCP flow size (in bytes). If a TCP flow is shorter than the specified size the flow\n"
         "                           | is not emitted. 0 is unlimited [default unlimited]\n");
 fprintf(stderr,"[-x <ratesFile>]           | File containing the stream rates.\n");
-fprintf(stderr,"[-g <parDegree>]           | The parallelism degree (only valid for dataflow execution). For  on dataflow execution it will\n"
-        "                           | be equal to the number of stages.\n");
 fprintf(stderr,"[-r]                       | Put the interface into 'No promiscous' mode\n");
 fprintf(stderr,"[-h]                       | Prints this help\n");
 }
@@ -71,7 +69,7 @@ fprintf(stderr,"[-h]                       | Prints this help\n");
 char *interface=NULL,*bpfFilter=NULL;
 char const *collector = "127.0.0.1";
 char const *streamFile = "";
-int version=-1,hashSize=4096,cnt=-1,maxAddCheck=1,maxNullCheck=1,maxReadTOCheck=-1,readTimeout=0, parDegree=-1;//30000; //TODO ANALIZZARE MEGLIO TIMEOUT
+int version=-1,hashSize=4096,cnt=-1,maxAddCheck=1,maxNullCheck=1,maxReadTOCheck=-1,readTimeout=0;//30000; //TODO ANALIZZARE MEGLIO TIMEOUT
 uint minFlowSize=0,queueTimeout=30,lifetime=120,numStages=1,idle=30,maxActiveFlows=4294967295;
 ushort port=2055;
 bool noPromisc=false;
@@ -215,7 +213,7 @@ void executeWithFastflow(){
 int main(int argc, char** argv){
     /**Args parsing.**/
     int c;
-    while ((c = getopt (argc, argv, "v:i:b:d:l:q:t:w:s:m:c:f:a:z:k:n:p:y:x:g:rh")) != -1)
+    while ((c = getopt (argc, argv, "v:i:b:d:l:q:t:w:s:m:c:f:a:z:k:n:p:y:x:rh")) != -1)
         switch (c){
             case 'v':
                 version = atoi(optarg);
@@ -276,9 +274,6 @@ int main(int argc, char** argv){
             case 'x':
                 streamFile = optarg;
                 break;
-            case 'g':
-                parDegree = atoi(optarg);
-                break;
             case 'r':
                 noPromisc=true;
                 break;
@@ -300,11 +295,6 @@ int main(int argc, char** argv){
 
     if(interface==NULL){
         printf("ERROR: -i <interface> required.\n");
-        exit(-1);
-    }
-
-    if(parDegree == -1){
-        printf("ERROR: -g <parDegree> required.\n");
         exit(-1);
     }
 
