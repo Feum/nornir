@@ -62,7 +62,7 @@ Mdfg* compile(Computable* c){
         uint n = g2->getNumMdfi();
         uint oldSecondStageFirstId;
         Computable *oldSecondStageFirst; ///<The first instruction of the second stage of the pipeline.
-        uint g1LastId, g2LastId, g2FirstId;
+        uint g1LastId, g2FirstId;
 
         g1LastId = g1->getLastId();
         g2FirstId = g2->getFirstId();
@@ -73,23 +73,19 @@ Mdfg* compile(Computable* c){
         Mdfg* combined = new Mdfg(*g1, 0);
 
         oldSecondStageFirstId = combined->createMdfi(g2, g2FirstId);
-
-        /**
-         *  Ok to call getMdfi(...) even if the graph will me modified. Indeed
-         *  we will not store the Mdfi itself but only the computable associated
-         *  to it.
-         */
-        oldSecondStageFirst = combined->getMdfi(oldSecondStageFirstId)->getComputable();
+        combined->addOffset(oldSecondStageFirstId, g1->getNumMdfi());
+        oldSecondStageFirst = combined->getComputable(oldSecondStageFirstId);
 
         /**
          * Adds the instructions of the second stage (except first instruction).
          **/
         for(uint i = 1; i < n; i++){
-            combined->createMdfi(g2, i);
+            size_t id = combined->createMdfi(g2, i);
+            combined->addOffset(id, g1->getNumMdfi());
         }
 
         /**Links the two stages.**/
-        combined->link(combined->getMdfi(g1LastId)->getComputable(),
+        combined->link(combined->getComputable(g1LastId),
                        oldSecondStageFirst);
 
         delete g1;
@@ -116,38 +112,37 @@ Mdfg* compile(Computable* c){
         Mdfg* gatherer = new Mdfg(ewc->getGatherer());
 
         uint workerSize = workers.at(0)->getNumMdfi();
-        /**
-         * \e firstWorkerInstr and \e lastWorkerInstrs contain the first and
-         * the last instructions of the workers.
-         **/
+
         int *firstWorkerInstr = new int[workersNum];
         int *lastWorkerInstr = new int[workersNum];
         /**Adds the workers.**/
         for(int i = 0; i < workersNum; i++){
             for(size_t j = 0; j < workerSize; j++){
                 size_t id = scatterer->createMdfi(workers.at(i), j);
-                if(workers.at(i)->getMdfi(j)->getId() == workerLastId){
+                scatterer->addOffset(id, 1);
+                if(j == workerLastId){
                     lastWorkerInstr[i] = id;
                 }
-                if(workers.at(i)->getMdfi(j)->getId() == workerFirstId){
+                if(j == workerFirstId){
                     firstWorkerInstr[i] = id;
                 }
             }
         }
         /**Links the emitter to the workers.**/
         for(int i = 0; i < workersNum; i++){
-            Computable* wc = scatterer->getMdfi(firstWorkerInstr[i])->getComputable();
-            scatterer->link(scatterer->getMdfi(0)->getComputable(), wc);
+            Computable* wc = scatterer->getComputable(firstWorkerInstr[i]);
+            scatterer->link(scatterer->getComputable(0), wc);
             ewc->getScatterer()->_workers.push_back(wc);
         }
         delete[] firstWorkerInstr;
         /**Adds the collector.**/
-        uint firstCollInstr = scatterer->createMdfi(gatherer, 0);
+        uint gathererInstrId = scatterer->createMdfi(gatherer, 0);
+        scatterer->addOffset(gathererInstrId, 1);
 
-        /**Links the workers to collector.**/
+        /**Links the workers to gatherer.**/
         for(int i = 0; i < workersNum; i++){
-            Computable* wc = scatterer->getMdfi(lastWorkerInstr[i])->getComputable();
-            scatterer->link(wc, scatterer->getMdfi(firstCollInstr)->getComputable());
+            Computable* wc = scatterer->getComputable(lastWorkerInstr[i]);
+            scatterer->link(wc, scatterer->getComputable(gathererInstrId));
             ewc->getGatherer()->_workers.push_back(wc);
         }
         delete[] lastWorkerInstr;
@@ -495,7 +490,6 @@ Interpreter::Interpreter(Parameters* p, Mdfg *graph, InputStream *i, OutputStrea
     graph->init();
     Mammut m;
     size_t numPhysicalCores = m.getInstanceTopology()->getPhysicalCores().size();
-
     if(numPhysicalCores < 3){
         throw std::runtime_error("Not enough cores available (you need at least "
                                  "3 physical cores).");

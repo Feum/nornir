@@ -163,6 +163,10 @@ public:
         return _instructions.size() - 1;
     }
 
+    inline void addOffset(size_t id, size_t offset){
+        _instructions.at(id).addOffset(offset);
+    }
+
     /**
      * Returns the id of the first instruction of the graph.
      * \return The id of the created instruction.
@@ -289,6 +293,10 @@ public:
      */
     inline Mdfi* getMdfi(uint id){
         return &(_instructions.at(id));
+    }
+
+    inline Computable* getComputable(uint id){
+        return _instructions.at(id).getComputable();
     }
 
     /**
