@@ -495,7 +495,7 @@ PredictorMishra::PredictorMishra(PredictorType type,
     const std::vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
     DEBUG("Found: " << combinations.size() << " combinations.");
     for(size_t i = 0; i < combinations.size(); i++){
-        _confIndexes.at(combinations.at(i)) = i;
+        _confIndexes[combinations.at(i)] = i;
     }
     _values.resize(combinations.size());
     _values.zeros();
@@ -516,7 +516,14 @@ void PredictorMishra::clear(){
 
 void PredictorMishra::refine(){
     _preparationNeeded = true;
-    size_t confId = _confIndexes.at(_configuration.getRealValues());
+    auto it = _confIndexes.find(_configuration.getRealValues());
+    if(it == _confIndexes.end()){
+        throw std::runtime_error("[Mishra] Impossible to find index for configuration.");
+    }
+    size_t confId = it->second;
+    if(confId >= _values.size()){
+        throw std::runtime_error("[Mishra] Invalid configuration index: " + confId);
+    }
     switch(_type){
         case PREDICTION_BANDWIDTH:{
             _values.at(confId) = _samples->average().bandwidth;
@@ -525,7 +532,7 @@ void PredictorMishra::refine(){
             _values.at(confId) = _samples->average().watts;
         }break;
         default:{
-            throw std::runtime_error("Unknown predictor type.");
+            throw std::runtime_error("[Mishra] Unknown predictor type.");
         }
     }
 }
@@ -533,11 +540,11 @@ void PredictorMishra::refine(){
 void PredictorMishra::prepareForPredictions(){
     if(_preparationNeeded){
         if(!readyForPredictions()){
-            throw std::runtime_error("prepareForPredictions: Not enough "
+            throw std::runtime_error("[Mishra] prepareForPredictions: Not enough "
                                      "points are present");
         }
 
-        string dataFile = NULL;
+        string dataFile;
         bool perColumnNormalization;
         switch(_type){
             case PREDICTION_BANDWIDTH:{
@@ -555,12 +562,25 @@ void PredictorMishra::prepareForPredictions(){
 
         leo::PredictionResults pr = leo::compute(_p.mishra.appId, dataFile,
                                                  &_values, perColumnNormalization);
+        _predictions = arma::conv_to<std::vector<double> >::from(pr.predictions);
+#if 0
+        for(arma::vec::iterator i = pr.predictions.begin(); i != pr.predictions.end(); ++i){
+            _predictions.push_back(*i);
+        }
+#endif
         _preparationNeeded = false;
     }
 }
 
 double PredictorMishra::predict(const KnobsValues& realValues){
-    size_t confId = _confIndexes.at(realValues);
+    auto it = _confIndexes.find(realValues);
+    if(it == _confIndexes.end()){
+        throw std::runtime_error("[Mishra] Impossible to find index for configuration.");
+    }
+    size_t confId = it->second;
+    if(confId >= _predictions.size()){
+        throw std::runtime_error("[Mishra] Invalid configuration index: " + confId);
+    }
     return _predictions.at(confId);
 }
 
@@ -598,7 +618,7 @@ void PredictorFullSearch::refine(){
             throw std::runtime_error("Unknown predictor type.");
         }
     }
-    _values.at(_configuration.getRealValues()) = value;
+    _values[_configuration.getRealValues()] = value;
 }
 
 void PredictorFullSearch::prepareForPredictions(){

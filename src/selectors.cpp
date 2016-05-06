@@ -575,7 +575,7 @@ SelectorFixedExploration::SelectorFixedExploration(const Parameters& p,
             SelectorPredictive(p, configuration, samples, std::move(bandwidthPredictor), std::move(powerPredictor)){
     const std::vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
     size_t numConfigurations = combinations.size();
-    for(size_t i = 0; i < numConfigurations; i += (numConfigurations/numSamples + 1)){
+    for(size_t i = 0; i < numConfigurations; i += ceil((double)numConfigurations/numSamples)){
         _confToExplore.push_back(combinations.at(i));
     }
 }
@@ -626,7 +626,7 @@ SelectorFullSearch::SelectorFullSearch(const Parameters& p,
         SelectorFixedExploration(p, configuration, samples,
                        std::unique_ptr<Predictor>(new PredictorFullSearch(PREDICTION_BANDWIDTH, p, configuration, samples)),
                        std::unique_ptr<Predictor>(new PredictorFullSearch(PREDICTION_POWER, p, configuration, samples)),
-                       _configuration.getAllRealCombinations().size()){
+                       configuration.getAllRealCombinations().size()){
     ;
 }
 

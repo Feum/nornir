@@ -603,6 +603,12 @@ private:
      */
     ParametersValidation validateContract();
 
+    /**                                                                                                                                                
+     * Validates the selector.
+     * @return The result of the validation.
+     */
+    ParametersValidation validateSelector();
+
     /**
      * Validates the predictor.
      * @return The result of the validation.

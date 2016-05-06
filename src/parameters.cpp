@@ -447,6 +447,17 @@ ParametersValidation Parameters::validateContract(){
     return VALIDATION_OK;
 }
 
+ParametersValidation Parameters::validateSelector(){
+    if(strategySelection == STRATEGY_SELECTION_MISHRA &&
+       (mishra.bandwidthData.compare("") == 0 ||
+        mishra.powerData.compare("") == 0 ||
+        mishra.appId == numeric_limits<uint>::max())){
+        return VALIDATION_NO_MISHRA_PARAMETERS;
+    }
+    return VALIDATION_OK;
+}
+
+
 ParametersValidation Parameters::validatePredictor(){
     if(strategyPrediction == STRATEGY_PREDICTION_MISHRA &&
          (mishra.bandwidthData.compare("") == 0 ||
@@ -673,6 +684,10 @@ ParametersValidation Parameters::validate(){
     if(r != VALIDATION_OK){return r;}
 
     /** Validate selectors. **/
+    r = validateSelector();
+    if(r != VALIDATION_OK){return r;}
+
+    /** Validate predictors. **/
     r = validatePredictor();
     if(r != VALIDATION_OK){return r;}
 
