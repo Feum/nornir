@@ -538,19 +538,23 @@ void PredictorMishra::prepareForPredictions(){
         }
 
         string dataFile = NULL;
+        bool perColumnNormalization;
         switch(_type){
             case PREDICTION_BANDWIDTH:{
                 dataFile = _p.mishra.bandwidthData;
+                perColumnNormalization = true;
             }break;
             case PREDICTION_POWER:{
                 dataFile = _p.mishra.powerData;
+                perColumnNormalization = false;
             }break;
             default:{
                 throw std::runtime_error("Unknown predictor type.");
             }
         }
 
-        leo::PredictionResults pr = leo::compute(_p.mishra.appId, dataFile, &_values, false);
+        leo::PredictionResults pr = leo::compute(_p.mishra.appId, dataFile,
+                                                 &_values, perColumnNormalization);
         _preparationNeeded = false;
     }
 }

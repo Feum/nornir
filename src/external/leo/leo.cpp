@@ -123,7 +123,7 @@ mat normalize(const mat* data, double low = 0, double high = 100.0){
 }
 
 vec denormalize(vec* data, mat* origData, double low = 0, double high = 100.0){
-    double min = minNonZero(data);
+    double min = minNonZero(origData);
     double max = origData->max();
     double rng = max - min;
     vec copy = *data;
@@ -134,8 +134,9 @@ vec denormalize(vec* data, mat* origData, double low = 0, double high = 100.0){
     return copy;
 }
 
-void loadData(uint appId, mat *data, mat *trueData, mat *W,
+void loadData(uint appId, mat *data, vec *trueData, mat *W,
               std::string dataFile, const vec* sampledData,
+              bool perColumnNormalization,
               bool computeError = false){
     int n, numSamples = 0;
     mat SupPower, SupPerf;
@@ -154,7 +155,12 @@ void loadData(uint appId, mat *data, mat *trueData, mat *W,
     }
         
     if(computeError){
-        *trueData = normalize(data).col(appId);
+        if(perColumnNormalization){
+            mat tmp(data->col(appId));
+            *trueData = normalize(&tmp);
+        }else{
+            *trueData = normalize(data).col(appId);
+        }
     }
 
     data->col(appId) = *sampledData;
@@ -163,18 +169,27 @@ void loadData(uint appId, mat *data, mat *trueData, mat *W,
 
 PredictionResults compute(uint appId, std::string dataFile,
                           const arma::vec* sampledData,
+                          bool perColumnNormalization,
                           bool computeError){
     int n;
     string str;
-    mat data, normData, y_em, W, trueData;
+    mat data, normData, y_em, W;
+    vec trueData;
     emParam_t oldData;
     emReturn_t applData;
     
     // LOAD DATA AND MISSING VALUES, BS is the name of target application
-    loadData(appId, &data, &trueData, &W, dataFile, sampledData, computeError);
+    loadData(appId, &data, &trueData, &W, dataFile, sampledData, perColumnNormalization, computeError);
 
     // Normalization
-    normData = normalize(&data);
+    if(perColumnNormalization){
+        for(size_t i = 0; i < data.n_cols; i++){
+            mat tmp(data.col(i));
+            normData.insert_cols(i, normalize(&tmp));
+        }
+    }else{
+        normData = normalize(&data);
+    }
   
     n = data.n_rows;    // # CONFIGURATIONS
     //m = data.n_cols;    // # APPLICATIONS
@@ -184,11 +199,17 @@ PredictionResults compute(uint appId, std::string dataFile,
 
     PredictionResults pr;
     if(computeError){
-        pr.accuracy = residualAccuracy(applData.w, trueData.col(0));
+        pr.accuracy = residualAccuracy(applData.w, trueData);
     }else{
         pr.accuracy = -1;
     }
-    pr.predictions = denormalize(&(applData.w), &data);
+
+    if(perColumnNormalization){
+        mat tmp(data.col(0));
+        pr.predictions = denormalize(&(applData.w), &tmp);
+    }else{
+        pr.predictions = denormalize(&(applData.w), &data);
+    }
     return pr;
 }
 } // End namespace
@@ -217,8 +238,10 @@ int main(int argc, char** argv){
 		}
 	}
 
-	PredictionResults pr = compute(appId, powerFile, bandwidthFile, &sampledPower, &sampledPerformance, true);
-	std::cout << pr.bandwidthAccuracy << " " << pr.powerAccuracy << std::endl;
-	//pr.bandwidthPredictions.print();
+	leo::PredictionResults pr = leo::compute(appId, bandwidthFile, &sampledPerformance, true, true);
+    std::cout << pr.accuracy << std::endl;
+
+	pr = leo::compute(appId, powerFile, &sampledPower, false, true);
+	std::cout << pr.accuracy << " ";
 }
 #endif

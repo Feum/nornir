@@ -48,6 +48,7 @@ typedef struct{
  **/
 PredictionResults compute(uint appId, std::string dataFile,
                           const arma::vec* sampledData,
+                          bool perColumnNormalization,
                           bool computeError = false);
 
 }
