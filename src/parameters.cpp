@@ -192,7 +192,8 @@ void Parameters::setDefault(){
     isolateManager = false;
     statsReconfiguration = false;
 
-    mishra.appId = numeric_limits<uint>::max();
+    mishra.applicationName = "";
+    mishra.namesData = "";
     mishra.bandwidthData = "";
     mishra.powerData = "";
 
@@ -451,7 +452,8 @@ ParametersValidation Parameters::validateSelector(){
     if(strategySelection == STRATEGY_SELECTION_MISHRA &&
        (mishra.bandwidthData.compare("") == 0 ||
         mishra.powerData.compare("") == 0 ||
-        mishra.appId == numeric_limits<uint>::max())){
+        mishra.applicationName.compare("") == 0 ||
+        mishra.namesData.compare("") == 0)){
         return VALIDATION_NO_MISHRA_PARAMETERS;
     }
     return VALIDATION_OK;
@@ -462,7 +464,8 @@ ParametersValidation Parameters::validatePredictor(){
     if(strategyPrediction == STRATEGY_PREDICTION_MISHRA &&
          (mishra.bandwidthData.compare("") == 0 ||
           mishra.powerData.compare("") == 0 ||
-          mishra.appId == numeric_limits<uint>::max())){
+          mishra.applicationName.compare("") == 0 ||
+          mishra.namesData.compare("") == 0)){
             return VALIDATION_NO_MISHRA_PARAMETERS;
     }
     return VALIDATION_OK;
@@ -616,7 +619,8 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, isolateManager);
     SETVALUE(xt, Bool, statsReconfiguration);
 
-    SETVALUE(xt, Uint, mishra.appId);
+    SETVALUE(xt, String, mishra.applicationName);
+    SETVALUE(xt, String, mishra.namesData);
     SETVALUE(xt, String, mishra.bandwidthData);
     SETVALUE(xt, String, mishra.powerData);
 

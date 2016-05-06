@@ -300,6 +300,7 @@ private:
     arma::vec _values;
     arma::vec _predictions;
     bool _preparationNeeded;
+    size_t _appId;
 public:
     PredictorMishra(PredictorType type,
               const Parameters& p,

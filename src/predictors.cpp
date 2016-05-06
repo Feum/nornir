@@ -499,6 +499,18 @@ PredictorMishra::PredictorMishra(PredictorType type,
     }
     _values.resize(combinations.size());
     _values.zeros();
+    std::vector<std::string> names = mammut::utils::readFile(p.mishra.namesData);
+    bool appFound = false;
+    for(size_t i = 0; i < names.size(); i++){
+        if(names.at(i).compare(p.mishra.applicationName) == 0){
+            _appId = i;
+            appFound = true;
+        }
+    }
+    if(!appFound){
+        throw std::runtime_error("Impossible to find application " + p.mishra.applicationName +
+                                 " in " + p.mishra.namesData);
+    }
 }
 
 PredictorMishra::~PredictorMishra(){
@@ -560,14 +572,9 @@ void PredictorMishra::prepareForPredictions(){
             }
         }
 
-        leo::PredictionResults pr = leo::compute(_p.mishra.appId, dataFile,
+        leo::PredictionResults pr = leo::compute(_appId, dataFile,
                                                  &_values, perColumnNormalization);
         _predictions = arma::conv_to<std::vector<double> >::from(pr.predictions);
-#if 0
-        for(arma::vec::iterator i = pr.predictions.begin(); i != pr.predictions.end(); ++i){
-            _predictions.push_back(*i);
-        }
-#endif
         _preparationNeeded = false;
     }
 }

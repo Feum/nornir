@@ -449,11 +449,15 @@ typedef struct ArchData{
 
 typedef struct{
     /**
-     * Application id [0, N-1]. N is the number of applications for which
-     * we collected offline data (equal to the number of columns in the
-     * data files).
+     * The name of this application (it must matches with one of the names
+     * in applicationNames file).
      */
-    uint appId;
+    std::string applicationName;
+    /**
+     * File containing the names of the applications, in the same
+     * order of the columns in bandwidth and power data.
+     */
+    std::string namesData;
     /**
      * File containing the data about the bandwidth. One column per application,
      * one row per configuration. Data doesn't need to be normalized.
