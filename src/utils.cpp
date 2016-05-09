@@ -179,6 +179,10 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
     for(size_t i = 0; i < calibrationStats.size(); i++){
         totalCalibration += calibrationStats.at(i);
     }
+    
+    if(durationMs == totalCalibration.duration){
+        durationMs += 0.001; // Just to avoid division by 0 
+    }
 
     _summaryFile << (_totalJoules - totalCalibration.joules) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
     _summaryFile << (totalTasks - totalCalibration.numTasks) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";

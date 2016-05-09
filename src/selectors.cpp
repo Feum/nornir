@@ -595,9 +595,11 @@ KnobsValues SelectorFixedExploration::getNextKnobsValues(double primaryValue,
         }
         KnobsValues r = _confToExplore.back();
         _confToExplore.pop_back();
+        ++_numCalibrationPoints;
         return r;
     }else{
         if(isCalibrating()){
+            refine();
             stopCalibration(totalTasks);
             return getBestKnobsValues(primaryValue);
         }else{
