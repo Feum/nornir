@@ -235,16 +235,18 @@ public:
 
 typedef struct MonitoredSample{
     mammut::energy::Joules watts; ///< Consumed watts.
-    double bandwidth; ///< Bandwidth of the entire farm.
+    double bandwidthMax; ///< Maximum bandwidth that could be processed with the current configuration.
+    double bandwidth; ///< Bandwidth of the entire farm (real).
     double utilization; ///< Utilization of the entire farm.
     double latency; ///< Average latency of a worker (nanoseconds).
 
-    MonitoredSample():watts(0),bandwidth(0), utilization(0), latency(0){;}
+    MonitoredSample():watts(0), bandwidthMax(0), bandwidth(0), utilization(0), latency(0){;}
 
     void swap(MonitoredSample& x){
         using std::swap;
 
         swap(watts, x.watts);
+        swap(bandwidthMax, x.bandwidthMax);
         swap(bandwidth, x.bandwidth);
         swap(utilization, x.utilization);
         swap(latency, x.latency);
@@ -257,6 +259,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
         watts += rhs.watts;
+        bandwidthMax += rhs.bandwidthMax;
         bandwidth += rhs.bandwidth;
         utilization += rhs.utilization;
         latency += rhs.latency;
@@ -265,6 +268,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample& operator-=(const MonitoredSample& rhs){
         watts -= rhs.watts;
+        bandwidthMax -= rhs.bandwidthMax;
         bandwidth -= rhs.bandwidth;
         utilization -= rhs.utilization;
         latency -= rhs.latency;
@@ -273,6 +277,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample& operator*=(const MonitoredSample& rhs){
         watts *= rhs.watts;
+        bandwidthMax *= rhs.bandwidthMax;
         bandwidth *= rhs.bandwidth;
         utilization *= rhs.utilization;
         latency *= rhs.latency;
@@ -281,6 +286,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample& operator/=(const MonitoredSample& rhs){
         watts /= rhs.watts;
+        bandwidthMax /= rhs.bandwidthMax;
         bandwidth /= rhs.bandwidth;
         utilization /= rhs.utilization;
         latency /= rhs.latency;
@@ -289,6 +295,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample operator/=(double x){
         watts /= x;
+        bandwidthMax /= x;
         bandwidth /= x;
         utilization /= x;
         latency /= x;
@@ -297,6 +304,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample operator*=(double x){
         watts *= x;
+        bandwidthMax *= x;
         bandwidth *= x;
         utilization *= x;
         latency *= x;
@@ -347,6 +355,7 @@ inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
 inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
     os << "[";
     os << "Watts: " << obj.watts << " ";
+    os << "BandwidthMax: " << obj.bandwidthMax << " ";
     os << "Bandwidth: " << obj.bandwidth << " ";
     os << "Utilization: " << obj.utilization << " ";
     os << "Latency: " << obj.latency << " ";
@@ -356,6 +365,7 @@ inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
 
 inline std::ofstream& operator<<(std::ofstream& os, const MonitoredSample& obj){
     os << obj.watts << "\t";
+    os << obj.bandwidthMax << "\t";
     os << obj.bandwidth << "\t";
     os << obj.utilization << "\t";
     os << obj.latency << "\t";
@@ -365,6 +375,7 @@ inline std::ofstream& operator<<(std::ofstream& os, const MonitoredSample& obj){
 inline MonitoredSample squareRoot(const MonitoredSample& x){
     MonitoredSample r;
     r.watts = x.watts?sqrt(x.watts):0;
+    r.bandwidthMax = x.bandwidthMax?sqrt(x.bandwidthMax):0;
     r.bandwidth = x.bandwidth?sqrt(x.bandwidth):0;
     r.utilization = x.utilization?sqrt(x.utilization):0;
     r.latency = x.latency?sqrt(x.latency):0;
@@ -373,6 +384,7 @@ inline MonitoredSample squareRoot(const MonitoredSample& x){
 
 inline void regularize(MonitoredSample& x){
     if(x.watts < 0){x.watts = 0;}
+    if(x.bandwidthMax < 0){x.bandwidthMax = 0;}
     if(x.bandwidth < 0){x.bandwidth = 0;}
     if(x.utilization < 0){x.utilization = 0;}
     if(x.latency < 0){x.latency = 0;}

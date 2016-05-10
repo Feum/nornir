@@ -55,7 +55,7 @@ typedef enum{
  * This struct represents a sample of values taken from an adaptive node.
  */
 typedef struct WorkerSample{
-    // The percentage of time that the node spent on svc().
+    // The percentage ([0, 100]) of time that the node spent on svc().
     double loadPercentage;
 
     // The number of computed tasks.

@@ -255,7 +255,7 @@ double adjustDerivedValue(ContractType contractType,
                               double primaryPrediction){
     switch(contractType){
         case CONTRACT_PERF_UTILIZATION:{
-            return (samples->average().bandwidth / primaryPrediction) *
+            return (samples->average().bandwidthMax / primaryPrediction) *
                     samples->average().utilization;
         }break;
         default:{

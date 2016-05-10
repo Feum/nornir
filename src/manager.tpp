@@ -85,7 +85,7 @@ double ManagerFarm<lb_t, gt_t>::getPrimaryValue(const MonitoredSample& sample) c
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
-            return sample.bandwidth;
+            return sample.bandwidthMax;
         }break;
         case CONTRACT_POWER_BUDGET:{
             return sample.watts;
@@ -105,7 +105,7 @@ double ManagerFarm<lb_t, gt_t>::getSecondaryValue(const MonitoredSample& sample)
             return sample.watts;
         }break;
         case CONTRACT_POWER_BUDGET:{
-            return sample.bandwidth;
+            return sample.bandwidthMax;
         }break;
         default:{
             return 0;
@@ -287,6 +287,7 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     //            the result observation file, we may have an higher
     //            number than the number of tasks.
     sample.bandwidth = ws.bandwidthTotal;
+    sample.bandwidthMax = sample.bandwidth / ((sample.utilization / 100.0));
     sample.latency = ws.latency;
 
     if(_p.synchronousWorkers){
@@ -295,6 +296,7 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
         // count. When this flag is set we count iterations, not real
         // tasks.
         sample.bandwidth /= _activeWorkers.size();
+        sample.bandwidthMax /= _activeWorkers.size();
     }
 
     _samples->add(sample);

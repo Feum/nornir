@@ -325,7 +325,7 @@ double PredictorLinearRegression::getCurrentResponse() const{
     double r = 0.0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            r = 1.0 / _samples->average().bandwidth;
+            r = 1.0 / _samples->average().bandwidthMax;
         }break;
         case PREDICTION_POWER:{
             r = _samples->average().watts;
@@ -476,7 +476,7 @@ void PredictorAnalytical::clear(){
 double PredictorAnalytical::predict(const KnobsValues& values){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            return _samples->average().bandwidth * getScalingFactor(values);
+            return _samples->average().bandwidthMax * getScalingFactor(values);
         }break;
         case PREDICTION_POWER:{
             return getPowerPrediction(values);
@@ -616,7 +616,7 @@ void PredictorFullSearch::refine(){
     double value = 0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            value = _samples->average().bandwidth;
+            value = _samples->average().bandwidthMax;
         }break;
         case PREDICTION_POWER:{
             value = _samples->average().watts;
