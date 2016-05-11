@@ -554,7 +554,7 @@ int main (int argc, char **argv)
 #else //ENABLE_TBB
 #ifdef ENABLE_FF
     nornir::Observer obs;
-    nornir::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Parameters ap("parameters.xml");
     ap.observer = &obs;
     ap.expectedTasksNumber = numOptions * NUM_RUNS / CHUNKSIZE;
     nornir::Farm<fftask_t> farm(&ap);

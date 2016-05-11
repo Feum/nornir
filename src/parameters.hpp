@@ -304,10 +304,6 @@ typedef enum{
     // Specified parameters are not valid for the specified contract.
     VALIDATION_WRONG_CONTRACT_PARAMETERS,
 
-    // strategyFrequencies is STRATEGY_FREQUENCY_POWER_CONSERVATIVE but
-    // the voltage file has not been specified or it does not exist.
-    VALIDATION_VOLTAGE_FILE_NEEDED,
-
     // Blocking threshold needs to be specified.
     VALIDATION_NO_BLOCKING_THRESHOLD,
 
@@ -434,15 +430,10 @@ typedef struct ArchData{
     // Number of ticks spent by a worker to reply to a monitoring request.
     double monitoringCost;
 
-    // The file containing the voltage table. It is mandatory when
-    // strategyFrequencies is STRATEGY_FREQUENCY_YES.
-    std::string voltageTableFile;
-
     mammut::cpufreq::VoltageTable voltageTable;
 
     ArchData():ticksPerNs(0),
-               monitoringCost(0),
-               voltageTableFile(""){;}
+               monitoringCost(0){;}
 
     void loadXml(const std::string& archFileName);
 }ArchData;
@@ -852,13 +843,10 @@ public:
      * Creates the adaptivity parameters.
      * @param paramFileName The name of the XML file containing the adaptivity
      *        parameters.
-     * @param archFileName The name of the XML file containing the
-     *        architectural data.
      * @param communicator The communicator used to instantiate the other
      *        modules. If NULL, the modules will be created as local modules.
      */
     Parameters(const std::string& paramFileName,
-               const std::string& archFileName,
                mammut::Communicator* const communicator = NULL);
 
     /**

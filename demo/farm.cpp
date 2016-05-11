@@ -103,7 +103,7 @@ int main(int argc, char * argv[]) {
 
     maxTasks = streamlen;
 
-    nornir::Farm<int, int> farm("parameters.xml", "archdata.xml");
+    nornir::Farm<int, int> farm("parameters.xml");
     farm.start<Emitter, Worker, Collector>(nworkers);
     farm.wait();
 

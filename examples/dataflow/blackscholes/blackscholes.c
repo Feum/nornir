@@ -551,13 +551,13 @@ int main (int argc, char **argv)
 #else //ENABLE_TBB
 #ifdef ENABLE_FF
     nornir::Observer obs;
-    nornir::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Parameters ap("parameters.xml");
     ap.observer = &obs;
     OptionsStreamRate oss(rateFile);
     oss.init();
     dataflow::Computable* farm = dataflow::createStandardFarm<fftask_t, fftask_t, compute>();
 
-    Parameters p("parameters.xml", "archdata.xml");
+    Parameters p("parameters.xml");
     p.dataflow.maxInterpreters = nThreads;
     Observer o;
     p.observer = &o;

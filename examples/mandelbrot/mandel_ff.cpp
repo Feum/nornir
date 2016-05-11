@@ -247,7 +247,7 @@ int main(int argc, char ** argv) {
 	    farm.add_collector(&C);
 
     nornir::Observer obs;
-    nornir::Parameters ap("parameters.xml", "archdata.xml");
+    nornir::Parameters ap("parameters.xml");
     ap.observer = &obs;
     ap.expectedTasksNumber = dim;
     nornir::ManagerFarm<> amf(&farm, ap);

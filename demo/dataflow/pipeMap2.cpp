@@ -113,7 +113,7 @@ int main(int argc, char** argv){
     Computable* map2 = createStandardMap<float, int, fun2>(nWorkers);
     Pipeline pipe(map1, map2);
 
-    nornir::Parameters p("parameters.xml", "archdata.xml");
+    nornir::Parameters p("parameters.xml");
     nornir::dataflow::Interpreter m(&p, &pipe, &inp, &out);
     m.start();
     m.wait();

@@ -107,7 +107,7 @@ int main(int argc, char** argv){
     Computable* pipeTmp = createStandardPipeline<int, int, int, fun1, fun2>();
     Computable* lastStage = new LastStage();
     Pipeline* pipe = new Pipeline(pipeTmp, lastStage);
-    nornir::Parameters p("parameters.xml", "archdata.xml");
+    nornir::Parameters p("parameters.xml");
     nornir::dataflow::Interpreter m(&p, pipe, &inp, &out);
     m.start();
     m.wait();

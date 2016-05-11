@@ -496,7 +496,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
 #if 0
     /** Creates the parallel section begin file. **/
     char* default_in_roi = (char*) malloc(sizeof(char)*256);
-    default_in_roi[0]='\0';
+    default_in_roi[0] = '\0';
     default_in_roi = strcat(default_in_roi, getenv("HOME"));
     default_in_roi = strcat(default_in_roi, "/roi_in");
     setenv(PAR_BEGIN_ENV, default_in_roi, 0);

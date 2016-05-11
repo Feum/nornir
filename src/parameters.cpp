@@ -27,6 +27,8 @@
 
 #include "parameters.hpp"
 
+#include <cstring>
+
 namespace nornir{
 
 using namespace std;
@@ -143,7 +145,6 @@ void ArchData::loadXml(const string& archFileName){
     XmlTree xc(archFileName, "archData");
     SETVALUE(xc, Double, ticksPerNs);
     SETVALUE(xc, Double, monitoringCost);
-    SETVALUE(xc, String, voltageTableFile);
 }
 
 void Parameters::setDefault(){
@@ -345,12 +346,6 @@ ParametersValidation Parameters::validateKnobFrequencies(){
     if(knobFrequencies != KNOB_FREQUENCY_NO){
         if(knobMapping == KNOB_MAPPING_NO){
             return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
-        }
-        if(archData.voltageTableFile.empty() ||
-           !existsFile(archData.voltageTableFile)){
-            return VALIDATION_VOLTAGE_FILE_NEEDED;
-        }else{
-            loadVoltageTable(archData.voltageTable, archData.voltageTableFile);
         }
     }
 
@@ -635,12 +630,29 @@ Parameters::Parameters(Communicator* const communicator):
     setDefault();
 }
 
+#define CONFPATH_LEN_MAX 512
+#define CONFPATH_FILE "/nornir/archdata.xml"
+#define CONFPATH_VOLTAGE "/nornir/voltage.csv"
+
 Parameters::Parameters(const string& paramFileName,
-                       const string& archFileName,
                        Communicator* const communicator):
       mammut(communicator){
     setDefault();
-    archData.loadXml(archFileName);
+
+    /** Retrieving archdata.xml configuration file. **/
+    char* confHome_c = getenv("XDG_CONFIG_HOME");
+    std::string confHome;
+    if(!confHome_c || strcmp(confHome_c, "") == 0){
+        confHome = std::string(getenv("HOME"));
+        confHome.append("/.config/");
+    }else{
+        confHome = std::string(confHome_c);
+    }
+
+    archData.loadXml(std::string(confHome + std::string(CONFPATH_FILE)));
+    loadVoltageTable(archData.voltageTable, confHome + std::string(CONFPATH_VOLTAGE));
+
+    /** Loading parameters. **/
     loadXml(paramFileName);
 }
 

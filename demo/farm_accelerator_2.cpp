@@ -87,7 +87,7 @@ int main(int argc, char * argv[]) {
 
     maxTasks = streamlen;
 
-    nornir::Parameters p("parameters.xml", "archdata.xml");
+    nornir::Parameters p("parameters.xml");
     p.contractType = nornir::CONTRACT_NONE;
     nornir::Observer o;
     p.observer = &o;

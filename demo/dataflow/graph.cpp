@@ -149,7 +149,7 @@ int main(int argc, char** argv){
     graph.link(C, E);
     graph.link(D, E);
 
-    nornir::Parameters p("parameters.xml", "archdata.xml");
+    nornir::Parameters p("parameters.xml");
     nornir::dataflow::Interpreter m(&p, &graph, &inp, &out);
     m.start();
     m.wait();

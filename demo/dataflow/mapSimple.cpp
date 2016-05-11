@@ -104,7 +104,7 @@ int main(int argc, char** argv){
 
     Computable* map = createStandardMap<float, int, fun>(nWorkers);
 
-    nornir::Parameters p("parameters.xml", "archdata.xml");
+    nornir::Parameters p("parameters.xml");
     nornir::dataflow::Interpreter m(&p, map, &inp, &out);
     m.start();
     m.wait();

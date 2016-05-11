@@ -119,7 +119,7 @@ int main(int argc, char** argv){
     FirstStage f;
     Pipeline pipe(&f, map);
 
-    nornir::Parameters p("parameters.xml", "archdata.xml");
+    nornir::Parameters p("parameters.xml");
     nornir::dataflow::Interpreter m(&p, &pipe, &inp, &out);
     m.start();
     m.wait();

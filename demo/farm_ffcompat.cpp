@@ -145,7 +145,7 @@ int main(int argc, char * argv[]) {
     /***************************************************************/
     /*  START - New code needed with respect to the existing code. */
     /***************************************************************/
-    nornir::Parameters ap("parameters.xml", "archdata.xml"); // Load parameters.
+    nornir::Parameters ap("parameters.xml"); // Load parameters.
     nornir::ManagerFarm<> amf(&farm, ap); // Create nornir manager.
     amf.start(); // Start farm.
     amf.join(); // Wait for farm end.

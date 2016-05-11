@@ -382,14 +382,11 @@ public:
      * The constructor of the farm.
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
-     * @param archFileName The filename of the XML file containing the
-     *        architectural parameters.
      */
-    FarmBase(const std::string& paramFileName,
-         const std::string& archFileName):_farm(NULL),
+    FarmBase(const std::string& paramFileName):_farm(NULL),
                                           _params(NULL), _manager(NULL){
         _nodesCreated = false;
-        _params = new Parameters(paramFileName, archFileName);
+        _params = new Parameters(paramFileName);
         _paramsCreated = true;
     }
 
@@ -506,11 +503,8 @@ public:
      * The constructor of the farm.
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
-     * @param archFileName The filename of the XML file containing the
-     *        architectural parameters.
      */
-    Farm(const std::string& paramFileName,
-         const std::string& archFileName):FarmBase<I,O>(paramFileName, archFileName){;}
+    Farm(const std::string& paramFileName):FarmBase<I,O>(paramFileName){;}
 
     /**
      * Adds the scheduler to the farm.
@@ -589,12 +583,9 @@ public:
      * The constructor of the farm.
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
-     * @param archFileName The filename of the XML file containing the
-     *        architectural parameters.
      */
-    FarmAcceleratorBase(const std::string& paramFileName,
-                    const std::string& archFileName):
-             FarmBase<I,O>::FarmBase(paramFileName, archFileName),
+    FarmAcceleratorBase(const std::string& paramFileName):
+             FarmBase<I,O>::FarmBase(paramFileName),
              _schedulerDummy(NULL){;}
 
     /**
@@ -735,12 +726,9 @@ public:
      * The constructor of the farm.
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
-     * @param archFileName The filename of the XML file containing the
-     *        architectural parameters.
      */
-    FarmAccelerator(const std::string& paramFileName,
-                    const std::string& archFileName):
-            FarmAcceleratorBase<S, I, O, G>(paramFileName, archFileName),
+    FarmAccelerator(const std::string& paramFileName):
+            FarmAcceleratorBase<S, I, O, G>(paramFileName),
             _gathererDummy(NULL){;}
 
     /**
@@ -824,12 +812,9 @@ public:
      * The constructor of the farm.
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
-     * @param archFileName The filename of the XML file containing the
-     *        architectural parameters.
      */
-    FarmAccelerator(const std::string& paramFileName,
-                    const std::string& archFileName):
-            FarmAcceleratorBase<S, I, std::nullptr_t, std::nullptr_t>(paramFileName, archFileName){;}
+    FarmAccelerator(const std::string& paramFileName):
+            FarmAcceleratorBase<S, I, std::nullptr_t, std::nullptr_t>(paramFileName){;}
 };
 
 /**
@@ -849,12 +834,9 @@ public:
      * The constructor of the farm.
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
-     * @param archFileName The filename of the XML file containing the
-     *        architectural parameters.
      */
-    FarmAccelerator(const std::string& paramFileName,
-                    const std::string& archFileName):
-            FarmAcceleratorBase<S, I, O, std::nullptr_t>(paramFileName, archFileName){;}
+    FarmAccelerator(const std::string& paramFileName):
+            FarmAcceleratorBase<S, I, O, std::nullptr_t>(paramFileName){;}
 
     /**
      * Adds the gatherer to the farm.
