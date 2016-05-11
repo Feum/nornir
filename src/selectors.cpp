@@ -75,8 +75,13 @@ bool Selector::isFeasiblePrimaryValue(double value, bool conservative) const{
                 conservativeOffset = (_p.overloadThresholdFarm - _p.underloadThresholdFarm) *
                                      (_p.conservativeValue / 100.0) / 2.0;
             }
-            return value > _p.underloadThresholdFarm + conservativeOffset &&
-                   value < _p.overloadThresholdFarm - conservativeOffset;
+            // Value is the predicted bandwidthMax.
+            // We assume that, since current rho is < 1 (this is true since
+            // we are working to ensure that it is < 1), real input bandwidth
+            // is equal to the current bandwidth.
+            double predictedRho = _samples->average().bandwidth / value;
+            return predictedRho > _p.underloadThresholdFarm + conservativeOffset &&
+                   predictedRho < _p.overloadThresholdFarm - conservativeOffset;
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
@@ -204,9 +209,12 @@ bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
         case CONTRACT_PERF_UTILIZATION:{
             // Concerning utilization factors, if both are suboptimal,
             // we prefer the closest to the lower bound.
+
+            double rhox = _samples->average().bandwidth / x;
+            double rhoy = _samples->average().bandwidth / y;
             double distanceX, distanceY;
-            distanceX = _p.underloadThresholdFarm - x;
-            distanceY = _p.underloadThresholdFarm - y;
+            distanceX = _p.underloadThresholdFarm - rhox;
+            distanceY = _p.underloadThresholdFarm - rhoy;
             if(distanceX > 0 && distanceY < 0){
                 return true;
             }else if(distanceX < 0 && distanceY > 0){
@@ -250,20 +258,6 @@ bool SelectorPredictive::isBestSecondaryValue(double x, double y) const{
     return false;
 }
 
-double adjustDerivedValue(ContractType contractType,
-                              const Smoother<MonitoredSample>* samples,
-                              double primaryPrediction){
-    switch(contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            return (samples->average().bandwidthMax / primaryPrediction) *
-                    samples->average().utilization;
-        }break;
-        default:{
-            return primaryPrediction;
-        }
-    }
-}
-
 KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
     KnobsValues bestValues(KNOB_VALUE_REAL);
     KnobsValues bestSuboptimalValues = _configuration.getRealValues();
@@ -305,9 +299,6 @@ KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
         primaryPrediction = _primaryPredictor->predict(currentValues);
         secondaryPrediction = _secondaryPredictor->predict(currentValues);
 
-        // Adjust derived predictions (e.g. UTILIZATION).
-        primaryPrediction = adjustDerivedValue(_p.contractType, _samples,
-                                               primaryPrediction);
         //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
             //std::cout << secondaryPrediction;

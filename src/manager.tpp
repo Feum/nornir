@@ -81,11 +81,11 @@ template <typename lb_t, typename gt_t>
 double ManagerFarm<lb_t, gt_t>::getPrimaryValue(const MonitoredSample& sample) const{
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
-            return sample.utilization;
+            return sample.bandwidthMax;
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
-            return sample.bandwidthMax;
+            return sample.bandwidth;
         }break;
         case CONTRACT_POWER_BUDGET:{
             return sample.watts;
@@ -105,7 +105,7 @@ double ManagerFarm<lb_t, gt_t>::getSecondaryValue(const MonitoredSample& sample)
             return sample.watts;
         }break;
         case CONTRACT_POWER_BUDGET:{
-            return sample.bandwidthMax;
+            return sample.bandwidth;
         }break;
         default:{
             return 0;
@@ -186,7 +186,7 @@ void ManagerFarm<lb_t, gt_t>::observe(){
                              ms.bandwidth,
                              _samples->coefficientVariation().bandwidth,
                              ms.latency,
-                             ms.utilization,
+                             ms.bandwidth / ms.bandwidthMax * 100.0,
                              _samples->getLastSample().watts,
                              ms.watts);
     }
@@ -279,7 +279,6 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     _lastStoredSampleMs = now;
 
     sample.watts = joules / durationSecs;
-    sample.utilization = ws.loadPercentage;
     // ATTENTION: Bandwidth is not the number of task since the
     //            last observation but the number of expected
     //            tasks that will be processed in 1 second.
@@ -287,7 +286,7 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     //            the result observation file, we may have an higher
     //            number than the number of tasks.
     sample.bandwidth = ws.bandwidthTotal;
-    sample.bandwidthMax = sample.bandwidth / ((sample.utilization / 100.0));
+    sample.bandwidthMax = sample.bandwidth / ((ws.loadPercentage / 100.0));
     sample.latency = ws.latency;
 
     if(_p.synchronousWorkers){

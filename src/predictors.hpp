@@ -162,6 +162,9 @@ protected:
     const FarmConfiguration& _configuration;
     const Smoother<MonitoredSample>* _samples;
     double _modelError;
+
+    double getCurrentBandwidth() const;
+    double getCurrentPower() const;
 public:
     Predictor(PredictorType type,
               const Parameters& p,

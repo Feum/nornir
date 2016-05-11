@@ -282,6 +282,18 @@ Predictor::~Predictor(){
     ;
 }
 
+double Predictor::getCurrentBandwidth() const{
+    if(_p.contractType == CONTRACT_PERF_UTILIZATION){
+        return _samples->average().bandwidthMax;
+    }else{
+        return _samples->average().bandwidth;
+    }
+}
+
+double Predictor::getCurrentPower() const{
+    return _samples->average().watts;
+}
+
 PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
                                                      const Parameters& p,
                                                      const FarmConfiguration& configuration,
@@ -325,10 +337,10 @@ double PredictorLinearRegression::getCurrentResponse() const{
     double r = 0.0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            r = 1.0 / _samples->average().bandwidthMax;
+            r = 1.0 / getCurrentBandwidth();
         }break;
         case PREDICTION_POWER:{
-            r = _samples->average().watts;
+            r = getCurrentPower();
         }break;
     }
     return r;
@@ -476,7 +488,7 @@ void PredictorAnalytical::clear(){
 double PredictorAnalytical::predict(const KnobsValues& values){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            return _samples->average().bandwidthMax * getScalingFactor(values);
+            return getCurrentBandwidth() * getScalingFactor(values);
         }break;
         case PREDICTION_POWER:{
             return getPowerPrediction(values);
@@ -616,10 +628,10 @@ void PredictorFullSearch::refine(){
     double value = 0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            value = _samples->average().bandwidthMax;
+            value = getCurrentBandwidth();
         }break;
         case PREDICTION_POWER:{
-            value = _samples->average().watts;
+            value = getCurrentPower();
         }break;
         default:{
             throw std::runtime_error("Unknown predictor type.");
