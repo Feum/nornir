@@ -550,10 +550,16 @@ void PredictorMishra::refine(){
     }
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            _values.at(confId) = _samples->average().bandwidth;
+            // TODO In the offline profiling data we have bandwidthMax, not bandwidth
+            // According, if we do not have PERF_UTILIZATION contracts and we have
+            // a utilization < 1, results may be wrong.
+            if(_samples->average().bandwidth / _samples->average().bandwidthMax < 0.95){
+                throw std::runtime_error("[Mishra] bandwidth bandwidthMax problem.");
+            }
+            _values.at(confId) = _samples->average().bandwidthMax;
         }break;
         case PREDICTION_POWER:{
-            _values.at(confId) = _samples->average().watts;
+            _values.at(confId) = getCurrentPower();
         }break;
         default:{
             throw std::runtime_error("[Mishra] Unknown predictor type.");

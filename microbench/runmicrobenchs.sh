@@ -5,12 +5,23 @@
 # 2. Insert another condition in the if for checking if the new field
 #    has been correctly created (e.g. 'grep "ticksPerNs" ... ')
 
-CURRENT_VERSION="1.0.0"
+if [ "$(id -u)" != "0" ]; then
+	echo "============================ ATTENTION ============================" 
+	echo "| You need to run this command with sudo (this is needed in order |"
+	echo "| to read some architecture specific information and to place the |"
+	echo "| configuration files in system directories).                     |"
+	echo "==================================================================="
+	exit 1
+fi
 
-CONFPATH_ROOT=$XDG_CONFIG_HOME
-if [ -z "$VAR" ];
+CURRENT_VERSION=$(grep "define CONFIGURATION_VERSION" ../src/parameters.cpp | cut -d ' ' -f 3)
+
+CONFPATH_ROOT=$XDG_CONFIG_DIRS
+if [ -z "$CONFPATH_ROOT" ];
 then
-	CONFPATH_ROOT=$HOME"/.config"
+	CONFPATH_ROOT="/etc/xdg"
+else
+	CONFPATH_ROOT=$(echo $XDG_CONFIG_DIRS | cut -d ':'  -f 1)
 fi
 
 echo "Creating "$CONFPATH_ROOT"/nornir folder."
@@ -25,8 +36,9 @@ if grep $CURRENT_VERSION "$CONFPATH_VERFILE" >/dev/null 2>&1 && \
    [ -f $CONFPATH_VOLTAGE ] && \
    [ -f $CONFPATH_FILE ]; 
 then
-	echo "Configuration file for version "$CURRENT_VERSION " already created."
+	echo "Configuration files for version "$CURRENT_VERSION " already created."
 else
+	echo "Creating configuration files for version "$CURRENT_VERSION
 	echo $CURRENT_VERSION > $CONFPATH_VERFILE
 	rm -rf $CONFPATH_FILE
 	# Header
@@ -40,10 +52,6 @@ else
 	# Voltage table
 	if [ ! -f $CONFPATH_VOLTAGE ]; then
 		if [ ! -f voltageTable.txt ]; then
-			if [ "$(id -u)" != "0" ]; then
-				echo "[[[[ ATTENTION ]]]] You need to run this command with sudo (this is needed in order to compute the voltage table)."
-				exit 1
-			fi
 			./voltageTable
 		fi
 		cp voltageTable.txt $CONFPATH_VOLTAGE
@@ -51,4 +59,5 @@ else
 	
 	# Footer
 	echo "</archData>" >> $CONFPATH_FILE
+	chmod -R ugo+r $CONFPATH_ROOT"/nornir/"
 fi

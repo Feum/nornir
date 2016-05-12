@@ -630,9 +630,11 @@ Parameters::Parameters(Communicator* const communicator):
     setDefault();
 }
 
+#define CONFIGURATION_VERSION "1.0.0"
 #define CONFPATH_LEN_MAX 512
-#define CONFPATH_FILE "/nornir/archdata.xml"
-#define CONFPATH_VOLTAGE "/nornir/voltage.csv"
+#define CONFFILE_VERSION "/nornir/version.csv"
+#define CONFFILE_ARCH "/nornir/archdata.xml"
+#define CONFFILE_VOLTAGE "/nornir/voltage.csv"
 
 Parameters::Parameters(const string& paramFileName,
                        Communicator* const communicator):
@@ -640,17 +642,33 @@ Parameters::Parameters(const string& paramFileName,
     setDefault();
 
     /** Retrieving archdata.xml configuration file. **/
-    char* confHome_c = getenv("XDG_CONFIG_HOME");
-    std::string confHome;
+    char* confHome_c = getenv("XDG_CONFIG_DIRS");
+    vector<string> confHomes;
     if(!confHome_c || strcmp(confHome_c, "") == 0){
-        confHome = std::string(getenv("HOME"));
-        confHome.append("/.config/");
+        confHomes.push_back(string(getenv("/etc/xdg")));
     }else{
-        confHome = std::string(confHome_c);
+        confHomes = split(string(confHome_c), ':');
     }
 
-    archData.loadXml(std::string(confHome + std::string(CONFPATH_FILE)));
-    loadVoltageTable(archData.voltageTable, confHome + std::string(CONFPATH_VOLTAGE));
+    size_t i = 0;
+    bool found = false;
+    while(i < confHomes.size() && !found){
+        string confFileArch = confHomes.at(i) + string(CONFFILE_ARCH);
+        string confFileVoltage = confHomes.at(i) + string(CONFFILE_VOLTAGE);
+        string confFileVersion = confHomes.at(i) + string(CONFFILE_VERSION);
+        if(existsFile(confFileArch) &&
+           existsFile(confFileVoltage) &&
+           existsFile(confFileVersion) &&
+           readFirstLineFromFile(confFileVersion).compare(CONFIGURATION_VERSION) == 0){
+            archData.loadXml(confFileArch);
+            loadVoltageTable(archData.voltageTable, confFileVoltage);
+            found = true;
+        }
+    }
+
+    if(!found){
+        throw runtime_error("Impossible to find configuration files. Please run 'sudo make microbench' from the nornir root folder.");
+    }
 
     /** Loading parameters. **/
     loadXml(paramFileName);

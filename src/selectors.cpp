@@ -79,9 +79,9 @@ bool Selector::isFeasiblePrimaryValue(double value, bool conservative) const{
             // We assume that, since current rho is < 1 (this is true since
             // we are working to ensure that it is < 1), real input bandwidth
             // is equal to the current bandwidth.
-            double predictedRho = _samples->average().bandwidth / value;
-            return predictedRho > _p.underloadThresholdFarm + conservativeOffset &&
-                   predictedRho < _p.overloadThresholdFarm - conservativeOffset;
+            double utilisation = _samples->average().bandwidth / value * 100.0;
+            return utilisation > _p.underloadThresholdFarm + conservativeOffset &&
+                   utilisation < _p.overloadThresholdFarm - conservativeOffset;
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
