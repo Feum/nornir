@@ -630,7 +630,7 @@ Parameters::Parameters(Communicator* const communicator):
     setDefault();
 }
 
-#define CONFIGURATION_VERSION "1.0.0"
+#define CONFIGURATION_VERSION "\"1.0.0\""
 #define CONFPATH_LEN_MAX 512
 #define CONFFILE_VERSION "/nornir/version.csv"
 #define CONFFILE_ARCH "/nornir/archdata.xml"
@@ -645,7 +645,7 @@ Parameters::Parameters(const string& paramFileName,
     char* confHome_c = getenv("XDG_CONFIG_DIRS");
     vector<string> confHomes;
     if(!confHome_c || strcmp(confHome_c, "") == 0){
-        confHomes.push_back(string(getenv("/etc/xdg")));
+        confHomes.push_back(string("/etc/xdg"));
     }else{
         confHomes = split(string(confHome_c), ':');
     }
@@ -664,6 +664,7 @@ Parameters::Parameters(const string& paramFileName,
             loadVoltageTable(archData.voltageTable, confFileVoltage);
             found = true;
         }
+        ++i;
     }
 
     if(!found){
