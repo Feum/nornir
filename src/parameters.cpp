@@ -159,6 +159,7 @@ void Parameters::setDefault(){
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_SAME;
     strategySelection = STRATEGY_SELECTION_LEARNING;
     strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
+    strategyModelPerformance = STRATEGY_MODEL_AMDAHL;
     strategyExploration = STRATEGY_EXPLORATION_HALTON;
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
@@ -527,6 +528,11 @@ template<> char const* enumStrings<StrategyPrediction>::data[] = {
     "MISHRA"
 };
 
+template<> char const* enumStrings<StrategyModelPerformance>::data[] = {
+    "AMDAHL",
+    "USL"
+};
+
 template<> char const* enumStrings<StrategyExploration>::data[] = {
     "RANDOM",
     "NIEDERREITER",
@@ -575,6 +581,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
     SETVALUE(xt, Enum, strategySelection);
     SETVALUE(xt, Enum, strategyPrediction);
+    SETVALUE(xt, Enum, strategyModelPerformance);
     SETVALUE(xt, Enum, strategyExploration);
     SETVALUE(xt, Enum, strategySmoothing);
     SETVALUE(xt, Enum, strategyPolling);
@@ -664,7 +671,7 @@ Parameters::Parameters(const string& paramFileName,
             loadVoltageTable(archData.voltageTable, confFileVoltage);
             found = true;
         }
-        ++i;
+        i++;
     }
 
     if(!found){

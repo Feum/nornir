@@ -113,6 +113,31 @@ double RegressionData::getUsedPhysicalCores(double numWorkers, bool includeServi
 void RegressionData::init(){init(_configuration.getRealValues());}
 
 void RegressionDataServiceTime::init(const KnobsValues& values){
+    switch(_p.strategyModelPerformance){
+        case STRATEGY_MODEL_AMDAHL:{
+            initAmdahl(values);
+        }break;
+        case STRATEGY_MODEL_USL:{
+            initUsl(values);
+        }break;
+    }
+}
+
+void RegressionDataServiceTime::initUsl(const KnobsValues& values){
+    _numPredictors = 0;
+    // For USL is ok to consider number of threads instead of number of cores.
+    uint numThreads = values[KNOB_TYPE_WORKERS];
+    _constArg = 1.0 / (/*_bwseq * */ numThreads);
+    ++_numPredictors;
+
+    _alfaArg = (numThreads - 1) / ((double) /*_bwseq * */ numThreads);
+    ++_numPredictors;
+
+    _betaArg = (numThreads - 1);
+    ++_numPredictors;
+}
+
+void RegressionDataServiceTime::initAmdahl(const KnobsValues& values){
     _numPredictors = 0;
     uint workersCores = values[KNOB_TYPE_WORKERS];
     double physicalCores = getUsedPhysicalCores(workersCores, false);
@@ -125,6 +150,8 @@ void RegressionDataServiceTime::init(const KnobsValues& values){
         _invScalFactorFreqAndCores = (double)_minFrequency /
                                      (physicalCores * frequency);
         ++_numPredictors;
+    }else{
+        throw std::runtime_error("Impossible to use Amdahl regression with no frequency.");
     }
 }
 
@@ -146,11 +173,29 @@ uint RegressionDataServiceTime::getNumPredictors() const{
 }
 
 void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) const{
+    switch(_p.strategyModelPerformance){
+        case STRATEGY_MODEL_AMDAHL:{
+            toArmaRowAmdahl(columnId, matrix);
+        }break;
+        case STRATEGY_MODEL_USL:{
+            toArmaRowUsl(columnId, matrix);
+        }break;
+    }
+}
+
+void RegressionDataServiceTime::toArmaRowAmdahl(size_t columnId, arma::mat& matrix) const{
     size_t rowId = 0;
     if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
         matrix(rowId++, columnId) = _invScalFactorFreq;
         matrix(rowId++, columnId) = _invScalFactorFreqAndCores;
     }
+}
+
+void RegressionDataServiceTime::toArmaRowUsl(size_t columnId, arma::mat& matrix) const{
+    size_t rowId = 0;
+    matrix(rowId++, columnId) = _constArg;
+    matrix(rowId++, columnId) = _alfaArg;
+    matrix(rowId++, columnId) = _betaArg;
 }
 
 void RegressionDataPower::init(const KnobsValues& values){
@@ -337,7 +382,21 @@ double PredictorLinearRegression::getCurrentResponse() const{
     double r = 0.0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            r = 1.0 / getCurrentBandwidth();
+            switch(_p.strategyModelPerformance){
+                case STRATEGY_MODEL_AMDAHL:{
+                    r = 1.0 / getCurrentBandwidth();
+                }break;
+                case STRATEGY_MODEL_USL:{
+                    if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
+                        // We need to scale wrt. frequency since in USL we only consider                                                                                                                            
+                        // the number of threads.                                                                              
+                        r = 1.0 / (getCurrentBandwidth() / ((double) _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getCurrentFrequencyUserspace() / 
+                                                            _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()) );
+                    }else{
+                        r = 1.0 / getCurrentBandwidth();
+                    }
+                }break;
+            }
         }break;
         case PREDICTION_POWER:{
             r = getCurrentPower();
@@ -431,14 +490,24 @@ double PredictorLinearRegression::predict(const KnobsValues& values){
     // One observation per column.
     arma::mat predictionInputMl(_predictionInput->getNumPredictors(), 1);
     arma::vec result(1);
+    double res = 0;
     _predictionInput->toArmaRow(0, predictionInputMl);
 
     _lr.Predict(predictionInputMl, result);
     if(_type == PREDICTION_BANDWIDTH){
-        result.at(0) = 1.0 / result.at(0);
+        if(_p.strategyModelPerformance == STRATEGY_MODEL_USL &&
+           _p.knobFrequencies == KNOB_FREQUENCY_YES){
+            // We need to scale wrt. frequency since in USL we only consider                                                                                                                                 
+            // the number of threads.                                                                                                                                                                        
+            res = (1.0 / result.at(0)) * ((values[KNOB_TYPE_FREQUENCY] / _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()));
+        }else{
+            res = 1.0 / result.at(0);
+        }
+    }else{
+        res = result.at(0);
     }
 
-    return result.at(0);
+    return res;
 }
     
 /**************** PredictorSimple ****************/

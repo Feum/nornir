@@ -104,7 +104,17 @@ private:
     double _invScalFactorFreq;
     double _invScalFactorFreqAndCores;
 
+    // Usl data.
+    double _constArg;
+    double _alfaArg;
+    double _betaArg;
+
     uint _numPredictors;
+
+    void initAmdahl(const KnobsValues& values);
+    void initUsl(const KnobsValues& values);
+    void toArmaRowAmdahl(size_t rowId, arma::mat& matrix) const;
+    void toArmaRowUsl(size_t rowId, arma::mat& matrix) const;
 public:
     void init(const KnobsValues& values);
 

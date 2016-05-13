@@ -181,6 +181,12 @@ typedef enum{
     STRATEGY_PREDICTION_MISHRA
 }StrategyPrediction;
 
+// Possible performance models to be used.
+typedef enum{
+    STRATEGY_MODEL_AMDAHL = 0, // Amdahl's Law
+    STRATEGY_MODEL_USL // Universal Scalability Law
+}StrategyModelPerformance;
+
 /// Possible ways to select the calibration points. Can only be specified if
 /// the selection strategy is "LEARNING".
 typedef enum{
@@ -662,6 +668,9 @@ public:
     // Only valid when strategySelection is LEARNING
     // [default = STRATEGY_PREDICTION_REGRESSION_LINEAR].
     StrategyPrediction strategyPrediction;
+
+    // Model to be used for performance [default = STRATEGY_MODEL_AMDHAL].
+    StrategyModelPerformance strategyModelPerformance;
 
     // Strategy to be used to select the points to be explored during
     // calibration. Only valid when strategySelection is LEARNING
