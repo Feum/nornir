@@ -327,16 +327,17 @@ Predictor::~Predictor(){
     ;
 }
 
-double Predictor::getCurrentBandwidth() const{
-    if(_p.contractType == CONTRACT_PERF_UTILIZATION){
-        return _samples->average().bandwidthMax;
-    }else{
-        return _samples->average().bandwidth;
-    }
+double Predictor::getMaximumBandwidth() const{
+    // Returns maximum bandwidth.
+    return _samples->average().bandwidth / (_samples->average().utilisation / 100.0);
 }
 
 double Predictor::getCurrentPower() const{
     return _samples->average().watts;
+}
+
+double Predictor::getRealBandwidthFromMaximum(double maximum, double bandwidthIn) const{
+    return min(maximum, bandwidthIn);
 }
 
 PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
@@ -384,16 +385,16 @@ double PredictorLinearRegression::getCurrentResponse() const{
         case PREDICTION_BANDWIDTH:{
             switch(_p.strategyModelPerformance){
                 case STRATEGY_MODEL_AMDAHL:{
-                    r = 1.0 / getCurrentBandwidth();
+                    r = 1.0 / getMaximumBandwidth();
                 }break;
                 case STRATEGY_MODEL_USL:{
                     if(_p.knobFrequencies == KNOB_FREQUENCY_YES){
                         // We need to scale wrt. frequency since in USL we only consider                                                                                                                            
                         // the number of threads.                                                                              
-                        r = 1.0 / (getCurrentBandwidth() / ((double) _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getCurrentFrequencyUserspace() / 
+                        r = 1.0 / (getMaximumBandwidth() / ((double) _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getCurrentFrequencyUserspace() / 
                                                             _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()) );
                     }else{
-                        r = 1.0 / getCurrentBandwidth();
+                        r = 1.0 / getMaximumBandwidth();
                     }
                 }break;
             }
@@ -484,7 +485,7 @@ void PredictorLinearRegression::prepareForPredictions(){
     }
 }
 
-double PredictorLinearRegression::predict(const KnobsValues& values){
+double PredictorLinearRegression::predict(const KnobsValues& values, double bandwidthIn){
     _predictionInput->init(values);
 
     // One observation per column.
@@ -495,13 +496,14 @@ double PredictorLinearRegression::predict(const KnobsValues& values){
 
     _lr.Predict(predictionInputMl, result);
     if(_type == PREDICTION_BANDWIDTH){
+        double realBandwidth = getRealBandwidthFromMaximum(result.at(0), bandwidthIn);
         if(_p.strategyModelPerformance == STRATEGY_MODEL_USL &&
            _p.knobFrequencies == KNOB_FREQUENCY_YES){
             // We need to scale wrt. frequency since in USL we only consider                                                                                                                                 
             // the number of threads.                                                                                                                                                                        
-            res = (1.0 / result.at(0)) * ((values[KNOB_TYPE_FREQUENCY] / _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()));
+            res = (1.0 / realBandwidth) * ((values[KNOB_TYPE_FREQUENCY] / _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()));
         }else{
-            res = 1.0 / result.at(0);
+            res = 1.0 / realBandwidth;
         }
     }else{
         res = result.at(0);
@@ -554,10 +556,12 @@ void PredictorAnalytical::clear(){
     ;
 }
 
-double PredictorAnalytical::predict(const KnobsValues& values){
+double PredictorAnalytical::predict(const KnobsValues& values, double bandwidthIn){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            return getCurrentBandwidth() * getScalingFactor(values);
+            double scalingFactor = getScalingFactor(values);
+            double predictedMaximum = getMaximumBandwidth() * scalingFactor;
+            return getRealBandwidthFromMaximum(predictedMaximum, bandwidthIn);
         }break;
         case PREDICTION_POWER:{
             return getPowerPrediction(values);
@@ -622,10 +626,10 @@ void PredictorMishra::refine(){
             // TODO In the offline profiling data we have bandwidthMax, not bandwidth
             // According, if we do not have PERF_UTILIZATION contracts and we have
             // a utilization < 1, results may be wrong.
-            if(_samples->average().bandwidth / _samples->average().bandwidthMax < 0.95){
+            if(_samples->average().utilisation < MAX_RHO){
                 throw std::runtime_error("[Mishra] bandwidth bandwidthMax problem.");
             }
-            _values.at(confId) = _samples->average().bandwidthMax;
+            _values.at(confId) = getMaximumBandwidth();
         }break;
         case PREDICTION_POWER:{
             _values.at(confId) = getCurrentPower();
@@ -666,7 +670,7 @@ void PredictorMishra::prepareForPredictions(){
     }
 }
 
-double PredictorMishra::predict(const KnobsValues& realValues){
+double PredictorMishra::predict(const KnobsValues& realValues, double bandwidthIn){
     auto it = _confIndexes.find(realValues);
     if(it == _confIndexes.end()){
         throw std::runtime_error("[Mishra] Impossible to find index for configuration.");
@@ -675,7 +679,7 @@ double PredictorMishra::predict(const KnobsValues& realValues){
     if(confId >= _predictions.size()){
         throw std::runtime_error("[Mishra] Invalid configuration index: " + confId);
     }
-    return _predictions.at(confId);
+    return getRealBandwidthFromMaximum(_predictions.at(confId), bandwidthIn);
 }
 
 PredictorFullSearch::PredictorFullSearch(PredictorType type,
@@ -703,7 +707,7 @@ void PredictorFullSearch::refine(){
     double value = 0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            value = getCurrentBandwidth();
+            value = getMaximumBandwidth();
         }break;
         case PREDICTION_POWER:{
             value = getCurrentPower();
@@ -719,12 +723,12 @@ void PredictorFullSearch::prepareForPredictions(){
     ;
 }
 
-double PredictorFullSearch::predict(const KnobsValues& realValues){
+double PredictorFullSearch::predict(const KnobsValues& realValues, double bandwidthIn){
     if(!readyForPredictions()){
         throw std::runtime_error("prepareForPredictions: Not enough "
                                  "points are present");
     }
-    return _values.at(realValues);
+    return getRealBandwidthFromMaximum(_values.at(realValues), bandwidthIn);
 }
 
 }

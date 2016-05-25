@@ -26,6 +26,7 @@
  */
 
 #include "selectors.hpp"
+#include "utils.hpp"
 #include <cfloat>
 
 #undef DEBUG
@@ -198,6 +199,13 @@ SelectorPredictive::SelectorPredictive(const Parameters& p,
             throw std::runtime_error("Unknown contract.");
         }break;
     }
+
+    // Input bandwidth smoother
+    if(p.strategySmoothing == STRATEGY_SMOOTHING_EXPONENTIAL){
+        _bandwidthIn = new MovingAverageExponential<double>(p.smoothingFactor);
+    }else{
+        _bandwidthIn = new MovingAverageSimple<double>(p.smoothingFactor);
+    }
 }
 
 SelectorPredictive::~SelectorPredictive(){
@@ -296,8 +304,8 @@ KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
     vector<KnobsValues> combinations = _configuration.getAllRealCombinations();
     for(size_t i = 0; i < combinations.size(); i++){
         KnobsValues currentValues = combinations.at(i);
-        primaryPrediction = _primaryPredictor->predict(currentValues);
-        secondaryPrediction = _secondaryPredictor->predict(currentValues);
+        primaryPrediction = _primaryPredictor->predict(currentValues, _bandwidthIn->average());
+        secondaryPrediction = _secondaryPredictor->predict(currentValues, _bandwidthIn->average());
 
         //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
@@ -335,6 +343,17 @@ void SelectorPredictive::refine(){
     _secondaryPredictor->refine();
 }
 
+void SelectorPredictive::updateBandwidthIn(){
+    if(_samples->average().utilisation < MAX_RHO){
+        if(_bandwidthIn->average() == numeric_limits<double>::max()){
+            _bandwidthIn->reset();
+        }
+        _bandwidthIn->add(_samples->average().bandwidth);
+    }else if(!_bandwidthIn->size()){
+        _bandwidthIn->add(numeric_limits<double>::max());
+    }
+}
+
 void SelectorPredictive::updatePredictions(const KnobsValues& next){
     KnobsValues real;
 
@@ -349,8 +368,8 @@ void SelectorPredictive::updatePredictions(const KnobsValues& next){
     }
     _primaryPredictor->prepareForPredictions();
     _secondaryPredictor->prepareForPredictions();
-    _primaryPrediction = _primaryPredictor->predict(real);
-    _secondaryPrediction = _secondaryPredictor->predict(real);
+    _primaryPrediction = _primaryPredictor->predict(real, _bandwidthIn->average());
+    _secondaryPrediction = _secondaryPredictor->predict(real, _bandwidthIn->average());
 }
 
 bool SelectorPredictive::predictorsReady() const{
@@ -474,7 +493,7 @@ SelectorLearner::~SelectorLearner(){
 
 KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
                                                 double secondaryValue,
-                                               u_int64_t totalTasks){
+                                                u_int64_t totalTasks){
     KnobsValues kv;
     bool contractViolated = isContractViolated(primaryValue);
     bool accurate = isAccurate(primaryValue, secondaryValue);
@@ -492,8 +511,11 @@ KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
     if(!_firstPointGenerated){
         _firstPointGenerated = true;
         startCalibration(totalTasks);
-    }else if(isCalibrating()){
-        refine();
+    }else{
+        if(isCalibrating()){
+            refine();
+        }
+        updateBandwidthIn();
     }
 
     if(isCalibrating()){
@@ -516,38 +538,47 @@ KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
         if(contractViolated){++_contractViolations;}
         if(!accurate){++_accuracyViolations;}
 
-        /**
-         * We need to check that this configuration is equal to the previous one
-         * to avoid to detect as a phase change a configuration change.
-         **/
-        if(_configuration.equal(_previousConfiguration) &&
+        if(_configuration.equal(_previousConfiguration) && // We need to check that this configuration is equal to the previous one
+                                                           // to avoid to detect as a phase change a configuration change.
            phaseChanged(primaryValue, secondaryValue)){
+            /******************* Phase change. *******************/
             _explorer->reset();
             kv = _explorer->nextRelativeKnobsValues();
+
+            // Drop old models.
             clearPredictors();
 
             startCalibration(totalTasks);
             resetTotalCalibrationTime();
             _accuracyViolations = 0;
             _contractViolations = 0;
-            DEBUG("Phase changed, ricalibrating");
+            DEBUG("Phase changed, recalibrating.");
+        }else if(_bandwidthIn->coefficientVariation() > 20.0){ //TODO Remove magic number
+            /******************* Bandwidth change. *******************/
+            refine();
+            kv = getBestKnobsValues(primaryValue);
+            updatePredictions(kv);
+            _accuracyViolations = 0;
+            _contractViolations = 0;
+            _bandwidthIn->reset();
+            DEBUG("Input bandwidth fluctuations, recomputing best solution.");
         }else if((!_p.maxCalibrationTime || getTotalCalibrationTime() < _p.maxCalibrationTime) &&
-                 ((isBestSolutionFeasible() && (contractViolated && _contractViolations > _p.tolerableSamples)) ||
-                 (!accurate && _accuracyViolations > _p.tolerableSamples))){
+                 ((!accurate && _accuracyViolations > _p.tolerableSamples) ||
+                  (isBestSolutionFeasible() && contractViolated && _contractViolations > _p.tolerableSamples))){
+            /******************* More calibration points. *******************/
             kv = _explorer->nextRelativeKnobsValues();
             updatePredictions(kv);
-
             refine();
-
             startCalibration(totalTasks);
             _accuracyViolations = 0;
             _contractViolations = 0;
             if(!accurate){
-                DEBUG("Inaccurate model, adding more points");
+                DEBUG("Inaccurate model, adding more points.");
             }else{
-                DEBUG("Contract violated, adding more points");
+                DEBUG("Contract violated, adding more points.");
             }
         }else{
+            /******************* Stable. *******************/
             if(accurate && _accuracyViolations){ --_accuracyViolations;}
             if(!contractViolated && _contractViolations){ --_contractViolations;}
             kv = _configuration.getRealValues();

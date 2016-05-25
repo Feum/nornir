@@ -157,7 +157,6 @@ private:
     std::unique_ptr<Predictor> _primaryPredictor;
     std::unique_ptr<Predictor> _secondaryPredictor;
     bool _feasible;
-
     /**
      * Checks if x is a best suboptimal monitored value than y.
      * @param x The first monitored value.
@@ -171,10 +170,15 @@ private:
      * Returns true if x is a best secondary value than y, false otherwise.
      */
     bool isBestSecondaryValue(double x, double y) const;
-
 protected:
+    Smoother<double>* _bandwidthIn;
     double _primaryPrediction;
     double _secondaryPrediction;
+
+    /**
+     * Updates the input bandwidth history with the current value.
+     */
+    void updateBandwidthIn();
 
     /**
      * Computes the best relative knobs values for the farm.

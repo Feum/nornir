@@ -56,10 +56,10 @@ double TriggerQBlocking::getIdleTime() const{
     // microsec.
     double latencyMicroSec = avg.latency / 1000.0;
 
-    double utilization = avg.bandwidth / avg.bandwidthMax;
-    if(!utilization){utilization = 1;} // Should never happen
 
-    return latencyMicroSec/utilization - latencyMicroSec;
+    if(!avg.utilisation){avg.utilisation = 1;} // Should never happen
+
+    return latencyMicroSec / avg.utilisation - latencyMicroSec;
 }
 
 bool TriggerQBlocking::setBlocking(){

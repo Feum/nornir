@@ -32,6 +32,8 @@
 #ifndef NORNIR_PREDICTORS_HPP_
 #define NORNIR_PREDICTORS_HPP_
 
+#define MAX_RHO 95
+
 #include "configuration.hpp"
 #include "utils.hpp"
 
@@ -173,8 +175,9 @@ protected:
     const Smoother<MonitoredSample>* _samples;
     double _modelError;
 
-    double getCurrentBandwidth() const;
+    double getMaximumBandwidth() const;
     double getCurrentPower() const;
+    double getRealBandwidthFromMaximum(double maximum, double bandwidthIn) const;
 public:
     Predictor(PredictorType type,
               const Parameters& p,
@@ -214,7 +217,7 @@ public:
      * @param values The values.
      * @return The predicted value at a specific combination of real knobs values.
      */
-    virtual double predict(const KnobsValues& realValues) = 0;
+    virtual double predict(const KnobsValues& realValues, double bandwidthIn) = 0;
 
     /**
      * Returns the model error, i.e. the error between the observations and the
@@ -267,7 +270,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& configuration);
+    double predict(const KnobsValues& configuration, double bandwidthIn);
 };
 
 /*
@@ -294,7 +297,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& values);
+    double predict(const KnobsValues& values, double bandwidthIn);
 
     void refine();
 
@@ -330,7 +333,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& realValues);
+    double predict(const KnobsValues& realValues, double bandwidthIn);
 };
 
 /**
@@ -357,7 +360,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& realValues);
+    double predict(const KnobsValues& realValues, double bandwidthIn);
 };
 
 }

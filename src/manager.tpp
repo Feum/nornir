@@ -80,9 +80,7 @@ void ManagerFarm<lb_t, gt_t>::setDomainToHighestFrequency(const Domain* domain){
 template <typename lb_t, typename gt_t>
 double ManagerFarm<lb_t, gt_t>::getPrimaryValue(const MonitoredSample& sample) const{
     switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            return sample.bandwidthMax;
-        }break;
+        case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
             return sample.bandwidth;
@@ -186,7 +184,7 @@ void ManagerFarm<lb_t, gt_t>::observe(){
                              ms.bandwidth,
                              _samples->coefficientVariation().bandwidth,
                              ms.latency,
-                             ms.bandwidth / ms.bandwidthMax * 100.0,
+                             ms.utilisation,
                              _samples->getLastSample().watts,
                              ms.watts);
     }
@@ -286,7 +284,7 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
     //            the result observation file, we may have an higher
     //            number than the number of tasks.
     sample.bandwidth = ws.bandwidthTotal;
-    sample.bandwidthMax = sample.bandwidth / ((ws.loadPercentage / 100.0));
+    sample.utilisation = ws.loadPercentage;
     sample.latency = ws.latency;
 
     if(_p.synchronousWorkers){
@@ -295,7 +293,6 @@ void ManagerFarm<lb_t, gt_t>::storeNewSample(){
         // count. When this flag is set we count iterations, not real
         // tasks.
         sample.bandwidth /= _activeWorkers.size();
-        sample.bandwidthMax /= _activeWorkers.size();
     }
 
     _samples->add(sample);

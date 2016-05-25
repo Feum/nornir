@@ -235,17 +235,17 @@ public:
 
 typedef struct MonitoredSample{
     mammut::energy::Joules watts; ///< Consumed watts.
-    double bandwidthMax; ///< Maximum bandwidth that could be processed with the current configuration.
+    double utilisation; ///< Utilisation [0, 100].
     double bandwidth; ///< Bandwidth of the entire farm (real).
     double latency; ///< Average latency of a worker (nanoseconds).
 
-    MonitoredSample():watts(0), bandwidthMax(0), bandwidth(0), latency(0){;}
+    MonitoredSample():watts(0), utilisation(0), bandwidth(0), latency(0){;}
 
     void swap(MonitoredSample& x){
         using std::swap;
 
         swap(watts, x.watts);
-        swap(bandwidthMax, x.bandwidthMax);
+        swap(utilisation, x.utilisation);
         swap(bandwidth, x.bandwidth);
         swap(latency, x.latency);
     }
@@ -257,7 +257,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
         watts += rhs.watts;
-        bandwidthMax += rhs.bandwidthMax;
+        utilisation += rhs.utilisation;
         bandwidth += rhs.bandwidth;
         latency += rhs.latency;
         return *this;
@@ -265,7 +265,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample& operator-=(const MonitoredSample& rhs){
         watts -= rhs.watts;
-        bandwidthMax -= rhs.bandwidthMax;
+        utilisation -= rhs.utilisation;
         bandwidth -= rhs.bandwidth;
         latency -= rhs.latency;
         return *this;
@@ -273,7 +273,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample& operator*=(const MonitoredSample& rhs){
         watts *= rhs.watts;
-        bandwidthMax *= rhs.bandwidthMax;
+        utilisation *= rhs.utilisation;
         bandwidth *= rhs.bandwidth;
         latency *= rhs.latency;
         return *this;
@@ -281,7 +281,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample& operator/=(const MonitoredSample& rhs){
         watts /= rhs.watts;
-        bandwidthMax /= rhs.bandwidthMax;
+        utilisation /= rhs.utilisation;
         bandwidth /= rhs.bandwidth;
         latency /= rhs.latency;
         return *this;
@@ -289,7 +289,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample operator/=(double x){
         watts /= x;
-        bandwidthMax /= x;
+        utilisation /= x;
         bandwidth /= x;
         latency /= x;
         return *this;
@@ -297,7 +297,7 @@ typedef struct MonitoredSample{
 
     MonitoredSample operator*=(double x){
         watts *= x;
-        bandwidthMax *= x;
+        utilisation *= x;
         bandwidth *= x;
         latency *= x;
         return *this;
@@ -347,7 +347,7 @@ inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
 inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
     os << "[";
     os << "Watts: " << obj.watts << " ";
-    os << "BandwidthMax: " << obj.bandwidthMax << " ";
+    os << "BandwidthMax: " << obj.utilisation << " ";
     os << "Bandwidth: " << obj.bandwidth << " ";
     os << "Latency: " << obj.latency << " ";
     os << "]";
@@ -356,7 +356,7 @@ inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
 
 inline std::ofstream& operator<<(std::ofstream& os, const MonitoredSample& obj){
     os << obj.watts << "\t";
-    os << obj.bandwidthMax << "\t";
+    os << obj.utilisation << "\t";
     os << obj.bandwidth << "\t";
     os << obj.latency << "\t";
     return os;
@@ -365,7 +365,7 @@ inline std::ofstream& operator<<(std::ofstream& os, const MonitoredSample& obj){
 inline MonitoredSample squareRoot(const MonitoredSample& x){
     MonitoredSample r;
     r.watts = x.watts?sqrt(x.watts):0;
-    r.bandwidthMax = x.bandwidthMax?sqrt(x.bandwidthMax):0;
+    r.utilisation = x.utilisation?sqrt(x.utilisation):0;
     r.bandwidth = x.bandwidth?sqrt(x.bandwidth):0;
     r.latency = x.latency?sqrt(x.latency):0;
     return r;
@@ -373,7 +373,7 @@ inline MonitoredSample squareRoot(const MonitoredSample& x){
 
 inline void regularize(MonitoredSample& x){
     if(x.watts < 0){x.watts = 0;}
-    if(x.bandwidthMax < 0){x.bandwidthMax = 0;}
+    if(x.utilisation < 0){x.utilisation = 0;}
     if(x.bandwidth < 0){x.bandwidth = 0;}
     if(x.latency < 0){x.latency = 0;}
 }
