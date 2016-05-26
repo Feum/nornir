@@ -183,6 +183,12 @@ private:
     void move(mammut::topology::VirtualCore* vc);
 
     /**
+     * Moves this node on a specific set of virtual cores.
+     * @param vc The virtual cores where this nodes must be moved.
+     */
+    void move(const std::vector<const mammut::topology::VirtualCore*>& virtualCores);
+
+    /**
      * The result of askForSample call.
      * @param sample The statistics computed since the last
      *               time 'askForSample' has been called.

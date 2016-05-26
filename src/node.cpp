@@ -114,6 +114,12 @@ void AdaptiveNode::move(VirtualCore* vc){
     }
 }
 
+void AdaptiveNode::move(const vector<const VirtualCore*>& virtualCores){
+    if(_thread){
+        _thread->move(virtualCores);
+    }
+}
+
 void AdaptiveNode::getSampleResponse(WorkerSample& sample, double avgLatency){
     while(_responseQ.empty()){
         if(*_terminated){

@@ -416,11 +416,11 @@ void KnobMapping::performLinearMapping(){
     getMappingIndexes(emitterIndex, firstWorkerIndex, collectorIndex);
 
     const vector<AdaptiveNode*>& activeWorkers = _knobWorkers.getActiveWorkers();
-    uint activePhysicalCores = _knobWorkers.getWorkersPhysicalCores();
 
     _activeVirtualCores.clear();
     _workersVirtualCores.clear();
 
+    /*********** Emitter mapping. ***********/
     if(_emitter && _p.knobMappingEmitter != KNOB_SNODE_MAPPING_NO){
         _emitterVirtualCore = _vcOrderLinear.at(emitterIndex);
         _activeVirtualCores.push_back(_emitterVirtualCore);
@@ -430,34 +430,46 @@ void KnobMapping::performLinearMapping(){
         _emitter->move(_emitterVirtualCore);
     }
 
+    /*********** Workers mapping. ***********/
+    switch(_p.knobWorkers){
+        case KNOB_WORKERS_MAPPING:{
+            // Move workers over a set of cores.
+            vector<const VirtualCore*> workersCores;
+            for(size_t i = 0; i < _vcOrderLinear.size(); i++){
+                if((!_emitter || i != emitterIndex) &&
+                   (!_collector || i != collectorIndex)){
+                    workersCores.push_back(_vcOrderLinear.at(i));
+                }
+            }
 
-    size_t nextWorkerIndex = firstWorkerIndex;
-    size_t remapFirstWorkerIndex = firstWorkerIndex;
-    for(size_t i = 0; i < activeWorkers.size(); i++){
-        if(_p.knobWorkers == KNOB_WORKERS_MAPPING && i && i % activePhysicalCores == 0){
-            // This happens only for remapping workers knob. In this
-            // case we need to use only the specified number of
-            // active cores (we can use more contextes on the same core).
-            nextWorkerIndex = (remapFirstWorkerIndex + numPhysicalCores) %
-                               _vcOrderLinear.size();
-            remapFirstWorkerIndex = nextWorkerIndex;
-        }
+            for(size_t i = 0; i < activeWorkers.size(); i++){
+                activeWorkers.at(i)->move(workersCores);
+            }
+        }break;
+        case KNOB_WORKERS_THREADS:{
+            size_t nextWorkerIndex = firstWorkerIndex;
+            for(size_t i = 0; i < activeWorkers.size(); i++){
+                VirtualCore* vc = _vcOrderLinear.at(nextWorkerIndex);
 
-        VirtualCore* vc = _vcOrderLinear.at(nextWorkerIndex);
+                _workersVirtualCores.push_back(vc);
+                _activeVirtualCores.push_back(vc);
+                if(!vc->isHotPlugged()){
+                    vc->hotPlug();
+                }
 
-        _workersVirtualCores.push_back(vc);
-        _activeVirtualCores.push_back(vc);
-        if(!vc->isHotPlugged()){
-            vc->hotPlug();
-        }
+                activeWorkers.at(i)->move(vc);
 
-        activeWorkers.at(i)->move(vc);
-
-        if(++nextWorkerIndex == _vcOrder.size()){
-            nextWorkerIndex = firstWorkerIndex;
-        }
+                if(++nextWorkerIndex == _vcOrder.size()){
+                    nextWorkerIndex = firstWorkerIndex;
+                }
+            }
+        }break;
+        default:{
+            throw std::runtime_error("Unknown workers knob configuration.");
+        }break;
     }
 
+    /*********** Collector mapping. ***********/
     if(_collector && _p.knobMappingCollector != KNOB_SNODE_MAPPING_NO){
         _collectorVirtualCore = _vcOrderLinear.at(collectorIndex);
         _activeVirtualCores.push_back(_collectorVirtualCore);

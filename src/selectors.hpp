@@ -47,6 +47,7 @@ private:
     mammut::energy::Counter* _joulesCounter;
     double _totalCalibrationTime;
     bool _calibrating;
+    KnobsValues _previousConfiguration;
 protected:
     const Parameters& _p;
     const FarmConfiguration& _configuration;
@@ -262,7 +263,6 @@ private:
     bool _firstPointGenerated;
     uint _contractViolations;
     uint _accuracyViolations;
-    KnobsValues _previousConfiguration;
 public:
     SelectorLearner(const Parameters& p,
                        const FarmConfiguration& configuration,

@@ -32,7 +32,7 @@
 #ifndef NORNIR_PREDICTORS_HPP_
 #define NORNIR_PREDICTORS_HPP_
 
-#define MAX_RHO 95
+#define MAX_RHO 90
 
 #include "configuration.hpp"
 #include "utils.hpp"

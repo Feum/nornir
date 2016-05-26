@@ -102,6 +102,11 @@ bool Selector::isFeasiblePrimaryValue(double value, bool conservative) const{
 }
 
 bool Selector::phaseChanged() const{
+    if(!_configuration.equal(_previousConfiguration)){
+        // We need to check that this configuration is equal to the previous one
+        // to avoid to detect as a phase change a configuration change.
+        return false;
+    }
     return _samples->coefficientVariation().latency > 20.0 ||
            _samples->coefficientVariation().watts > 20.0;
 }
@@ -177,6 +182,7 @@ SelectorFixed::SelectorFixed(const Parameters& p,
 SelectorFixed::~SelectorFixed(){;}
 
 KnobsValues SelectorFixed::getNextKnobsValues(u_int64_t totalTasks){
+    _previousConfiguration = _configuration.getRealValues();
     return _configuration.getRealValues();
 }
 
@@ -222,23 +228,7 @@ SelectorPredictive::~SelectorPredictive(){
 
 bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
     switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            // Concerning utilization factors, if both are suboptimal,
-            // we prefer the closest to the lower bound.
-
-            double rhox = _samples->average().bandwidth / x;
-            double rhoy = _samples->average().bandwidth / y;
-            double distanceX, distanceY;
-            distanceX = _p.underloadThresholdFarm - rhox;
-            distanceY = _p.underloadThresholdFarm - rhoy;
-            if(distanceX > 0 && distanceY < 0){
-                return true;
-            }else if(distanceX < 0 && distanceY > 0){
-                return false;
-            }else{
-                return abs(distanceX) < abs(distanceY);
-            }
-        }break;
+        case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
             // Concerning bandwidths, if both are suboptimal,
@@ -466,6 +456,7 @@ SelectorAnalytical::SelectorAnalytical(const Parameters& p,
 }
 
 KnobsValues SelectorAnalytical::getNextKnobsValues(u_int64_t totalTasks){
+    _previousConfiguration = _configuration.getRealValues();
     if(isContractViolated()){
         if(_violations > _p.tolerableSamples){
             _violations = 0;
@@ -516,6 +507,7 @@ SelectorLearner::~SelectorLearner(){
 }
 
 KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
+    _previousConfiguration = _configuration.getRealValues();
     KnobsValues kv;
     bool contractViolated = isContractViolated();
     bool accurate = isAccurate();
@@ -560,9 +552,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
         if(contractViolated){++_contractViolations;}
         if(!accurate){++_accuracyViolations;}
 
-        if(_configuration.equal(_previousConfiguration) && // We need to check that this configuration is equal to the previous one
-                                                           // to avoid to detect as a phase change a configuration change.
-           phaseChanged()){
+        if(phaseChanged()){
             /******************* Phase change. *******************/
             _explorer->reset();
             kv = _explorer->nextRelativeKnobsValues();
@@ -585,8 +575,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             _bandwidthIn->reset();
             DEBUG("Input bandwidth fluctuations, recomputing best solution.");
         }else if((!_p.maxCalibrationTime || getTotalCalibrationTime() < _p.maxCalibrationTime) &&
-                 ((!accurate && _accuracyViolations > _p.tolerableSamples) ||
-                  (isBestSolutionFeasible() && contractViolated && _contractViolations > _p.tolerableSamples))){
+                 (!accurate && _accuracyViolations > _p.tolerableSamples)){
             /******************* More calibration points. *******************/
             kv = _explorer->nextRelativeKnobsValues();
             updatePredictions(kv);
@@ -599,6 +588,13 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             }else{
                 DEBUG("Contract violated, adding more points.");
             }
+        }else if(contractViolated && _contractViolations > _p.tolerableSamples){
+            /******************* Contract violation. *******************/
+            refine();
+            kv = getBestKnobsValues();
+            updatePredictions(kv);
+            _accuracyViolations = 0;
+            _contractViolations = 0;
         }else{
             /******************* Stable. *******************/
             if(accurate && _accuracyViolations){ --_accuracyViolations;}
@@ -606,7 +602,6 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             kv = _configuration.getRealValues();
         }
     }
-    _previousConfiguration = _configuration.getRealValues();
     return kv;
 }
 
@@ -629,6 +624,7 @@ SelectorFixedExploration::~SelectorFixedExploration(){
 }
 
 KnobsValues SelectorFixedExploration::getNextKnobsValues(u_int64_t totalTasks){
+    _previousConfiguration = _configuration.getRealValues();
     if(_confToExplore.size()){
         if(!isCalibrating()){
             startCalibration(totalTasks);
@@ -725,6 +721,7 @@ SelectorLiMartinez::~SelectorLiMartinez(){
 }
 
 KnobsValues SelectorLiMartinez::getNextKnobsValues(u_int64_t totalTasks){
+    _previousConfiguration = _configuration.getRealValues();
     KnobsValues kv(KNOB_VALUE_REAL);
     kv[KNOB_TYPE_MAPPING] = KNOB_MAPPING_LINEAR;
 
