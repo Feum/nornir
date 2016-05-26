@@ -40,6 +40,7 @@
 #include <iostream>
 #include <limits>
 #include <string>
+#include <stdlib.h>
 
 #undef DEBUG
 #undef DEBUGB
@@ -449,7 +450,238 @@ void ManagerFarm<lb_t, gt_t>::cleanNodes() {
     }
 }
 
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::updateRequiredBandwidth() {
+    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+        double now = getMillisecondsTime();
+        if(now / 1000.0 >= _deadline){
+            _p.requiredBandwidth = numeric_limits<double>::max();
+        }else{
+            _p.requiredBandwidth = _remainingTasks / ((_deadline * 1000.0 - now) / 1000.0);
+        }
+    }
+}
+
 #define PAR_BEGIN_ENV "__PAR_BEGIN"
+
+typedef struct{
+    double numCores;
+    double frequency;
+}SimulationKey;
+
+inline std::ostream& operator<<(std::ostream& os, const SimulationKey& obj){
+    os << "[";
+    os << obj.numCores << ", " << obj.frequency;
+    os << "]";
+    return os;
+}
+
+struct SimulationKeyCompare{
+   bool operator()(const SimulationKey& lhs, const SimulationKey& rhs) const{
+       if(lhs.numCores != rhs.numCores){
+           return lhs.numCores < rhs.numCores;
+       }else{
+           return lhs.frequency < rhs.frequency;
+       }
+   }
+};
+
+typedef struct{
+    double completionTime;
+    double wattsCpu;
+    double wattsCores;
+    double wattsDram;
+}SimulationData;
+
+template <typename lb_t, typename gt_t>
+KnobsValues ManagerFarm<lb_t, gt_t>::getRealValues(const KnobsValues& values){
+    KnobsValues real(KNOB_VALUE_REAL);
+
+    if(values.areRelative()){
+        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            double realv;
+            assert(_configuration.getKnob((KnobType)i)->getRealFromRelative(values[(KnobType)i], realv));
+            real[(KnobType)i] = realv;
+        }
+    }else{
+        real = values;
+    }
+    return real;
+}
+
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::simulate(string configurationData){
+    vector<string> lines = readFile(configurationData);
+    map<SimulationKey, SimulationData, SimulationKeyCompare> table;
+    // Starts from 1 to skip the header line.
+    for(size_t i = 1; i < lines.size(); i++){
+        SimulationKey key;
+        SimulationData data;
+        vector<string> fields = split(lines.at(i), '\t');
+        key.numCores = atof(fields[0].c_str());
+        key.frequency = atof(fields[1].c_str());
+
+        data.completionTime = atof(fields[2].c_str());
+        data.wattsCpu = atof(fields[3].c_str());
+        data.wattsCores = atof(fields[4].c_str());
+        data.wattsDram = atof(fields[5].c_str());
+
+        table.insert(std::pair<SimulationKey, SimulationData>(key, data));
+    }
+
+    initSelector();
+
+    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+        _remainingTasks = _p.expectedTasksNumber;
+        _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
+    }
+
+    if(_p.qSize){
+        _farm->setFixedSize(true);
+        // We need to multiply for the number of workers since FastFlow
+        // will divide the size for the number of workers.
+        _farm->setInputQueueLength(_p.qSize * _activeWorkers.size());
+        _farm->setOutputQueueLength(_p.qSize * _activeWorkers.size());
+    }
+
+    DEBUG("Init pre run");
+    initNodesPreRun();
+
+    DEBUG("Going to run");
+    _farm->run_then_freeze();
+
+    DEBUG("Init post run");
+    initNodesPostRun();
+    DEBUG("Farm started.");
+#if 0
+    /** Creates the parallel section begin file. **/
+    char* default_in_roi = (char*) malloc(sizeof(char)*256);
+    default_in_roi[0] = '\0';
+    default_in_roi = strcat(default_in_roi, getenv("HOME"));
+    default_in_roi = strcat(default_in_roi, "/roi_in");
+    setenv(PAR_BEGIN_ENV, default_in_roi, 0);
+    free(default_in_roi);
+    FILE* in_roi = fopen(getenv(PAR_BEGIN_ENV), "w");
+    fclose(in_roi);
+#endif
+
+    if(_counter){
+        _counter->reset();
+    }
+    _lastStoredSampleMs = getMillisecondsTime();
+    if(_p.observer){
+        _p.observer->_startMonitoringMs = _lastStoredSampleMs;
+    }
+
+    /* Force the first calibration point. **/
+    changeKnobs();
+
+    ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
+    thisThread->move(MANAGER_VIRTUAL_CORE);
+
+    double microsecsSleep = 0;
+    double startSample = getMillisecondsTime();
+    double overheadMs = 0;
+
+    uint samplingInterval;
+    uint steadySamples = 0;
+
+    KnobsValues values = getRealValues(_selector->getNextKnobsValues(0));
+    SimulationKey key;
+    key.numCores = values[KNOB_TYPE_WORKERS];
+    key.frequency = values[KNOB_TYPE_FREQUENCY];
+    SimulationData data;
+    if(table.find(key) != table.end()){
+        data = table[key];
+    }else{
+        //throw std::runtime_error("Impossible to find value for key.");
+    }
+
+    while(!_terminated){
+        overheadMs = getMillisecondsTime() - startSample;
+        if(_selector->isCalibrating()){
+            samplingInterval = _p.samplingIntervalCalibration;
+            steadySamples = 0;
+        }else if(steadySamples < _p.steadyThreshold){
+            samplingInterval = _p.samplingIntervalCalibration;
+            steadySamples++;
+        }else{
+            samplingInterval = _p.samplingIntervalSteady;
+        }
+        microsecsSleep = ((double)samplingInterval - overheadMs)*
+                          (double)MAMMUT_MICROSECS_IN_MILLISEC;
+        if(microsecsSleep < 0){
+            microsecsSleep = 0;
+        }else{
+            usleep(microsecsSleep);
+        }
+
+        startSample = getMillisecondsTime();
+        DEBUG("Storing new sample.");
+        storeNewSample();
+        _samples->reset();
+        _variations->reset();
+
+
+        MonitoredSample sample;
+        sample.watts = data.wattsCores;
+        sample.bandwidth = 1.0 / data.completionTime;
+        sample.utilisation = 100.0; //TODO Not yet implemented.
+        sample.latency = 0; //TODO Not yet implemented.
+
+        if(_p.synchronousWorkers){
+            sample.bandwidth /= key.numCores;
+        }
+
+        _samples->add(sample);
+        _variations->add(getPrimaryValue(_samples->coefficientVariation()));
+
+        DEBUG("New sample stored.");
+
+        updateRequiredBandwidth();
+
+        observe();
+
+        if(!persist()){
+            DEBUG("Asking selector.");
+            changeKnobs();
+
+            values = _configuration.getRealValues();
+            key.numCores = values[KNOB_TYPE_WORKERS];
+            key.frequency = values[KNOB_TYPE_FREQUENCY];
+            if(table.find(key) != table.end()){
+                data = table[key];
+            }else{
+                //throw std::runtime_error("Impossible to find value for key.");
+            }
+
+            _configuration.trigger();
+            startSample = getMillisecondsTime();
+        }
+    }
+
+    DEBUG("Terminating...wait freezing.");
+    _farm->wait_freezing();
+    _farm->wait();
+    DEBUG("Terminated.");
+
+    double duration = _farm->ffTime();
+#if 0
+    unlink(getenv(PAR_BEGIN_ENV));
+#endif
+    if(_p.observer){
+        vector<CalibrationStats> cs;
+        if(_selector){
+            _selector->stopCalibration(_totalTasks);
+            cs = _selector->getCalibrationsStats();
+            _p.observer->calibrationStats(cs, duration, _totalTasks);
+        }
+        ReconfigurationStats rs = _configuration.getReconfigurationStats();
+        _p.observer->summaryStats(cs, rs, duration, _totalTasks);
+    }
+
+    cleanNodes();
+}
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::run(){
@@ -534,14 +766,7 @@ void ManagerFarm<lb_t, gt_t>::run(){
         storeNewSample();
         DEBUG("New sample stored.");
 
-        if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-            double now = getMillisecondsTime(); 
-            if(now/1000.0 >= _deadline){
-                _p.requiredBandwidth = numeric_limits<double>::max();
-            }else{
-                _p.requiredBandwidth = _remainingTasks / ((_deadline*1000.0 - now) / 1000.0);
-            }
-        }
+        updateRequiredBandwidth();
 
         observe();
 
@@ -556,7 +781,6 @@ void ManagerFarm<lb_t, gt_t>::run(){
     DEBUG("Terminating...wait freezing.");
     _farm->wait_freezing();
     _farm->wait();
-
     DEBUG("Terminated.");
 
     double duration = _farm->ffTime();

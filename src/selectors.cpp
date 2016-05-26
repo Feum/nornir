@@ -76,9 +76,8 @@ bool Selector::isFeasiblePrimaryValue(double value, bool conservative) const{
                 conservativeOffset = (_p.overloadThresholdFarm - _p.underloadThresholdFarm) *
                                      (_p.conservativeValue / 100.0) / 2.0;
             }
-            double utilisation = _samples->average().utilisation;
-            return utilisation > _p.underloadThresholdFarm + conservativeOffset &&
-                   utilisation < _p.overloadThresholdFarm - conservativeOffset;
+            return value > _p.underloadThresholdFarm + conservativeOffset &&
+                   value < _p.overloadThresholdFarm - conservativeOffset;
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
@@ -114,8 +113,9 @@ bool Selector::phaseChanged() const{
 bool Selector::isContractViolated() const{
     double primaryValue = 0.0;
     switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_BANDWIDTH:{
+            primaryValue = _samples->average().utilisation;
+        }break;
         case CONTRACT_PERF_COMPLETION_TIME:{
             primaryValue = _samples->average().bandwidth;
         }break;
@@ -228,7 +228,20 @@ SelectorPredictive::~SelectorPredictive(){
 
 bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
     switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_UTILIZATION:{
+            // Concerning utilization factors, if both are suboptimal,
+            // we prefer the closest to the lower bound.
+            double distanceX, distanceY;
+            distanceX = _p.underloadThresholdFarm - x;
+            distanceY = _p.underloadThresholdFarm - y;
+            if(distanceX > 0 && distanceY < 0){
+                return true;
+            }else if(distanceX < 0 && distanceY > 0){
+                return false;
+            }else{
+                return abs(distanceX) < abs(distanceY);
+            }
+        }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
             // Concerning bandwidths, if both are suboptimal,
@@ -307,9 +320,11 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
         primaryPrediction = _primaryPredictor->predict(currentValues, _bandwidthIn->average());
         secondaryPrediction = _secondaryPredictor->predict(currentValues, _bandwidthIn->average());
 
-        // Get real banwdidth from maximum
+        // Get real bandwidth from maximum
         switch(_p.contractType){
-            case CONTRACT_PERF_UTILIZATION:
+            case CONTRACT_PERF_UTILIZATION:{
+                primaryPrediction = _bandwidthIn->average() / primaryPrediction * 100.0;
+            }break;
             case CONTRACT_PERF_BANDWIDTH:
             case CONTRACT_PERF_COMPLETION_TIME:{
                 primaryPrediction = std::min(primaryPrediction, _bandwidthIn->average());

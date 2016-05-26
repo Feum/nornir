@@ -412,7 +412,6 @@ void KnobMapping::getMappingIndexes(size_t& emitterIndex,
 
 void KnobMapping::performLinearMapping(){
     size_t emitterIndex, firstWorkerIndex, collectorIndex;
-    size_t numPhysicalCores = _topologyHandler->getPhysicalCores().size();
     getMappingIndexes(emitterIndex, firstWorkerIndex, collectorIndex);
 
     const vector<AdaptiveNode*>& activeWorkers = _knobWorkers.getActiveWorkers();

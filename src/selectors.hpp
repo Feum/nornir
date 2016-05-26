@@ -47,12 +47,12 @@ private:
     mammut::energy::Counter* _joulesCounter;
     double _totalCalibrationTime;
     bool _calibrating;
-    KnobsValues _previousConfiguration;
 protected:
     const Parameters& _p;
     const FarmConfiguration& _configuration;
     const Smoother<MonitoredSample>* _samples;
     size_t _numCalibrationPoints;
+    KnobsValues _previousConfiguration;
 
     /**
      * Checks if a specific primary value respects the required contract.

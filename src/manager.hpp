@@ -93,6 +93,13 @@ public:
      */
     ~ManagerFarm();
 
+
+    /**
+     * Simulates the execution.
+     * ATTENTION: This is only meant to be used by developers.
+     */
+    void simulate(std::string configurationData);
+
     /**
      * Function executed by this thread.
      */
@@ -157,6 +164,13 @@ private:
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
+
+    KnobsValues getRealValues(const KnobsValues& values);
+
+    /**
+     * Updates the required bandwidth.
+     */
+    void updateRequiredBandwidth();
 
     /**
      * Set a specified domain to the highest frequency.
