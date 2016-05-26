@@ -112,24 +112,12 @@ double ManagerFarm<lb_t, gt_t>::getSecondaryValue(const MonitoredSample& sample)
 }
 
 template <typename lb_t, typename gt_t>
-double ManagerFarm<lb_t, gt_t>::getPrimaryValue() const{
-    return getPrimaryValue(_samples->average());
-}
-
-template <typename lb_t, typename gt_t>
-double ManagerFarm<lb_t, gt_t>::getSecondaryValue() const{
-    return getSecondaryValue(_samples->average());
-}
-
-template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::changeKnobs(){
     if(!_configuration.knobsChangeNeeded()){
         return;
     }
 
-    KnobsValues values = _selector->getNextKnobsValues(getPrimaryValue(),
-                                                       getSecondaryValue(),
-                                                       _totalTasks);
+    KnobsValues values = _selector->getNextKnobsValues(_totalTasks);
     if(!_configuration.equal(values)){
         _configuration.setValues(values);
 

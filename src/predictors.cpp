@@ -328,8 +328,11 @@ Predictor::~Predictor(){
 }
 
 double Predictor::getMaximumBandwidth() const{
-    // Returns maximum bandwidth.
-    return _samples->average().bandwidth / (_samples->average().utilisation / 100.0);
+    if(_samples->average().utilisation >= MAX_RHO){
+        return _samples->average().bandwidth;
+    }else{
+        return _samples->average().bandwidth / (_samples->average().utilisation / 100.0);
+    }
 }
 
 double Predictor::getCurrentPower() const{

@@ -181,17 +181,6 @@ private:
      * the required contract.
      */
     double getSecondaryValue(const MonitoredSample& sample) const;
-    /**
-     * Returns the primary value according to the required contract.
-     * @return The primary value according to the required contract.
-     */
-    double getPrimaryValue() const;
-
-    /**
-     * Returns the secondary value according to the required contract.
-     * @return The secondary value according to the required contract.
-     */
-    double getSecondaryValue() const;
 
     /**
      * Changes the knobs.

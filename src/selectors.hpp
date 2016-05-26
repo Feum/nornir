@@ -62,10 +62,9 @@ protected:
 
     /**
      * Checks if the contract is violated.
-     * @param primaryValue The primary value.
      * @return true if the contract has been violated, false otherwise.
      */
-    bool isContractViolated(double primaryValue) const;
+    bool isContractViolated() const;
 
     /**
      * Starts the recording of calibration stats.
@@ -75,11 +74,9 @@ protected:
 
     /**
      * Checks if the application phase changed.
-     * @param primaryValue The primary value.
-     * @param secondaryValue The secondary value.
      * @return true if the phase changed, false otherwise.
      */
-    bool phaseChanged(double primaryValue, double secondaryValue) const;
+    bool phaseChanged() const;
 public:
     Selector(const Parameters& p,
              const FarmConfiguration& configuration,
@@ -89,15 +86,11 @@ public:
 
     /**
      * Returns the next values to be set for the knobs.
-     * @param primaryValue The primary value.
-     * @param secondaryValue The secondary value.
      * @param totalTasks The total processed tasks.
      *
      * @return The next values to be set for the knobs.
      */
-    virtual KnobsValues getNextKnobsValues(double primaryValue,
-                                           double secondaryValue,
-                                           u_int64_t totalTasks) = 0;
+    virtual KnobsValues getNextKnobsValues(u_int64_t totalTasks) = 0;
 
     /**
      * Returns the calibration statistics.
@@ -143,9 +136,7 @@ public:
 
     ~SelectorFixed();
 
-    KnobsValues getNextKnobsValues(double primaryValue,
-                                   double secondaryValue,
-                                   u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
 };
 
 /**
@@ -182,10 +173,9 @@ protected:
 
     /**
      * Computes the best relative knobs values for the farm.
-     * @param primaryValue The primary value.
      * @return The best relative knobs values.
      */
-    KnobsValues getBestKnobsValues(double primaryValue);
+    KnobsValues getBestKnobsValues();
 
     /**
      * Refines the models with current data.
@@ -226,11 +216,9 @@ protected:
 
     /**
      * Checks the accuracy of the predictions.
-     * @param primaryValue The primary value.
-     * @param secondaryValue The secondary value.
      * @return True if the predictions were accurate, false otherwise.
      */
-    bool isAccurate(double primaryValue, double secondaryValue);
+    bool isAccurate();
 public:
     SelectorPredictive(const Parameters& p,
                        const FarmConfiguration& configuration,
@@ -242,15 +230,11 @@ public:
 
     /**
      * Returns the next values to be set for the knobs.
-     * @param primaryValue The primary value.
-     * @param secondaryValue The secondary value.
      * @param totalTasks The total processed tasks.
      *
      * @return The next values to be set for the knobs.
      */
-    virtual KnobsValues getNextKnobsValues(double primaryValue,
-                                           double secondaryValue,
-                                           u_int64_t totalTasks) = 0;
+    virtual KnobsValues getNextKnobsValues(u_int64_t totalTasks) = 0;
 
 
 };
@@ -266,9 +250,7 @@ public:
                    const FarmConfiguration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
-    KnobsValues getNextKnobsValues(double primaryValue,
-                                   double secondaryValue,
-                                   u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
 };
 
 /**
@@ -288,9 +270,7 @@ public:
 
     ~SelectorLearner();
 
-    KnobsValues getNextKnobsValues(double primaryValue,
-                                   double secondaryValue,
-                                   u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
 
 };
 
@@ -313,9 +293,7 @@ public:
     ~SelectorFixedExploration();
 
 
-    KnobsValues getNextKnobsValues(double primaryValue,
-                                   double secondaryValue,
-                                   u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
 };
 
 /**
@@ -374,9 +352,7 @@ public:
                          const Smoother<MonitoredSample>* samples);
     ~SelectorLiMartinez();
 
-    KnobsValues getNextKnobsValues(double primaryValue,
-                                   double secondaryValue,
-                                   u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
 };
 
 }

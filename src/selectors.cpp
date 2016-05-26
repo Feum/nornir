@@ -76,11 +76,7 @@ bool Selector::isFeasiblePrimaryValue(double value, bool conservative) const{
                 conservativeOffset = (_p.overloadThresholdFarm - _p.underloadThresholdFarm) *
                                      (_p.conservativeValue / 100.0) / 2.0;
             }
-            // Value is the predicted bandwidthMax.
-            // We assume that, since current rho is < 1 (this is true since
-            // we are working to ensure that it is < 1), real input bandwidth
-            // is equal to the current bandwidth.
-            double utilisation = _samples->average().bandwidth / value * 100.0;
+            double utilisation = _samples->average().utilisation;
             return utilisation > _p.underloadThresholdFarm + conservativeOffset &&
                    utilisation < _p.overloadThresholdFarm - conservativeOffset;
         }break;
@@ -105,12 +101,26 @@ bool Selector::isFeasiblePrimaryValue(double value, bool conservative) const{
     return false;
 }
 
-bool Selector::phaseChanged(double primaryValue, double secondaryValue) const{
+bool Selector::phaseChanged() const{
     return _samples->coefficientVariation().latency > 20.0 ||
            _samples->coefficientVariation().watts > 20.0;
 }
 
-bool Selector::isContractViolated(double primaryValue) const{
+bool Selector::isContractViolated() const{
+    double primaryValue = 0.0;
+    switch(_p.contractType){
+        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_COMPLETION_TIME:{
+            primaryValue = _samples->average().bandwidth;
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            primaryValue = _samples->average().watts;
+        }break;
+        default:{
+            return 0;
+        }break;
+    }
     return !isFeasiblePrimaryValue(primaryValue, false);
 }
 
@@ -166,9 +176,7 @@ SelectorFixed::SelectorFixed(const Parameters& p,
 
 SelectorFixed::~SelectorFixed(){;}
 
-KnobsValues SelectorFixed::getNextKnobsValues(double primaryValue,
-                               double secondaryValue,
-                               u_int64_t totalTasks){
+KnobsValues SelectorFixed::getNextKnobsValues(u_int64_t totalTasks){
     return _configuration.getRealValues();
 }
 
@@ -266,7 +274,7 @@ bool SelectorPredictive::isBestSecondaryValue(double x, double y) const{
     return false;
 }
 
-KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
+KnobsValues SelectorPredictive::getBestKnobsValues(){
     KnobsValues bestValues(KNOB_VALUE_REAL);
     KnobsValues bestSuboptimalValues = _configuration.getRealValues();
 
@@ -278,25 +286,27 @@ KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
     double suboptimalSecondary = 0;
 #endif
     double bestSecondaryPrediction = 0;
-    double bestSuboptimalValue = primaryValue;
-
-    _feasible = false;
+    double bestSuboptimalValue = 0;
 
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
+            bestSuboptimalValue = _samples->average().bandwidth;
             // We have to minimize the power.
             bestSecondaryPrediction = numeric_limits<double>::max();
         }break;
         case CONTRACT_POWER_BUDGET:{
+            bestSuboptimalValue = _samples->average().watts;
             // We have to maximize the bandwidth.
             bestSecondaryPrediction = numeric_limits<double>::min();
         }break;
         default:{
-            ;
+            throw std::runtime_error("Unkown contract type.");
         }break;
     }
+
+    _feasible = false;
 
     _primaryPredictor->prepareForPredictions();
     _secondaryPredictor->prepareForPredictions();
@@ -306,6 +316,18 @@ KnobsValues SelectorPredictive::getBestKnobsValues(double primaryValue){
         KnobsValues currentValues = combinations.at(i);
         primaryPrediction = _primaryPredictor->predict(currentValues, _bandwidthIn->average());
         secondaryPrediction = _secondaryPredictor->predict(currentValues, _bandwidthIn->average());
+
+        // Get real banwdidth from maximum
+        switch(_p.contractType){
+            case CONTRACT_PERF_UTILIZATION:
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:{
+                primaryPrediction = std::min(primaryPrediction, _bandwidthIn->average());
+            }break;
+            default:{
+                ;
+            }break;
+        }
 
         //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
@@ -389,28 +411,32 @@ void SelectorPredictive::clearPredictors(){
     _secondaryPrediction = NOT_VALID;
 }
 
-bool SelectorPredictive::isAccurate(double primaryValue, double secondaryValue){
-    double primaryError = (primaryValue - _primaryPrediction)/primaryValue*100.0;
-    double secondaryError = (secondaryValue - _secondaryPrediction)/
-                            secondaryValue*100.0;
+bool SelectorPredictive::isAccurate(){
+    double maxBandwidth = 0.0; double predictedMaxBandwidth = 0.0;
+    double power = 0.0; double predictedPower = 0.0;
 
-    double performanceError = 100.0, powerError = 100.0;
+    maxBandwidth = _samples->average().bandwidth / (_samples->average().utilisation / 100.0);
+    power = _samples->average().watts;
 
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_COMPLETION_TIME:
         case CONTRACT_PERF_BANDWIDTH:{
-            performanceError = std::abs(primaryError);
-            powerError = std::abs(secondaryError);
+            predictedMaxBandwidth = _primaryPrediction;
+            predictedPower = _secondaryPrediction;
         }break;
         case CONTRACT_POWER_BUDGET:{
-            performanceError = std::abs(secondaryError);
-            powerError = std::abs(primaryError);
+            predictedMaxBandwidth = _secondaryPrediction;
+            predictedPower = _primaryPrediction;
         }break;
         default:{
             ;
         }break;
     }
+
+    double performanceError = 100.0, powerError = 100.0;
+    performanceError = std::abs((maxBandwidth - predictedMaxBandwidth) / maxBandwidth*100.0);
+    powerError = std::abs((power - predictedPower) / power*100.0);
 
     DEBUG("Perf error: " << performanceError);
     DEBUG("Power error: " << powerError);
@@ -439,13 +465,11 @@ SelectorAnalytical::SelectorAnalytical(const Parameters& p,
     ;
 }
 
-KnobsValues SelectorAnalytical::getNextKnobsValues(double primaryValue,
-                                                   double secondaryValue,
-                                                   u_int64_t totalTasks){
-    if(isContractViolated(primaryValue)){
+KnobsValues SelectorAnalytical::getNextKnobsValues(u_int64_t totalTasks){
+    if(isContractViolated()){
         if(_violations > _p.tolerableSamples){
             _violations = 0;
-            return getBestKnobsValues(primaryValue);
+            return getBestKnobsValues();
         }else{
             ++_violations;
             return _configuration.getRealValues();
@@ -491,12 +515,10 @@ SelectorLearner::~SelectorLearner(){
     }
 }
 
-KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
-                                                double secondaryValue,
-                                                u_int64_t totalTasks){
+KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
     KnobsValues kv;
-    bool contractViolated = isContractViolated(primaryValue);
-    bool accurate = isAccurate(primaryValue, secondaryValue);
+    bool contractViolated = isContractViolated();
+    bool accurate = isAccurate();
 
     /**
      * The first point is generated as soon as the application starts.
@@ -524,7 +546,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
             kv = _explorer->nextRelativeKnobsValues();
         }else{
             if(predictionsDone() && accurate){
-                kv = getBestKnobsValues(primaryValue);
+                kv = getBestKnobsValues();
                 updatePredictions(kv);
                 DEBUG("Finished in " << _numCalibrationPoints <<
                       " steps with configuration " << kv);
@@ -540,7 +562,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
 
         if(_configuration.equal(_previousConfiguration) && // We need to check that this configuration is equal to the previous one
                                                            // to avoid to detect as a phase change a configuration change.
-           phaseChanged(primaryValue, secondaryValue)){
+           phaseChanged()){
             /******************* Phase change. *******************/
             _explorer->reset();
             kv = _explorer->nextRelativeKnobsValues();
@@ -556,7 +578,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(double primaryValue,
         }else if(_bandwidthIn->coefficientVariation() > 20.0){ //TODO Remove magic number
             /******************* Bandwidth change. *******************/
             refine();
-            kv = getBestKnobsValues(primaryValue);
+            kv = getBestKnobsValues();
             updatePredictions(kv);
             _accuracyViolations = 0;
             _contractViolations = 0;
@@ -606,9 +628,7 @@ SelectorFixedExploration::~SelectorFixedExploration(){
     ;
 }
 
-KnobsValues SelectorFixedExploration::getNextKnobsValues(double primaryValue,
-                                               double secondaryValue,
-                                               u_int64_t totalTasks){
+KnobsValues SelectorFixedExploration::getNextKnobsValues(u_int64_t totalTasks){
     if(_confToExplore.size()){
         if(!isCalibrating()){
             startCalibration(totalTasks);
@@ -623,7 +643,7 @@ KnobsValues SelectorFixedExploration::getNextKnobsValues(double primaryValue,
         if(isCalibrating()){
             refine();
             stopCalibration(totalTasks);
-            return getBestKnobsValues(primaryValue);
+            return getBestKnobsValues();
         }else{
             return _configuration.getRealValues();
         }
@@ -704,9 +724,7 @@ SelectorLiMartinez::~SelectorLiMartinez(){
     ;
 }
 
-KnobsValues SelectorLiMartinez::getNextKnobsValues(double primaryValue,
-                                                   double secondaryValue,
-                                                   u_int64_t totalTasks){
+KnobsValues SelectorLiMartinez::getNextKnobsValues(u_int64_t totalTasks){
     KnobsValues kv(KNOB_VALUE_REAL);
     kv[KNOB_TYPE_MAPPING] = KNOB_MAPPING_LINEAR;
 
@@ -728,9 +746,9 @@ KnobsValues SelectorLiMartinez::getNextKnobsValues(double primaryValue,
     }else{
         if(!isCalibrating()){
             return _optimalKv;
-        }else if(!isContractViolated(primaryValue)){
+        }else if(!isContractViolated()){
             ++_numCalibrationPoints;
-            _currentWatts = secondaryValue;
+            _currentWatts = _samples->average().watts;
 
             if(_currentWatts < _optimalWatts){
                 _improved = true;
@@ -745,7 +763,7 @@ KnobsValues SelectorLiMartinez::getNextKnobsValues(double primaryValue,
             Frequency currentFrequency = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
             kv[KNOB_TYPE_WORKERS] = _configuration.getKnob(KNOB_TYPE_WORKERS)->getRealValue();
 
-            Frequency nextFrequency = currentFrequency * (_p.requiredBandwidth / primaryValue);
+            Frequency nextFrequency = currentFrequency * (_p.requiredBandwidth / _samples->average().bandwidth);
             nextFrequency = findNearestFrequency(nextFrequency);
             if(nextFrequency == currentFrequency){
                 --_numCalibrationPoints;
