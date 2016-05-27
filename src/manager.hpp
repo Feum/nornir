@@ -177,9 +177,6 @@ private:
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
-
-    KnobsValues getRealValues(const KnobsValues& values);
-
     /**
      * Updates the required bandwidth.
      */

@@ -241,6 +241,10 @@ typedef struct MonitoredSample{
 
     MonitoredSample():watts(0), utilisation(0), bandwidth(0), latency(0){;}
 
+    double getMaximumBandwidth(){
+        return bandwidth / (utilisation / 100.0);
+    }
+
     void swap(MonitoredSample& x){
         using std::swap;
 

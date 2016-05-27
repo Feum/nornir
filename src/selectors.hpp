@@ -149,6 +149,8 @@ private:
     std::unique_ptr<Predictor> _primaryPredictor;
     std::unique_ptr<Predictor> _secondaryPredictor;
     bool _feasible;
+    // Association between REAL values and observed data.
+    std::map<KnobsValues, MonitoredSample> _observedValues;
     /**
      * Checks if x is a best suboptimal monitored value than y.
      * @param x The first monitored value.

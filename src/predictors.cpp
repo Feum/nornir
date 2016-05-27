@@ -331,7 +331,7 @@ double Predictor::getMaximumBandwidth() const{
     if(_samples->average().utilisation >= MAX_RHO){
         return _samples->average().bandwidth;
     }else{
-        return _samples->average().bandwidth / (_samples->average().utilisation / 100.0);
+        return _samples->average().getMaximumBandwidth();
     }
 }
 

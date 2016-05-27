@@ -80,17 +80,11 @@ void updateParameters(Parameters& p, double requirementA, double requirementB = 
     }
 }
 
-std::vector<double> getPowerBounds(std::string confData, mammut::Mammut& mammut){
+std::vector<double> getPowerBounds(std::vector<std::string>& lines){
     std::vector<double> r;
-    std::vector<std::string> lines = mammut::utils::readFile(confData);
     double minPw = std::numeric_limits<double>::max(),
            maxPw = 0, pw;
-    for(size_t i = 1; i < lines.size(); i++){
-        // Check if the frequency in the file is a supported frequency. (e.g. tu avoid turbo boost frequencies.)
-        if(!mammut::utils::contains(mammut.getInstanceCpuFreq()->getDomains().back()->getAvailableFrequencies(),
-                                    (Frequency) atof(mammut::utils::split(lines.at(i), '\t')[1].c_str()))){
-            continue;
-        }
+    for(size_t i = 0; i < lines.size(); i++){
         pw = atof(mammut::utils::split(lines.at(i), '\t')[4].c_str());
         if(pw < minPw){
             minPw = pw;
@@ -106,17 +100,11 @@ std::vector<double> getPowerBounds(std::string confData, mammut::Mammut& mammut)
     return r;
 }
 
-std::vector<double> getBandwidthBounds(std::string confData, mammut::Mammut& mammut){
+std::vector<double> getBandwidthBounds(std::vector<std::string> lines){
     std::vector<double> r;
-    std::vector<std::string> lines = mammut::utils::readFile(confData);
     double minBw = std::numeric_limits<double>::max(),
            maxBw = 0, bw;
-    for(size_t i = 1; i < lines.size(); i++){
-        // Check if the frequency in the file is a supported frequency. (e.g. tu avoid turbo boost frequencies.)
-        if(!mammut::utils::contains(mammut.getInstanceCpuFreq()->getDomains().back()->getAvailableFrequencies(),
-                                    (Frequency) atof(mammut::utils::split(lines.at(i), '\t')[1].c_str()))){
-            continue;
-        }
+    for(size_t i = 0; i < lines.size(); i++){
         bw = 1.0 / atof(mammut::utils::split(lines.at(i), '\t')[2].c_str());
         if(bw < minBw){
             minBw = bw;
@@ -132,11 +120,10 @@ std::vector<double> getBandwidthBounds(std::string confData, mammut::Mammut& mam
     return r;
 }
 
-double getBest(std::string confData, ContractType contract, double bound){
-    std::vector<std::string> lines = mammut::utils::readFile(confData);
+double getBest(std::vector<std::string> lines, ContractType contract, double bound){
     double bestBw = 0, bestPw = std::numeric_limits<double>::max(), bw, pw;
     double best = 0;
-    for(size_t i = 1; i < lines.size(); i++){
+    for(size_t i = 0; i < lines.size(); i++){
         pw = atof(mammut::utils::split(lines.at(i), '\t')[4].c_str());
         bw = 1.0 / atof(mammut::utils::split(lines.at(i), '\t')[2].c_str());
         switch(contract){
@@ -176,12 +163,33 @@ int main(int argc, char * argv[]) {
 
     std::string confData(argv[1]);
 
+    std::vector<std::string> lines = mammut::utils::readFile(confData);
+    lines.erase(lines.begin()); // Remove header.
+    mammut::Mammut m;
+    for(auto it = lines.begin(); it != lines.end(); ){
+        // Check if the frequency in the file is a supported frequency. (e.g. tu avoid turbo boost frequencies.)
+        if(!mammut::utils::contains(m.getInstanceCpuFreq()->getDomains().back()->getAvailableFrequencies(),
+                                    (Frequency) atof(mammut::utils::split(*it, '\t')[1].c_str()))){
+            it = lines.erase(it);
+        }else{
+            ++it;
+        }
+    }
+
+
     uint numWorkers = 0;
     if(argc > 2){
         numWorkers = atoi(argv[2]);
+        for(auto it = lines.begin(); it != lines.end(); ){
+            // Check if there are more workers in the file than those activated.
+            if(atof(mammut::utils::split(*it, '\t')[0].c_str()) > numWorkers){
+                it = lines.erase(it);
+            }else{
+                ++it;
+            }
+        }
     }else{
-        std::vector<std::string> lines = mammut::utils::readFile(confData);
-        for(size_t i = 1; i < lines.size(); i++){
+        for(size_t i = 0; i < lines.size(); i++){
             uint currNumWorkers = atoi(mammut::utils::split(lines.at(i), '\t')[0].c_str());
             if(currNumWorkers > numWorkers){
                 numWorkers = currNumWorkers;
@@ -194,10 +202,10 @@ int main(int argc, char * argv[]) {
 
     switch(p.contractType){
         case CONTRACT_PERF_BANDWIDTH:{
-            bounds = getBandwidthBounds(confData, p.mammut);
+            bounds = getBandwidthBounds(lines);
         }break;
         case CONTRACT_POWER_BUDGET:{
-            bounds = getPowerBounds(confData, p.mammut);
+            bounds = getPowerBounds(lines);
         }break;
         default:{
             throw std::runtime_error("Unsupported contract.");
@@ -216,7 +224,7 @@ int main(int argc, char * argv[]) {
         ManagerFarm<> amf(&farm, p);
         SimulationResult sr = amf.simulate(std::string(argv[1]), &terminationFlag);
         //ATTENTION: No need to join. simulate() call will not start a new thread.
-        double opt = getBest(confData, p.contractType, bounds.at(i));
+        double opt = getBest(lines, p.contractType, bounds.at(i));
         double loss = 0;
         bool sat = false;
         std::cout << sr.numSteps << "\t";

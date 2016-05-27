@@ -494,22 +494,6 @@ typedef struct{
 }SimulationData;
 
 template <typename lb_t, typename gt_t>
-KnobsValues ManagerFarm<lb_t, gt_t>::getRealValues(const KnobsValues& values){
-    KnobsValues real(KNOB_VALUE_REAL);
-
-    if(values.areRelative()){
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            double realv;
-            assert(_configuration.getKnob((KnobType)i)->getRealFromRelative(values[(KnobType)i], realv));
-            real[(KnobType)i] = realv;
-        }
-    }else{
-        real = values;
-    }
-    return real;
-}
-
-template <typename lb_t, typename gt_t>
 SimulationResult ManagerFarm<lb_t, gt_t>::simulate(string configurationData, volatile bool* terminate, size_t maxIterations){
     vector<string> lines = readFile(configurationData);
     map<SimulationKey, SimulationData, SimulationKeyCompare> table;

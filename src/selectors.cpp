@@ -228,38 +228,72 @@ SelectorPredictive::~SelectorPredictive(){
 }
 
 double SelectorPredictive::getPrimaryPrediction(KnobsValues values){
-    _primaryPredictor->prepareForPredictions();
-    double primaryPrediction = _primaryPredictor->predict(values, _bandwidthIn->average());
-
+    auto observation = _observedValues.find(getRealValues(_configuration, values));
 
     // Get real bandwidth from maximum
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
-            primaryPrediction = _bandwidthIn->average() / primaryPrediction * 100.0;
+            if(observation != _observedValues.end()){
+                return observation->second.utilisation;
+            }else{
+                _primaryPredictor->prepareForPredictions();
+                double maxBandwidth = _primaryPredictor->predict(values, _bandwidthIn->average());
+                return _bandwidthIn->average() / maxBandwidth * 100.0;
+            }
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
-            primaryPrediction = std::min(primaryPrediction, _bandwidthIn->average());
+            double maxBandwidth = 0;
+            if(observation != _observedValues.end()){
+                maxBandwidth = observation->second.getMaximumBandwidth();
+            }else{
+                _primaryPredictor->prepareForPredictions();
+                maxBandwidth = _primaryPredictor->predict(values, _bandwidthIn->average());
+            }
+            return min(maxBandwidth, _bandwidthIn->average());
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            if(observation != _observedValues.end()){
+                return observation->second.watts;
+            }else{
+                _primaryPredictor->prepareForPredictions();
+                return _primaryPredictor->predict(values, _bandwidthIn->average());
+            }
         }break;
         default:{
-            ;
+            throw std::runtime_error("Unknown contract.");
         }break;
     }
-    return primaryPrediction;
 }
 
 double SelectorPredictive::getSecondaryPrediction(KnobsValues values){
-    _secondaryPredictor->prepareForPredictions();
-    double secondaryPrediction = _secondaryPredictor->predict(values, _bandwidthIn->average());
+    auto observation = _observedValues.find(getRealValues(_configuration, values));
+
     switch(_p.contractType){
+        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_COMPLETION_TIME:{
+            if(observation != _observedValues.end()){
+                return observation->second.watts;
+            }else{
+                _secondaryPredictor->prepareForPredictions();
+                return _secondaryPredictor->predict(values, _bandwidthIn->average());
+            }
+        }break;
         case CONTRACT_POWER_BUDGET:{
-            secondaryPrediction = std::min(secondaryPrediction, _bandwidthIn->average());
+            double maxBandwidth = 0;
+            if(observation != _observedValues.end()){
+                maxBandwidth = observation->second.getMaximumBandwidth();
+            }else{
+                _secondaryPredictor->prepareForPredictions();
+                maxBandwidth = _secondaryPredictor->predict(values, _bandwidthIn->average());
+            }
+            return min(maxBandwidth, _bandwidthIn->average());
         }break;
         default:{
-            ;
+            throw std::runtime_error("Unknown contract.");
         }break;
     }
-    return secondaryPrediction;
 }
 
 bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
@@ -298,7 +332,9 @@ bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
 
 bool SelectorPredictive::isBestSecondaryValue(double x, double y) const{
     switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_UTILIZATION:{
+
+        }break;
         case CONTRACT_PERF_COMPLETION_TIME:
         case CONTRACT_PERF_BANDWIDTH:{
             return x < y;
@@ -387,6 +423,7 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
 void SelectorPredictive::refine(){
     _primaryPredictor->refine();
     _secondaryPredictor->refine();
+    _observedValues[_configuration.getRealValues()] = _samples->average();
 }
 
 void SelectorPredictive::updateBandwidthIn(){
@@ -432,17 +469,22 @@ void SelectorPredictive::clearPredictors(){
     _secondaryPredictor->clear();
     _primaryPrediction = NOT_VALID;
     _secondaryPrediction = NOT_VALID;
+    _observedValues.clear();
 }
 
 bool SelectorPredictive::isAccurate(){
     double maxBandwidth = 0.0; double predictedMaxBandwidth = 0.0;
     double power = 0.0; double predictedPower = 0.0;
 
-    maxBandwidth = _samples->average().bandwidth / (_samples->average().utilisation / 100.0);
+    maxBandwidth = _samples->average().getMaximumBandwidth();
     power = _samples->average().watts;
 
     switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_UTILIZATION:{
+            // primaryPrediction is rho, we need to convert to max bandwidth.
+            predictedMaxBandwidth = _bandwidthIn->average() / (_primaryPrediction / 100.0);
+            predictedPower = _secondaryPrediction;
+        }break;
         case CONTRACT_PERF_COMPLETION_TIME:
         case CONTRACT_PERF_BANDWIDTH:{
             predictedMaxBandwidth = _primaryPrediction;

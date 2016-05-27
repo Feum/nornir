@@ -146,5 +146,7 @@ public:
     }
 };
 
+KnobsValues getRealValues(const FarmConfiguration& configuration, const KnobsValues& values);
+
 }
 #endif /* NORNIR_CONFIGURATION_HPP_ */

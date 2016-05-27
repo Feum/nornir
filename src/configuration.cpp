@@ -237,4 +237,19 @@ void FarmConfiguration::trigger(){
     }
 }
 
+KnobsValues getRealValues(const FarmConfiguration& configuration, const KnobsValues& values){
+    KnobsValues real(KNOB_VALUE_REAL);
+
+    if(values.areRelative()){
+        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            double realv;
+            assert(configuration.getKnob((KnobType)i)->getRealFromRelative(values[(KnobType)i], realv));
+            real[(KnobType)i] = realv;
+        }
+    }else{
+        real = values;
+    }
+    return real;
+}
+
 }
