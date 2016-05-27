@@ -32,7 +32,7 @@
 #ifndef NORNIR_PREDICTORS_HPP_
 #define NORNIR_PREDICTORS_HPP_
 
-#define MAX_RHO 90
+#define MAX_RHO 95
 
 #include "configuration.hpp"
 #include "utils.hpp"
@@ -209,6 +209,8 @@ public:
 
     /**
      * Prepare the predictor to accept a set of prediction requests.
+     * ATTENTION: If it is already ready to perform predictions, nothing should
+     *            be done.
      */
     virtual void prepareForPredictions() = 0;
 

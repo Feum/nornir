@@ -510,9 +510,10 @@ KnobsValues ManagerFarm<lb_t, gt_t>::getRealValues(const KnobsValues& values){
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::simulate(string configurationData){
+SimulationResult ManagerFarm<lb_t, gt_t>::simulate(string configurationData, volatile bool* terminate, size_t maxIterations){
     vector<string> lines = readFile(configurationData);
     map<SimulationKey, SimulationData, SimulationKeyCompare> table;
+    KnobsValues lastConfigurationValues = _configuration.getRealValues();
     // Starts from 1 to skip the header line.
     for(size_t i = 1; i < lines.size(); i++){
         SimulationKey key;
@@ -576,6 +577,39 @@ void ManagerFarm<lb_t, gt_t>::simulate(string configurationData){
     /* Force the first calibration point. **/
     changeKnobs();
 
+    _samples->reset();
+    _variations->reset();
+
+    SimulationResult res;
+    KnobsValues values = _configuration.getRealValues();
+    SimulationKey key;
+    SimulationData data;
+    key.numCores = values[KNOB_TYPE_WORKERS];
+    key.frequency = values[KNOB_TYPE_FREQUENCY];
+    if(table.find(key) != table.end()){
+        data = table[key];
+    }else{
+        throw std::runtime_error("Impossible to find value for key.");
+    }
+
+    MonitoredSample sample;
+    sample.watts = data.wattsCores;
+    sample.bandwidth = 1.0 / data.completionTime;
+    sample.utilisation = 100.0; //TODO Not yet implemented.
+    sample.latency = 0; //TODO Not yet implemented.
+    size_t steps = 1;
+
+    if(_p.synchronousWorkers){
+        sample.bandwidth /= key.numCores;
+    }
+
+    res.currentBandwidth = sample.bandwidth;
+    res.currentPower = sample.watts;
+
+    _samples->add(sample);
+    _variations->add(getPrimaryValue(_samples->coefficientVariation()));
+
+
     ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
     thisThread->move(MANAGER_VIRTUAL_CORE);
 
@@ -586,18 +620,9 @@ void ManagerFarm<lb_t, gt_t>::simulate(string configurationData){
     uint samplingInterval;
     uint steadySamples = 0;
 
-    KnobsValues values = getRealValues(_selector->getNextKnobsValues(0));
-    SimulationKey key;
-    key.numCores = values[KNOB_TYPE_WORKERS];
-    key.frequency = values[KNOB_TYPE_FREQUENCY];
-    SimulationData data;
-    if(table.find(key) != table.end()){
-        data = table[key];
-    }else{
-        //throw std::runtime_error("Impossible to find value for key.");
-    }
-
-    while(!_terminated){
+    while(!_configuration.equal(lastConfigurationValues) && (!maxIterations || steps <= maxIterations)){
+        ++steps;
+        lastConfigurationValues = _configuration.getRealValues();
         overheadMs = getMillisecondsTime() - startSample;
         if(_selector->isCalibrating()){
             samplingInterval = _p.samplingIntervalCalibration;
@@ -633,6 +658,9 @@ void ManagerFarm<lb_t, gt_t>::simulate(string configurationData){
             sample.bandwidth /= key.numCores;
         }
 
+        res.currentBandwidth = sample.bandwidth;
+        res.currentPower = sample.watts;
+
         _samples->add(sample);
         _variations->add(getPrimaryValue(_samples->coefficientVariation()));
 
@@ -652,7 +680,7 @@ void ManagerFarm<lb_t, gt_t>::simulate(string configurationData){
             if(table.find(key) != table.end()){
                 data = table[key];
             }else{
-                //throw std::runtime_error("Impossible to find value for key.");
+                throw std::runtime_error("Impossible to find value for key.");
             }
 
             _configuration.trigger();
@@ -660,27 +688,76 @@ void ManagerFarm<lb_t, gt_t>::simulate(string configurationData){
         }
     }
 
+#if 0
+    unlink(getenv(PAR_BEGIN_ENV));
+#endif
+
+    *terminate = true;
     DEBUG("Terminating...wait freezing.");
     _farm->wait_freezing();
     _farm->wait();
     DEBUG("Terminated.");
 
-    double duration = _farm->ffTime();
-#if 0
-    unlink(getenv(PAR_BEGIN_ENV));
-#endif
-    if(_p.observer){
-        vector<CalibrationStats> cs;
-        if(_selector){
-            _selector->stopCalibration(_totalTasks);
-            cs = _selector->getCalibrationsStats();
-            _p.observer->calibrationStats(cs, duration, _totalTasks);
-        }
-        ReconfigurationStats rs = _configuration.getReconfigurationStats();
-        _p.observer->summaryStats(cs, rs, duration, _totalTasks);
-    }
-
     cleanNodes();
+
+    // We do -1 because the last step was the optimal configuration.
+    res.numSteps = steps - 1;
+    res.foundConfiguration = _configuration.getRealValues();
+
+    switch(_p.strategySelection){
+        // For SelectorPredictive selectors we compute the MAPE.
+        case STRATEGY_SELECTION_LEARNING:
+        case STRATEGY_SELECTION_MISHRA:
+        case STRATEGY_SELECTION_FULLSEARCH:
+        case STRATEGY_SELECTION_ANALYTICAL:{
+            double primaryPrediction, secondaryPrediction;
+            double primaryValue, secondaryValue;
+            size_t keys = 0;
+            double mapeBandwidth = 0, mapePower = 0;
+            SelectorPredictive* sel = (SelectorPredictive*) _selector;
+            std::vector<KnobsValues> combinations = _configuration.getAllRealCombinations();
+            for(size_t i = 0; i < combinations.size(); i++){
+                ++keys;
+                SimulationKey k;
+                KnobsValues v = combinations.at(i);
+                k.numCores = v[KNOB_TYPE_WORKERS];
+                k.frequency = v[KNOB_TYPE_FREQUENCY];
+
+                primaryPrediction = sel->getPrimaryPrediction(v);
+                secondaryPrediction = sel->getSecondaryPrediction(v);
+
+                switch(_p.contractType){
+                    case CONTRACT_PERF_UTILIZATION:
+                    case CONTRACT_PERF_BANDWIDTH:
+                    case CONTRACT_PERF_COMPLETION_TIME:{
+                        primaryValue = 1.0 / table[k].completionTime;
+                        secondaryValue = table[k].wattsCores;
+                        mapeBandwidth += abs((primaryValue - primaryPrediction) / primaryPrediction)*100.0;
+                        mapePower += abs((secondaryValue - secondaryPrediction) / secondaryPrediction)*100.0;
+                    }break;
+                    case CONTRACT_POWER_BUDGET:{
+                        secondaryValue = 1.0 / table[k].completionTime;
+                        primaryValue = table[k].wattsCores;
+                        mapePower += abs((secondaryValue - secondaryPrediction) / secondaryPrediction)*100.0;
+                        mapePower += abs((primaryValue - primaryPrediction) / primaryPrediction)*100.0;
+                    }break;
+                    default:{
+                        ;
+                    }break;
+                }
+            }
+
+            mapeBandwidth /= keys;
+            mapePower /= keys;
+
+            res.bandwidthAccuracy = 100.0 - mapeBandwidth;
+            res.powerAccuracy = 100.0 - mapePower;
+        }break;
+        default:{
+            ;
+        }break;
+    }
+    return res;
 }
 
 template <typename lb_t, typename gt_t>

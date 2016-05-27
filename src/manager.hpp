@@ -64,6 +64,15 @@ using namespace mammut::utils;
 
 struct MonitoredSample;
 
+typedef struct{
+    size_t numSteps;
+    double bandwidthAccuracy;
+    double powerAccuracy;
+    double currentBandwidth;
+    double currentPower;
+    KnobsValues foundConfiguration;
+}SimulationResult;
+
 /*!
  * \class ManagerFarm
  * \brief This class manages the adaptivity in farm based computations.
@@ -97,8 +106,12 @@ public:
     /**
      * Simulates the execution.
      * ATTENTION: This is only meant to be used by developers.
+     * @param configurationData A file containing the data for all the configurations.
+     * @param maxIterations The maximum number of iterations to be performed
+     *        during calibration phase. If 0, there is no bound on the maximum
+     *        number of iterations.
      */
-    void simulate(std::string configurationData);
+    SimulationResult simulate(std::string configurationData, volatile bool* terminate, size_t maxIterations = 0);
 
     /**
      * Function executed by this thread.

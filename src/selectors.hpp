@@ -237,7 +237,19 @@ public:
      */
     virtual KnobsValues getNextKnobsValues(u_int64_t totalTasks) = 0;
 
+    /**
+     * Return the primary prediction for a given configuration.
+     * @param values The knobs values.
+     * @return The primary prediction for a given configuration.
+     */
+    double getPrimaryPrediction(KnobsValues values);
 
+    /**
+     * Return the secondary prediction for a given configuration.
+     * @param values The knobs values.
+     * @return The secondary prediction for a given configuration.
+     */
+    double getSecondaryPrediction(KnobsValues values);
 };
 
 /**
