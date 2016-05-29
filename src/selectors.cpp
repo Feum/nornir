@@ -214,13 +214,15 @@ SelectorPredictive::SelectorPredictive(const Parameters& p,
             throw std::runtime_error("Unknown contract.");
         }break;
     }
-
+#if 0
     // Input bandwidth smoother
     if(p.strategySmoothing == STRATEGY_SMOOTHING_EXPONENTIAL){
         _bandwidthIn = new MovingAverageExponential<double>(p.smoothingFactor);
     }else{
         _bandwidthIn = new MovingAverageSimple<double>(p.smoothingFactor);
     }
+#endif
+    _bandwidthIn = new MovingAverageSimple<double>(3);
 }
 
 SelectorPredictive::~SelectorPredictive(){
@@ -233,17 +235,18 @@ double SelectorPredictive::getPrimaryPrediction(KnobsValues values){
     // Get real bandwidth from maximum
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
+            double maxBandwidth = 0.0;
             if(observation != _observedValues.end()){
-                return observation->second.utilisation;
+                maxBandwidth = observation->second.getMaximumBandwidth();
             }else{
                 _primaryPredictor->prepareForPredictions();
-                double maxBandwidth = _primaryPredictor->predict(values, _bandwidthIn->average());
-                return _bandwidthIn->average() / maxBandwidth * 100.0;
+                maxBandwidth = _primaryPredictor->predict(values, _bandwidthIn->average());
             }
+            return _bandwidthIn->average() / maxBandwidth * 100.0;
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
-            double maxBandwidth = 0;
+            double maxBandwidth = 0.0;
             if(observation != _observedValues.end()){
                 maxBandwidth = observation->second.getMaximumBandwidth();
             }else{
@@ -332,9 +335,7 @@ bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
 
 bool SelectorPredictive::isBestSecondaryValue(double x, double y) const{
     switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-
-        }break;
+        case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_COMPLETION_TIME:
         case CONTRACT_PERF_BANDWIDTH:{
             return x < y;
@@ -389,9 +390,9 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
         primaryPrediction = getPrimaryPrediction(currentValues);
         secondaryPrediction = getSecondaryPrediction(currentValues);
 
-        //std::cout << currentValues << " " << primaryPrediction << " ";
+        //        std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
-            //std::cout << secondaryPrediction;
+            //            std::cout << secondaryPrediction;
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
                 _feasible = true;
@@ -404,7 +405,7 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
             bestSuboptimalValues = currentValues;
             DEBUGB(suboptimalSecondary = secondaryPrediction);
         }
-        //std::cout << std::endl;
+        //        std::cout << std::endl;
     }
 
     if(_feasible){
@@ -431,7 +432,7 @@ void SelectorPredictive::updateBandwidthIn(){
         if(_bandwidthIn->average() == numeric_limits<double>::max()){
             _bandwidthIn->reset();
         }
-        _bandwidthIn->add(_samples->average().bandwidth);
+        _bandwidthIn->add(_samples->getLastSample().bandwidth);
     }else if(!_bandwidthIn->size()){
         _bandwidthIn->add(numeric_limits<double>::max());
     }
@@ -640,7 +641,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             _accuracyViolations = 0;
             _contractViolations = 0;
             DEBUG("Phase changed, recalibrating.");
-        }else if(_bandwidthIn->coefficientVariation() > 20.0){ //TODO Remove magic number
+        }else if(_bandwidthIn->coefficientVariation() > 1.0){ //TODO Remove magic number
             /******************* Bandwidth change. *******************/
             refine();
             kv = getBestKnobsValues();
