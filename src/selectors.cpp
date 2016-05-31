@@ -64,6 +64,15 @@ Selector::Selector(const Parameters& p,
     _joulesCounter = _localMammut.getInstanceEnergy()->getCounter();
     //TODO Fare meglio con mammut
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
+#if 0
+    // Input bandwidth smoother                                                                                                                                                                                      
+    if(p.strategySmoothing == STRATEGY_SMOOTHING_EXPONENTIAL){
+        _bandwidthIn = new MovingAverageExponential<double>(p.smoothingFactor);
+    }else{
+        _bandwidthIn = new MovingAverageSimple<double>(p.smoothingFactor);
+    }
+#endif
+    _bandwidthIn = new MovingAverageSimple<double>(3);
 }
 
 
@@ -173,6 +182,18 @@ bool Selector::isCalibrating() const{
     return _calibrating;
 }
 
+void Selector::updateBandwidthIn(){
+    if(_samples->average().utilisation < MAX_RHO){
+        if(_bandwidthIn->average() == numeric_limits<double>::max()){
+            _bandwidthIn->reset();
+        }
+        _bandwidthIn->add(_samples->getLastSample().bandwidth);
+    }else if(!_bandwidthIn->size()){
+        _bandwidthIn->add(numeric_limits<double>::max());
+    }
+}
+
+
 SelectorFixed::SelectorFixed(const Parameters& p,
          const FarmConfiguration& configuration,
          const Smoother<MonitoredSample>* samples):
@@ -214,15 +235,6 @@ SelectorPredictive::SelectorPredictive(const Parameters& p,
             throw std::runtime_error("Unknown contract.");
         }break;
     }
-#if 0
-    // Input bandwidth smoother
-    if(p.strategySmoothing == STRATEGY_SMOOTHING_EXPONENTIAL){
-        _bandwidthIn = new MovingAverageExponential<double>(p.smoothingFactor);
-    }else{
-        _bandwidthIn = new MovingAverageSimple<double>(p.smoothingFactor);
-    }
-#endif
-    _bandwidthIn = new MovingAverageSimple<double>(3);
 }
 
 SelectorPredictive::~SelectorPredictive(){
@@ -390,9 +402,9 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
         primaryPrediction = getPrimaryPrediction(currentValues);
         secondaryPrediction = getSecondaryPrediction(currentValues);
 
-        //        std::cout << currentValues << " " << primaryPrediction << " ";
+        //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
-            //            std::cout << secondaryPrediction;
+            //std::cout << secondaryPrediction;
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
                 _feasible = true;
@@ -405,7 +417,7 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
             bestSuboptimalValues = currentValues;
             DEBUGB(suboptimalSecondary = secondaryPrediction);
         }
-        //        std::cout << std::endl;
+        //std::cout << std::endl;
     }
 
     if(_feasible){
@@ -425,17 +437,6 @@ void SelectorPredictive::refine(){
     _primaryPredictor->refine();
     _secondaryPredictor->refine();
     _observedValues[_configuration.getRealValues()] = _samples->average();
-}
-
-void SelectorPredictive::updateBandwidthIn(){
-    if(_samples->average().utilisation < MAX_RHO){
-        if(_bandwidthIn->average() == numeric_limits<double>::max()){
-            _bandwidthIn->reset();
-        }
-        _bandwidthIn->add(_samples->getLastSample().bandwidth);
-    }else if(!_bandwidthIn->size()){
-        _bandwidthIn->add(numeric_limits<double>::max());
-    }
 }
 
 void SelectorPredictive::updatePredictions(const KnobsValues& next){
@@ -605,7 +606,6 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
         if(isCalibrating()){
             refine();
         }
-        updateBandwidthIn();
     }
 
     if(isCalibrating()){
@@ -641,7 +641,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             _accuracyViolations = 0;
             _contractViolations = 0;
             DEBUG("Phase changed, recalibrating.");
-        }else if(_bandwidthIn->coefficientVariation() > 1.0){ //TODO Remove magic number
+        }else if(_bandwidthIn->coefficientVariation() > 100.0){ //TODO Remove magic number
             /******************* Bandwidth change. *******************/
             refine();
             kv = getBestKnobsValues();
@@ -700,6 +700,7 @@ KnobsValues SelectorFixedExploration::getNextKnobsValues(u_int64_t totalTasks){
             startCalibration(totalTasks);
         }else{
             refine();
+
         }
         KnobsValues r = _confToExplore.back();
         _confToExplore.pop_back();
@@ -781,9 +782,9 @@ SelectorLiMartinez::SelectorLiMartinez(const Parameters& p,
     _low2(0), _mid2(0), _high2(0), _midId(1),
     _availableFrequencies(_p.mammut.getInstanceCpuFreq()->getDomains().back()->getAvailableFrequencies()),
     _currentWatts(DBL_MAX), _optimalWatts(DBL_MAX),
-    _optimalFrequency(_availableFrequencies.back()), _optimalWorkers(1),
+    _optimalFrequency(_availableFrequencies.back()), _optimalWorkers(configuration.getKnob(KNOB_TYPE_WORKERS)->getAllowedValues().back()),
     _currentBw(0),_leftBw(0), _rightBw(0), _improved(false){
-    ;
+    _allowedWorkers = configuration.getKnob(KNOB_TYPE_WORKERS)->getAllowedValues();
 }
 
 SelectorLiMartinez::~SelectorLiMartinez(){
@@ -797,12 +798,13 @@ KnobsValues SelectorLiMartinez::getNextKnobsValues(u_int64_t totalTasks){
 
     if(!_firstPointGenerated){
         _firstPointGenerated = true;
-        uint maxWorkers = _configuration.getKnob(KNOB_TYPE_WORKERS)->getRealValue();
+        uint maxWorkers = _allowedWorkers.size(); //_configuration.getKnob(KNOB_TYPE_WORKERS)->getRealValue();
         _low2 = 1;
         _mid2 = maxWorkers / 2.0;
         _high2 = maxWorkers;
 
-        kv[KNOB_TYPE_WORKERS] = _mid2;
+        DEBUG("Max workers: " << maxWorkers << " mid2: " << _mid2);
+        kv[KNOB_TYPE_WORKERS] = _allowedWorkers[_mid2 - 1];
         kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies.back();
         _midId = 2;
 
@@ -848,15 +850,25 @@ changeworkers:
             if(_optimalWatts == DBL_MAX){
                 // Still I have not found a number of workers that satisfied
                 // the time requirement. I increase workers. (Go right).
-                kv[KNOB_TYPE_WORKERS] = _mid2;
+                kv[KNOB_TYPE_WORKERS] = _allowedWorkers[_mid2 - 1];
                 goRight();
                 _midId = 2;
+                DEBUG("New interval 1: [" << _low1 << "," << _mid1 << "," << _high1 << "]");
+                DEBUG("New interval 2: [" << _low2 << "," << _mid2 << "," << _high2 << "]");
+                if(_low1 > _high1 || _low2 > _high2){
+                    kv[KNOB_TYPE_WORKERS] = _optimalWorkers;
+                    kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
+                    _optimalKv = kv;
+                    stopCalibration(totalTasks);
+                    DEBUG("Exploration finished with: " << kv);
+                }
+
             }else if(_currentWatts > _optimalWatts || !_improved){
                 DEBUG("This number of workers is worst than the best we found "
                       "up to now.");
                 // This number of workers is not ok
                 if(_midId == 1){
-                    kv[KNOB_TYPE_WORKERS] = _mid2;
+                    kv[KNOB_TYPE_WORKERS] = _allowedWorkers[_mid2 - 1];
                     _midId = 2;
                     DEBUG("Trying with the right side. We move to " << kv);
                 }else{
@@ -880,11 +892,11 @@ changeworkers:
 
                 if(_low1 <= _high1){
                     _midId = 1;
-                    kv[KNOB_TYPE_WORKERS] = _mid1;
+                    kv[KNOB_TYPE_WORKERS] = _allowedWorkers[_mid1 - 1];
                     DEBUG("We move to " << kv);
                 }else if(_low2 <= _high2){
                     _midId = 2;
-                    kv[KNOB_TYPE_WORKERS] = _mid2;
+                    kv[KNOB_TYPE_WORKERS] = _allowedWorkers[_mid2 - 1];
                     DEBUG("We move to " << kv);
                 }else{
                     kv[KNOB_TYPE_WORKERS] = _optimalWorkers;

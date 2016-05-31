@@ -94,7 +94,7 @@ std::vector<double> getPowerBounds(std::vector<std::string>& lines){
         }
     }
 
-    for(size_t i = 10; i <= 100; i += 20){
+    for(size_t i = 10; i < 100; i += 10){
         r.push_back(minPw + (maxPw - minPw)*(i/100.0));
     }
     return r;
@@ -114,7 +114,7 @@ std::vector<double> getBandwidthBounds(std::vector<std::string> lines){
         }
     }
 
-    for(size_t i = 10; i <= 100; i += 20){
+    for(size_t i = 10; i < 100; i += 10){
         r.push_back(minBw + (maxBw - minBw)*(i/100.0));
     }
     return r;
@@ -152,7 +152,7 @@ void buildFarm(ff_farm<>& farm, size_t numWorkers){
     std::vector<ff::ff_node*> w;
     for(size_t i = 0; i < numWorkers; ++i) w.push_back(new DummyNode);
     farm.add_workers(w);
-    farm.add_collector(new DummyNode);
+    //farm.add_collector(new DummyNode);
 }
 
 int main(int argc, char * argv[]) {
@@ -180,13 +180,21 @@ int main(int argc, char * argv[]) {
     uint numWorkers = 0;
     if(argc > 2){
         numWorkers = atoi(argv[2]);
+        uint maxNumWorkers = 0, currNumWorkers = 0;
         for(auto it = lines.begin(); it != lines.end(); ){
             // Check if there are more workers in the file than those activated.
-            if(atof(mammut::utils::split(*it, '\t')[0].c_str()) > numWorkers){
+            currNumWorkers = atof(mammut::utils::split(*it, '\t')[0].c_str());
+            if(currNumWorkers > numWorkers || !mammut::utils::split(*it, '\t')[2].compare("")){
                 it = lines.erase(it);
             }else{
                 ++it;
+                if(currNumWorkers > maxNumWorkers){
+                    maxNumWorkers = currNumWorkers;
+                }
             }
+        }
+        if(maxNumWorkers < numWorkers){
+            numWorkers = maxNumWorkers;
         }
     }else{
         for(size_t i = 0; i < lines.size(); i++){
@@ -219,10 +227,9 @@ int main(int argc, char * argv[]) {
         ff_farm<> farm;
         buildFarm(farm, numWorkers);
         updateParameters(p, bounds.at(i));
-
         terminationFlag = false;
         ManagerFarm<> amf(&farm, p);
-        SimulationResult sr = amf.simulate(std::string(argv[1]), &terminationFlag);
+        SimulationResult sr = amf.simulate(lines, &terminationFlag);
         //ATTENTION: No need to join. simulate() call will not start a new thread.
         double opt = getBest(lines, p.contractType, bounds.at(i));
         double loss = 0;

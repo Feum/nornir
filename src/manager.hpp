@@ -71,6 +71,8 @@ typedef struct{
     double currentBandwidth;
     double currentPower;
     KnobsValues foundConfiguration;
+    std::vector<double> performanceErrors;
+    std::vector<double> powerErrors;
 }SimulationResult;
 
 /*!
@@ -106,12 +108,12 @@ public:
     /**
      * Simulates the execution.
      * ATTENTION: This is only meant to be used by developers.
-     * @param configurationData A file containing the data for all the configurations.
+     * @param configurationData The lines contained in configurationData file.
      * @param maxIterations The maximum number of iterations to be performed
      *        during calibration phase. If 0, there is no bound on the maximum
      *        number of iterations.
      */
-    SimulationResult simulate(std::string configurationData, volatile bool* terminate, size_t maxIterations = 0);
+    SimulationResult simulate(std::vector<std::string>& configurationData, volatile bool* terminate, size_t maxIterations = 0);
 
     /**
      * Function executed by this thread.

@@ -118,6 +118,11 @@ void ManagerFarm<lb_t, gt_t>::changeKnobs(){
         return;
     }
 
+    if(_totalTasks){
+        // We need to update the input bandwidth only if we already processed some tasks.
+        // By doing this check, we avoid updating bandwidth for the first forced reconfiguration.
+        _selector->updateBandwidthIn();
+    }
     KnobsValues values = _selector->getNextKnobsValues(_totalTasks);
     if(!_configuration.equal(values)){
         _configuration.setValues(values);
@@ -494,12 +499,12 @@ typedef struct{
 }SimulationData;
 
 template <typename lb_t, typename gt_t>
-SimulationResult ManagerFarm<lb_t, gt_t>::simulate(string configurationData, volatile bool* terminate, size_t maxIterations){
-    vector<string> lines = readFile(configurationData);
+SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& configurationData, volatile bool* terminate, size_t maxIterations){                
+    vector<string>& lines = configurationData;
     map<SimulationKey, SimulationData, SimulationKeyCompare> table;
     KnobsValues lastConfigurationValues = _configuration.getRealValues();
     // Starts from 1 to skip the header line.
-    for(size_t i = 1; i < lines.size(); i++){
+    for(size_t i = 0; i < lines.size(); i++){
         SimulationKey key;
         SimulationData data;
         vector<string> fields = split(lines.at(i), '\t');
@@ -604,7 +609,7 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(string configurationData, vol
     uint samplingInterval;
     uint steadySamples = 0;
 
-    while(!_configuration.equal(lastConfigurationValues) && (!maxIterations || steps <= maxIterations)){
+    while((!_configuration.equal(lastConfigurationValues) || _selector->isCalibrating()) && (!maxIterations || steps <= maxIterations)){
         ++steps;
         lastConfigurationValues = _configuration.getRealValues();
         overheadMs = getMillisecondsTime() - startSample;
@@ -716,14 +721,22 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(string configurationData, vol
                     case CONTRACT_PERF_COMPLETION_TIME:{
                         primaryValue = 1.0 / table[k].completionTime;
                         secondaryValue = table[k].wattsCores;
-                        mapeBandwidth += abs((primaryValue - primaryPrediction) / primaryPrediction)*100.0;
-                        mapePower += abs((secondaryValue - secondaryPrediction) / secondaryPrediction)*100.0;
+                        double bwError = abs((primaryValue - primaryPrediction) / primaryPrediction)*100.0;
+                        double pwError = abs((secondaryValue - secondaryPrediction) / secondaryPrediction)*100.0;
+                        mapeBandwidth += bwError;
+                        mapePower += pwError;
+                        res.performanceErrors.push_back(bwError);
+                        res.powerErrors.push_back(pwError);
                     }break;
                     case CONTRACT_POWER_BUDGET:{
                         secondaryValue = 1.0 / table[k].completionTime;
                         primaryValue = table[k].wattsCores;
-                        mapePower += abs((secondaryValue - secondaryPrediction) / secondaryPrediction)*100.0;
-                        mapePower += abs((primaryValue - primaryPrediction) / primaryPrediction)*100.0;
+                        double bwError = abs((secondaryValue - secondaryPrediction) / secondaryPrediction)*100.0;
+                        double pwError = abs((primaryValue - primaryPrediction) / primaryPrediction)*100.0;
+                        mapeBandwidth += bwError;
+                        mapePower += pwError;
+                        res.performanceErrors.push_back(bwError);
+                        res.powerErrors.push_back(pwError);
                     }break;
                     default:{
                         ;

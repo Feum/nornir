@@ -53,6 +53,7 @@ protected:
     const Smoother<MonitoredSample>* _samples;
     size_t _numCalibrationPoints;
     KnobsValues _previousConfiguration;
+    Smoother<double>* _bandwidthIn;
 
     /**
      * Checks if a specific primary value respects the required contract.
@@ -84,6 +85,13 @@ public:
              const Smoother<MonitoredSample>* samples);
 
     virtual ~Selector(){;}
+
+
+    /**
+     * Updates the input bandwidth history with the current value.
+     * MUST be called before calling getNextKnobsValues(...).
+     */
+    void updateBandwidthIn();
 
     /**
      * Returns the next values to be set for the knobs.
@@ -165,14 +173,8 @@ private:
      */
     bool isBestSecondaryValue(double x, double y) const;
 protected:
-    Smoother<double>* _bandwidthIn;
     double _primaryPrediction;
     double _secondaryPrediction;
-
-    /**
-     * Updates the input bandwidth history with the current value.
-     */
-    void updateBandwidthIn();
 
     /**
      * Computes the best relative knobs values for the farm.
@@ -356,6 +358,7 @@ private:
     double _currentBw, _leftBw, _rightBw;
     KnobsValues _optimalKv;
     bool _improved;
+    std::vector<double> _allowedWorkers;
 
     mammut::cpufreq::Frequency findNearestFrequency(mammut::cpufreq::Frequency f) const;
     void goRight();
