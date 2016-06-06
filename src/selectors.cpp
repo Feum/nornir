@@ -709,8 +709,9 @@ KnobsValues SelectorFixedExploration::getNextKnobsValues(u_int64_t totalTasks){
     }else{
         if(isCalibrating()){
             refine();
+            KnobsValues kv = getBestKnobsValues();
             stopCalibration(totalTasks);
-            return getBestKnobsValues();
+            return kv;
         }else{
             return _configuration.getRealValues();
         }
