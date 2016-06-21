@@ -109,9 +109,7 @@ void Observer::addJoules(Joules j){
 void Observer::observe(unsigned int timeStamp,
                      size_t workers,
                      Frequency frequency,
-                     const VirtualCore* emitterVirtualCore,
-                     const vector<VirtualCore*>& workersVirtualCore,
-                     const VirtualCore* collectorVirtualCore,
+                     const vector<VirtualCore*>& virtualCores,
                      double currentBandwidth,
                      double smoothedBandwidth,
                      double coeffVarBandwidth,
@@ -125,18 +123,8 @@ void Observer::observe(unsigned int timeStamp,
     _lastTimestamp = timeStamp;
     _statsFile << timeStamp - _startMonitoringMs << "\t";
     _statsFile << "[";
-    if(emitterVirtualCore){
-        _statsFile << "[" << emitterVirtualCore->getVirtualCoreId() << "]";
-    }
-
-    _statsFile << "[";
-    for(size_t i = 0; i < workersVirtualCore.size(); i++){
-        _statsFile << workersVirtualCore.at(i)->getVirtualCoreId() << ",";
-    }
-    _statsFile << "]";
-
-    if(collectorVirtualCore){
-        _statsFile << "[" << collectorVirtualCore->getVirtualCoreId() << "]";
+    for(size_t i = 0; i < virtualCores.size(); i++){
+        _statsFile << virtualCores.at(i)->getVirtualCoreId() << ",";
     }
     _statsFile << "]" << "\t";
 

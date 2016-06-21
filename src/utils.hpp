@@ -187,8 +187,7 @@ typedef struct CalibrationStats{
  * for each observed statistic.
  */
 class Observer{
-    template <typename L, typename G>
-    friend class ManagerFarm;
+    friend class Manager;
 private:
     std::ofstream _statsFile;
     std::ofstream _calibrationFile;
@@ -211,9 +210,7 @@ public:
     virtual void observe(unsigned int timeStamp,
                          size_t workers,
                          mammut::cpufreq::Frequency frequency,
-                         const mammut::topology::VirtualCore* emitterVirtualCore,
-                         const std::vector<mammut::topology::VirtualCore*>& workersVirtualCore,
-                         const mammut::topology::VirtualCore* collectorVirtualCore,
+                         const std::vector<mammut::topology::VirtualCore*>& virtualCores,
                          double currentBandwidth,
                          double smoothedBandwidth,
                          double coeffVarBandwidth,

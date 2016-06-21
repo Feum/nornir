@@ -49,7 +49,7 @@ private:
     bool _calibrating;
 protected:
     const Parameters& _p;
-    const FarmConfiguration& _configuration;
+    const Configuration& _configuration;
     const Smoother<MonitoredSample>* _samples;
     size_t _numCalibrationPoints;
     KnobsValues _previousConfiguration;
@@ -73,15 +73,9 @@ protected:
      * @param totalTasks The total number of tasks processed up to now.
      */
     void startCalibration(uint64_t totalTasks);
-
-    /**
-     * Checks if the application phase changed.
-     * @return true if the phase changed, false otherwise.
-     */
-    bool phaseChanged() const;
 public:
     Selector(const Parameters& p,
-             const FarmConfiguration& configuration,
+             const Configuration& configuration,
              const Smoother<MonitoredSample>* samples);
 
     virtual ~Selector(){;}
@@ -140,7 +134,7 @@ public:
 class SelectorFixed: public Selector{
 public:
     SelectorFixed(const Parameters& p,
-             const FarmConfiguration& configuration,
+             const Configuration& configuration,
              const Smoother<MonitoredSample>* samples);
 
     ~SelectorFixed();
@@ -226,7 +220,7 @@ protected:
     bool isAccurate();
 public:
     SelectorPredictive(const Parameters& p,
-                       const FarmConfiguration& configuration,
+                       const Configuration& configuration,
                        const Smoother<MonitoredSample>* samples,
                        std::unique_ptr<Predictor> bandwidthPredictor,
                        std::unique_ptr<Predictor> powerPredictor);
@@ -264,7 +258,7 @@ private:
     uint _violations;
 public:
     SelectorAnalytical(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
     KnobsValues getNextKnobsValues(u_int64_t totalTasks);
@@ -281,13 +275,18 @@ private:
     uint _accuracyViolations;
 public:
     SelectorLearner(const Parameters& p,
-                       const FarmConfiguration& configuration,
+                       const Configuration& configuration,
                        const Smoother<MonitoredSample>* samples);
 
     ~SelectorLearner();
 
     KnobsValues getNextKnobsValues(u_int64_t totalTasks);
 
+    /**
+     * Checks if the application phase changed.
+     * @return true if the phase changed, false otherwise.
+     */
+    bool phaseChanged() const;
 };
 
 /**
@@ -300,7 +299,7 @@ private:
     std::vector<KnobsValues> _confToExplore;
 public:
     SelectorFixedExploration(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples,
                    std::unique_ptr<Predictor> bandwidthPredictor,
                    std::unique_ptr<Predictor> powerPredictor,
@@ -321,7 +320,7 @@ public:
 class SelectorMishra: public SelectorFixedExploration{
 public:
     SelectorMishra(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
     ~SelectorMishra();
@@ -333,7 +332,7 @@ public:
 class SelectorFullSearch: public SelectorFixedExploration{
 public:
     SelectorFullSearch(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
     ~SelectorFullSearch();
@@ -358,14 +357,14 @@ private:
     double _currentBw, _leftBw, _rightBw;
     KnobsValues _optimalKv;
     bool _improved;
-    std::vector<double> _allowedWorkers;
+    std::vector<double> _allowedCores;
 
     mammut::cpufreq::Frequency findNearestFrequency(mammut::cpufreq::Frequency f) const;
     void goRight();
     void goLeft();
 public:
     SelectorLiMartinez(const Parameters& p,
-                         const FarmConfiguration& configuration,
+                         const Configuration& configuration,
                          const Smoother<MonitoredSample>* samples);
     ~SelectorLiMartinez();
 

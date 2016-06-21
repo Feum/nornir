@@ -44,6 +44,7 @@
 #include "external/Mammut/mammut/module.hpp"
 #include "external/Mammut/mammut/utils.hpp"
 #include "external/Mammut/mammut/mammut.hpp"
+#include "external/orlog/src/orlog.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -76,53 +77,21 @@ typedef struct{
 }SimulationResult;
 
 /*!
- * \class ManagerFarm
- * \brief This class manages the adaptivity in farm based computations.
+ * \class Manager
+ * \brief This class manages the adaptivity parallel applications.
  *
- * This class manages the adaptivity in farm based computations.
+ * This class manages the adaptivity in parallel applications.
  */
-template <typename lb_t = ff::ff_loadbalancer, typename gt_t = ff::ff_gatherer>
-class ManagerFarm: public Thread{
-    friend class PredictorAnalytical;
-    friend class PredictorLinearRegression;
-    friend class RegressionData;
-    friend class RegressionDataServiceTime;
-    friend class RegressionDataPower;
-    friend class Calibrator;
-    friend class CalibratorLowDiscrepancy;
+class Manager: public Thread{
 public:
-    /**
-     * Creates a farm adaptivity manager.
-     * @param farm The farm to be managed.
-     * @param adaptivityParameters The parameters to be used for
-     * adaptivity decisions.
-     */
-    ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters adaptivityParameters);
-
-    /**
-     * Destroyes this adaptivity manager.
-     */
-    ~ManagerFarm();
-
-
-    /**
-     * Simulates the execution.
-     * ATTENTION: This is only meant to be used by developers.
-     * @param configurationData The lines contained in configurationData file.
-     * @param maxIterations The maximum number of iterations to be performed
-     *        during calibration phase. If 0, there is no bound on the maximum
-     *        number of iterations.
-     */
-    SimulationResult simulate(std::vector<std::string>& configurationData, volatile bool* terminate, size_t maxIterations = 0);
+    Manager(Parameters adaptivityParameters);
 
     /**
      * Function executed by this thread.
+     * ATTENTION: The user must not call this one but 'start()'.
      */
     void run();
-private:
-    // The managed farm.
-    ff_farm<lb_t, gt_t>* _farm;
-
+protected:
     // Flag for checking farm termination.
     volatile bool _terminated;
 
@@ -141,23 +110,11 @@ private:
     // The topology module.
     Topology* _topology;
 
-    // The emitter (if present).
-    AdaptiveNode* _emitter;
-
-    // The collector (if present).
-    AdaptiveNode* _collector;
-
-    // The vector of active workers.
-    std::vector<AdaptiveNode*> _activeWorkers;
-
     // Monitored samples;
     Smoother<MonitoredSample>* _samples;
 
     // Variations
     Smoother<double>* _variations;
-
-    // The current configuration of the farm.
-    FarmConfiguration _configuration;
 
     // The number of tasks processed since the last reconfiguration.
     double _totalTasks;
@@ -172,13 +129,41 @@ private:
 
     // Milliseconds timestamp of the last store of a sample.
     double _lastStoredSampleMs;
-
-    // The configuration selector.
-    Selector* _selector;
-
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
+
+    /**
+     * Wait for the application to start.
+     */
+    virtual void waitForStart() = 0;
+
+    /**
+     * Asks the application for a sample.
+     */
+    virtual void askSample() = 0;
+
+    /**
+     * Obtain application sample.
+     * @param sample An application sample. It will be filled by this call.
+     */
+    virtual void getSample(orlog::ApplicationSample& sample) = 0;
+
+    /**
+     * Manages a configuration change.
+     */
+    virtual void manageConfigurationChange() = 0;
+
+    /**
+     * Cleaning after termination.
+     */
+    virtual void clean() = 0;
+
+    /**
+     * Returns the execution time of the application (milliseconds).
+     */
+    virtual ulong getExecutionTime() = 0;
+
     /**
      * Updates the required bandwidth.
      */
@@ -209,51 +194,6 @@ private:
     double getSecondaryValue(const MonitoredSample& sample) const;
 
     /**
-     * Changes the knobs.
-     */
-    void changeKnobs();
-
-    /**
-     * Send data to observer.
-     **/
-    void observe();
-
-    /**
-     * Asks the workers for their samples.
-     */
-    void askForWorkersSamples();
-
-    /**
-     * Obtain workers samples.
-     * @param sample A worker sample. It will be filled by this call with the
-     *               global data of the farm.
-     */
-    void getWorkersSamples(WorkerSample& sample);
-
-    /**
-     * Resets the workers samples.
-     */
-    void resetSample();
-
-    /**
-     * Gets the consumed joules since the last reset and 
-     * resets the counter.
-     * @return The joules consumed since the last reset.
-     */
-    Joules getAndResetJoules();
-
-    /**
-     * Store a new sample.
-     **/
-    void storeNewSample();
-
-    /**
-     * Updates the tasks count.
-     * @param sample The workers sample to be used for the update.
-     */
-    void updateTasksCount(WorkerSample& sample);
-
-    /**
      * Returns true if the manager doesn't have still to check for a new
      * configuration.
      * @return True if the manager doesn't have still to check for a new
@@ -262,30 +202,141 @@ private:
     bool persist() const;
 
     /**
-     * Initializes the selector.
+     * Locks the knobs according to the selector/predictor.
      */
-    void initSelector();
-
-    /**
-     * Operations that need to take place before running the nodes.
-     */
-    void initNodesPreRun();
-
-    /**
-     * Operations that need to take place after running the nodes.
-     */
-    void initNodesPostRun();
-
-    /**
-     * Cleans the adaptive nodes.
-     */
-    void cleanNodes();
+    void lockKnobs() const;
 
     /**
      * Initializes the samples.
      * return A samples smoother with no recorded samples.
      */
     Smoother<MonitoredSample>* initSamples() const;
+
+    /**
+     * Updates the tasks count.
+     * @param sample The workers sample to be used for the update.
+     */
+    void updateTasksCount(orlog::ApplicationSample& sample);
+
+    /**
+     * Store a new sample.
+     **/
+    void registerSample();
+
+    /**
+     * Changes the knobs.
+     */
+    void changeKnobs();
+
+    /**
+     * Gets the consumed joules since the last reset and
+     * resets the counter.
+     * @return The joules consumed since the last reset.
+     */
+    Joules getAndResetJoules();
+
+    /**
+     * Send data to observer.
+     **/
+    void observe();
+protected:
+    // The current configuration of the application.
+    Configuration* _configuration;
+
+    // The configuration selector.
+    Selector* _selector;
+
+    /**
+     * Creates the selector.
+     */
+    Selector* createSelector() const;
+};
+
+
+class ManagerExternal: public Manager{
+private:
+    orlog::Monitor _monitor;
+    pid_t _pid;
+public:
+    /**
+     * Creates an adaptivity manager for an external application.
+     * @param orlogChannel The name of the Orlog channel.
+     * @param adaptivityParameters The parameters to be used for
+     * adaptivity decisions.
+     */
+    ManagerExternal(const std::string& orlogChannel,
+                    Parameters adaptivityParameters);
+
+    /**
+     * Destroyes this adaptivity manager.
+     */
+    ~ManagerExternal();
+protected:
+    void waitForStart();
+    void askSample();
+    void getSample(orlog::ApplicationSample& sample);
+    void manageConfigurationChange();
+    void clean();
+    ulong getExecutionTime();
+};
+
+
+/*!
+ * \class ManagerFarm
+ * \brief This class manages the adaptivity in farm based computations.
+ *
+ * This class manages the adaptivity in farm based computations.
+ */
+template <typename lb_t = ff::ff_loadbalancer, typename gt_t = ff::ff_gatherer>
+class ManagerFarm: public Manager{
+public:
+    /**
+     * Creates a farm adaptivity manager.
+     * @param farm The farm to be managed.
+     * @param adaptivityParameters The parameters to be used for
+     * adaptivity decisions.
+     */
+    ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters adaptivityParameters);
+
+    /**
+     * Destroyes this adaptivity manager.
+     */
+    ~ManagerFarm();
+
+
+    /**
+     * Simulates the execution.
+     * ATTENTION: This is only meant to be used by developers.
+     * @param configurationData The lines contained in configurationData file.
+     * @param maxIterations The maximum number of iterations to be performed
+     *        during calibration phase. If 0, there is no bound on the maximum
+     *        number of iterations.
+     */
+    SimulationResult simulate(std::vector<std::string>& configurationData,
+                              volatile bool* terminate,
+                              size_t maxIterations = 0);
+
+private:
+    // The managed farm.
+    ff_farm<lb_t, gt_t>* _farm;
+
+    // The emitter (if present).
+    AdaptiveNode* _emitter;
+
+    // The collector (if present).
+    AdaptiveNode* _collector;
+
+    // The vector of active workers.
+    std::vector<AdaptiveNode*> _activeWorkers;
+
+    void waitForStart();
+    void askSample();
+    void getSample(orlog::ApplicationSample& sample);
+    void initNodesPreRun();
+    void initNodesPostRun();
+    void manageConfigurationChange();
+    void clean();
+    ulong getExecutionTime();
 };
 
 }

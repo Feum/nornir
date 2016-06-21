@@ -55,7 +55,7 @@ class KnobsValues;
 class RegressionData{
 protected:
     const Parameters& _p;
-    const FarmConfiguration& _configuration;
+    const Configuration& _configuration;
     const Smoother<MonitoredSample>* _samples;
     mammut::topology::Topology* _topology;
     uint _cpus;
@@ -63,10 +63,10 @@ protected:
     uint _phyCoresPerCpu;
     uint _virtCoresPerPhyCores;
 
-    double getUsedPhysicalCores(double numWorkers, bool includeServiceNodes);
+    double getUsedPhysicalCores(double numWorkers, bool realWorkers);
 public:
     RegressionData(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
     /**
@@ -121,7 +121,7 @@ public:
     void init(const KnobsValues& values);
 
     RegressionDataServiceTime(const Parameters& p,
-                              const FarmConfiguration& configuration,
+                              const Configuration& configuration,
                               const Smoother<MonitoredSample>* samples);
 
     uint getNumPredictors() const;
@@ -147,7 +147,7 @@ public:
     void init(const KnobsValues& values);
 
     RegressionDataPower(const Parameters& p,
-                        const FarmConfiguration& configuration,
+                        const Configuration& configuration,
                         const Smoother<MonitoredSample>* samples);
 
     uint getNumPredictors() const;
@@ -171,7 +171,7 @@ class Predictor{
 protected:
     PredictorType _type;
     const Parameters& _p;
-    const FarmConfiguration& _configuration;
+    const Configuration& _configuration;
     const Smoother<MonitoredSample>* _samples;
     double _modelError;
 
@@ -181,7 +181,7 @@ protected:
 public:
     Predictor(PredictorType type,
               const Parameters& p,
-              const FarmConfiguration& configuration,
+              const Configuration& configuration,
               const Smoother<MonitoredSample>* samples);
 
     virtual ~Predictor();
@@ -261,7 +261,7 @@ private:
 public:
     PredictorLinearRegression(PredictorType type,
                               const Parameters& p,
-                              const FarmConfiguration& configuration,
+                              const Configuration& configuration,
                               const Smoother<MonitoredSample>* samples);
 
     ~PredictorLinearRegression();
@@ -294,7 +294,7 @@ private:
 public:
     PredictorAnalytical(PredictorType type,
                     const Parameters& p,
-                    const FarmConfiguration& configuration,
+                    const Configuration& configuration,
                     const Smoother<MonitoredSample>* samples);
 
     bool readyForPredictions();
@@ -324,7 +324,7 @@ private:
 public:
     PredictorMishra(PredictorType type,
               const Parameters& p,
-              const FarmConfiguration& configuration,
+              const Configuration& configuration,
               const Smoother<MonitoredSample>* samples);
 
     ~PredictorMishra();
@@ -351,7 +351,7 @@ private:
 public:
     PredictorFullSearch(PredictorType type,
               const Parameters& p,
-              const FarmConfiguration& configuration,
+              const Configuration& configuration,
               const Smoother<MonitoredSample>* samples);
 
     ~PredictorFullSearch();

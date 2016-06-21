@@ -149,12 +149,6 @@ void ArchData::loadXml(const string& archFileName){
 
 void Parameters::setDefault(){
     contractType = CONTRACT_NONE;
-    knobWorkers = KNOB_WORKERS_THREADS;
-    knobFrequencies = KNOB_FREQUENCY_YES;
-    knobMapping = KNOB_MAPPING_AUTO;
-    knobMappingEmitter = KNOB_SNODE_MAPPING_AUTO;
-    knobMappingCollector = KNOB_SNODE_MAPPING_AUTO;
-    knobHyperthreading = KNOB_HT_AUTO;
     triggerQBlocking = TRIGGER_Q_BLOCKING_NO;
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_SAME;
     strategySelection = STRATEGY_SELECTION_LEARNING;
@@ -164,6 +158,10 @@ void Parameters::setDefault(){
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
+    strategyCoresChange = STRATEGY_CORES_RETHREADING;
+    knobCoresEnabled = true;
+    knobMappingEnabled = true;
+    knobFrequencyEnabled = true;
     turboBoost = false;
     fastReconfiguration = true;
     migrateCollector = false;
@@ -332,10 +330,9 @@ ParametersValidation Parameters::validateKnobFrequencies(){
     vector<VirtualCore*> virtualCores;
     virtualCores = mammut.getInstanceTopology()->getVirtualCores();
 
-    if(knobFrequencies == KNOB_FREQUENCY_YES &&
-       !(isGovernorAvailable(GOVERNOR_USERSPACE) &&
+    if(knobFrequencyEnabled && !(isGovernorAvailable(GOVERNOR_USERSPACE) &&
          availableFrequencies.size())){
-        knobFrequencies = KNOB_FREQUENCY_NO;
+        knobFrequencyEnabled = false;
     }
 
     for(size_t i = 0; i < virtualCores.size(); i++){
@@ -344,14 +341,12 @@ ParametersValidation Parameters::validateKnobFrequencies(){
         }
     }
 
-    if(knobFrequencies != KNOB_FREQUENCY_NO){
-        if(knobMapping == KNOB_MAPPING_NO){
-            return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
-        }
+    if(knobFrequencyEnabled && !knobMappingEnabled){
+        return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
     }
 
     if(fastReconfiguration &&
-       (!isHighestFrequencySettable() || knobFrequencies == KNOB_FREQUENCY_NO || 
+       (!isHighestFrequencySettable() ||
          strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_NONE)){
         fastReconfiguration = false;
     }
@@ -362,31 +357,6 @@ ParametersValidation Parameters::validateKnobFrequencies(){
         }else{
             mammut.getInstanceCpuFreq()->disableBoosting();
         }
-    }
-    return VALIDATION_OK;
-}
-
-ParametersValidation Parameters::validateKnobMapping(){
-    if(knobMapping == KNOB_MAPPING_AUTO){
-        knobMapping = KNOB_MAPPING_LINEAR;
-    }
-    return VALIDATION_OK;
-}
-
-ParametersValidation Parameters::validateKnobSnodeMapping(){
-    if(knobMappingEmitter == KNOB_SNODE_MAPPING_AUTO){
-        knobMappingEmitter = KNOB_SNODE_MAPPING_ALONE;
-    }
-
-    if(knobMappingCollector == KNOB_SNODE_MAPPING_AUTO){
-        knobMappingCollector = KNOB_SNODE_MAPPING_ALONE;
-    }
-    return VALIDATION_OK;
-}
-
-ParametersValidation Parameters::validateKnobHt(){
-    if(knobHyperthreading == KNOB_HT_AUTO){
-        knobHyperthreading = KNOB_HT_NO;
     }
     return VALIDATION_OK;
 }
@@ -475,36 +445,10 @@ template<> char const* enumStrings<ContractType>::data[] = {
     "POWER_BUDGET"
 };
 
-template<> char const* enumStrings<KnobConfWorkers>::data[] = {
-    "NO",
-    "THREADS",
-    "MAPPING"
-};
-
-template<> char const* enumStrings<KnobConfFrequencies>::data[] = {
-    "NO",
-    "YES"
-};
-
-template<> char const* enumStrings<KnobConfMapping>::data[] = {
-    "NO",
-    "AUTO",
-    "LINEAR",
-    "CACHE_EFFICIENT"
-};
-
 template<> char const* enumStrings<TriggerConfQBlocking>::data[] = {
     "NO",
     "YES",
     "AUTO"
-};
-
-
-template<> char const* enumStrings<KnobConfHyperthreading>::data[] = {
-    "NO",
-    "AUTO",
-    "SOONER",
-    "LATER"
 };
 
 template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
@@ -541,13 +485,6 @@ template<> char const* enumStrings<StrategyExploration>::data[] = {
     "HALTON_REVERSE"
 };
 
-template<> char const* enumStrings<KnobConfSNodeMapping>::data[] = {
-    "NO",
-    "AUTO",
-    "ALONE",
-    "COLLAPSED",
-};
-
 template<> char const* enumStrings<StrategySmoothing>::data[] = {
     "MOVING_AVERAGE",
     "EXPONENTIAL"
@@ -570,14 +507,15 @@ template<> char const* enumStrings<StrategyPersistence>::data[] = {
     "VARIATION"
 };
 
+template<> char const* enumStrings<StrategyCoresChange>::data[] = {
+    "RETHREADING",
+    "REMAPPING"
+};
+
 void Parameters::loadXml(const string& paramFileName){
     XmlTree xt(paramFileName, "adaptivityParameters");
 
     SETVALUE(xt, Enum, contractType);
-    SETVALUE(xt, Enum, knobWorkers);
-    SETVALUE(xt, Enum, knobMapping);
-    SETVALUE(xt, Enum, knobHyperthreading);
-    SETVALUE(xt, Enum, knobFrequencies);
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
     SETVALUE(xt, Enum, strategySelection);
     SETVALUE(xt, Enum, strategyPrediction);
@@ -586,9 +524,11 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, strategySmoothing);
     SETVALUE(xt, Enum, strategyPolling);
     SETVALUE(xt, Enum, strategyPersistence);
-    SETVALUE(xt, Enum, knobMappingEmitter);
-    SETVALUE(xt, Enum, knobMappingCollector);
+    SETVALUE(xt, Enum, strategyCoresChange);
     SETVALUE(xt, Enum, triggerQBlocking);
+    SETVALUE(xt, Bool, knobCoresEnabled);
+    SETVALUE(xt, Bool, knobMappingEnabled);
+    SETVALUE(xt, Bool, knobFrequencyEnabled);
 
     SETVALUE(xt, Bool, turboBoost);
     SETVALUE(xt, Bool, fastReconfiguration);
@@ -689,28 +629,10 @@ Parameters::~Parameters(){
 ParametersValidation Parameters::validate(){
     ParametersValidation r = VALIDATION_OK;
 
-    if(contractType == CONTRACT_NONE){
-        knobWorkers = KNOB_WORKERS_NO;
-        knobFrequencies = KNOB_FREQUENCY_NO;
-        knobMapping = KNOB_MAPPING_NO;
-    }
-
     setDefaultPost();
 
     /** Validate frequency knob. **/
     r = validateKnobFrequencies();
-    if(r != VALIDATION_OK){return r;}
-
-    /** Validate mapping knob. **/
-    r = validateKnobMapping();
-    if(r != VALIDATION_OK){return r;}
-
-    /** Validate service nodes mapping knob. **/
-    r = validateKnobSnodeMapping();
-    if(r != VALIDATION_OK){return r;}
-
-    /** Validate hyperthreading knob. **/
-    r = validateKnobHt();
     if(r != VALIDATION_OK){return r;}
 
     /** Validate triggers. **/
@@ -732,12 +654,6 @@ ParametersValidation Parameters::validate(){
     /** Validate predictors. **/
     r = validatePredictor();
     if(r != VALIDATION_OK){return r;}
-
-    /** Validate unsupported strategies. **/
-    if(knobHyperthreading == KNOB_HT_SOONER ||
-       knobMapping == KNOB_MAPPING_CACHE_EFFICIENT){
-        throw runtime_error("Not yet supported.");
-    }
 
     return VALIDATION_OK;
 }

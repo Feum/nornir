@@ -40,9 +40,9 @@
 #endif
 
 namespace nornir{
-    Explorer::Explorer(const FarmConfiguration& configuration):_configuration(configuration){;}
+    Explorer::Explorer(const Configuration& configuration):_configuration(configuration){;}
 
-    ExplorerRandom::ExplorerRandom(const FarmConfiguration& configuration):
+    ExplorerRandom::ExplorerRandom(const Configuration& configuration):
             Explorer(configuration){
         srand(time(NULL));
     }
@@ -50,7 +50,7 @@ namespace nornir{
     KnobsValues ExplorerRandom::nextRelativeKnobsValues() const{
         KnobsValues r(KNOB_VALUE_RELATIVE);
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(_configuration.getKnob((KnobType) i)->needsCalibration()){
+            if(!_configuration.getKnob((KnobType) i)->isLocked()){
                 r[(KnobType)i] = rand() % 100;
             }else{
                 /**
@@ -67,12 +67,12 @@ namespace nornir{
     void ExplorerRandom::reset(){;}
 
     ExplorerLowDiscrepancy::ExplorerLowDiscrepancy(
-                const FarmConfiguration& configuration,
+                const Configuration& configuration,
                 StrategyExploration explorationStrategy):
             Explorer(configuration), _explorationStrategy(explorationStrategy){
         uint d = 0;
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(_configuration.getKnob((KnobType) i)->needsCalibration()){
+            if(!_configuration.getKnob((KnobType) i)->isLocked()){
                 ++d;
             }
         }
@@ -113,7 +113,7 @@ namespace nornir{
         gsl_qrng_get(_generator, _normalizedPoint);
         size_t nextCoordinate = 0;
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(_configuration.getKnob((KnobType) i)->needsCalibration()){
+            if(!_configuration.getKnob((KnobType) i)->isLocked()){
                 r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
                 ++nextCoordinate;
             }else{

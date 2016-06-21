@@ -35,9 +35,9 @@ namespace nornir{
 
 class Explorer{
 protected:
-    const FarmConfiguration& _configuration;
+    const Configuration& _configuration;
 public:
-    Explorer(const FarmConfiguration& configuration);
+    Explorer(const Configuration& configuration);
     virtual ~Explorer(){;}
 
     /**
@@ -59,7 +59,7 @@ public:
  */
 class ExplorerRandom: public Explorer{
 public:
-    ExplorerRandom(const FarmConfiguration& configuration);
+    ExplorerRandom(const Configuration& configuration);
     virtual ~ExplorerRandom(){;}
     void reset();
     KnobsValues nextRelativeKnobsValues() const;
@@ -75,7 +75,7 @@ private:
     double* _normalizedPoint;
     StrategyExploration _explorationStrategy;
 public:
-    ExplorerLowDiscrepancy(const FarmConfiguration& configuration,
+    ExplorerLowDiscrepancy(const Configuration& configuration,
                            StrategyExploration explorationStrategy);
     virtual ~ExplorerLowDiscrepancy();
     void reset();

@@ -1,5 +1,5 @@
 /*
- * manager.cpp
+ * manager.tpp
  *
  * Created on: 23/03/2015
  *
@@ -26,7 +26,6 @@
  */
 
 #include "./ffincs.hpp"
-#include "./manager.hpp"
 #include "./parameters.hpp"
 #include "./predictors.hpp"
 #include "./node.hpp"
@@ -66,139 +65,41 @@ using namespace mammut::topology;
 using namespace mammut::utils;
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::setDomainToHighestFrequency(const Domain* domain){
-    if(!domain->setGovernor(GOVERNOR_PERFORMANCE)){
-        if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
-           !domain->setHighestFrequencyUserspace()){
-            throw runtime_error("AdaptivityManagerFarm: Fatal error while "
-                                "setting highest frequency for sensitive "
-                                "emitter/collector. Try to run it without "
-                                "sensitivity parameters.");
-        }
+void ManagerFarm<lb_t, gt_t>::waitForStart(){
+    if(_p.qSize){
+        _farm->setFixedSize(true);
+        // We need to multiply for the number of workers since FastFlow
+        // will divide the size for the number of workers.
+        _farm->setInputQueueLength(_p.qSize * _activeWorkers.size());
+        _farm->setOutputQueueLength(_p.qSize * _activeWorkers.size());
     }
+
+    DEBUG("Init pre run");
+    initNodesPreRun();
+
+    DEBUG("Going to run");
+    _farm->run_then_freeze();
+
+    DEBUG("Init post run");
+    initNodesPostRun();
+    DEBUG("Farm started.");
 }
 
 template <typename lb_t, typename gt_t>
-double ManagerFarm<lb_t, gt_t>::getPrimaryValue(const MonitoredSample& sample) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            return sample.bandwidth;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            return sample.watts;
-        }break;
-        default:{
-            return 0;
-        }break;
-    }
-}
-
-template <typename lb_t, typename gt_t>
-double ManagerFarm<lb_t, gt_t>::getSecondaryValue(const MonitoredSample& sample) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            return sample.watts;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            return sample.bandwidth;
-        }break;
-        default:{
-            return 0;
-        }break;
-    }
-}
-
-template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::changeKnobs(){
-    if(!_configuration.knobsChangeNeeded()){
-        return;
-    }
-
-    if(_totalTasks){
-        // We need to update the input bandwidth only if we already processed some tasks.
-        // By doing this check, we avoid updating bandwidth for the first forced reconfiguration.
-        _selector->updateBandwidthIn();
-    }
-    KnobsValues values = _selector->getNextKnobsValues(_totalTasks);
-    if(!_configuration.equal(values)){
-        _configuration.setValues(values);
-
-        const KnobWorkers* knobWorkers = dynamic_cast<const KnobWorkers*>(_configuration.getKnob(KNOB_TYPE_WORKERS));
-        std::vector<AdaptiveNode*> newWorkers = knobWorkers->getActiveWorkers();
-        WorkerSample ws;
-
-        if(_activeWorkers.size() != newWorkers.size()){
-            /** 
-             * Since I stopped the workers after I asked for a sample, there
-             * may still be tasks that have been processed but I did not count.
-             * For this reason, I get them.
-             * I do not need to ask since the node put it in the Q when it 
-             * terminated.
-             */
-            DEBUG("Getting spurious..");
-            getWorkersSamples(ws);
-            updateTasksCount(ws);
-            DEBUG("Spurious got.");
-        }
-
-        _activeWorkers = newWorkers;
-
-        /****************** Clean state ******************/
-        _samples->reset();
-        _variations->reset();
-        Joules joules = getAndResetJoules();
-        if(_p.observer){
-            _p.observer->addJoules(joules);
-        }
-        DEBUG("Resetting sample.");
-        _lastStoredSampleMs = getMillisecondsTime();
-        askForWorkersSamples();
-        getWorkersSamples(ws);
-        updateTasksCount(ws);
-        //resetSample();
-    }
-}
-
-template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::observe(){
-    if(_p.observer){
-        const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration.getKnob(KNOB_TYPE_MAPPING));
-        MonitoredSample ms = _samples->average();
-        _p.observer->observe(_lastStoredSampleMs,
-                             _configuration.getRealValue(KNOB_TYPE_WORKERS),
-                             _configuration.getRealValue(KNOB_TYPE_FREQUENCY),
-                             kMapping->getEmitterVirtualCore(),
-                             kMapping->getWorkersVirtualCore(),
-                             kMapping->getCollectorVirtualCore(),
-                             _samples->getLastSample().bandwidth,
-                             ms.bandwidth,
-                             _samples->coefficientVariation().bandwidth,
-                             ms.latency,
-                             ms.utilisation,
-                             _samples->getLastSample().watts,
-                             ms.watts);
-    }
-}
-
-template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::askForWorkersSamples(){
+void ManagerFarm<lb_t, gt_t>::askSample(){
     for(size_t i = 0; i < _activeWorkers.size(); i++){
         _activeWorkers.at(i)->askForSample();
     }
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::getWorkersSamples(WorkerSample& sample){
+void ManagerFarm<lb_t, gt_t>::getSample(orlog::ApplicationSample& sample){
     AdaptiveNode* w;
     uint numActiveWorkers = _activeWorkers.size();
-    sample = WorkerSample();
+    sample = orlog::ApplicationSample();
 
     for(size_t i = 0; i < numActiveWorkers; i++){
-        WorkerSample tmp;
+        orlog::ApplicationSample tmp;
         w = _activeWorkers.at(i);
         w->getSampleResponse(tmp, _samples->average().latency);
         sample += tmp;
@@ -208,182 +109,19 @@ void ManagerFarm<lb_t, gt_t>::getWorkersSamples(WorkerSample& sample){
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::resetSample(){
-    for(size_t i = 0; i < _activeWorkers.size(); i++){
-        _activeWorkers.at(i)->resetSample();
-    }
-}
-
-template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::updateTasksCount(WorkerSample& sample){
-    double newTasks = sample.tasksCount;
-    if(_p.synchronousWorkers){
-        // When we have synchronous workers we need to count the iterations,
-        // not the real tasks (indeed in this case each worker will receive
-        // the same amount of tasks, e.g. in canneal) since they are sent in
-        // broadcast.
-        newTasks /= _activeWorkers.size();
-    }
-    _totalTasks += newTasks;
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        if(_remainingTasks > newTasks){
-            _remainingTasks -= newTasks;
-        }else{
-            _remainingTasks = 0;
-        }
-    }
-}
-
-template <typename lb_t, typename gt_t>
-Joules ManagerFarm<lb_t, gt_t>::getAndResetJoules(){
-    Joules joules = 0.0;
-    if(_counter){
-        switch(_counter->getType()){
-            case COUNTER_CPUS:{
-                joules = ((CounterCpus*) _counter)->getJoulesCoresAll();
-            }break;
-            default:{
-                joules = _counter->getJoules();
-            }break;
-        }
-        _counter->reset();
-    }
-    return joules;
-}
-
-template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::storeNewSample(){
-    MonitoredSample sample;
-    WorkerSample ws;
-    Joules joules = 0.0;
-
-    askForWorkersSamples();
-    getWorkersSamples(ws);
-    updateTasksCount(ws);
-
-    joules = getAndResetJoules();
-    if(_p.observer){
-        _p.observer->addJoules(joules);
-    }
-
-    double now = getMillisecondsTime();
-    double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
-    _lastStoredSampleMs = now;
-
-    sample.watts = joules / durationSecs;
-    // ATTENTION: Bandwidth is not the number of task since the
-    //            last observation but the number of expected
-    //            tasks that will be processed in 1 second.
-    //            For this reason, if we sum all the bandwidths in
-    //            the result observation file, we may have an higher
-    //            number than the number of tasks.
-    sample.bandwidth = ws.bandwidthTotal;
-    sample.utilisation = ws.loadPercentage;
-    sample.latency = ws.latency;
-
-    if(_p.synchronousWorkers){
-        // When we have synchronous workers we need to divide
-        // for the number of workers since we do it for the totalTasks
-        // count. When this flag is set we count iterations, not real
-        // tasks.
-        sample.bandwidth /= _activeWorkers.size();
-    }
-
-    _samples->add(sample);
-    _variations->add(getPrimaryValue(_samples->coefficientVariation()));
-
-    DEBUGB(samplesFile << *_samples << "\n");
-}
-
-template <typename lb_t, typename gt_t>
-bool ManagerFarm<lb_t, gt_t>::persist() const{
-    bool r = false;
-    switch(_p.strategyPersistence){
-        case STRATEGY_PERSISTENCE_SAMPLES:{
-            r = _samples->size() < _p.persistenceValue;
-        }break;
-        case STRATEGY_PERSISTENCE_VARIATION:{
-            const MonitoredSample& variation = _samples->coefficientVariation();
-            double primaryVariation =  getPrimaryValue(variation);
-            double secondaryVariation =  getSecondaryValue(variation);
-            r = _samples->size() < 1 ||
-                primaryVariation > _p.persistenceValue ||
-                secondaryVariation > _p.persistenceValue;
-#if 0
-            double primaryVariation = _variations->coefficientVariation();
-            std::cout << "Variation size: " << _variations->size() << " PrimaryVariation: " << primaryVariation << std::endl;
-            r = _variations->size() < 2 || primaryVariation > _p.persistenceValue;
-#endif
-        }break;
-    }
-    return r;
-}
-
-template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::initSelector(){
-    if(_p.contractType == CONTRACT_NONE){
-        _selector = new SelectorFixed(_p, _configuration, _samples);
-    }else{
-        switch(_p.strategySelection){
-            case STRATEGY_SELECTION_ANALYTICAL:{
-                _selector = new SelectorAnalytical(_p, _configuration, _samples);
-            }break;
-            case STRATEGY_SELECTION_LEARNING:{
-                _selector = new SelectorLearner(_p, _configuration, _samples);
-            }break;
-            case STRATEGY_SELECTION_LIMARTINEZ:{
-                _selector = new SelectorLiMartinez(_p, _configuration, _samples);
-            }break;
-            case STRATEGY_SELECTION_MISHRA:{
-                _selector = new SelectorMishra(_p, _configuration, _samples);
-            }break;
-            case STRATEGY_SELECTION_FULLSEARCH:{
-                _selector = new SelectorFullSearch(_p, _configuration, _samples);
-            }break;
-            default:{
-                throw std::runtime_error("Selector not yet implemented.");
-            }break;
-        }
-    }
-}
-
-static Parameters& validate(Parameters& p){
-    ParametersValidation apv = p.validate();
-    if(apv != VALIDATION_OK){
-        throw runtime_error("Invalid adaptivity parameters: " + std::to_string(apv));
-    }
-    return p;
-}
-
-static std::vector<AdaptiveNode*> convertWorkers(svector<ff_node*> w){
-    std::vector<AdaptiveNode*> r;
-    for(size_t i = 0; i < w.size(); i++){
-        r.push_back(dynamic_cast<AdaptiveNode*>(w[i]));
-    }
-    return r;
-}
-
-template <typename lb_t, typename gt_t>
 ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters parameters):
+        Manager(parameters),
         _farm(farm),
-        _terminated(false),
-        _p(validate(parameters)),
-        _cpufreq(_p.mammut.getInstanceCpuFreq()),
-        _counter(_p.mammut.getInstanceEnergy()->getCounter()),
-        _task(_p.mammut.getInstanceTask()),
-        _topology(_p.mammut.getInstanceTopology()),
         _emitter(dynamic_cast<AdaptiveNode*>(_farm->getEmitter())),
         _collector(dynamic_cast<AdaptiveNode*>(_farm->getCollector())),
-        _activeWorkers(convertWorkers(_farm->getWorkers())),
-        _samples(initSamples()),
-        _variations(new MovingAverageExponential<double>(0.5)),
-        _configuration(_p, _emitter, _collector, _farm->getgt(), _activeWorkers,
-                       _samples, &_terminated),
-        _totalTasks(0),
-        _remainingTasks(0),
-        _deadline(0),
-        _lastStoredSampleMs(0),
-        _selector(NULL){
+        _activeWorkers(convertWorkers(_farm->getWorkers())){
+    Manager::_configuration = new ConfigurationFarm(_p, _samples, _emitter,
+                                                   _activeWorkers,
+                                                   _collector, _farm->getgt(),
+                                                   &_terminated);
+    lockKnobs();
+    _configuration->createAllRealCombinations();
+    _selector = createSelector();
     DEBUGB(samplesFile.open("samples.csv"));
 }
 
@@ -394,22 +132,10 @@ ManagerFarm<lb_t, gt_t>::~ManagerFarm(){
     if(_selector){
         delete _selector;
     }
-    DEBUGB(samplesFile.close());
-}
-
-template <typename lb_t, typename gt_t>
-Smoother<MonitoredSample>* ManagerFarm<lb_t, gt_t>::initSamples() const{
-    switch(_p.strategySmoothing){
-        case STRATEGY_SMOOTHING_MOVING_AVERAGE:{
-            return new MovingAverageSimple<MonitoredSample>(_p.smoothingFactor);
-        }break;
-        case STRATEGY_SMOOTHING_EXPONENTIAL:{
-            return new MovingAverageExponential<MonitoredSample>(_p.smoothingFactor);
-        }break;
-        default:{
-            return NULL;
-        }
+    if(Manager::_configuration){
+        delete Manager::_configuration;
     }
+    DEBUGB(samplesFile.close());
 }
 
 template <typename lb_t, typename gt_t>
@@ -443,7 +169,34 @@ void ManagerFarm<lb_t, gt_t>::initNodesPostRun() {
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::cleanNodes() {
+void ManagerFarm<lb_t, gt_t>::manageConfigurationChange(){
+    const KnobVirtualCoresFarm* knobWorkers = dynamic_cast<const KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES));
+    std::vector<AdaptiveNode*> newWorkers = knobWorkers->getActiveWorkers();
+    orlog::ApplicationSample ws;
+
+    if(_activeWorkers.size() != newWorkers.size()){
+        /**
+         * Since I stopped the workers after I asked for a sample, there
+         * may still be tasks that have been processed but I did not count.
+         * For this reason, I get them.
+         * I do not need to ask since the node put it in the Q when it
+         * terminated.
+         */
+        DEBUG("Getting spurious..");
+        getSample(ws);
+        updateTasksCount(ws);
+        DEBUG("Spurious got.");
+    }
+
+    _activeWorkers = newWorkers;
+}
+
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::clean(){
+    DEBUG("Terminating...wait freezing.");
+    _farm->wait_freezing();
+    _farm->wait();
+    DEBUG("Terminated.");
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
         _activeWorkers.at(i)->clean();
     }
@@ -456,15 +209,8 @@ void ManagerFarm<lb_t, gt_t>::cleanNodes() {
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::updateRequiredBandwidth() {
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        double now = getMillisecondsTime();
-        if(now / 1000.0 >= _deadline){
-            _p.requiredBandwidth = numeric_limits<double>::max();
-        }else{
-            _p.requiredBandwidth = _remainingTasks / ((_deadline * 1000.0 - now) / 1000.0);
-        }
-    }
+ulong ManagerFarm<lb_t, gt_t>::getExecutionTime(){
+    return _farm->ffTime();
 }
 
 #define PAR_BEGIN_ENV "__PAR_BEGIN"
@@ -502,7 +248,7 @@ template <typename lb_t, typename gt_t>
 SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& configurationData, volatile bool* terminate, size_t maxIterations){                
     vector<string>& lines = configurationData;
     map<SimulationKey, SimulationData, SimulationKeyCompare> table;
-    KnobsValues lastConfigurationValues = _configuration.getRealValues();
+    KnobsValues lastConfigurationValues = _configuration->getRealValues();
     // Starts from 1 to skip the header line.
     for(size_t i = 0; i < lines.size(); i++){
         SimulationKey key;
@@ -519,30 +265,13 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
         table.insert(std::pair<SimulationKey, SimulationData>(key, data));
     }
 
-    initSelector();
 
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
         _remainingTasks = _p.expectedTasksNumber;
         _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
     }
 
-    if(_p.qSize){
-        _farm->setFixedSize(true);
-        // We need to multiply for the number of workers since FastFlow
-        // will divide the size for the number of workers.
-        _farm->setInputQueueLength(_p.qSize * _activeWorkers.size());
-        _farm->setOutputQueueLength(_p.qSize * _activeWorkers.size());
-    }
-
-    DEBUG("Init pre run");
-    initNodesPreRun();
-
-    DEBUG("Going to run");
-    _farm->run_then_freeze();
-
-    DEBUG("Init post run");
-    initNodesPostRun();
-    DEBUG("Farm started.");
+    waitForStart();
 #if 0
     /** Creates the parallel section begin file. **/
     char* default_in_roi = (char*) malloc(sizeof(char)*256);
@@ -570,10 +299,10 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
     _variations->reset();
 
     SimulationResult res;
-    KnobsValues values = _configuration.getRealValues();
+    KnobsValues values = _configuration->getRealValues();
     SimulationKey key;
     SimulationData data;
-    key.numCores = values[KNOB_TYPE_WORKERS];
+    key.numCores = values[KNOB_TYPE_VIRTUAL_CORES];
     key.frequency = values[KNOB_TYPE_FREQUENCY];
     if(table.find(key) != table.end()){
         data = table[key];
@@ -609,9 +338,9 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
     uint samplingInterval;
     uint steadySamples = 0;
 
-    while((!_configuration.equal(lastConfigurationValues) || _selector->isCalibrating()) && (!maxIterations || steps <= maxIterations)){
+    while((!_configuration->equal(lastConfigurationValues) || _selector->isCalibrating()) && (!maxIterations || steps <= maxIterations)){
         ++steps;
-        lastConfigurationValues = _configuration.getRealValues();
+        lastConfigurationValues = _configuration->getRealValues();
         overheadMs = getMillisecondsTime() - startSample;
         if(_selector->isCalibrating()){
             samplingInterval = _p.samplingIntervalCalibration;
@@ -632,7 +361,7 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
 
         startSample = getMillisecondsTime();
         DEBUG("Storing new sample.");
-        storeNewSample();
+        registerSample();
         _samples->reset();
         _variations->reset();
 
@@ -663,8 +392,8 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
             DEBUG("Asking selector.");
             changeKnobs();
 
-            values = _configuration.getRealValues();
-            key.numCores = values[KNOB_TYPE_WORKERS];
+            values = _configuration->getRealValues();
+            key.numCores = values[KNOB_TYPE_VIRTUAL_CORES];
             key.frequency = values[KNOB_TYPE_FREQUENCY];
             if(table.find(key) != table.end()){
                 data = table[key];
@@ -672,7 +401,7 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
                 throw std::runtime_error("Impossible to find value for key.");
             }
 
-            _configuration.trigger();
+            _configuration->trigger();
             startSample = getMillisecondsTime();
         }
     }
@@ -682,16 +411,11 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
 #endif
 
     *terminate = true;
-    DEBUG("Terminating...wait freezing.");
-    _farm->wait_freezing();
-    _farm->wait();
-    DEBUG("Terminated.");
-
-    cleanNodes();
+    clean();
 
     // We do -1 because the last step was the optimal configuration.
     res.numSteps = steps - 1;
-    res.foundConfiguration = _configuration.getRealValues();
+    res.foundConfiguration = _configuration->getRealValues();
 
     switch(_p.strategySelection){
         // For SelectorPredictive selectors we compute the MAPE.
@@ -704,12 +428,12 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
             size_t keys = 0;
             double mapeBandwidth = 0, mapePower = 0;
             SelectorPredictive* sel = (SelectorPredictive*) _selector;
-            std::vector<KnobsValues> combinations = _configuration.getAllRealCombinations();
+            std::vector<KnobsValues> combinations = _configuration->getAllRealCombinations();
             for(size_t i = 0; i < combinations.size(); i++){
                 ++keys;
                 SimulationKey k;
                 KnobsValues v = combinations.at(i);
-                k.numCores = v[KNOB_TYPE_WORKERS];
+                k.numCores = v[KNOB_TYPE_VIRTUAL_CORES];
                 k.frequency = v[KNOB_TYPE_FREQUENCY];
 
                 primaryPrediction = sel->getPrimaryPrediction(v);
@@ -755,124 +479,6 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
         }break;
     }
     return res;
-}
-
-template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::run(){
-    initSelector();
-
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        _remainingTasks = _p.expectedTasksNumber;
-        _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
-    }
-
-    if(_p.qSize){
-        _farm->setFixedSize(true);
-        // We need to multiply for the number of workers since FastFlow
-        // will divide the size for the number of workers.
-        _farm->setInputQueueLength(_p.qSize * _activeWorkers.size());
-        _farm->setOutputQueueLength(_p.qSize * _activeWorkers.size());
-    }
-
-    DEBUG("Init pre run");
-    initNodesPreRun();
-
-    DEBUG("Going to run");
-    _farm->run_then_freeze();
-
-    DEBUG("Init post run");
-    initNodesPostRun();
-    DEBUG("Farm started.");
-#if 0
-    /** Creates the parallel section begin file. **/
-    char* default_in_roi = (char*) malloc(sizeof(char)*256);
-    default_in_roi[0] = '\0';
-    default_in_roi = strcat(default_in_roi, getenv("HOME"));
-    default_in_roi = strcat(default_in_roi, "/roi_in");
-    setenv(PAR_BEGIN_ENV, default_in_roi, 0);
-    free(default_in_roi);
-    FILE* in_roi = fopen(getenv(PAR_BEGIN_ENV), "w");
-    fclose(in_roi);
-#endif
-
-    if(_counter){
-        _counter->reset();
-    }
-    _lastStoredSampleMs = getMillisecondsTime();
-    if(_p.observer){
-        _p.observer->_startMonitoringMs = _lastStoredSampleMs;
-    }
-
-    /* Force the first calibration point. **/
-    changeKnobs();
-
-    ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
-    thisThread->move(MANAGER_VIRTUAL_CORE);
-
-    double microsecsSleep = 0;
-    double startSample = getMillisecondsTime();
-    double overheadMs = 0;
-
-    uint samplingInterval;
-    uint steadySamples = 0;
-
-    while(!_terminated){
-        overheadMs = getMillisecondsTime() - startSample;
-        if(_selector->isCalibrating()){
-            samplingInterval = _p.samplingIntervalCalibration;
-            steadySamples = 0;
-        }else if(steadySamples < _p.steadyThreshold){
-            samplingInterval = _p.samplingIntervalCalibration;
-            steadySamples++;
-        }else{
-            samplingInterval = _p.samplingIntervalSteady;
-        }
-        microsecsSleep = ((double)samplingInterval - overheadMs)*
-                          (double)MAMMUT_MICROSECS_IN_MILLISEC;
-        if(microsecsSleep < 0){
-            microsecsSleep = 0;
-        }else{
-            usleep(microsecsSleep);
-        }
-
-        startSample = getMillisecondsTime();
-        DEBUG("Storing new sample.");
-        storeNewSample();
-        DEBUG("New sample stored.");
-
-        updateRequiredBandwidth();
-
-        observe();
-
-        if(!persist()){
-            DEBUG("Asking selector.");
-            changeKnobs();
-            _configuration.trigger();
-            startSample = getMillisecondsTime();
-        }
-    }
-
-    DEBUG("Terminating...wait freezing.");
-    _farm->wait_freezing();
-    _farm->wait();
-    DEBUG("Terminated.");
-
-    double duration = _farm->ffTime();
-#if 0
-    unlink(getenv(PAR_BEGIN_ENV));
-#endif
-    if(_p.observer){
-        vector<CalibrationStats> cs;
-        if(_selector){
-            _selector->stopCalibration(_totalTasks);
-            cs = _selector->getCalibrationsStats();
-            _p.observer->calibrationStats(cs, duration, _totalTasks);
-        }
-        ReconfigurationStats rs = _configuration.getReconfigurationStats();
-        _p.observer->summaryStats(cs, rs, duration, _totalTasks);
-    }
-
-    cleanNodes();
 }
 
 }

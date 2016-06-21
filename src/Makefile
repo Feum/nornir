@@ -1,4 +1,4 @@
-TARGET = knob.o trigger.o node.o parameters.o selectors.o predictors.o explorers.o configuration.o utils.o
+TARGET = manager.o knob.o trigger.o node.o parameters.o selectors.o predictors.o explorers.o configuration.o utils.o
 
 .PHONY: all clean cleanall install uninstall lib
 
@@ -15,7 +15,7 @@ clean:
 cleanall:
 	-rm -fr *.o *~ *.a
 	$(MAKE) -C dataflow cleanall
-	$(MAKE) -C external cleanall
+#	$(MAKE) -C external cleanall
 lib: $(TARGET)
 	ar rc libnornir.a $(TARGET) dataflow/*.o
 	ranlib libnornir.a

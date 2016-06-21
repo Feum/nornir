@@ -65,58 +65,6 @@ typedef enum{
     CONTRACT_POWER_BUDGET
 }ContractType;
 
-/// Cores knob.
-typedef enum{
-    // Never changes the number of threads or their mapping.
-    KNOB_WORKERS_NO = 0,
-
-    // Changes the number of threads used by the application.
-    KNOB_WORKERS_THREADS,
-
-    // Changes the mapping of the threads used by the application.
-    KNOB_WORKERS_MAPPING,
-}KnobConfWorkers;
-
-/// Frequency knob.
-typedef enum{
-    // Disables the possibility to dinamically change the frequencies.
-    KNOB_FREQUENCY_NO = 0,
-
-    // Enables the possibility to dinamically change the frequencies.
-    KNOB_FREQUENCY_YES,
-}KnobConfFrequencies;
-
-/// Mapping knob.
-typedef enum{
-    // Mapping decisions will be performed by the operating system.
-    KNOB_MAPPING_NO = 0,
-
-    // Best mapping decisions will be at runtime.
-    KNOB_MAPPING_AUTO,
-
-    // Tries to keep the threads as close as possible.
-    KNOB_MAPPING_LINEAR,
-
-    // Tries to make good use of the shared caches.
-    // Particularly useful when threads have large working sets.
-    KNOB_MAPPING_CACHE_EFFICIENT
-}KnobConfMapping;
-
-/// Hyperthreading knob.
-typedef enum{
-    // Hyperthreading is not used.
-    KNOB_HT_NO = 0,
-
-    // The runtime system will decide at runtime if use or not hyperthreading.
-    KNOB_HT_AUTO,
-
-    // Hyperthreading is used since the beginning.
-    KNOB_HT_SOONER,
-
-    // Hyperthreading is used only when we used all the physical cores.
-    KNOB_HT_LATER
-}KnobConfHyperthreading;
-
 /// Communication queues blocking/nonblocking.
 typedef enum{
     // Non blocking queue.
@@ -202,22 +150,6 @@ typedef enum{
     STRATEGY_EXPLORATION_HALTON_REVERSE,
 }StrategyExploration;
 
-/// Service nodes (emitter or collector) mapping knob.
-typedef enum{
-    // The service node is not explicitly mapped.
-    KNOB_SNODE_MAPPING_NO = 0,
-
-    // The mapping is automatically chosen by the runtime system.
-    KNOB_SNODE_MAPPING_AUTO,
-
-    // The service node is mapped on a physical core where no workers
-    // are mapped.
-    KNOB_SNODE_MAPPING_ALONE,
-
-    // The service node is mapped on a physical core together with a worker.
-    KNOB_SNODE_MAPPING_COLLAPSED,
-}KnobConfSNodeMapping;
-
 /// Possible ways to smooth the values.
 typedef enum{
     // Simple moving average
@@ -264,6 +196,15 @@ typedef enum{
     // Coefficient of variation.
     STRATEGY_PERSISTENCE_VARIATION
 }StrategyPersistence;
+
+// Strategy to be applied when changing the number of cores.
+typedef enum{
+    // Changes the number of threads.
+    STRATEGY_CORES_RETHREADING = 0,
+
+    // Changes the mapping of the threads.
+    STRATEGY_CORES_REMAPPING
+}StrategyCoresChange;
 
 /// Possible parameters validation results.
 typedef enum{
@@ -575,24 +516,6 @@ private:
     ParametersValidation validateKnobFrequencies();
 
     /**
-     * Validates the mapping knob.
-     * @return The result of the validation.
-     */
-    ParametersValidation validateKnobMapping();
-
-    /**
-     * Validates the service nodes knob.
-     * @return The result of the validation.
-     */
-    ParametersValidation validateKnobSnodeMapping();
-
-    /**
-     * Validates the hyperthreading knob.
-     * @return The result of the validation.
-     */
-    ParametersValidation validateKnobHt();
-
-    /**
      * Validates the triggers.
      * @return The result of the validation.
      */
@@ -634,28 +557,8 @@ public:
     // [default = CONTRACT_NONE].
     ContractType contractType;
 
-    // The workers knob [default = KNOB_WORKERS_THREADS].
-    KnobConfWorkers knobWorkers;
-
-    // The frequency knob. It can be KNOB_FREQUENCY_YES
-    // only if knobMapping is different from KNOB_MAPPING_NO
-    // [default = KNOB_FREQUENCY_YES].
-    KnobConfFrequencies knobFrequencies;
-
-    //  The mapping knob [default = KNOB_MAPPING_AUTO].
-    KnobConfMapping knobMapping;
-
-    // Emitter mapping knob [default = KNOB_SNODE_MAPPING_AUTO].
-    KnobConfSNodeMapping knobMappingEmitter;
-
-    // Collector mapping knob [default = KNOB_SNODE_MAPPING_AUTO].
-    KnobConfSNodeMapping knobMappingCollector;
-
     // The Q blocking knob [default = KNOB_Q_BLOCKING_NO].
     TriggerConfQBlocking triggerQBlocking;
-
-    // The hyperthreading knob [default = KNOB_HT_AUTO].
-    KnobConfHyperthreading knobHyperthreading;
 
     // Strategy for unused virtual cores [default = STRATEGY_UNUSED_VC_SAME].
     StrategyUnusedVirtualCores strategyUnusedVirtualCores;
@@ -685,6 +588,18 @@ public:
 
     // Persistence strategy [default = STRATEGY_PERSISTENCE_SAMPLES].
     StrategyPersistence strategyPersistence;
+
+    // Cores change strategy [default = STRATEGY_CORES_RETHREADING].
+    StrategyCoresChange strategyCoresChange;
+
+    // Flag to enable/disable cores knobs [default = true].
+    bool knobCoresEnabled;
+
+    // Flag to enable/disable mapping knob [default = true].
+    bool knobMappingEnabled;
+
+    // Flag to enable/disable frequency knob [default = true].
+    bool knobFrequencyEnabled;
 
     // Parameters for Mishra predictor.
     MishraParameters mishra;
