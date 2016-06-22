@@ -86,6 +86,7 @@ class Manager: public Thread{
 public:
     Manager(Parameters adaptivityParameters);
 
+    virtual ~Manager();
     /**
      * Function executed by this thread.
      * ATTENTION: The user must not call this one but 'start()'.

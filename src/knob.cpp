@@ -163,6 +163,24 @@ std::ostream& operator<< (std::ostream& out, const std::vector<AdaptiveNode*>& v
     out << "]";
     return out;
 }
+
+std::ostream& operator<< (std::ostream& out, const std::vector<VirtualCore*>& v){
+    out << "[";
+    for(size_t i = 0; i < v.size(); i++){
+        out << (v.at(i))->getVirtualCoreId() << ", ";
+    }
+    out << "]";
+    return out;
+}
+
+std::ostream& operator<< (std::ostream& out, const std::vector<Domain*>& v){
+    out << "[";
+    for(size_t i = 0; i < v.size(); i++){
+        out << (v.at(i))->getId() << ", ";
+    }
+    out << "]";
+    return out;
+}
 #endif
 
 KnobVirtualCoresFarm::KnobVirtualCoresFarm(Parameters p,
@@ -310,7 +328,7 @@ template<> char const* enumStrings<MappingType>::data[] = {
 void KnobMapping::changeValueReal(double v){
     DEBUG("[Mapping] Changing real value to: " << enumToString<MappingType>((MappingType)v));
 
-    vector<const VirtualCore*> vcOrder;
+    vector<VirtualCore*> vcOrder;
     switch((MappingType) v){
         case MAPPING_TYPE_LINEAR:{
             vcOrder = computeVcOrderLinear();
@@ -321,7 +339,7 @@ void KnobMapping::changeValueReal(double v){
     }
 
     /** Performs mapping. **/
-    _activeVirtualCores.clear();
+    _activeVirtualCores = vcOrder;
     move(vcOrder);
 
     /** Updates unused virtual cores. **/
@@ -346,14 +364,14 @@ const vector<VirtualCore*>& KnobMapping::getUnusedVirtualCores() const{
     return _unusedVirtualCores;
 }
 
-vector<const VirtualCore*> KnobMapping::computeVcOrderLinear(){
+vector<VirtualCore*> KnobMapping::computeVcOrderLinear(){
    /*
     * Generates a vector of virtual cores to be used for linear
     * mapping. It contains first one virtual core per physical
     * core (virtual cores on the same CPU are consecutive).
     * Then, the other groups of virtual cores follow.
     */
-    vector<const VirtualCore*> vcOrder;
+    vector<VirtualCore*> vcOrder;
     size_t virtualPerPhysical = _knobHyperThreading.getRealValue();
 
     vector<Cpu*> cpus = _topologyHandler->getCpus();
@@ -387,8 +405,10 @@ void KnobMappingExternal::setPid(pid_t pid){
     _processHandler = _p.mammut.getInstanceTask()->getProcessHandler(pid);
 }
 
-void KnobMappingExternal::move(const vector<const VirtualCore*>& vcOrder){
-    _processHandler->move(vcOrder);
+void KnobMappingExternal::move(const vector<VirtualCore*>& vcOrder){
+    if(_processHandler){
+        _processHandler->move(vcOrder);
+    }
 }
 
 KnobMappingFarm::KnobMappingFarm(const Parameters& p,
@@ -401,7 +421,7 @@ KnobMappingFarm::KnobMappingFarm(const Parameters& p,
     ;
 }
 
-void KnobMappingFarm::move(const vector<const VirtualCore*>& vcOrder){
+void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){
     vector<AdaptiveNode*> workers = ((KnobVirtualCoresFarm*) &_knobCores)->getActiveWorkers();
     size_t nextIndex = 0;
     if(_emitter){
@@ -446,8 +466,6 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
         _knobValues.push_back(availableFrequencies.at(i));
 
     }
-    DEBUG("[Frequency] Setting userspace governor. Scalable domains: " << scalableDomains);
-    DEBUG("[Frequency] Unused VC strategy: " << _unusedVc);
 }
 
 void KnobFrequency::changeValueReal(double v){
@@ -464,6 +482,8 @@ void KnobFrequency::changeValueReal(double v){
     }
     applyUnusedVCStrategy(v);
     DEBUG("[Frequency] Frequency changed for domains: " << scalableDomains);
+    DEBUG("[Frequency] Active VC: " << _knobMapping.getActiveVirtualCores());
+    DEBUG("[Frequency] Unused VC: " << _knobMapping.getUnusedVirtualCores());
 }
 
 void KnobFrequency::applyUnusedVCStrategySame(const vector<VirtualCore*>& unusedVc, Frequency v){

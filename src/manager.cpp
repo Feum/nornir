@@ -95,6 +95,10 @@ Manager::Manager(Parameters adaptivityParameters):
     _p.synchronousWorkers = false;
 }
 
+Manager::~Manager(){
+    delete _selector;
+}
+
 void Manager::run(){
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
         _remainingTasks = _p.expectedTasksNumber;
@@ -168,6 +172,7 @@ void Manager::run(){
         }
     }
 
+    clean();
     ulong duration = getExecutionTime();
 #if 0
     unlink(getenv(PAR_BEGIN_ENV));

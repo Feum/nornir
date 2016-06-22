@@ -101,13 +101,6 @@ void AdaptiveNode::initPostRun(){
     _thread = _tasksManager->getThreadHandler(getpid(), tid);
 }
 
-void AdaptiveNode::clean(){
-    if(_thread){
-        _tasksManager->releaseThreadHandler(_thread);
-        _thread = NULL;
-    }
-}
-
 void AdaptiveNode::move(VirtualCore* vc){
     if(_thread){
         _thread->move(vc);
@@ -357,7 +350,10 @@ AdaptiveNode::AdaptiveNode():
 }
 
 AdaptiveNode::~AdaptiveNode(){
-    clean();
+    if(_thread){
+        _tasksManager->releaseThreadHandler(_thread);
+        _thread = NULL;
+    }
 }
 
 void AdaptiveNode::terminate(){

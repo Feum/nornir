@@ -197,15 +197,6 @@ void ManagerFarm<lb_t, gt_t>::clean(){
     _farm->wait_freezing();
     _farm->wait();
     DEBUG("Terminated.");
-    for (size_t i = 0; i < _activeWorkers.size(); i++) {
-        _activeWorkers.at(i)->clean();
-    }
-    if (_emitter) {
-        _emitter->clean();
-    }
-    if (_collector) {
-        _collector->clean();
-    }
 }
 
 template <typename lb_t, typename gt_t>

@@ -58,7 +58,7 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
         throw runtime_error("Observer: Impossible to open file.");
     }
     _statsFile << "TimestampMillisecs" << "\t";
-    _statsFile << "[[EmitterVc][WorkersVc][CollectorVc]]" << "\t";
+    _statsFile << "[VirtualCores]" << "\t";
     _statsFile << "Workers" << "\t";
     _statsFile << "Frequency" << "\t";
     _statsFile << "CurrentBandwidth" << "\t";

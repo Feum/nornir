@@ -1,4 +1,5 @@
 TARGET  = blackscholes
+TARGETEXT = blackscholes-ext
 M4_BASE = .
 MACROS  = c.m4.pthreads
 
@@ -13,7 +14,7 @@ endif
 
 CSRC    = $(SRC)
 
-version = ff
+version = none
 #chk_err = 1
 
 ifdef version
@@ -63,11 +64,14 @@ endif
 
 CXXFLAGS += $(MT) $(NCO) $(FUNC) $(ERR)
 
-all: $(TARGET)
+all: $(TARGET) $(TARGETEXT)
 
 $(TARGET): $(CSRC)
-	$(CXX) $(CXXFLAGS) $(CSRC) $(INCS) $(LDFLAGS) $(LDLIBS) -o $(TARGET)
+	$(CXX) $(CXXFLAGS) --std=c++11 -O3 -DENABLE_FF -pthread $(CSRC) $(INCS) $(LDFLAGS) $(LDLIBS) -o $(TARGET)
 	$(CXX) $(CXXFLAGS) inputgen.c $(INCS) $(LDFLAGS) $(LDLIBS)  -o inputgen
+
+$(TARGETEXT): blackscholes-ext.c
+	$(CXX) $(CXXFLAGS) -DENABLE_OPENMP  blackscholes-ext.c $(INCS) $(LDFLAGS) $(LDLIBS) -lgomp -o $(TARGETEXT)
 
 $(M4_SRC): $(SRC)
 	$(M4) $(M4_BASE)/$(MACROS) $< > $@

@@ -217,7 +217,9 @@ void Configuration::setValues(const KnobsValues& values){
 
 void Configuration::trigger(){
     for(size_t i = 0; i < TRIGGER_TYPE_NUM; i++){
-        _triggers[i]->trigger();
+        if(_triggers[i]){
+            _triggers[i]->trigger();
+        }
     }
 }
 
@@ -232,6 +234,8 @@ ConfigurationExternal::ConfigurationExternal(const Parameters& p):
                                                 *((KnobHyperThreading*) _knobs[KNOB_TYPE_HYPERTHREADING]));
     _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p,
                                                     *((KnobMappingExternal*) _knobs[KNOB_TYPE_MAPPING]));
+
+    _triggers[TRIGGER_TYPE_Q_BLOCKING] = NULL;
 }
 
 
@@ -248,13 +252,6 @@ ConfigurationFarm::ConfigurationFarm(const Parameters& p,
                                           emitter, collector, gt, workers,
                                           terminated);
 
-    _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
-                                                              p.thresholdQBlocking,
-                                                              samples,
-                                                              emitter);
-    if(emitter){++_numServiceNodes;}
-    if(collector){++_numServiceNodes;}
-
     _knobs[KNOB_TYPE_HYPERTHREADING] = new KnobHyperThreading(p);
     _knobs[KNOB_TYPE_MAPPING] = new KnobMappingFarm(p,
                                                 *((KnobVirtualCoresFarm*) _knobs[KNOB_TYPE_VIRTUAL_CORES]),
@@ -262,6 +259,14 @@ ConfigurationFarm::ConfigurationFarm(const Parameters& p,
                                                 emitter, collector);
     _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p,
                                                     *((KnobMappingFarm*) _knobs[KNOB_TYPE_MAPPING]));
+
+    _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
+                                                              p.thresholdQBlocking,
+                                                              samples,
+                                                              emitter);
+
+    if(emitter){++_numServiceNodes;}
+    if(collector){++_numServiceNodes;}
 }
 
 

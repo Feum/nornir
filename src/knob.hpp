@@ -195,7 +195,7 @@ public:
                 const KnobHyperThreading& knobHyperThreading);
     void changeValueReal(double v);
 
-    virtual void move(const std::vector<const mammut::topology::VirtualCore*>& vcOrder) = 0;
+    virtual void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder) = 0;
 
     const std::vector<mammut::topology::VirtualCore*>& getActiveVirtualCores() const;
     const std::vector<mammut::topology::VirtualCore*>& getUnusedVirtualCores() const;
@@ -208,7 +208,7 @@ private:
     std::vector<mammut::topology::VirtualCore*> _unusedVirtualCores;
     mammut::topology::Topology* _topologyHandler;
 
-    std::vector<const mammut::topology::VirtualCore*> computeVcOrderLinear();
+    std::vector<mammut::topology::VirtualCore*> computeVcOrderLinear();
 };
 
 class KnobMappingExternal: public KnobMapping{
@@ -221,7 +221,7 @@ public:
 
     void setPid(pid_t pid);
 
-    void move(const std::vector<const mammut::topology::VirtualCore*>& vcOrder);
+    void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder);
 };
 
 class KnobMappingFarm: public KnobMapping{
@@ -235,7 +235,7 @@ public:
                 AdaptiveNode* emitter,
                 AdaptiveNode* collector);
 
-    void move(const std::vector<const mammut::topology::VirtualCore*>& vcOrder);
+    void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder);
 };
 
 class KnobFrequency: public Knob{

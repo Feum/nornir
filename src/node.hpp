@@ -135,11 +135,6 @@ private:
     void initPostRun();
 
     /**
-     * Cleans then node.
-     */
-    void clean();
-
-    /**
      * Moves this node on a specific virtual core.
      * @param vc The virtual core where this nodes must be moved.
      */
