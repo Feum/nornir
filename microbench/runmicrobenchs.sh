@@ -42,7 +42,7 @@ else
 	echo $CURRENT_VERSION > $CONFPATH_VERFILE
 	rm -rf $CONFPATH_FILE
 	# Header
-	echo "<?xml version="1.0" encoding="UTF-8"?>" >> $CONFPATH_FILE
+	echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" >> $CONFPATH_FILE
 	echo "<archData>" >> $CONFPATH_FILE
 	
 	# TickPerNs
@@ -61,3 +61,4 @@ else
 	echo "</archData>" >> $CONFPATH_FILE
 	chmod -R ugo+r $CONFPATH_ROOT"/nornir/"
 fi
+

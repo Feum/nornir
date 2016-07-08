@@ -265,6 +265,8 @@ class XmlTree{
 private:
     char* _fileContentChars;
     rapidxml::xml_node<>* _root;
+
+    void init(const std::string& content, const std::string& rootName);
 public:
     /**
      * Reads the XML tree contained in 'fileName' and starting

@@ -25,11 +25,6 @@
  * =========================================================================
  */
 
-
-/**
- * Basic test for the nornir farm.
- */
-
 #include <vector>
 #include <iostream>
 #include <fstream>

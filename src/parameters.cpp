@@ -39,8 +39,16 @@ using mammut::Communicator;
 using mammut::Mammut;
 using mammut::utils::enumStrings;
 
-XmlTree::XmlTree(const string& fileName, const string& rootName){
+void XmlTree::init(const std::string& content, const std::string& rootName){
     rapidxml::xml_document<> xmlContent;
+    _fileContentChars = new char[content.size() + 1];
+    copy(content.begin(), content.end(), _fileContentChars);
+    _fileContentChars[content.size()] = '\0';
+    xmlContent.parse<0>(_fileContentChars);
+    _root = xmlContent.first_node(rootName.c_str());
+}
+
+XmlTree::XmlTree(const string& fileName, const string& rootName){
     ifstream file(fileName.c_str());
     if(!file){
         throw runtime_error("Impossible to read xml file " + fileName);
@@ -52,12 +60,12 @@ XmlTree::XmlTree(const string& fileName, const string& rootName){
     file.seekg(0, ios::beg);
     fileContent.assign((istreambuf_iterator<char>(file)),
                         istreambuf_iterator<char>());
-    _fileContentChars = new char[fileContent.size() + 1];
-    copy(fileContent.begin(), fileContent.end(), _fileContentChars);
-    _fileContentChars[fileContent.size()] = '\0';
-    xmlContent.parse<0>(_fileContentChars);
-    _root = xmlContent.first_node(rootName.c_str());
+    init(fileContent, rootName);
 }
+
+/*XmlTree::XmlTree(const std::string& content, const std::string& rootName){
+    init(content, rootName);
+}*/
 
 XmlTree::~XmlTree(){
     delete[] _fileContentChars;
@@ -603,6 +611,7 @@ Parameters::Parameters(const string& paramFileName,
         string confFileArch = confHomes.at(i) + string(CONFFILE_ARCH);
         string confFileVoltage = confHomes.at(i) + string(CONFFILE_VOLTAGE);
         string confFileVersion = confHomes.at(i) + string(CONFFILE_VERSION);
+
         if(existsFile(confFileArch) &&
            existsFile(confFileVoltage) &&
            existsFile(confFileVersion) &&

@@ -269,6 +269,17 @@ public:
                     Parameters adaptivityParameters);
 
     /**
+     * Creates an adaptivity manager for an external application.
+     * @param orlogSocket The Orlog socket.
+     * @param chid The channel id.
+     * @param adaptivityParameters The parameters to be used for
+     * adaptivity decisions.
+     */
+    ManagerExternal(nn::socket& orlogSocket,
+                    int chid,
+                    Parameters adaptivityParameters);
+
+    /**
      * Destroyes this adaptivity manager.
      */
     ~ManagerExternal();

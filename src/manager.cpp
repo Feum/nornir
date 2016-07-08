@@ -492,6 +492,16 @@ ManagerExternal::ManagerExternal(const std::string& orlogChannel,
     _selector = createSelector();
 }
 
+ManagerExternal::ManagerExternal(nn::socket& orlogSocket,
+                                 int chid,
+                                 Parameters adaptivityParameters):
+            Manager(adaptivityParameters), _monitor(orlogSocket, chid), _pid(0){
+    Manager::_configuration = new ConfigurationExternal(_p);
+    lockKnobs();
+    _configuration->createAllRealCombinations();
+    _selector = createSelector();
+}
+
 ManagerExternal::~ManagerExternal(){
     if(Manager::_configuration){
         delete Manager::_configuration;

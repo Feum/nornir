@@ -1,4 +1,4 @@
-TARGET               = manager-single
+TARGET               = manager-single manager-external
 
 .PHONY: all clean cleanall
 
