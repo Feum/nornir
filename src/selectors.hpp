@@ -273,6 +273,10 @@ private:
     bool _firstPointGenerated;
     uint _contractViolations;
     uint _accuracyViolations;
+    std::unique_ptr<Predictor> getPredictor(PredictorType type,
+                                            const Parameters& p,
+                                            const Configuration& configuration,
+                                            const Smoother<MonitoredSample>* samples) const;
 public:
     SelectorLearner(const Parameters& p,
                        const Configuration& configuration,

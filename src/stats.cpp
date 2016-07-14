@@ -1,5 +1,5 @@
 /*
- * utils.cpp
+ * stats.cpp
  *
  * Created on: 09/07/2015
  *
@@ -26,11 +26,11 @@
  */
 
 /*!
- * \file utils.cpp
- * \brief Implementation of various utilities.
+ * \file stats.cpp
+ * \brief Statistics collection utilities.
  **/
 
-#include "utils.hpp"
+#include "stats.hpp"
 
 namespace nornir{
 
@@ -167,9 +167,9 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
     for(size_t i = 0; i < calibrationStats.size(); i++){
         totalCalibration += calibrationStats.at(i);
     }
-    
+
     if(durationMs == totalCalibration.duration){
-        durationMs += 0.001; // Just to avoid division by 0 
+        durationMs += 0.001; // Just to avoid division by 0
     }
 
     _summaryFile << (_totalJoules - totalCalibration.joules) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
@@ -204,3 +204,4 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
 }
 
 }
+

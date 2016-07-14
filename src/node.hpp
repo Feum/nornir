@@ -30,9 +30,15 @@
 
 #include "./ffincs.hpp"
 #include "./parameters.hpp"
+#include "utils.hpp"
 
 #include "external/Mammut/mammut/mammut.hpp"
+
+
+PUSH_WARNING
+GCC_DISABLE_WARNING(unused-variable)
 #include "external/orlog/src/orlog.hpp"
+POP_WARNING
 
 #undef DEBUG
 #undef DEBUGB

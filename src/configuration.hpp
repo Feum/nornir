@@ -32,6 +32,7 @@
 #include "knob.hpp"
 #include "node.hpp"
 #include "parameters.hpp"
+#include "stats.hpp"
 #include "trigger.hpp"
 
 #include "external/Mammut/mammut/utils.hpp"

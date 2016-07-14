@@ -184,7 +184,8 @@ public:
 
 typedef enum{
     MAPPING_TYPE_LINEAR = 0,
-    MAPPING_TYPE_CACHE_OPTIMAL,
+    MAPPING_TYPE_INTERLEAVED, // One per CPU, round robin
+    //MAPPING_TYPE_CACHE_OPTIMAL,
     MAPPING_TYPE_NUM // ATTENTION: This must be the last value.
 }MappingType;
 
@@ -209,6 +210,7 @@ private:
     mammut::topology::Topology* _topologyHandler;
 
     std::vector<mammut::topology::VirtualCore*> computeVcOrderLinear();
+    std::vector<mammut::topology::VirtualCore*> computeVcOrderInterleaved();
 };
 
 class KnobMappingExternal: public KnobMapping{

@@ -315,13 +315,14 @@ KnobMapping::KnobMapping(const Parameters& p,
          _knobCores(knobCores),
          _knobHyperThreading(knobHyperThreading),
          _topologyHandler(p.mammut.getInstanceTopology()){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM - 1; i++){
+    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
         _knobValues.push_back((MappingType) i);
     }
 }
 
 template<> char const* enumStrings<MappingType>::data[] = {
     "LINEAR",
+    "INTERLEAVED",
     "CACHE OPTIMAL"
 };
 
@@ -332,6 +333,9 @@ void KnobMapping::changeValueReal(double v){
     switch((MappingType) v){
         case MAPPING_TYPE_LINEAR:{
             vcOrder = computeVcOrderLinear();
+        }break;
+        case MAPPING_TYPE_INTERLEAVED:{
+            vcOrder = computeVcOrderInterleaved();
         }break;
         default:{
             throw runtime_error("KnobMapping: Mapping type still not supported.");
@@ -392,6 +396,38 @@ vector<VirtualCore*> KnobMapping::computeVcOrderLinear(){
         }
     }
     return vcOrder;
+}
+
+vector<VirtualCore*> KnobMapping::computeVcOrderInterleaved(){
+   /*
+    * Generates a vector of virtual cores to be used for interleaved
+    * mapping.
+    */
+    vector<VirtualCore*> vcOrder;
+    size_t virtualPerPhysical = _knobHyperThreading.getRealValue();
+
+    vector<Cpu*> cpus = _topologyHandler->getCpus();
+    size_t nextPhysicalId = 0;
+    size_t nextVirtualId = 0;
+    while(true){
+        for(size_t i = 0; i < cpus.size(); i++){
+            vector<PhysicalCore*> phyCores = cpus.at(i)->getPhysicalCores();
+            PhysicalCore* p = phyCores.at(nextPhysicalId);
+            vector<VirtualCore*> virtCores = p->getVirtualCores();
+            VirtualCore* v = virtCores.at(nextVirtualId);
+            if(!_p.isolateManager || v->getVirtualCoreId() != MANAGER_VIRTUAL_CORE){
+                vcOrder.push_back(v);
+                if(vcOrder.size() == _knobCores.getRealValue()){return vcOrder;}
+            }
+        }
+        if(nextPhysicalId + 1 < cpus.at(0)->getPhysicalCores().size()){
+            nextPhysicalId += 1;
+        }else{
+            nextPhysicalId = 0;
+            nextVirtualId += 1;
+            if(nextVirtualId >= virtualPerPhysical){return vcOrder;}
+        }
+    }
 }
 
 KnobMappingExternal::KnobMappingExternal(const Parameters& p,

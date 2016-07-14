@@ -540,12 +540,34 @@ KnobsValues SelectorAnalytical::getNextKnobsValues(u_int64_t totalTasks){
     }
 }
 
+std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
+                                                         const Parameters& p,
+                                                         const Configuration& configuration,
+                                                         const Smoother<MonitoredSample>* samples) const{
+    Predictor* predictor;
+    switch(p.strategyPrediction){
+        case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
+            predictor = new PredictorLinearRegression(type, p, configuration, samples);
+        }break;
+        case STRATEGY_PREDICTION_REGRESSION_LINEAR_MAPPING:{
+            predictor = new PredictorLinearRegressionMapping(type, p, configuration, samples);
+        }break;
+        case STRATEGY_PREDICTION_MISHRA:{
+            predictor = new PredictorMishra(type, p, configuration, samples);
+        }break;
+        default:{
+            throw std::runtime_error("Unknown prediction strategy.");
+        }break;
+    }
+    return std::unique_ptr<Predictor>(predictor);
+}
+
 SelectorLearner::SelectorLearner(const Parameters& p,
                    const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples):
              SelectorPredictive(p, configuration, samples,
-                               std::unique_ptr<Predictor>(new PredictorLinearRegression(PREDICTION_BANDWIDTH, p, configuration, samples)),
-                               std::unique_ptr<Predictor>(new PredictorLinearRegression(PREDICTION_POWER, p, configuration, samples))),
+                                getPredictor(PREDICTION_BANDWIDTH, p, configuration, samples),
+                                getPredictor(PREDICTION_POWER, p, configuration, samples)),
              _explorer(NULL), _firstPointGenerated(false),
              _contractViolations(0), _accuracyViolations(0){
     /***************************************/

@@ -236,7 +236,7 @@ typedef struct{
 }Observation;
 
 /*
- * Represents a linear regression predictor.
+ * A linear regression predictor for <Cores, Frequency> configurations.
  */
 class PredictorLinearRegression: public Predictor{
 private:
@@ -265,6 +265,31 @@ public:
                               const Smoother<MonitoredSample>* samples);
 
     ~PredictorLinearRegression();
+
+    void clear();
+
+    bool readyForPredictions();
+
+    void refine();
+
+    void prepareForPredictions();
+
+    double predict(const KnobsValues& configuration, double bandwidthIn);
+};
+
+/**
+ * A linear regression predictor for <Cores, Frequency, Mapping> configurations.
+ */
+class PredictorLinearRegressionMapping: public Predictor{
+private:
+    PredictorLinearRegression* _predictors[MAPPING_TYPE_NUM];
+public:
+    PredictorLinearRegressionMapping(PredictorType type,
+                              const Parameters& p,
+                              const Configuration& configuration,
+                              const Smoother<MonitoredSample>* samples);
+
+    ~PredictorLinearRegressionMapping();
 
     void clear();
 

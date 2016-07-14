@@ -477,6 +477,7 @@ template<> char const* enumStrings<StrategySelection>::data[] = {
 
 template<> char const* enumStrings<StrategyPrediction>::data[] = {
     "REGRESSION_LINEAR",
+    "REGRESSION_LINEAR_MAPPING",
     "MISHRA"
 };
 

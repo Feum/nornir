@@ -293,6 +293,9 @@ void Manager::lockKnobs() const{
                     _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
                     _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
                 }break;
+                case STRATEGY_PREDICTION_REGRESSION_LINEAR_MAPPING:{
+                    _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
+                }break;
             }
         }break;
         case STRATEGY_SELECTION_LIMARTINEZ:{
