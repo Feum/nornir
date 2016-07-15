@@ -368,6 +368,10 @@ const vector<VirtualCore*>& KnobMapping::getUnusedVirtualCores() const{
     return _unusedVirtualCores;
 }
 
+size_t KnobMapping::getNumVirtualCores(){
+    return _knobCores.getRealValue();
+}
+
 vector<VirtualCore*> KnobMapping::computeVcOrderLinear(){
    /*
     * Generates a vector of virtual cores to be used for linear
@@ -385,7 +389,7 @@ vector<VirtualCore*> KnobMapping::computeVcOrderLinear(){
             vector<VirtualCore*> virtCores = phyCores.at(j)->getVirtualCores();
             for(size_t k = 0; k < virtCores.size(); k++){
                 if(k >= virtualPerPhysical){break;}
-                if(vcOrder.size() == _knobCores.getRealValue()){
+                if(vcOrder.size() == getNumVirtualCores()){
                     return vcOrder;
                 }
                 if(!_p.isolateManager ||
@@ -417,7 +421,7 @@ vector<VirtualCore*> KnobMapping::computeVcOrderInterleaved(){
             VirtualCore* v = virtCores.at(nextVirtualId);
             if(!_p.isolateManager || v->getVirtualCoreId() != MANAGER_VIRTUAL_CORE){
                 vcOrder.push_back(v);
-                if(vcOrder.size() == _knobCores.getRealValue()){return vcOrder;}
+                if(vcOrder.size() == getNumVirtualCores()){return vcOrder;}
             }
         }
         if(nextPhysicalId + 1 < cpus.at(0)->getPhysicalCores().size()){
@@ -455,6 +459,13 @@ KnobMappingFarm::KnobMappingFarm(const Parameters& p,
         KnobMapping(p, knobCores, knobHyperThreading), _emitter(emitter),
         _collector(collector){
     ;
+}
+
+size_t KnobMappingFarm::getNumVirtualCores(){
+    size_t v = _knobCores.getRealValue();
+    if(_emitter) ++v;
+    if(_collector) ++v;
+    return v;
 }
 
 void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){

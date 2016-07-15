@@ -204,6 +204,8 @@ protected:
     const Parameters& _p;
     const KnobVirtualCores& _knobCores;
     const KnobHyperThreading& _knobHyperThreading;
+
+    virtual size_t getNumVirtualCores();
 private:
     std::vector<mammut::topology::VirtualCore*> _activeVirtualCores;
     std::vector<mammut::topology::VirtualCore*> _unusedVirtualCores;
@@ -230,6 +232,8 @@ class KnobMappingFarm: public KnobMapping{
 private:
     AdaptiveNode* _emitter;
     AdaptiveNode* _collector;
+protected:
+    size_t getNumVirtualCores();
 public:
     KnobMappingFarm(const Parameters& p,
                 const KnobVirtualCoresFarm& knobCores,
