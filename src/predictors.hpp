@@ -255,8 +255,6 @@ private:
 
     bool _preparationNeeded;
 
-    bool _singular;
-
     double getCurrentResponse() const;
 public:
     PredictorLinearRegression(PredictorType type,

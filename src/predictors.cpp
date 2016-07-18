@@ -316,7 +316,7 @@ PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
                                                      const Parameters& p,
                                                      const Configuration& configuration,
                                                      const Smoother<MonitoredSample>* samples):
-        Predictor(type, p, configuration, samples), _preparationNeeded(true), _singular(false){
+        Predictor(type, p, configuration, samples), _preparationNeeded(true){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
             _predictionInput = new RegressionDataServiceTime(p, configuration, samples);
@@ -450,12 +450,12 @@ void PredictorLinearRegression::prepareForPredictions(){
         std::ostringstream x2;
         arma::set_stream_err1(x1);
         arma::set_stream_err2(x2);
-        _lr = LinearRegression(dataMl, responsesMl);
+        LinearRegression newlr = LinearRegression(dataMl, responsesMl);
         if(x1.str().compare("") || x2.str().compare("")){
-            _singular = true;
+            ;
         }else{
+            _lr = newlr;
             _modelError =  _lr.ComputeError(dataMl, responsesMl);
-             _singular = false;
         }
 
         DEBUG("Error in model: " << _modelError);
@@ -464,10 +464,6 @@ void PredictorLinearRegression::prepareForPredictions(){
 }
 
 double PredictorLinearRegression::predict(const KnobsValues& values, double bandwidthIn){
-    if(_singular){
-        // TODO: Better to return an error and discard predictions.
-        return std::numeric_limits<double>::max();
-    }
     _predictionInput->init(values);
 
     // One observation per column.

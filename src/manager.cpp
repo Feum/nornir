@@ -89,10 +89,7 @@ Manager::Manager(Parameters adaptivityParameters):
         _lastStoredSampleMs(0),
         _configuration(NULL),
         _selector(NULL){
-    // Only remapping is possible for external applications.
-    _p.strategyCoresChange = STRATEGY_CORES_REMAPPING;
-    // For external application we do not care if synchronous of not (we count iterations).
-    _p.synchronousWorkers = false;
+    ;
 }
 
 Manager::~Manager(){
@@ -493,6 +490,10 @@ ManagerExternal::ManagerExternal(const std::string& orlogChannel,
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
+    // Only remapping is possible for external applications. 
+    _p.strategyCoresChange = STRATEGY_CORES_REMAPPING;
+    // For external application we do not care if synchronous of not (we count iterations).   
+    _p.synchronousWorkers = false;
 }
 
 ManagerExternal::ManagerExternal(nn::socket& orlogSocket,
@@ -503,6 +504,10 @@ ManagerExternal::ManagerExternal(nn::socket& orlogSocket,
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
+    // Only remapping is possible for external applications. 
+    _p.strategyCoresChange = STRATEGY_CORES_REMAPPING;
+    // For external application we do not care if synchronous of not (we count iterations).
+    _p.synchronousWorkers = false;
 }
 
 ManagerExternal::~ManagerExternal(){
