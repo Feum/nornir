@@ -442,6 +442,29 @@ void PredictorLinearRegression::prepareForPredictions(){
             }
         }
 
+        // Remove rows in dataMl if they contain all the same value.
+        // In this way we ensure that the matrix can be inverted and that
+        // the regression has a solution.
+        size_t id = 0;
+        for(size_t i = 0; i < dataMl.n_rows; ){
+            double firstElem = dataMl(i, 0);
+            bool removeRow = true;
+            for(size_t j = 1; j < dataMl.n_cols; j++){
+                if(dataMl(i, j) != firstElem){
+                    removeRow = false;
+                    break;
+                }
+            }
+            if(removeRow){
+                dataMl.shed_row(i);
+                _removedRows.push_back(id);
+            }else{
+                i++;
+            }
+            ++id;
+        }
+        //// End of row removal ////
+
         if(_p.regressionAging && _agingVector.size() != _observations.size()){
             dataMl.resize(_observations.begin()->second.data->getNumPredictors(),
                           _agingVector.size());
@@ -473,6 +496,11 @@ double PredictorLinearRegression::predict(const KnobsValues& values, double band
     arma::vec result(1);
     double res = 0;
     _predictionInput->toArmaRow(0, predictionInputMl);
+
+    // Remove from prediction input the corresponding positions
+    for(size_t i = 0; i < _removedRows.size(); i++){
+        predictionInputMl.shed_row(_removedRows.at(i));
+    }
 
     _lr.Predict(predictionInputMl, result);
     if(_type == PREDICTION_BANDWIDTH){

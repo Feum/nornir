@@ -253,6 +253,10 @@ private:
 
     bool _preparationNeeded;
 
+    // Identifier of rows that have been removed to let the dataMl matrix
+    // invertible.
+    std::vector<size_t> _removedRows;
+
     double getCurrentResponse() const;
 public:
     PredictorLinearRegression(PredictorType type,
