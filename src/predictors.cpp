@@ -446,6 +446,7 @@ void PredictorLinearRegression::prepareForPredictions(){
         // In this way we ensure that the matrix can be inverted and that
         // the regression has a solution.
         size_t id = 0;
+        _removedRows.clear();
         for(size_t i = 0; i < dataMl.n_rows; ){
             double firstElem = dataMl(i, 0);
             bool removeRow = true;
