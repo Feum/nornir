@@ -46,6 +46,7 @@
 
 #define MSECS_IN_SECS 1000.0 // Milliseconds in 1 second
 #define NSECS_IN_SECS 1000000000.0 // Nanoseconds in 1 second
+#define MAX_RHO 5
 
 namespace nornir{
 
@@ -83,7 +84,11 @@ typedef struct MonitoredSample{
     MonitoredSample():watts(0), utilisation(0), bandwidth(0), latency(0){;}
 
     double getMaximumBandwidth(){
-        return bandwidth / (utilisation / 100.0);
+        if(utilisation < MAX_RHO){
+            return bandwidth / (utilisation / 100.0);
+        }else{
+            return bandwidth;
+        }
     }
 
     void swap(MonitoredSample& x){

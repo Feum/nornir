@@ -392,14 +392,15 @@ void PredictorLinearRegression::refine(){
         }
         _currentAgingId = (_currentAgingId + 1) % _p.regressionAging;
     }
+    double response = getCurrentResponse();
     DEBUG("Refining with configuration " << currentValues << ": "
-                                         << getCurrentResponse());
+                                         << response);
     if(lb != _observations.end() &&
        !(_observations.key_comp()(currentValues, lb->first))){
         // Key already exists
         DEBUG("Replacing " << currentValues);
         lb->second.data->init();
-        lb->second.response = getCurrentResponse();
+        lb->second.response = response;
     }else{
         // The key does not exist in the map
         Observation o;
@@ -411,7 +412,7 @@ void PredictorLinearRegression::refine(){
                 o.data = new RegressionDataPower(_p, _configuration, _samples);
             }break;
         }
-        o.response = getCurrentResponse();
+        o.response = response;
         _observations.insert(lb, Observations::value_type(currentValues, o));
     }
 }
