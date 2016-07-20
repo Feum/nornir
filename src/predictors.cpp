@@ -207,7 +207,7 @@ void RegressionDataPower::init(const KnobsValues& values){
         if(values[KNOB_TYPE_MAPPING] == MAPPING_TYPE_LINEAR){
             usedCpus = std::ceil(usedPhysicalCores / (double) _phyCoresPerCpu);
         }else{
-            usedCpus = usedPhysicalCores>_cpus?_cpus:usedPhysicalCores;
+            usedCpus = std::min(usedPhysicalCores, (double) _cpus);
         }
         usedCpus = std::min(usedCpus, _cpus);
         uint unusedCpus = _cpus - usedCpus;
