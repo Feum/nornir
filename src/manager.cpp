@@ -93,7 +93,7 @@ Manager::Manager(Parameters adaptivityParameters):
 }
 
 Manager::~Manager(){
-    delete _selector;
+    ;
 }
 
 void Manager::run(){
@@ -513,6 +513,9 @@ ManagerExternal::ManagerExternal(nn::socket& orlogSocket,
 ManagerExternal::~ManagerExternal(){
     if(Manager::_configuration){
         delete Manager::_configuration;
+    }
+    if(_selector){
+        delete _selector;
     }
 }
 
