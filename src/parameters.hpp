@@ -133,7 +133,7 @@ typedef enum{
 // Possible performance models to be used.
 typedef enum{
     STRATEGY_MODEL_AMDAHL = 0, // Amdahl's Law
-    STRATEGY_MODEL_USL // Universal Scalability Law
+    STRATEGY_MODEL_USL, // Universal Scalability Law
 }StrategyModelPerformance;
 
 /// Possible ways to select the calibration points. Can only be specified if

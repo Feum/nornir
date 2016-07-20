@@ -63,7 +63,7 @@ protected:
     uint _phyCoresPerCpu;
     uint _virtCoresPerPhyCores;
 
-    double getUsedPhysicalCores(double numWorkers, bool realWorkers);
+    double getUsedPhysicalCores(double numWorkers);
 public:
     RegressionData(const Parameters& p,
                    const Configuration& configuration,

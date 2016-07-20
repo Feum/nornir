@@ -102,14 +102,12 @@ RegressionData::RegressionData(const Parameters& p,
     _virtCoresPerPhyCores = _topology->getPhysicalCore(0)->getVirtualCores().size();
 }
 
-double RegressionData::getUsedPhysicalCores(double numVirtualCores, bool realWorkers){
-    uint numNodes = 0;
-    if(realWorkers){
-        numNodes = _configuration.getNumWorkerThreads();
-    }else{
-        numNodes = numVirtualCores;
+double RegressionData::getUsedPhysicalCores(double numVirtualCores){
+    if(_configuration.getRealValue(KNOB_TYPE_HYPERTHREADING) != 1){
+        throw std::runtime_error("getUsedPhysicalCores, ht > 1 not yet implemented.");
     }
-    return std::min(numNodes, _phyCores);
+    uint realVirtualCores = numVirtualCores + _configuration.getNumServiceNodes();
+    return std::min(realVirtualCores, _phyCores);
 }
 
 void RegressionData::init(){init(_configuration.getRealValues());}
@@ -141,7 +139,6 @@ void RegressionDataServiceTime::initUsl(const KnobsValues& values){
 void RegressionDataServiceTime::initAmdahl(const KnobsValues& values){
     _numPredictors = 0;
     uint numVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
-    double physicalCores = getUsedPhysicalCores(numVirtualCores, true);
 
     if(_p.knobFrequencyEnabled){
         double frequency = values[KNOB_TYPE_FREQUENCY];
@@ -149,7 +146,7 @@ void RegressionDataServiceTime::initAmdahl(const KnobsValues& values){
         ++_numPredictors;
 
         _invScalFactorFreqAndCores = (double)_minFrequency /
-                                     (physicalCores * frequency);
+                                     (numVirtualCores * frequency);
         ++_numPredictors;
     }else{
         throw std::runtime_error("Impossible to use Amdahl regression with no frequency.");
@@ -203,14 +200,14 @@ void RegressionDataPower::init(const KnobsValues& values){
     _numPredictors = 0;
     Frequency frequency = values[KNOB_TYPE_FREQUENCY];
     uint numVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
-    double usedPhysicalCores = getUsedPhysicalCores(numVirtualCores, false);
+    double usedPhysicalCores = getUsedPhysicalCores(numVirtualCores);
 
     if(_p.knobFrequencyEnabled){
         uint usedCpus = 0;
         if(values[KNOB_TYPE_MAPPING] == MAPPING_TYPE_LINEAR){
             usedCpus = std::ceil(usedPhysicalCores / (double) _phyCoresPerCpu);
         }else{
-            throw std::runtime_error("TODO"); //TODO
+            usedCpus = usedPhysicalCores>_cpus?_cpus:usedPhysicalCores;
         }
         usedCpus = std::min(usedCpus, _cpus);
         uint unusedCpus = _cpus - usedCpus;
@@ -381,6 +378,10 @@ double PredictorLinearRegression::getCurrentResponse() const{
 void PredictorLinearRegression::refine(){
     KnobsValues currentValues = _configuration.getRealValues();
     _preparationNeeded = true;
+    if(_type == PREDICTION_POWER){
+        // Add service nodes
+        currentValues[KNOB_TYPE_VIRTUAL_CORES] += _configuration.getNumServiceNodes();
+    }
     obs_it lb = _observations.lower_bound(currentValues);
 
     if(_p.regressionAging && !contains(_agingVector, currentValues)){

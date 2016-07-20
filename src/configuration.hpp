@@ -142,15 +142,12 @@ public:
         return _reconfigurationStats;
     }
 
-    virtual uint getNumWorkerThreads() const = 0;
+    virtual uint getNumServiceNodes() const{return 0;}
 };
 
 class ConfigurationExternal: public Configuration{
 public:
     ConfigurationExternal(const Parameters& p);
-    inline uint getNumWorkerThreads() const{
-        return _knobs[KNOB_TYPE_VIRTUAL_CORES]->getRealValue();
-    }
 };
 
 class ConfigurationFarm: public Configuration{
@@ -165,8 +162,8 @@ public:
                       ff::ff_gatherer* gt,
                       volatile bool* terminated);
 
-    inline uint getNumWorkerThreads() const{
-        return _knobs[KNOB_TYPE_VIRTUAL_CORES]->getRealValue() - _numServiceNodes;
+    inline uint getNumServiceNodes() const{
+        return _numServiceNodes;
     }
 };
 
