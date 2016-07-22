@@ -87,6 +87,7 @@ Manager::Manager(Parameters adaptivityParameters):
         _remainingTasks(0),
         _deadline(0),
         _lastStoredSampleMs(0),
+        _inhibited(false),
         _configuration(NULL),
         _selector(NULL){
     ;
@@ -115,6 +116,9 @@ void Manager::run(){
     fclose(in_roi);
 #endif
 
+    /** Wait for the disinhibition from global manager. **/
+    while(_inhibited){;}
+
     if(_counter){
         _counter->reset();
     }
@@ -124,7 +128,7 @@ void Manager::run(){
     }
 
     /* Force the first calibration point. **/
-    changeKnobs();
+    decideAndAct();
 
     ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
     thisThread->move(MANAGER_VIRTUAL_CORE);
@@ -156,16 +160,17 @@ void Manager::run(){
         }
 
         startSample = getMillisecondsTime();
-        registerSample();
-        updateRequiredBandwidth();
+        if(!_inhibited){
+            observe();
+            updateRequiredBandwidth();
+            logObservation();
 
-        observe();
-
-        if(!persist()){
-            DEBUG("Asking selector.");
-            changeKnobs();
-            _configuration->trigger();
-            startSample = getMillisecondsTime();
+            if(!persist()){
+                DEBUG("Asking selector.");
+                decideAndAct();
+                _configuration->trigger();
+                startSample = getMillisecondsTime();
+            }
         }
     }
 
@@ -184,7 +189,40 @@ void Manager::run(){
         ReconfigurationStats rs = _configuration->getReconfigurationStats();
         _p.observer->summaryStats(cs, rs, duration, _totalTasks);
     }
+}
 
+void Manager::inhibit(){
+    _inhibited = true;
+}
+
+void Manager::disinhibit(){
+    _inhibited = false;
+}
+
+std::vector<VirtualCoreId> Manager::getUsedCores(){
+    if(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){
+        return std::vector<VirtualCoreId>();
+    }else{
+        std::vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getActiveVirtualCores();
+        std::vector<VirtualCoreId> vcid;
+        for(size_t i = 0; i < vc.size(); i++){
+            vcid.push_back(vc.at(i)->getVirtualCoreId());
+        }
+        return vcid;
+    }
+}
+
+void Manager::allowVirtualCores(std::vector<mammut::topology::VirtualCoreId> ids){
+    vector<VirtualCore*> vc = _topology->getVirtualCores();
+    vector<VirtualCore*> allowedVc;
+    for(size_t i = 0; i < vc.size(); i++){
+        if(contains(ids, vc.at(i)->getVirtualCoreId())){
+            allowedVc.push_back(vc.at(i));
+        }
+    }
+    size_t availablePhysical = getNumPhysicalCores(allowedVc);
+    ((KnobVirtualCores*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES))->changeMax(availablePhysical);
+    //TODO: Change mapping
 
 }
 
@@ -373,7 +411,7 @@ void Manager::updateTasksCount(orlog::ApplicationSample& sample){
     }
 }
 
-void Manager::registerSample(){
+void Manager::observe(){
     MonitoredSample sample;
     orlog::ApplicationSample ws;
     Joules joules = 0.0;
@@ -416,7 +454,7 @@ void Manager::registerSample(){
     DEBUGB(samplesFile << *_samples << "\n");
 }
 
-void Manager::changeKnobs(){
+void Manager::decideAndAct(){
     if(!_configuration->knobsChangeNeeded()){
         return;
     }
@@ -465,7 +503,7 @@ Joules Manager::getAndResetJoules(){
     return joules;
 }
 
-void Manager::observe(){
+void Manager::logObservation(){
     if(_p.observer){
         const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration->getKnob(KNOB_TYPE_MAPPING));
         MonitoredSample ms = _samples->average();

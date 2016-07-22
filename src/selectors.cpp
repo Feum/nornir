@@ -587,6 +587,10 @@ SelectorLearner::SelectorLearner(const Parameters& p,
             throw std::runtime_error("Unknown exploration strategy.");
         }
     }
+
+    if(_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR_MAPPING){
+        _explorer = new ExplorerMultiple(_configuration, _explorer, KNOB_TYPE_MAPPING, MAPPING_TYPE_NUM);
+    }
 }
 
 SelectorLearner::~SelectorLearner(){

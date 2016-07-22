@@ -67,7 +67,7 @@ public:
 
 /**
  * Explorer that selects the configuration by using a low discrepancy
- * generator..
+ * generator.
  */
 class ExplorerLowDiscrepancy: public Explorer{
 private:
@@ -78,6 +78,26 @@ public:
     ExplorerLowDiscrepancy(const Configuration& configuration,
                            StrategyExploration explorationStrategy);
     virtual ~ExplorerLowDiscrepancy();
+    void reset();
+    KnobsValues nextRelativeKnobsValues() const;
+};
+
+/**
+ * Explorer to be used when building multiple models together.
+ */
+class ExplorerMultiple: public Explorer{
+private:
+    Explorer* _explorer;
+    KnobType _kt;
+    size_t _numValues;
+    mutable size_t _nextValue;
+    mutable KnobsValues _lastkv;
+public:
+    ExplorerMultiple(const Configuration& configuration,
+                     Explorer* explorer,
+                     KnobType kt,
+                     size_t numValues);
+    virtual ~ExplorerMultiple();
     void reset();
     KnobsValues nextRelativeKnobsValues() const;
 };

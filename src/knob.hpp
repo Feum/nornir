@@ -123,9 +123,11 @@ protected:
 class KnobVirtualCores: public Knob{
 private:
     Parameters _p;
+    uint _plus;
 public:
     KnobVirtualCores(Parameters p, uint plus = 0);
     void changeValueReal(double v);
+    void changeMax(double v);
 };
 
 class KnobVirtualCoresFarm: public KnobVirtualCores{
@@ -198,6 +200,10 @@ public:
 
     virtual void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder) = 0;
 
+    void setAllowedCores(std::vector<mammut::topology::VirtualCore*> vc);
+
+    bool isAllowed(mammut::topology::VirtualCore*) const;
+
     const std::vector<mammut::topology::VirtualCore*>& getActiveVirtualCores() const;
     const std::vector<mammut::topology::VirtualCore*>& getUnusedVirtualCores() const;
 protected:
@@ -210,6 +216,7 @@ private:
     std::vector<mammut::topology::VirtualCore*> _activeVirtualCores;
     std::vector<mammut::topology::VirtualCore*> _unusedVirtualCores;
     mammut::topology::Topology* _topologyHandler;
+    std::vector<mammut::topology::VirtualCore*> _allowedVirtualCores;
 
     std::vector<mammut::topology::VirtualCore*> computeVcOrderLinear();
     std::vector<mammut::topology::VirtualCore*> computeVcOrderInterleaved();

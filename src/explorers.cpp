@@ -131,4 +131,32 @@ namespace nornir{
     void ExplorerLowDiscrepancy::reset(){
         gsl_qrng_init(_generator);
     }
+
+    ExplorerMultiple::ExplorerMultiple(const Configuration& configuration,
+                                       Explorer* explorer,
+                                       KnobType kt,
+                                       size_t numValues):
+                Explorer(configuration), _explorer(explorer), _kt(kt),
+                _numValues(numValues), _nextValue(0), _lastkv(explorer->nextRelativeKnobsValues()){
+        ;
+    }
+
+    ExplorerMultiple::~ExplorerMultiple(){
+        ;
+    }
+
+    void ExplorerMultiple::reset(){
+        _explorer->reset();
+    }
+
+    KnobsValues ExplorerMultiple::nextRelativeKnobsValues() const{
+        if(_nextValue == _numValues){
+            _nextValue = 0;
+            _lastkv = _explorer->nextRelativeKnobsValues();
+        }
+        KnobsValues kv = _lastkv;
+        kv[_kt] = _nextValue * (100.0 / (double) _numValues);
+        ++_nextValue;
+        return kv;
+    }
 }

@@ -53,6 +53,7 @@
 namespace nornir{
 
 class Parameters;
+class ManagerMulti;
 
 //TODO REMOVE USING
 using namespace std;
@@ -83,6 +84,7 @@ typedef struct{
  * This class manages the adaptivity in parallel applications.
  */
 class Manager: public Thread{
+    friend class ManagerMulti;
 public:
     Manager(Parameters adaptivityParameters);
 
@@ -130,6 +132,15 @@ protected:
 
     // Milliseconds timestamp of the last store of a sample.
     double _lastStoredSampleMs;
+
+    // Inhibition flag.
+    bool _inhibited;
+
+    // The current configuration of the application.
+    Configuration* _configuration;
+
+    // The configuration selector.
+    Selector* _selector;
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
@@ -220,14 +231,14 @@ protected:
     void updateTasksCount(orlog::ApplicationSample& sample);
 
     /**
-     * Store a new sample.
+     * Observes.
      **/
-    void registerSample();
+    void observe();
 
     /**
-     * Changes the knobs.
+     * Decides what to do and acts.
      */
-    void changeKnobs();
+    void decideAndAct();
 
     /**
      * Gets the consumed joules since the last reset and
@@ -237,20 +248,28 @@ protected:
     Joules getAndResetJoules();
 
     /**
-     * Send data to observer.
+     * Logs the last observation.
      **/
-    void observe();
-protected:
-    // The current configuration of the application.
-    Configuration* _configuration;
-
-    // The configuration selector.
-    Selector* _selector;
+    void logObservation();
 
     /**
      * Creates the selector.
      */
     Selector* createSelector() const;
+private:
+    void inhibit();
+
+    void disinhibit();
+
+    /**
+     * Returns the vector of virtual cores used by the manager.
+     * The vector is empty if the manager still didn't finished the calibration.
+     *
+     * @return The vector of virtual cores used by the manager.
+     */
+    std::vector<VirtualCoreId> getUsedCores();
+
+    void allowVirtualCores(std::vector<mammut::topology::VirtualCoreId> ids);
 };
 
 
@@ -327,7 +346,6 @@ public:
     SimulationResult simulate(std::vector<std::string>& configurationData,
                               volatile bool* terminate,
                               size_t maxIterations = 0);
-
 private:
     // The managed farm.
     ff_farm<lb_t, gt_t>* _farm;

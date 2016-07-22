@@ -284,7 +284,7 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
     }
 
     /* Force the first calibration point. **/
-    changeKnobs();
+    decideAndAct();
 
     _samples->reset();
     _variations->reset();
@@ -352,7 +352,7 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
 
         startSample = getMillisecondsTime();
         DEBUG("Storing new sample.");
-        registerSample();
+        observe();
         _samples->reset();
         _variations->reset();
 
@@ -377,11 +377,11 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
 
         updateRequiredBandwidth();
 
-        observe();
+        logObservation();
 
         if(!persist()){
             DEBUG("Asking selector.");
-            changeKnobs();
+            decideAndAct();
 
             values = _configuration->getRealValues();
             key.numCores = values[KNOB_TYPE_VIRTUAL_CORES];

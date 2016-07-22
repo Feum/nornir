@@ -143,16 +143,20 @@ std::vector<double> Knob::getAllowedValues() const{
     return _knobValues;
 }
 
-KnobVirtualCores::KnobVirtualCores(Parameters p, uint plus):_p(p){
+KnobVirtualCores::KnobVirtualCores(Parameters p, uint plus):_p(p), _plus(plus){
     std::vector<VirtualCore*> virtualCores = _p.mammut.getInstanceTopology()->getVirtualCores();
-    for(size_t i = 0; i < virtualCores.size() - plus; i++){
-        if(!utils::contains(p.disallowedNumCores, (uint) i + 1 + plus)){
-            _knobValues.push_back(i + 1 + plus);
-        }
-    }
+    changeMax(virtualCores.size());
 }
 
 void KnobVirtualCores::changeValueReal(double v){;}
+
+void KnobVirtualCores::changeMax(double v){
+    for(size_t i = 0; i < v - _plus; i++){
+        if(!utils::contains(_p.disallowedNumCores, (uint) i + 1 + _plus)){
+            _knobValues.push_back(i + 1 + _plus);
+        }
+    }
+}
 
 #ifdef DEBUG_KNOB
 std::ostream& operator<< (std::ostream& out, const std::vector<AdaptiveNode*>& v){
@@ -360,6 +364,18 @@ void KnobMapping::changeValueReal(double v){
     DEBUG("[Mapping] Unused VCs: " << _unusedVirtualCores);
 }
 
+void KnobMapping::setAllowedCores(std::vector<mammut::topology::VirtualCore*> vc){
+    _allowedVirtualCores = vc;
+}
+
+bool KnobMapping::isAllowed(mammut::topology::VirtualCore* v) const{
+    if(!_allowedVirtualCores.size()){
+        return true;
+    }else{
+        return utils::contains(_allowedVirtualCores, v);
+    }
+}
+
 const vector<VirtualCore*>& KnobMapping::getActiveVirtualCores() const{
     return _activeVirtualCores;
 }
@@ -392,8 +408,8 @@ vector<VirtualCore*> KnobMapping::computeVcOrderLinear(){
                 if(vcOrder.size() == getNumVirtualCores()){
                     return vcOrder;
                 }
-                if(!_p.isolateManager ||
-                   virtCores.at(k)->getVirtualCoreId() != MANAGER_VIRTUAL_CORE){
+                if((!_p.isolateManager || virtCores.at(k)->getVirtualCoreId() != MANAGER_VIRTUAL_CORE) &&
+                    isAllowed(virtCores.at(k))){
                     vcOrder.push_back(virtCores.at(k));
                 }
             }
@@ -419,7 +435,8 @@ vector<VirtualCore*> KnobMapping::computeVcOrderInterleaved(){
             PhysicalCore* p = phyCores.at(nextPhysicalId);
             vector<VirtualCore*> virtCores = p->getVirtualCores();
             VirtualCore* v = virtCores.at(nextVirtualId);
-            if(!_p.isolateManager || v->getVirtualCoreId() != MANAGER_VIRTUAL_CORE){
+            if((!_p.isolateManager || v->getVirtualCoreId() != MANAGER_VIRTUAL_CORE) &&
+                isAllowed(v)){
                 vcOrder.push_back(v);
                 if(vcOrder.size() == getNumVirtualCores()){return vcOrder;}
             }
