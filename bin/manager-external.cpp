@@ -30,6 +30,7 @@
 #include <fstream>
 #include <stdlib.h>
 #include "../src/manager.hpp"
+#include "../src/manager-multi.hpp"
 #include "../src/monitor.hpp"
 
 using namespace nornir;
@@ -63,9 +64,11 @@ int main(int argc, char * argv[]){
     int mainChid;
     mainChid = mainChannel.bind(EXTERNAL_CHANNEL_NAME);
     std::list<ApplicationInstance*> instances;
-    system("mkdir -p /tmp/nornir");
-    system("chmod ugo+rwx /tmp/nornir.ipc");
-    system("chmod ugo+rwx /tmp/nornir/");
+    if(system("mkdir -p /tmp/nornir") == -1){throw std::runtime_error("Impossible to create nornir dir.");}
+    if(system("chmod ugo+rwx /tmp/nornir.ipc") == -1){throw std::runtime_error("Impossible to set permission to nornir channel.");}
+    if(system("chmod ugo+rwx /tmp/nornir/") == -1){throw std::runtime_error("Impossible to set permission nornir dir.");}
+    ManagerMulti mm;
+    mm.start();
     while(true){
         pid_t pid;
         assert(mainChannel.recv(&pid, sizeof(pid), 0) == sizeof(pid));
@@ -101,17 +104,22 @@ int main(int argc, char * argv[]){
         ai->manager = new ManagerExternal(ai->channel, ai->chid, p);
         ai->manager->start();
         instances.push_back(ai);
+        mm.addManager(ai->manager);
 
         /** Try to join and delete already terminated managers. **/
-        for(auto it = instances.begin(); it != instances.end(); it++){
-            if(!(*it)->manager->running()){
-                DEBUG("Application manager terminated, cleaning.");
-                delete ((*it)->manager);
-                (*it)->channel.shutdown((*it)->chid);
-                ApplicationInstance* ai = (*it);
-                instances.erase(it);
-                delete ((*it)->observer);
-                delete ai;
+        Manager* m;
+        m = mm.getTerminatedManager();
+        if(m){
+            for(auto it = instances.begin(); it != instances.end(); it++){
+                if((*it)->manager == m){
+                    DEBUG("Application manager terminated, cleaning.");
+                    delete ((*it)->manager);
+                    (*it)->channel.shutdown((*it)->chid);
+                    ApplicationInstance* ai = (*it);
+                    instances.erase(it);
+                    delete ((*it)->observer);
+                    delete ai;
+                }
             }
         }
     }

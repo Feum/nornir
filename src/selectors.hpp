@@ -54,6 +54,10 @@ protected:
     size_t _numCalibrationPoints;
     KnobsValues _previousConfiguration;
     Smoother<double>* _bandwidthIn;
+    bool _forced;
+    KnobsValues _forcedConfiguration;
+    bool _calibrationCoordination;
+    bool _calibrationAllowed;
 
     /**
      * Checks if a specific primary value respects the required contract.
@@ -80,6 +84,12 @@ public:
 
     virtual ~Selector(){;}
 
+
+    /**
+     * Forces the selector on a specific configuration.
+     * @param kv The configuration.
+     */
+    void forceConfiguration(KnobsValues& kv);
 
     /**
      * Updates the input bandwidth history with the current value.
@@ -126,6 +136,17 @@ public:
      * Resets the total calibration time.
      */
     void resetTotalCalibrationTime();
+
+    /**
+     * If this function is called, the selector needs to coordinate with a
+     * centralised manager before performing calibrations.
+     */
+    void setCalibrationCoordination();
+
+    /**
+     * Allows the selector to start calibration.
+     */
+    void allowCalibration();
 };
 
 /**
@@ -153,6 +174,9 @@ private:
     bool _feasible;
     // Association between REAL values and observed data.
     std::map<KnobsValues, MonitoredSample> _observedValues;
+    std::map<KnobsValues, double> _primaryPredictions;
+    std::map<KnobsValues, double> _secondaryPredictions;
+
     /**
      * Checks if x is a best suboptimal monitored value than y.
      * @param x The first monitored value.
@@ -248,6 +272,18 @@ public:
      * @return The secondary prediction for a given configuration.
      */
     double getSecondaryPrediction(KnobsValues values);
+
+    /**
+     * Returns a map with all the primary predictions.
+     * @return A map with all the primary predictions.
+     */
+    const std::map<KnobsValues, double>& getPrimaryPredictions() const;
+
+    /**
+     * Returns a map with all the secondary predictions.
+     * @return A map with all the secondary predictions.
+     */
+    const std::map<KnobsValues, double>& getSecondaryPredictions() const;
 };
 
 /**

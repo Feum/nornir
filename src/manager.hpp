@@ -262,14 +262,14 @@ private:
     void disinhibit();
 
     /**
-     * Returns the vector of virtual cores used by the manager.
+     * Returns the vector of physical cores used by the manager.
      * The vector is empty if the manager still didn't finished the calibration.
      *
-     * @return The vector of virtual cores used by the manager.
+     * @return The vector of physical cores used by the manager.
      */
-    std::vector<VirtualCoreId> getUsedCores();
+    std::vector<PhysicalCoreId> getUsedCores();
 
-    void allowVirtualCores(std::vector<mammut::topology::VirtualCoreId> ids);
+    void allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> ids);
 };
 
 

@@ -1,4 +1,4 @@
-TARGET = monitor.o manager.o knob.o trigger.o node.o parameters.o selectors.o predictors.o explorers.o configuration.o stats.o
+TARGET = monitor.o manager-multi.o manager.o knob.o trigger.o node.o parameters.o selectors.o predictors.o explorers.o configuration.o stats.o
 
 .PHONY: all clean cleanall install uninstall lib
 

@@ -199,31 +199,32 @@ void Manager::disinhibit(){
     _inhibited = false;
 }
 
-std::vector<VirtualCoreId> Manager::getUsedCores(){
+std::vector<PhysicalCoreId> Manager::getUsedCores(){
     if(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){
-        return std::vector<VirtualCoreId>();
+        return std::vector<PhysicalCoreId>();
     }else{
-        std::vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getActiveVirtualCores();
-        std::vector<VirtualCoreId> vcid;
+        vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getActiveVirtualCores();
+        vector<PhysicalCoreId> pcid;
         for(size_t i = 0; i < vc.size(); i++){
-            vcid.push_back(vc.at(i)->getVirtualCoreId());
+            PhysicalCoreId pci = vc.at(i)->getPhysicalCoreId();
+            if(!contains(pcid, pci)){
+                pcid.push_back(pci);
+            }
         }
-        return vcid;
+        return pcid;
     }
 }
 
-void Manager::allowVirtualCores(std::vector<mammut::topology::VirtualCoreId> ids){
+void Manager::allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> ids){
     vector<VirtualCore*> vc = _topology->getVirtualCores();
     vector<VirtualCore*> allowedVc;
     for(size_t i = 0; i < vc.size(); i++){
-        if(contains(ids, vc.at(i)->getVirtualCoreId())){
+        if(contains(ids, vc.at(i)->getPhysicalCoreId())){
             allowedVc.push_back(vc.at(i));
         }
     }
-    size_t availablePhysical = getNumPhysicalCores(allowedVc);
-    ((KnobVirtualCores*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES))->changeMax(availablePhysical);
-    //TODO: Change mapping
-
+    ((KnobVirtualCores*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES))->changeMax(ids.size());
+    ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->setAllowedCores(allowedVc);
 }
 
 void Manager::updateRequiredBandwidth() {

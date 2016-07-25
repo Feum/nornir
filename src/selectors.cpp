@@ -42,6 +42,8 @@
 
 #define NOT_VALID DBL_MIN
 
+#define STORE_PREDICTIONS 1
+
 using namespace mammut::cpufreq;
 using namespace mammut::energy;
 using namespace mammut::utils;
@@ -60,7 +62,10 @@ Selector::Selector(const Parameters& p,
         _p(p),
         _configuration(configuration),
         _samples(samples),
-        _numCalibrationPoints(0){
+        _numCalibrationPoints(0),
+        _forced(false),
+        _calibrationCoordination(false),
+        _calibrationAllowed(false){
     _joulesCounter = _localMammut.getInstanceEnergy()->getCounter();
     //TODO Fare meglio con mammut
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
@@ -131,6 +136,10 @@ bool Selector::isContractViolated() const{
 
 void Selector::startCalibration(uint64_t totalTasks){
     _calibrating = true;
+    if(_calibrationCoordination){
+        while(!_calibrationAllowed){;}
+        _calibrationAllowed = false;
+    }
     _numCalibrationPoints = 0;
     _calibrationStartMs = getMillisecondsTime();
     _calibrationStartTasks = totalTasks;
@@ -163,6 +172,13 @@ void Selector::resetTotalCalibrationTime(){
     _totalCalibrationTime = 0;
 }
 
+void Selector::setCalibrationCoordination(){
+    _calibrationCoordination = true;
+}
+
+void Selector::allowCalibration(){
+    _calibrationAllowed = true;
+}
 
 std::vector<CalibrationStats> Selector::getCalibrationsStats() const{
     return _calibrationStats;
@@ -170,6 +186,11 @@ std::vector<CalibrationStats> Selector::getCalibrationsStats() const{
 
 bool Selector::isCalibrating() const{
     return _calibrating;
+}
+
+void Selector::forceConfiguration(KnobsValues& kv){
+    _forced = true;
+    _forcedConfiguration = kv;
 }
 
 void Selector::updateBandwidthIn(){
@@ -301,6 +322,22 @@ double SelectorPredictive::getSecondaryPrediction(KnobsValues values){
     }
 }
 
+const std::map<KnobsValues, double>& SelectorPredictive::getPrimaryPredictions() const{
+#if STORE_PREDICTIONS
+    return _primaryPredictions;
+#else
+    throw std::runtime_error("Please define STORE_PREDICTIONS macro to 1.");
+#endif
+}
+
+const std::map<KnobsValues, double>& SelectorPredictive::getSecondaryPredictions() const{
+#if STORE_PREDICTIONS
+    return _secondaryPredictions;
+#else
+    throw std::runtime_error("Please define STORE_PREDICTIONS macro to 1.");
+#endif
+}
+
 bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
@@ -391,6 +428,11 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
         KnobsValues currentValues = combinations.at(i);
         primaryPrediction = getPrimaryPrediction(currentValues);
         secondaryPrediction = getSecondaryPrediction(currentValues);
+
+#if STORE_PREDICTIONS
+        _primaryPredictions[combinations.at(i)] = primaryPrediction;
+        _secondaryPredictions[combinations.at(i)] = secondaryPrediction;
+#endif
 
         //std::cout << currentValues << " " << primaryPrediction << " ";
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
@@ -601,6 +643,10 @@ SelectorLearner::~SelectorLearner(){
 
 KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
     _previousConfiguration = _configuration.getRealValues();
+    if(_forced){
+        return _forcedConfiguration;
+    }
+
     KnobsValues kv;
     bool contractViolated = isContractViolated();
     bool accurate = isAccurate();
@@ -656,6 +702,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             resetTotalCalibrationTime();
             _accuracyViolations = 0;
             _contractViolations = 0;
+            _forced = false;
             DEBUG("Phase changed, recalibrating.");
         }else if(_bandwidthIn->coefficientVariation() > 100.0){ //TODO Remove magic number
             /******************* Bandwidth change. *******************/
@@ -665,10 +712,11 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             _accuracyViolations = 0;
             _contractViolations = 0;
             _bandwidthIn->reset();
+            _forced = false;
             DEBUG("Input bandwidth fluctuations, recomputing best solution.");
         }else if((!_p.maxCalibrationTime || getTotalCalibrationTime() < _p.maxCalibrationTime) &&
                  ((!accurate && _accuracyViolations > _p.tolerableSamples) ||
-                  (contractViolated && _contractViolations > _p.tolerableSamples))){
+                  (!_forced && contractViolated && _contractViolations > _p.tolerableSamples))){
             /******************* More calibration points. *******************/
             kv = _explorer->nextRelativeKnobsValues();
             updatePredictions(kv);
