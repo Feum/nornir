@@ -32,7 +32,7 @@ ifdef version
   endif
   ifeq "$(version)" "ff"
     CXXFLAGS += --std=c++11 -O3
-    MT        = -DENABLE_FF
+    MT        = -DENABLE_FF 
     LDLIBS      += -pthread
   endif
 else

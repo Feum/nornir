@@ -141,6 +141,9 @@ protected:
 
     // The configuration selector.
     Selector* _selector;
+
+    // Watts correction value for multiple applications scenario.
+    Joules _wattsCorrection;
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
@@ -270,6 +273,10 @@ private:
     std::vector<PhysicalCoreId> getUsedCores();
 
     void allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> ids);
+
+    void removeWattsCorrection();
+
+    void updateWattsCorrection();
 };
 
 

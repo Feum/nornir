@@ -151,6 +151,7 @@ KnobVirtualCores::KnobVirtualCores(Parameters p, uint plus):_p(p), _plus(plus){
 void KnobVirtualCores::changeValueReal(double v){;}
 
 void KnobVirtualCores::changeMax(double v){
+    _knobValues.clear();
     for(size_t i = 0; i < v - _plus; i++){
         if(!utils::contains(_p.disallowedNumCores, (uint) i + 1 + _plus)){
             _knobValues.push_back(i + 1 + _plus);

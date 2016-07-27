@@ -55,6 +55,7 @@ protected:
     KnobsValues _previousConfiguration;
     Smoother<double>* _bandwidthIn;
     bool _forced;
+    bool _forcedReturned;
     KnobsValues _forcedConfiguration;
     bool _calibrationCoordination;
     bool _calibrationAllowed;

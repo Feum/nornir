@@ -64,6 +64,7 @@ Selector::Selector(const Parameters& p,
         _samples(samples),
         _numCalibrationPoints(0),
         _forced(false),
+        _forcedReturned(false),
         _calibrationCoordination(false),
         _calibrationAllowed(false){
     _joulesCounter = _localMammut.getInstanceEnergy()->getCounter();
@@ -190,6 +191,7 @@ bool Selector::isCalibrating() const{
 
 void Selector::forceConfiguration(KnobsValues& kv){
     _forced = true;
+    _forcedReturned = false;
     _forcedConfiguration = kv;
 }
 
@@ -643,7 +645,8 @@ SelectorLearner::~SelectorLearner(){
 
 KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
     _previousConfiguration = _configuration.getRealValues();
-    if(_forced){
+    if(_forced && !_forcedReturned){
+        _forcedReturned = true;
         return _forcedConfiguration;
     }
 

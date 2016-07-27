@@ -44,6 +44,7 @@ using namespace tbb;
 #include <iostream>
 #include "../../src/interface.hpp"
 #include "../../src/manager-multi.hpp"
+#include "../../src/external/Mammut/mammut/utils.hpp"
 
 using namespace ff;
 #endif //ENABLE_FF
@@ -416,8 +417,10 @@ static nornir::ManagerMulti mm;
 typedef struct{
     int argc;
     char **argv;
-    bool started;
+    volatile bool started;
     size_t tid;
+    nornir::ContractType ct;
+    double bound;
 }runArg;
 
 void* run(void* arg){
@@ -578,19 +581,31 @@ void* run(void* arg){
     farm.add_emitter((ff_node*)new Emitter(rarg->tid));
     farm.remove_collector();
 
-    nornir::Observer obs;
+    nornir::Observer obs(std::string("stats_") + mammut::utils::intToString(rarg->tid) + std::string(".csv"), 
+                         std::string("calibration_") + mammut::utils::intToString(rarg->tid) + std::string(".csv"),
+                         std::string("summary_") + mammut::utils::intToString(rarg->tid) + std::string(".csv"));
     nornir::Parameters ap("parameters.xml");
+    ap.contractType = rarg->ct;
+    if(rarg->ct == nornir::CONTRACT_PERF_BANDWIDTH){
+        ap.requiredBandwidth = rarg->bound;
+    }else if(rarg->ct == nornir::CONTRACT_POWER_BUDGET){
+        ap.powerBudget = rarg->bound;
+    }else{
+        throw std::runtime_error("Contract type not supported yet.");
+    }
     ap.observer = &obs;
     ap.expectedTasksNumber = numOptions[rarg->tid] * NUM_RUNS / CHUNKSIZE;
     nornir::ManagerFarm<> amf(&farm, ap);
     mm.addManager(&amf);
     rarg->started = true;
+    sleep(2);
     while(amf.running()){sleep(1);}
+    std::cout << "Manager terminated." << std::endl;
     //farm.ffStats(std::cout);
 #else //ENABLE_FF
     //serial version
-    int tid=0;
-    bs_thread(&tid);
+    int ttid=0;
+    bs_thread(&ttid);
 #endif //ENABLE_FF
 #endif //ENABLE_TBB
 #endif //ENABLE_OPENMP
@@ -665,10 +680,14 @@ int main(int argc, char **argv){
     rarg->argv = argv;
     rarg->started = false;
     rarg->tid = nexttid;
+    rarg->ct = nornir::CONTRACT_PERF_BANDWIDTH;
+    rarg->bound = 14420;
     nexttid++;
     std::cout << "Creating first blackscholes instance." << std::endl;
-    pthread_create(&tid1, NULL, run, (void*) rarg);
+    pthread_create(&tid1, NULL, &run, (void*) rarg);
+    std::cout << "Instance created." << std::endl;
     while(!rarg->started){;}
+    std::cout << "Instance started." << std::endl;
     sleep(8);
 
     rarg = new runArg();
@@ -676,10 +695,15 @@ int main(int argc, char **argv){
     rarg->argv = argv;
     rarg->started = false;
     rarg->tid = nexttid;
+    rarg->ct = nornir::CONTRACT_POWER_BUDGET;
+    rarg->bound = 50;
+    //    rarg->bound = 14420*2;
     nexttid++;
     std::cout << "Creating second blackscholes instance." << std::endl;
-    pthread_create(&tid2, NULL, run, (void*) rarg);
+    pthread_create(&tid2, NULL, &run, (void*) rarg);
+    std::cout << "Instance created." <<std::endl;
     while(!rarg->started){;}
+    std::cout << "Instance started." <<std::endl;
 
     pthread_join(tid1, NULL);
     pthread_join(tid2, NULL);

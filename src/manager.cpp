@@ -89,7 +89,9 @@ Manager::Manager(Parameters adaptivityParameters):
         _lastStoredSampleMs(0),
         _inhibited(false),
         _configuration(NULL),
-        _selector(NULL){
+        _selector(NULL),
+        _wattsCorrection(0)
+{
     ;
 }
 
@@ -225,6 +227,25 @@ void Manager::allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> i
     }
     ((KnobVirtualCores*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES))->changeMax(ids.size());
     ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->setAllowedCores(allowedVc);
+    _configuration->createAllRealCombinations();
+}
+
+void Manager::removeWattsCorrection(){
+    _wattsCorrection = 0;
+}
+
+void Manager::updateWattsCorrection(){
+    removeWattsCorrection();
+    _wattsCorrection = 0;
+    if(_samples->size()){
+        getAndResetJoules();
+        usleep(100*(double)MAMMUT_MICROSECS_IN_MILLISEC);
+        Joules watts = getAndResetJoules() / 0.1;
+        _wattsCorrection = watts - _samples->average().watts;
+        DEBUG(this << "Applied a watts correction of " << _wattsCorrection << " watts.");
+        _samples->reset();
+        _lastStoredSampleMs = getMillisecondsTime();
+    }
 }
 
 void Manager::updateRequiredBandwidth() {
@@ -430,7 +451,8 @@ void Manager::observe(){
     double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
     _lastStoredSampleMs = now;
 
-    sample.watts = joules / durationSecs;
+    sample.watts = joules / durationSecs - _wattsCorrection;
+    DEBUG(this << " realwatts: " << joules / durationSecs << " correctedwatts: " << sample.watts);
     // ATTENTION: Bandwidth is not the number of task since the
     //            last observation but the number of expected
     //            tasks that will be processed in 1 second.
@@ -517,8 +539,8 @@ void Manager::logObservation(){
                              _samples->coefficientVariation().bandwidth,
                              ms.latency,
                              ms.utilisation,
-                             _samples->getLastSample().watts,
-                             ms.watts);
+                             _samples->getLastSample().watts + _wattsCorrection,
+                             ms.watts + _wattsCorrection);
     }
 }
 

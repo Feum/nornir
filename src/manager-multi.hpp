@@ -45,11 +45,13 @@ private:
     std::map<Manager*, std::vector<KnobsValues> > _allocations;
     std::vector<std::vector<size_t> > _allocationsCombinations;
 
-    void inhibitAll();
+    void inhibitAll(Manager* except);
 
     void disinhibitAll();
 
     std::vector<mammut::topology::PhysicalCoreId> getAvailablePhysicalCores() const;
+
+    std::map<KnobsValues, double> invertMap(const std::map<KnobsValues, double>& map) const;
 
     void updateAllocations(Manager* m);
 
@@ -65,6 +67,8 @@ private:
     std::vector<size_t> findBestAllocation();
 
     void applyNewAllocation();
+
+    void applyWattsCorrection();
 public:
     ManagerMulti();
 
