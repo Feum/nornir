@@ -225,7 +225,7 @@ void Manager::allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> i
             allowedVc.push_back(vc.at(i));
         }
     }
-    ((KnobVirtualCores*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES))->changeMax(ids.size());
+    ((KnobVirtualCores*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES))->changeMax(ids.size() - _configuration->getNumServiceNodes());
     ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->setAllowedCores(allowedVc);
     _configuration->createAllRealCombinations();
 }
