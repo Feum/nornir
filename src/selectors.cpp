@@ -436,9 +436,8 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
         _secondaryPredictions[combinations.at(i)] = secondaryPrediction;
 #endif
 
-        //std::cout << currentValues << " " << primaryPrediction << " ";
+        //std::cout << currentValues << " " << primaryPrediction << " " << secondaryPrediction << std::endl;
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
-            //std::cout << secondaryPrediction;
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
                 _feasible = true;
@@ -451,7 +450,6 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
             bestSuboptimalValues = currentValues;
             DEBUGB(suboptimalSecondary = secondaryPrediction);
         }
-        //std::cout << std::endl;
     }
 
     if(_feasible){
@@ -542,8 +540,9 @@ bool SelectorPredictive::isAccurate(){
     DEBUG("Perf error: " << performanceError);
     DEBUG("Power error: " << powerError);
 
+    // For multi applications scenario we ignore power consumption model inaccuracies.
     if(performanceError > _p.maxPerformancePredictionError ||
-       powerError > _p.maxPowerPredictionError /* ||
+       (!_calibrationCoordination && powerError > _p.maxPowerPredictionError) /* ||
        _primaryPredictor->getModelError() > 10 || //TODO
        _secondaryPredictor->getModelError() > 10*/){
         return false;
@@ -719,7 +718,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             DEBUG("Input bandwidth fluctuations, recomputing best solution.");
         }else if((!_p.maxCalibrationTime || getTotalCalibrationTime() < _p.maxCalibrationTime) &&
                  ((!accurate && _accuracyViolations > _p.tolerableSamples) ||
-                  (!_forced && contractViolated && _contractViolations > _p.tolerableSamples))){
+                  (isBestSolutionFeasible() && !_forced && contractViolated && _contractViolations > _p.tolerableSamples))){
             /******************* More calibration points. *******************/
             kv = _explorer->nextRelativeKnobsValues();
             updatePredictions(kv);
@@ -748,8 +747,9 @@ bool SelectorLearner::phaseChanged() const{
         // to avoid to detect as a phase change a configuration change.
         return false;
     }
+    // For multi applications scenario we ignore power consumption variation.
     return _samples->coefficientVariation().latency > 20.0 ||
-           _samples->coefficientVariation().watts > 20.0;
+           (!_calibrationCoordination && _samples->coefficientVariation().watts > 20.0);
 }
 
 SelectorFixedExploration::SelectorFixedExploration(const Parameters& p,

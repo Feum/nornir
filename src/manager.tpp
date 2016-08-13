@@ -250,8 +250,12 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
 
         data.completionTime = atof(fields[2].c_str());
         data.wattsCpu = atof(fields[3].c_str());
-        data.wattsCores = atof(fields[4].c_str());
-        data.wattsDram = atof(fields[5].c_str());
+        if(fields.size() > 4){
+            data.wattsCores = atof(fields[4].c_str());
+        }
+        if(fields.size() > 5){
+            data.wattsDram = atof(fields[5].c_str());
+        }
 
         table.insert(std::pair<SimulationKey, SimulationData>(key, data));
     }
@@ -284,7 +288,8 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
     }
 
     /* Force the first calibration point. **/
-    decideAndAct();
+    KnobsValues kv = decide();
+    act(kv);
 
     _samples->reset();
     _variations->reset();
@@ -381,7 +386,8 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
 
         if(!persist()){
             DEBUG("Asking selector.");
-            decideAndAct();
+            KnobsValues kv = decide();
+            act(kv);
 
             values = _configuration->getRealValues();
             key.numCores = values[KNOB_TYPE_VIRTUAL_CORES];

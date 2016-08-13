@@ -30,6 +30,8 @@
  * \brief Predictors used by adaptive farm.
  */
 
+#include <iomanip>
+
 #include "predictors.hpp"
 #include "manager.hpp"
 
@@ -280,6 +282,16 @@ void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
     }
 }
 
+bool RegressionDataPower::getInactivePowerPosition(size_t& pos) const{
+    // ATTENTION: pos = 0 is the intercept (constant value).
+    if(_p.knobFrequencyEnabled && _cpus > 1){
+        pos = _numPredictors;
+        return true;
+    }else{
+        return false;
+    }
+}
+
 Predictor::Predictor(PredictorType type,
                      const Parameters& p,
                      const Configuration& configuration,
@@ -521,6 +533,17 @@ double PredictorLinearRegression::predict(const KnobsValues& values, double band
     return res;
 }
 
+double PredictorLinearRegression::getInactivePowerParameter() const{
+    if(_type == PREDICTION_POWER){
+        size_t pos;
+        if(!((RegressionDataPower*)_predictionInput)->getInactivePowerPosition(pos)){
+            throw std::runtime_error("Impossible to get inactive power parameter.");
+        }
+        return _lr.Parameters().at(pos);
+    }else{
+        throw std::runtime_error("getInactivePowerParameter can only be called on POWER predictors.");
+    }
+}
 
 /*************************************************/
 /*        PredictorLinearRegressionMapping       */

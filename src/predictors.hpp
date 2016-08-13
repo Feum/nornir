@@ -151,6 +151,16 @@ public:
     uint getNumPredictors() const;
 
     void toArmaRow(size_t rowId, arma::mat& matrix) const;
+
+    /**
+     * Set the position of the inactive power parameter into the parameters
+     * vector into the variable passed as parameter.
+     * @param pos The position of the inactive power parameter into the parameters
+     * vector.
+     * @return True if there inactive power is considered by the model, false
+     * otherwise (e.g. if only one CPU is present on the machine).
+     */
+    bool getInactivePowerPosition(size_t& pos) const;
 };
 
 
@@ -275,6 +285,8 @@ public:
     void prepareForPredictions();
 
     double predict(const KnobsValues& configuration, double bandwidthIn);
+
+    double getInactivePowerParameter() const;
 };
 
 /**

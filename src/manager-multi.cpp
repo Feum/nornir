@@ -40,9 +40,11 @@ using namespace mammut::cpufreq;
  */
 
 #ifdef DEBUG_MANAGER_MULTI
+#undef DEBUG
 #define DEBUG(x) do { cerr << "[ManagerMulti] " << x << endl; } while (0)
 #define DEBUGB(x) do {x;} while(0)
 #else
+#undef DEBUG
 #define DEBUG(x)
 #define DEBUGB(x)
 #endif
@@ -276,6 +278,8 @@ void ManagerMulti::applyNewAllocation(){
     for(auto it = _allocations.begin(); it != _allocations.end(); it++){
         man = it->first;
         KnobsValues kv = it->second.at(alloc.at(pos));
+        DEBUG("Allocations: " << it->second);
+        DEBUG("Allocation: " << man << " " << kv << " " << ((SelectorPredictive*)man->_selector)->getPrimaryPrediction(kv) << " " << ((SelectorPredictive*)man->_selector)->getSecondaryPrediction(kv));
         size_t numCores;
         if(kv.areRelative()){
             double tmp;
@@ -293,7 +297,9 @@ void ManagerMulti::applyNewAllocation(){
         }
         DEBUG("Forcing manager " << man << " to " << cores);
         man->allowPhysicalCores(cores);
-        man->_selector->forceConfiguration(kv);
+        //man->_selector->forceConfiguration(kv);
+        man->act(kv, true);
+        ((SelectorPredictive*) man->_selector)->updatePredictions(kv);
         ++pos;
         nextCoreId += numCores;
     }
@@ -302,6 +308,22 @@ void ManagerMulti::applyNewAllocation(){
 void ManagerMulti::applyWattsCorrection(){
     for(size_t i = 0; i < _activeManagers.size(); i++){
         _activeManagers.at(i)->updateWattsCorrection();
+    }
+}
+
+PredictorLinearRegression* ManagerMulti::getPowerPredictor(Manager* m) const{
+    switch(m->_p.contractType){
+        case CONTRACT_PERF_BANDWIDTH:
+        case CONTRACT_PERF_COMPLETION_TIME:
+        case CONTRACT_PERF_UTILIZATION:{
+            return ((PredictorLinearRegression*) ((SelectorPredictive*) m->_selector)->getSecondaryPredictor());
+        }break;
+        case CONTRACT_POWER_BUDGET:{
+            return ((PredictorLinearRegression*) ((SelectorPredictive*) m->_selector)->getPrimaryPredictor());
+        }break;
+        default:{
+            throw std::runtime_error("Unknown contract type.");
+        }
     }
 }
 
@@ -321,6 +343,7 @@ void ManagerMulti::run(){
                    m->_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR_MAPPING);
 
             _activeManagers.push_back(m);
+            _allocatedCores[m] = vector<PhysicalCoreId>();
             if(_activeManagers.size() > 1){
                 inhibitAll(m); //TODO: Inhibition should freeze the application.
             }
@@ -335,12 +358,13 @@ void ManagerMulti::run(){
             // Wait for calibration termination.
             while(m->_selector->isCalibrating() || !m->_selector->getTotalCalibrationTime()){;}
             DEBUG("Calibration terminated.");
+
             if(_activeManagers.size() > 1){
                 applyNewAllocation();
                 DEBUG("Best allocation applied.");
                 // TODO Add external contributions to perf models.
-                applyWattsCorrection();
-                // Disinhibit all the other managers
+                //applyWattsCorrection();
+                // Disinhibit all the managers
                 disinhibitAll();
                 DEBUG("All managers disinhibited.");
             }
@@ -355,7 +379,7 @@ void ManagerMulti::run(){
                     _allocatedCores.erase(m);
                     _activeManagers.erase(_activeManagers.begin() + i);
                     if(_activeManagers.size()){
-                        applyWattsCorrection(); //TODO Possible contention on samples
+                        //applyWattsCorrection(); //TODO Possible contention on samples
                     }
                     while(!_qOut.push((void*) m)){;}
                 }else{
@@ -372,7 +396,7 @@ void ManagerMulti::run(){
                             applyNewAllocation();
                             DEBUG("Best allocation applied.");
                             // TODO Add external contributions to perf models.
-                            applyWattsCorrection();
+                            //applyWattsCorrection();
                             // Disinhibit all the other managers
                             disinhibitAll();
                             DEBUG("All managers disinhibited.");

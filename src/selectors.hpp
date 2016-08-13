@@ -164,11 +164,14 @@ public:
     KnobsValues getNextKnobsValues(u_int64_t totalTasks);
 };
 
+class ManagerMulti;
+
 /**
  * A generic selector that uses the predictions of ALL the configurations
  * to find the best one.
  */
 class SelectorPredictive: public Selector{
+    friend class ManagerMulti;
 private:
     std::unique_ptr<Predictor> _primaryPredictor;
     std::unique_ptr<Predictor> _secondaryPredictor;
@@ -285,6 +288,10 @@ public:
      * @return A map with all the secondary predictions.
      */
     const std::map<KnobsValues, double>& getSecondaryPredictions() const;
+
+    Predictor* getPrimaryPredictor() const{return _primaryPredictor.get();}
+
+    Predictor* getSecondaryPredictor() const{return _secondaryPredictor.get();}
 };
 
 /**

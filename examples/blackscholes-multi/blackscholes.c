@@ -675,6 +675,7 @@ int main(int argc, char **argv){
     size_t nexttid = 0;
     pthread_t tid1, tid2;
     mm.start();
+
     runArg* rarg = new runArg();
     rarg->argc = argc;
     rarg->argv = argv;
@@ -690,14 +691,30 @@ int main(int argc, char **argv){
     std::cout << "Instance started." << std::endl;
     sleep(8);
 
+
     rarg = new runArg();
     rarg->argc = argc;
     rarg->argv = argv;
     rarg->started = false;
     rarg->tid = nexttid;
-    rarg->ct = nornir::CONTRACT_POWER_BUDGET;
-    rarg->bound = 50;
-    //    rarg->bound = 14420*2;
+    rarg->ct = nornir::CONTRACT_PERF_BANDWIDTH;
+    rarg->bound = 14420;
+    nexttid++;
+    std::cout << "Creating first blackscholes instance." << std::endl;
+    pthread_create(&tid1, NULL, &run, (void*) rarg);
+    std::cout << "Instance created." << std::endl;
+    while(!rarg->started){;}
+    std::cout << "Instance started." << std::endl;
+
+    rarg = new runArg();
+    rarg->argc = argc;
+    rarg->argv = argv;
+    rarg->started = false;
+    rarg->tid = nexttid;
+    //rarg->ct = nornir::CONTRACT_POWER_BUDGET;
+    //rarg->bound = 50;
+    rarg->ct = nornir::CONTRACT_PERF_BANDWIDTH;
+    rarg->bound = 14420*4;
     nexttid++;
     std::cout << "Creating second blackscholes instance." << std::endl;
     pthread_create(&tid2, NULL, &run, (void*) rarg);

@@ -130,7 +130,8 @@ void Manager::run(){
     }
 
     /* Force the first calibration point. **/
-    decideAndAct();
+    KnobsValues kv = decide();
+    act(kv);
 
     ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
     thisThread->move(MANAGER_VIRTUAL_CORE);
@@ -169,7 +170,8 @@ void Manager::run(){
 
             if(!persist()){
                 DEBUG("Asking selector.");
-                decideAndAct();
+                KnobsValues kv = decide();
+                act(kv);
                 _configuration->trigger();
                 startSample = getMillisecondsTime();
             }
@@ -236,16 +238,35 @@ void Manager::removeWattsCorrection(){
 
 void Manager::updateWattsCorrection(){
     removeWattsCorrection();
-    _wattsCorrection = 0;
+    getAndResetJoules();
+    usleep(100*(double)MAMMUT_MICROSECS_IN_MILLISEC);
+    Joules watts = getAndResetJoules() / 0.1;
+
     if(_samples->size()){
-        getAndResetJoules();
-        usleep(100*(double)MAMMUT_MICROSECS_IN_MILLISEC);
-        Joules watts = getAndResetJoules() / 0.1;
         _wattsCorrection = watts - _samples->average().watts;
-        DEBUG(this << "Applied a watts correction of " << _wattsCorrection << " watts.");
-        _samples->reset();
-        _lastStoredSampleMs = getMillisecondsTime();
+    }else{
+        double pred = 0;
+        switch(_p.contractType){
+            case CONTRACT_PERF_BANDWIDTH:
+            case CONTRACT_PERF_COMPLETION_TIME:
+            case CONTRACT_PERF_UTILIZATION:{
+                pred = ((SelectorPredictive*) _selector)->getSecondaryPrediction(_configuration->getRealValues());
+            }break;
+            case CONTRACT_POWER_BUDGET:{
+                pred = ((SelectorPredictive*) _selector)->getPrimaryPrediction(_configuration->getRealValues());
+            }break;
+            default:{
+                throw std::runtime_error("Unknown contract type.");
+            }
+        }
+        if(pred > watts){
+            _wattsCorrection = pred - watts;
+        }else{
+            _wattsCorrection = watts - pred;
+        }
     }
+    _samples->reset();
+    _lastStoredSampleMs = getMillisecondsTime();
 }
 
 void Manager::updateRequiredBandwidth() {
@@ -452,7 +473,6 @@ void Manager::observe(){
     _lastStoredSampleMs = now;
 
     sample.watts = joules / durationSecs - _wattsCorrection;
-    DEBUG(this << " realwatts: " << joules / durationSecs << " correctedwatts: " << sample.watts);
     // ATTENTION: Bandwidth is not the number of task since the
     //            last observation but the number of expected
     //            tasks that will be processed in 1 second.
@@ -477,9 +497,9 @@ void Manager::observe(){
     DEBUGB(samplesFile << *_samples << "\n");
 }
 
-void Manager::decideAndAct(){
+KnobsValues Manager::decide(){
     if(!_configuration->knobsChangeNeeded()){
-        return;
+        return _configuration->getRealValues();
     }
 
     if(_totalTasks){
@@ -488,9 +508,12 @@ void Manager::decideAndAct(){
         // the first forced reconfiguration.
         _selector->updateBandwidthIn();
     }
-    KnobsValues values = _selector->getNextKnobsValues(_totalTasks);
-    if(!_configuration->equal(values)){
-        _configuration->setValues(values);
+    return _selector->getNextKnobsValues(_totalTasks);
+}
+
+void Manager::act(KnobsValues kv, bool force){
+    if(force || !_configuration->equal(kv)){
+        _configuration->setValues(kv);
         manageConfigurationChange();
 
         /****************** Clean state ******************/

@@ -239,9 +239,15 @@ protected:
     void observe();
 
     /**
-     * Decides what to do and acts.
+     * Decides the next configuration.
      */
-    void decideAndAct();
+    KnobsValues decide();
+
+    /**
+     * Move to the specified configuration.
+     * @param kv The configuration
+     */
+    void act(KnobsValues kv, bool force = false);
 
     /**
      * Gets the consumed joules since the last reset and

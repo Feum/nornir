@@ -69,6 +69,8 @@ private:
     void applyNewAllocation();
 
     void applyWattsCorrection();
+
+    PredictorLinearRegression* getPowerPredictor(Manager* m) const;
 public:
     ManagerMulti();
 
