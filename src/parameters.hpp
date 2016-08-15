@@ -122,19 +122,23 @@ typedef enum{
     STRATEGY_SELECTION_MISHRA
 }StrategySelection;
 
-// Possible prediction strategies. Can only be specified if the selection
-// strategy is "LEARNING".
+// Possible prediction strategies for performance. Can only be specified if the
+// selection strategy is "LEARNING".
 typedef enum{
-    STRATEGY_PREDICTION_REGRESSION_LINEAR = 0,
-    STRATEGY_PREDICTION_REGRESSION_LINEAR_MAPPING,
-    STRATEGY_PREDICTION_MISHRA
-}StrategyPrediction;
+    STRATEGY_PREDICTION_PERFORMANCE_AMDAHL = 0,
+    STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING,
+    STRATEGY_PREDICTION_PERFORMANCE_USL,
+    STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING,
+    STRATEGY_PREDICTION_PERFORMANCE_MISHRA
+}StrategyPredictionPerformance;
 
-// Possible performance models to be used.
+// Possible prediction strategies for power consumption. Can only be specified
+// if the selection strategy is "LEARNING".
 typedef enum{
-    STRATEGY_MODEL_AMDAHL = 0, // Amdahl's Law
-    STRATEGY_MODEL_USL, // Universal Scalability Law
-}StrategyModelPerformance;
+    STRATEGY_PREDICTION_POWER_LINEAR = 0,
+    STRATEGY_PREDICTION_POWER_LINEAR_MAPPING,
+    STRATEGY_PREDICTION_POWER_MISHRA
+}StrategyPredictionPower;
 
 /// Possible ways to select the calibration points. Can only be specified if
 /// the selection strategy is "LEARNING".
@@ -570,13 +574,15 @@ public:
     // to the requirements [default = STRATEGY_SELECTION_LEARNING].
     StrategySelection strategySelection;
 
-    // Strategy to be used to predict power and performance values.
+    // Strategy to be used to predict performance values.
     // Only valid when strategySelection is LEARNING
-    // [default = STRATEGY_PREDICTION_REGRESSION_LINEAR].
-    StrategyPrediction strategyPrediction;
+    // [default = STRATEGY_PREDICTION_PERFORMANCE_USL].
+    StrategyPredictionPerformance strategyPredictionPerformance;
 
-    // Model to be used for performance [default = STRATEGY_MODEL_AMDHAL].
-    StrategyModelPerformance strategyModelPerformance;
+    // Strategy to be used to predict power values.
+    // Only valid when strategySelection is LEARNING
+    // [default = STRATEGY_PREDICTION_POWER_LINEAR].
+    StrategyPredictionPower strategyPredictionPower;
 
     // Strategy to be used to select the points to be explored during
     // calibration. Only valid when strategySelection is LEARNING
@@ -707,7 +713,7 @@ public:
     // The aging value for the linear regression predictor. If it has a value
     // of n, then we will only consider the last n configurations we collected
     // in order to perform predictions. If 0, no aging will be applied and all
-    // the previous samples will be considered [default = 10].
+    // the previous samples will be considered [default = 0].
     uint regressionAging;
 
     // The maximum percentage of monitoring overhead, in the range (0, 100).

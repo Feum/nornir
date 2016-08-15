@@ -71,6 +71,8 @@ private:
     void applyWattsCorrection();
 
     PredictorLinearRegression* getPowerPredictor(Manager* m) const;
+
+    double getInactivePowerParameter(Manager* m) const;
 public:
     ManagerMulti();
 

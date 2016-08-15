@@ -37,6 +37,7 @@
 
 #include "external/Mammut/mammut/mammut.hpp"
 
+#include <gsl/gsl_multifit.h>
 #include <mlpack/core.hpp>
 #include <mlpack/methods/linear_regression/linear_regression.hpp>
 #include "external/leo/leo.h" // Must be included after mlpack
@@ -104,17 +105,7 @@ private:
     double _invScalFactorFreq;
     double _invScalFactorFreqAndCores;
 
-    // Usl data.
-    double _constArg;
-    double _alfaArg;
-    double _betaArg;
-
     uint _numPredictors;
-
-    void initAmdahl(const KnobsValues& values);
-    void initUsl(const KnobsValues& values);
-    void toArmaRowAmdahl(size_t rowId, arma::mat& matrix) const;
-    void toArmaRowUsl(size_t rowId, arma::mat& matrix) const;
 public:
     void init(const KnobsValues& values);
 
@@ -267,6 +258,8 @@ private:
     // invertible.
     std::vector<size_t> _removedRows;
 
+    uint _otherApplicationsCores;
+
     double getCurrentResponse() const;
 public:
     PredictorLinearRegression(PredictorType type,
@@ -294,7 +287,7 @@ public:
  */
 class PredictorLinearRegressionMapping: public Predictor{
 private:
-    PredictorLinearRegression* _predictors[MAPPING_TYPE_NUM];
+    Predictor* _predictors[MAPPING_TYPE_NUM];
 public:
     PredictorLinearRegressionMapping(PredictorType type,
                               const Parameters& p,
@@ -302,6 +295,40 @@ public:
                               const Smoother<MonitoredSample>* samples);
 
     ~PredictorLinearRegressionMapping();
+
+    void clear();
+
+    bool readyForPredictions();
+
+    void refine();
+
+    void prepareForPredictions();
+
+    double predict(const KnobsValues& configuration, double bandwidthIn);
+};
+
+/**
+ * A predictor that uses Universal Scalability Law to predict application
+ * performance.
+ */
+#define POLYNOMIAL_DEGREE_USL 3 // Second degree polynomial
+
+class PredictorUsl: public Predictor{
+private:
+    std::vector<double> _xs;
+    std::vector<double> _ys;
+    gsl_multifit_linear_workspace *_ws;
+    gsl_matrix *_cov, *_x;
+    gsl_vector *_y, *_c;
+    double _chisq;
+    std::vector<double> _coefficients;
+public:
+    PredictorUsl(PredictorType type,
+                 const Parameters& p,
+                 const Configuration& configuration,
+                 const Smoother<MonitoredSample>* samples);
+
+    ~PredictorUsl();
 
     void clear();
 

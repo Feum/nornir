@@ -327,6 +327,10 @@ PredictorLinearRegression* ManagerMulti::getPowerPredictor(Manager* m) const{
     }
 }
 
+double ManagerMulti::getInactivePowerParameter(Manager* m) const{
+    return getPowerPredictor(m)->getInactivePowerParameter();
+}
+
 void ManagerMulti::run(){
     while(true){
         Manager* m;
@@ -339,8 +343,12 @@ void ManagerMulti::run(){
                    m->_p.contractType == CONTRACT_PERF_UTILIZATION);
             */
             assert(m->_p.strategySelection == STRATEGY_SELECTION_LEARNING);
-            assert(m->_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR ||
-                   m->_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR_MAPPING);
+            assert(m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
+                    m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||
+                    m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
+                    m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING ||
+                    m->_p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR ||
+                    m->_p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR_MAPPING);
 
             _activeManagers.push_back(m);
             _allocatedCores[m] = vector<PhysicalCoreId>();
@@ -358,6 +366,8 @@ void ManagerMulti::run(){
             // Wait for calibration termination.
             while(m->_selector->isCalibrating() || !m->_selector->getTotalCalibrationTime()){;}
             DEBUG("Calibration terminated.");
+
+            DEBUG(m << " Inactive power parameter: " << getInactivePowerParameter(m));
 
             if(_activeManagers.size() > 1){
                 applyNewAllocation();
@@ -392,6 +402,7 @@ void ManagerMulti::run(){
                         m->_selector->allowCalibration();
                         while(m->_selector->isCalibrating()){;}
                         DEBUG("Calibration terminated.");
+                        DEBUG(m << " Inactive power parameter: " << getInactivePowerParameter(m));
                         if(_activeManagers.size() > 1){
                             applyNewAllocation();
                             DEBUG("Best allocation applied.");

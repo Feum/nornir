@@ -472,7 +472,7 @@ void SelectorPredictive::refine(){
 }
 
 void SelectorPredictive::updatePredictions(const KnobsValues& next){
-    KnobsValues real;
+    KnobsValues real(KNOB_VALUE_REAL);
 
     if(next.areRelative()){
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
@@ -588,18 +588,41 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
                                                          const Configuration& configuration,
                                                          const Smoother<MonitoredSample>* samples) const{
     Predictor* predictor;
-    switch(p.strategyPrediction){
-        case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
-            predictor = new PredictorLinearRegression(type, p, configuration, samples);
+    switch(type){
+        case PREDICTION_BANDWIDTH:{
+            switch(p.strategyPredictionPerformance){
+                case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL:{
+                    predictor = new PredictorLinearRegression(type, p, configuration, samples);
+                }break;
+                case STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING:{
+                    predictor = new PredictorLinearRegressionMapping(type, p, configuration, samples);
+                }break;
+                case STRATEGY_PREDICTION_PERFORMANCE_USL:{
+                    predictor = new PredictorUsl(type, p, configuration, samples);
+                }break;
+                case STRATEGY_PREDICTION_PERFORMANCE_MISHRA:{
+                    predictor = new PredictorMishra(type, p, configuration, samples);
+                }break;
+                default:{
+                    throw std::runtime_error("Unknown prediction strategy.");
+                }break;
+            }
         }break;
-        case STRATEGY_PREDICTION_REGRESSION_LINEAR_MAPPING:{
-            predictor = new PredictorLinearRegressionMapping(type, p, configuration, samples);
-        }break;
-        case STRATEGY_PREDICTION_MISHRA:{
-            predictor = new PredictorMishra(type, p, configuration, samples);
-        }break;
-        default:{
-            throw std::runtime_error("Unknown prediction strategy.");
+        case PREDICTION_POWER:{
+            switch(p.strategyPredictionPower){
+                case STRATEGY_PREDICTION_POWER_LINEAR:{
+                    predictor = new PredictorLinearRegression(type, p, configuration, samples);
+                }break;
+                case STRATEGY_PREDICTION_POWER_LINEAR_MAPPING:{
+                    predictor = new PredictorLinearRegressionMapping(type, p, configuration, samples);
+                }break;
+                case STRATEGY_PREDICTION_POWER_MISHRA:{
+                    predictor = new PredictorMishra(type, p, configuration, samples);
+                }break;
+                default:{
+                    throw std::runtime_error("Unknown prediction strategy.");
+                }break;
+            }
         }break;
     }
     return std::unique_ptr<Predictor>(predictor);
@@ -631,7 +654,9 @@ SelectorLearner::SelectorLearner(const Parameters& p,
         }
     }
 
-    if(_p.strategyPrediction == STRATEGY_PREDICTION_REGRESSION_LINEAR_MAPPING){
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||
+       _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING ||
+       _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR_MAPPING){
         _explorer = new ExplorerMultiple(_configuration, _explorer, KNOB_TYPE_MAPPING, MAPPING_TYPE_NUM);
     }
 }

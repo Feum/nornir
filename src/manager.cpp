@@ -365,13 +365,15 @@ void Manager::lockKnobs() const{
             _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
         }break;
         case STRATEGY_SELECTION_LEARNING:{
-            switch(_p.strategyPrediction){
-                case STRATEGY_PREDICTION_MISHRA:
-                case STRATEGY_PREDICTION_REGRESSION_LINEAR:{
+            switch(_p.strategyPredictionPerformance){
+                case STRATEGY_PREDICTION_PERFORMANCE_MISHRA:
+                case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL:
+                case STRATEGY_PREDICTION_PERFORMANCE_USL:{
                     _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
                     _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
                 }break;
-                case STRATEGY_PREDICTION_REGRESSION_LINEAR_MAPPING:{
+                case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING:
+                case STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING:{
                     _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
                 }break;
             }

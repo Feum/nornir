@@ -160,8 +160,8 @@ void Parameters::setDefault(){
     triggerQBlocking = TRIGGER_Q_BLOCKING_NO;
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_SAME;
     strategySelection = STRATEGY_SELECTION_LEARNING;
-    strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
-    strategyModelPerformance = STRATEGY_MODEL_AMDAHL;
+    strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_USL;
+    strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR;
     strategyExploration = STRATEGY_EXPLORATION_HALTON;
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
@@ -191,7 +191,7 @@ void Parameters::setDefault(){
     maxCalibrationTime = 0;
     maxPerformancePredictionError = 10.0;
     maxPowerPredictionError = 5.0;
-    regressionAging = 10;
+    regressionAging = 0;
     maxMonitoringOverhead = 1.0;
     thresholdQBlocking = -1;
     tolerableSamples = 0;
@@ -435,7 +435,7 @@ ParametersValidation Parameters::validateSelector(){
 
 
 ParametersValidation Parameters::validatePredictor(){
-    if(strategyPrediction == STRATEGY_PREDICTION_MISHRA &&
+    if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_MISHRA &&
          (mishra.bandwidthData.compare("") == 0 ||
           mishra.powerData.compare("") == 0 ||
           mishra.applicationName.compare("") == 0 ||
@@ -475,15 +475,18 @@ template<> char const* enumStrings<StrategySelection>::data[] = {
     "MISHRA"
 };
 
-template<> char const* enumStrings<StrategyPrediction>::data[] = {
-    "REGRESSION_LINEAR",
-    "REGRESSION_LINEAR_MAPPING",
+template<> char const* enumStrings<StrategyPredictionPerformance>::data[] = {
+    "AMDAHL",
+    "AMDAHL_MAPPING",
+    "USL",
+    "USL_MAPPING",
     "MISHRA"
 };
 
-template<> char const* enumStrings<StrategyModelPerformance>::data[] = {
-    "AMDAHL",
-    "USL"
+template<> char const* enumStrings<StrategyPredictionPower>::data[] = {
+    "LINEAR",
+    "LINEAR_MAPPING",
+    "MISHRA"
 };
 
 template<> char const* enumStrings<StrategyExploration>::data[] = {
@@ -527,8 +530,8 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, contractType);
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
     SETVALUE(xt, Enum, strategySelection);
-    SETVALUE(xt, Enum, strategyPrediction);
-    SETVALUE(xt, Enum, strategyModelPerformance);
+    SETVALUE(xt, Enum, strategyPredictionPerformance);
+    SETVALUE(xt, Enum, strategyPredictionPower);
     SETVALUE(xt, Enum, strategyExploration);
     SETVALUE(xt, Enum, strategySmoothing);
     SETVALUE(xt, Enum, strategyPolling);

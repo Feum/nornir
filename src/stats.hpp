@@ -151,7 +151,9 @@ typedef struct CalibrationStats{
  */
 class Observer{
     friend class Manager;
-    template<typename U, typename V> friend class ManagerFarm;
+
+    template <typename T, typename V>
+    friend class ManagerFarm;
 private:
     std::ofstream _statsFile;
     std::ofstream _calibrationFile;

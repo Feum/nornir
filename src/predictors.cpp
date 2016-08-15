@@ -30,8 +30,6 @@
  * \brief Predictors used by adaptive farm.
  */
 
-#include <iomanip>
-
 #include "predictors.hpp"
 #include "manager.hpp"
 
@@ -115,30 +113,6 @@ double RegressionData::getUsedPhysicalCores(double numVirtualCores){
 void RegressionData::init(){init(_configuration.getRealValues());}
 
 void RegressionDataServiceTime::init(const KnobsValues& values){
-    switch(_p.strategyModelPerformance){
-        case STRATEGY_MODEL_AMDAHL:{
-            initAmdahl(values);
-        }break;
-        case STRATEGY_MODEL_USL:{
-            initUsl(values);
-        }break;
-    }
-}
-
-void RegressionDataServiceTime::initUsl(const KnobsValues& values){
-    _numPredictors = 0;
-    uint numCores = values[KNOB_TYPE_VIRTUAL_CORES];
-    _constArg = 1.0 / (/*_bwseq * */ numCores);
-    ++_numPredictors;
-
-    _alfaArg = (numCores - 1) / ((double) /*_bwseq * */ numCores);
-    ++_numPredictors;
-
-    _betaArg = (numCores - 1);
-    ++_numPredictors;
-}
-
-void RegressionDataServiceTime::initAmdahl(const KnobsValues& values){
     _numPredictors = 0;
     uint numVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
 
@@ -173,29 +147,11 @@ uint RegressionDataServiceTime::getNumPredictors() const{
 }
 
 void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) const{
-    switch(_p.strategyModelPerformance){
-        case STRATEGY_MODEL_AMDAHL:{
-            toArmaRowAmdahl(columnId, matrix);
-        }break;
-        case STRATEGY_MODEL_USL:{
-            toArmaRowUsl(columnId, matrix);
-        }break;
-    }
-}
-
-void RegressionDataServiceTime::toArmaRowAmdahl(size_t columnId, arma::mat& matrix) const{
     size_t rowId = 0;
     if(_p.knobFrequencyEnabled){
         matrix(rowId++, columnId) = _invScalFactorFreq;
         matrix(rowId++, columnId) = _invScalFactorFreqAndCores;
     }
-}
-
-void RegressionDataServiceTime::toArmaRowUsl(size_t columnId, arma::mat& matrix) const{
-    size_t rowId = 0;
-    matrix(rowId++, columnId) = _constArg;
-    matrix(rowId++, columnId) = _alfaArg;
-    matrix(rowId++, columnId) = _betaArg;
 }
 
 void RegressionDataPower::init(const KnobsValues& values){
@@ -364,21 +320,7 @@ double PredictorLinearRegression::getCurrentResponse() const{
     double r = 0.0;
     switch(_type){
         case PREDICTION_BANDWIDTH:{
-            switch(_p.strategyModelPerformance){
-                case STRATEGY_MODEL_AMDAHL:{
-                    r = 1.0 / getMaximumBandwidth();
-                }break;
-                case STRATEGY_MODEL_USL:{
-                    if(_p.knobFrequencyEnabled){
-                        // We need to scale wrt. frequency since in USL we only consider                                                                                                                            
-                        // the number of threads.                                                                              
-                        r = 1.0 / (getMaximumBandwidth() / ((double) _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getCurrentFrequencyUserspace() / 
-                                                            _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()) );
-                    }else{
-                        r = 1.0 / getMaximumBandwidth();
-                    }
-                }break;
-            }
+            r = 1.0 / getMaximumBandwidth();
         }break;
         case PREDICTION_POWER:{
             r = getCurrentPower();
@@ -518,14 +460,7 @@ double PredictorLinearRegression::predict(const KnobsValues& values, double band
     _lr.Predict(predictionInputMl, result);
     if(_type == PREDICTION_BANDWIDTH){
         double realBandwidth = getRealBandwidthFromMaximum(result.at(0), bandwidthIn);
-        if(_p.strategyModelPerformance == STRATEGY_MODEL_USL &&
-           _p.knobFrequencyEnabled){
-            // We need to scale wrt. frequency since in USL we only consider                                                                                                                                 
-            // the number of threads.                                                                                                                                                                        
-            res = (1.0 / realBandwidth) * ((values[KNOB_TYPE_FREQUENCY] / _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()));
-        }else{
-            res = 1.0 / realBandwidth;
-        }
+        res = 1.0 / realBandwidth;
     }else{
         res = result.at(0);
     }
@@ -554,7 +489,7 @@ PredictorLinearRegressionMapping::PredictorLinearRegressionMapping(PredictorType
                           const Smoother<MonitoredSample>* samples):
             Predictor(type, p, configuration, samples){
     for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        _predictors[i] = new PredictorLinearRegression(type, p, configuration, samples);
+        _predictors[i] = new PredictorUsl(type, p, configuration, samples);
     }
 }
 
@@ -598,6 +533,102 @@ double PredictorLinearRegressionMapping::predict(const KnobsValues& configuratio
         realValue = configuration[KNOB_TYPE_MAPPING];
     }
     return _predictors[(MappingType) realValue]->predict(configuration, bandwidthIn);
+}
+
+
+/**************** PredictorUSL ****************/
+PredictorUsl::PredictorUsl(PredictorType type,
+             const Parameters& p,
+             const Configuration& configuration,
+             const Smoother<MonitoredSample>* samples):
+                    Predictor(type, p, configuration, samples),
+                    _ws(NULL), _x(NULL), _y(NULL), _chisq(0){
+    if(type != PREDICTION_BANDWIDTH){
+        throw std::runtime_error("PredictorUsl can only be used for bandwidth predictions.");
+    }
+    _c = gsl_vector_alloc(POLYNOMIAL_DEGREE_USL);
+    _cov = gsl_matrix_alloc(POLYNOMIAL_DEGREE_USL, POLYNOMIAL_DEGREE_USL);
+
+}
+
+PredictorUsl::~PredictorUsl(){
+    gsl_matrix_free(_cov);
+    gsl_vector_free(_c);
+}
+
+void PredictorUsl::clear(){
+    _xs.clear();
+    _ys.clear();
+}
+
+bool PredictorUsl::readyForPredictions(){
+    return _xs.size() >= POLYNOMIAL_DEGREE_USL;
+}
+
+void PredictorUsl::refine(){
+    double numCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
+    auto it = std::find(_xs.begin(), _xs.end(), numCores);
+    if(it != _xs.end()){
+        _xs.erase(it);
+    }
+    double bandwidth = getMaximumBandwidth();
+    if(_p.knobFrequencyEnabled){
+        // We always interpolate minimum frequency.
+        bandwidth *= _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front() /
+                     _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
+    }
+    _xs.push_back(numCores - 1);
+    _ys.push_back(numCores / bandwidth);
+}
+
+void PredictorUsl::prepareForPredictions(){
+    if(!readyForPredictions()){
+        throw std::runtime_error("PredictorUsl: Not yet ready for predictions.");
+    }
+    _x = gsl_matrix_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
+    _y = gsl_vector_alloc(_xs.size());
+    size_t i = 0, j = 0;
+    for(i = 0; i < _xs.size(); i++) {
+        for(j = 0; j < POLYNOMIAL_DEGREE_USL; j++) {
+            gsl_matrix_set(_x, i, j, pow(_xs.at(i), j));
+        }
+        gsl_vector_set(_y, i, _ys.at(i));
+    }
+
+    _ws = gsl_multifit_linear_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
+    gsl_multifit_linear(_x, _y, _c, _cov, &_chisq, _ws);
+
+    _coefficients.clear();
+    for(i = 0; i < POLYNOMIAL_DEGREE_USL; i++){
+        _coefficients.push_back(gsl_vector_get(_c, i));
+    }
+    gsl_matrix_free(_x);
+    gsl_vector_free(_y);
+    gsl_multifit_linear_free(_ws);
+}
+
+double PredictorUsl::predict(const KnobsValues& configuration, double bandwidthIn){
+    double result = 0;
+    double numCores = 0;
+    double frequency = 0;
+    if(configuration.areReal()){
+        numCores = configuration[KNOB_TYPE_VIRTUAL_CORES];
+        frequency = configuration[KNOB_TYPE_FREQUENCY];
+    }else{
+        _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealFromRelative(configuration[KNOB_TYPE_VIRTUAL_CORES], numCores);
+        _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealFromRelative(configuration[KNOB_TYPE_FREQUENCY], frequency);
+    }
+    for(size_t i = 0; i < _coefficients.size(); i++){
+        result += _coefficients.at(i)*std::pow(numCores - 1, i);
+    }
+    result = (numCores / result);
+
+    if(_p.knobFrequencyEnabled){
+        // Now we have the bandwidth at minimum frequency, let's scale it up.
+        result *= (frequency /
+                  _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front());
+    }
+    return result;
 }
     
 /**************** PredictorSimple ****************/
