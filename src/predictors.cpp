@@ -542,7 +542,7 @@ PredictorUsl::PredictorUsl(PredictorType type,
              const Configuration& configuration,
              const Smoother<MonitoredSample>* samples):
                     Predictor(type, p, configuration, samples),
-                    _ws(NULL), _x(NULL), _y(NULL), _chisq(0){
+                    _ws(NULL), _x(NULL), _y(NULL), _chisq(0), _preparationNeeded(true){
     if(type != PREDICTION_BANDWIDTH){
         throw std::runtime_error("PredictorUsl can only be used for bandwidth predictions.");
     }
@@ -567,44 +567,57 @@ bool PredictorUsl::readyForPredictions(){
 
 void PredictorUsl::refine(){
     double numCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
-    auto it = std::find(_xs.begin(), _xs.end(), numCores);
-    if(it != _xs.end()){
-        _xs.erase(it);
-    }
     double bandwidth = getMaximumBandwidth();
     if(_p.knobFrequencyEnabled){
         // We always interpolate minimum frequency.
         bandwidth *= _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front() /
                      _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
     }
-    _xs.push_back(numCores - 1);
-    _ys.push_back(numCores / bandwidth);
+
+    // Checks if a y is already present for this x
+    int pos = -1;
+    for(size_t i = 0; i < _xs.size(); i++){
+        if(_xs[i] == numCores - 1){
+            pos = i;
+            break;
+        }
+    }
+    if(pos == -1){
+        _xs.push_back(numCores - 1);
+        _ys.push_back(numCores / bandwidth);
+    }else{
+        _ys.at(pos) = numCores / bandwidth;
+    }
+    _preparationNeeded = true;
 }
 
 void PredictorUsl::prepareForPredictions(){
-    if(!readyForPredictions()){
-        throw std::runtime_error("PredictorUsl: Not yet ready for predictions.");
-    }
-    _x = gsl_matrix_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
-    _y = gsl_vector_alloc(_xs.size());
-    size_t i = 0, j = 0;
-    for(i = 0; i < _xs.size(); i++) {
-        for(j = 0; j < POLYNOMIAL_DEGREE_USL; j++) {
-            gsl_matrix_set(_x, i, j, pow(_xs.at(i), j));
+    if(_preparationNeeded){
+        if(!readyForPredictions()){
+            throw std::runtime_error("PredictorUsl: Not yet ready for predictions.");
         }
-        gsl_vector_set(_y, i, _ys.at(i));
-    }
+        _x = gsl_matrix_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
+        _y = gsl_vector_alloc(_xs.size());
+        size_t i = 0, j = 0;
+        for(i = 0; i < _xs.size(); i++) {
+            for(j = 0; j < POLYNOMIAL_DEGREE_USL; j++) {
+                gsl_matrix_set(_x, i, j, pow(_xs.at(i), j));
+            }
+            gsl_vector_set(_y, i, _ys.at(i));
+        }
 
-    _ws = gsl_multifit_linear_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
-    gsl_multifit_linear(_x, _y, _c, _cov, &_chisq, _ws);
+        _ws = gsl_multifit_linear_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
+        gsl_multifit_linear(_x, _y, _c, _cov, &_chisq, _ws);
 
-    _coefficients.clear();
-    for(i = 0; i < POLYNOMIAL_DEGREE_USL; i++){
-        _coefficients.push_back(gsl_vector_get(_c, i));
+        _coefficients.clear();
+        for(i = 0; i < POLYNOMIAL_DEGREE_USL; i++){
+            _coefficients.push_back(gsl_vector_get(_c, i));
+        }
+        gsl_matrix_free(_x);
+        gsl_vector_free(_y);
+        gsl_multifit_linear_free(_ws);
+        _preparationNeeded = false;
     }
-    gsl_matrix_free(_x);
-    gsl_vector_free(_y);
-    gsl_multifit_linear_free(_ws);
 }
 
 double PredictorUsl::predict(const KnobsValues& configuration, double bandwidthIn){

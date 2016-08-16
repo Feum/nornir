@@ -322,6 +322,7 @@ private:
     gsl_vector *_y, *_c;
     double _chisq;
     std::vector<double> _coefficients;
+    bool _preparationNeeded;
 public:
     PredictorUsl(PredictorType type,
                  const Parameters& p,
