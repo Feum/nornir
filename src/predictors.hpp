@@ -130,6 +130,7 @@ private:
     double _voltagePerUsedSockets;
     double _voltagePerUnusedSockets;
     unsigned int _additionalContextes;
+    mammut::cpufreq::Frequency _lowestFrequency;
 
     uint _numPredictors;
 public:
@@ -353,6 +354,7 @@ class PredictorAnalytical: public Predictor{
 private:
     uint _phyCores;
     uint _phyCoresPerCpu;
+    uint _cpus;
 
     double getScalingFactor(const KnobsValues& values);
     double getPowerPrediction(const KnobsValues& values);

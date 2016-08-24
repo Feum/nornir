@@ -70,24 +70,40 @@ static double getVoltage(VoltageTable table, uint workers, Frequency frequency){
 
 /**
  * Computes a proportional value for power consumption of a configuration.
- * ATTENTION: Assumes linear mapping of the workers on the cores.
  */
 static void getPowerProportions(VoltageTable table, uint physicalCores,
                                 Frequency frequency, uint coresPerDomain,
+                                uint numDomains, MappingType mt,
                                 double& staticPower, double& dynamicPower){
     int numCores = physicalCores;
     double voltage = 0;
     staticPower = 0;
     dynamicPower = 0;
     uint currentCores = 0;
+    int interleavedPerDomain = physicalCores / numDomains;
+    int interleavedSpurious = physicalCores % numDomains;
     while(numCores > 0){
-        currentCores = (numCores < (int) coresPerDomain)?(uint)numCores:coresPerDomain;
+        switch(mt){
+            case MAPPING_TYPE_LINEAR:{
+                currentCores = (numCores < (int) coresPerDomain)?(uint)numCores:coresPerDomain;
+            }break;
+            case MAPPING_TYPE_INTERLEAVED:{
+                currentCores =  interleavedPerDomain;
+                if(interleavedSpurious){
+                    currentCores +=1;
+                    interleavedSpurious--;
+                }
+            }break;
+            default:{
+                throw std::runtime_error("getPowerProportions: mapping type not supported.");
+            }
+        }
         voltage = getVoltage(table, currentCores, frequency);
 
         staticPower += voltage;
         dynamicPower += currentCores*frequency*voltage*voltage;
 
-        numCores -= coresPerDomain;
+        numCores -= currentCores;
     }
 }
 
@@ -155,6 +171,7 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
 }
 
 void RegressionDataPower::init(const KnobsValues& values){
+    assert(values.areReal());
     _numPredictors = 0;
     Frequency frequency = values[KNOB_TYPE_FREQUENCY];
     uint numVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
@@ -174,30 +191,36 @@ void RegressionDataPower::init(const KnobsValues& values){
         //TODO: Potrebbe non esserci una frequenza se FREQUENCY_NO. In tal caso non possiamo predirre nulla.
         getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
                 frequency, _phyCoresPerCpu,
+                _cpus, (MappingType) values[KNOB_TYPE_MAPPING],
                 staticPowerProp, dynamicPowerProp);
-        _voltagePerUsedSockets = staticPowerProp;
-        ++_numPredictors;
+        //_voltagePerUsedSockets = staticPowerProp;
+        //++_numPredictors;
 
         if(_cpus > 1){
             Frequency frequencyUnused;
             switch(_strategyUnused){
-                /**
-                 * TODO:
-                 * For simplicity we assume that the frequency of the unused
-                 * sockets is equal to the frequency of the used sockets. This
-                 * should be modified as future work.
-                 */
-                default:{
+                case STRATEGY_UNUSED_VC_SAME:{
                     frequencyUnused = frequency;
+                }break;
+                case STRATEGY_UNUSED_VC_LOWEST_FREQUENCY:{
+                    frequencyUnused = _lowestFrequency;
+                }break;
+                default:{
+                    throw std::runtime_error("RegressionDataPower: init: strategyUnused unsupported.");
                 }
             }
             double voltage = getVoltage(_p.archData.voltageTable, 0, frequencyUnused);
-            _voltagePerUnusedSockets = voltage * unusedCpus;
+            _voltagePerUnusedSockets = (voltage * unusedCpus) + staticPowerProp;
             ++_numPredictors;
         }
 
         _dynamicPowerModel = dynamicPowerProp;
         ++_numPredictors;
+#if 0
+        std::cout << "VxUsed " << _voltagePerUsedSockets << std::endl;
+        std::cout << "VxUnused " << _voltagePerUnusedSockets << std::endl;
+        std::cout << "DynPow " << _dynamicPowerModel << std::endl;
+#endif
     }else{
         /**
          * Since I do not control the frequency, this model can be very
@@ -220,6 +243,7 @@ RegressionDataPower::RegressionDataPower(const Parameters& p,
     _phyCoresPerCpu = _topology->getCpu(0)->getPhysicalCores().size();
     _virtCoresPerPhyCores = _topology->getPhysicalCore(0)->getVirtualCores().size();
     _strategyUnused = _p.strategyUnusedVirtualCores;
+    _lowestFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().front()->getAvailableFrequencies().front();
     init(_configuration.getRealValues());
 }
 
@@ -231,7 +255,7 @@ void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
     size_t rowId = 0;
     matrix(rowId++, columnId) = _dynamicPowerModel;
     if(_p.knobFrequencyEnabled){
-        matrix(rowId++, columnId) = _voltagePerUsedSockets;
+        //matrix(rowId++, columnId) = _voltagePerUsedSockets;
         if(_cpus > 1){
             matrix(rowId++, columnId) = _voltagePerUnusedSockets;
         }
@@ -453,11 +477,20 @@ double PredictorLinearRegression::predict(const KnobsValues& values, double band
     _predictionInput->toArmaRow(0, predictionInputMl);
 
     // Remove from prediction input the corresponding positions
-    for(size_t i = 0; i < _removedRows.size(); i++){
-        predictionInputMl.shed_row(_removedRows.at(i));
+    //for(size_t i = 0; i < _removedRows.size(); i++){
+    //    predictionInputMl.shed_row(_removedRows.at(i));
+    //}
+    arma::mat predictionInputMlShed(_predictionInput->getNumPredictors(), 1);
+    size_t realSize = 0;
+    for(size_t i = 0; i < _predictionInput->getNumPredictors(); i++){
+        if(!contains(_removedRows, i)){
+            predictionInputMlShed(realSize, 0) = predictionInputMl(i, 0);
+            ++realSize;
+        }
     }
+    predictionInputMlShed.resize(realSize, 1);
 
-    _lr.Predict(predictionInputMl, result);
+    _lr.Predict(predictionInputMlShed, result);
     if(_type == PREDICTION_BANDWIDTH){
         double realBandwidth = getRealBandwidthFromMaximum(result.at(0), bandwidthIn);
         res = 1.0 / realBandwidth;
@@ -489,7 +522,11 @@ PredictorLinearRegressionMapping::PredictorLinearRegressionMapping(PredictorType
                           const Smoother<MonitoredSample>* samples):
             Predictor(type, p, configuration, samples){
     for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        _predictors[i] = new PredictorUsl(type, p, configuration, samples);
+        if(type == PREDICTION_BANDWIDTH){
+            _predictors[i] = new PredictorUsl(type, p, configuration, samples);
+        }else{
+            _predictors[i] = new PredictorLinearRegression(type, p, configuration, samples);
+        }
     }
 }
 
@@ -654,6 +691,7 @@ PredictorAnalytical::PredictorAnalytical(PredictorType type,
     Topology* t = _p.mammut.getInstanceTopology();
     _phyCores = t->getPhysicalCores().size();
     _phyCoresPerCpu = t->getCpu(0)->getPhysicalCores().size();
+    _cpus = t->getCpus().size();
 }
 
 double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
@@ -664,10 +702,12 @@ double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
 }
 
 double PredictorAnalytical::getPowerPrediction(const KnobsValues& values){
+    assert(values.areReal());
     double staticPower = 0, dynamicPower = 0;
     double usedPhysicalCores = values[KNOB_TYPE_VIRTUAL_CORES];
     getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
                         values[KNOB_TYPE_FREQUENCY], _phyCoresPerCpu,
+                        _cpus, (MappingType) values[KNOB_TYPE_MAPPING],
                         staticPower, dynamicPower);
     return dynamicPower;
 }

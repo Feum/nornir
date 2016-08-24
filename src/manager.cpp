@@ -521,17 +521,19 @@ void Manager::act(KnobsValues kv, bool force){
         /****************** Clean state ******************/
         _samples->reset();
         _variations->reset();
-        Joules joules = getAndResetJoules();
-        if(_p.observer){
-            _p.observer->addJoules(joules);
-        }
         DEBUG("Resetting sample.");
-        _lastStoredSampleMs = getMillisecondsTime();
+        // _lastStoredSampleMs = getMillisecondsTime();
         // Discarding a sample since it may be between 2 different configurations.
         orlog::ApplicationSample ws;
         askSample();
         getSample(ws);
         updateTasksCount(ws);
+
+        Joules joules = getAndResetJoules();
+        if(_p.observer){
+            _p.observer->addJoules(joules);
+        }
+        _lastStoredSampleMs = getMillisecondsTime();
     }
 }
 

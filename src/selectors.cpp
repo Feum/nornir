@@ -506,7 +506,7 @@ void SelectorPredictive::clearPredictors(){
     _observedValues.clear();
 }
 
-bool SelectorPredictive::isAccurate(){
+bool SelectorLearner::isAccurate(){
     double maxBandwidth = 0.0; double predictedMaxBandwidth = 0.0;
     double power = 0.0; double predictedPower = 0.0;
 
@@ -545,9 +545,21 @@ bool SelectorPredictive::isAccurate(){
        (!_calibrationCoordination && powerError > _p.maxPowerPredictionError) /* ||
        _primaryPredictor->getModelError() > 10 || //TODO
        _secondaryPredictor->getModelError() > 10*/){
+        if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||
+           _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING ||
+           _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR_MAPPING){
+            _accuracyConsolidationLeft = MAPPING_TYPE_NUM;
+        }else{
+            _accuracyConsolidationLeft = 1;
+        }
+
         return false;
     }else{
-        return true;
+        if(_accuracyConsolidationLeft && --_accuracyConsolidationLeft){
+            return false;
+        }else{
+            return true;
+        }
     }
 }
 
@@ -635,19 +647,33 @@ SelectorLearner::SelectorLearner(const Parameters& p,
                                 getPredictor(PREDICTION_BANDWIDTH, p, configuration, samples),
                                 getPredictor(PREDICTION_POWER, p, configuration, samples)),
              _explorer(NULL), _firstPointGenerated(false),
-             _contractViolations(0), _accuracyViolations(0){
+             _contractViolations(0), _accuracyViolations(0),
+             _accuracyConsolidationLeft(1){
     /***************************************/
     /*              Explorers              */
     /***************************************/
+    vector<bool> knobsFlags;
+    knobsFlags.resize(KNOB_TYPE_NUM, false);
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||
+       _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING ||
+       _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR_MAPPING){
+        knobsFlags[KNOB_TYPE_VIRTUAL_CORES] = true;
+        knobsFlags[KNOB_TYPE_FREQUENCY] = true;
+    }else{
+        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            knobsFlags[i] = !_configuration.getKnob((KnobType) i)->isLocked();
+        }
+    }
+
     switch(_p.strategyExploration){
         case STRATEGY_EXPLORATION_RANDOM:{
-            _explorer = new ExplorerRandom(configuration);
+            _explorer = new ExplorerRandom(knobsFlags);
         }break;
         case STRATEGY_EXPLORATION_HALTON:
         case STRATEGY_EXPLORATION_HALTON_REVERSE:
         case STRATEGY_EXPLORATION_NIEDERREITER:
         case STRATEGY_EXPLORATION_SOBOL:{
-            _explorer = new ExplorerLowDiscrepancy(configuration, _p.strategyExploration);
+            _explorer = new ExplorerLowDiscrepancy(knobsFlags, _p.strategyExploration);
         }break;
         default:{
             throw std::runtime_error("Unknown exploration strategy.");
@@ -657,7 +683,8 @@ SelectorLearner::SelectorLearner(const Parameters& p,
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||
        _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING ||
        _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR_MAPPING){
-        _explorer = new ExplorerMultiple(_configuration, _explorer, KNOB_TYPE_MAPPING, MAPPING_TYPE_NUM);
+        _accuracyConsolidationLeft = MAPPING_TYPE_NUM;
+        _explorer = new ExplorerMultiple(knobsFlags, _explorer, KNOB_TYPE_MAPPING, MAPPING_TYPE_NUM);
     }
 }
 
@@ -707,6 +734,14 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
                 updatePredictions(kv);
                 DEBUG("Finished in " << _numCalibrationPoints <<
                       " steps with configuration " << kv);
+                if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||
+                   _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING ||
+                   _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR_MAPPING){
+                    _accuracyConsolidationLeft = MAPPING_TYPE_NUM;
+                }else{
+                    _accuracyConsolidationLeft = 1;
+                }
+
                 stopCalibration(totalTasks);
             }else{
                 kv = _explorer->nextRelativeKnobsValues();

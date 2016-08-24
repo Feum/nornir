@@ -40,17 +40,17 @@
 #endif
 
 namespace nornir{
-    Explorer::Explorer(const Configuration& configuration):_configuration(configuration){;}
+    Explorer::Explorer(std::vector<bool> knobs):_knobs(knobs){;}
 
-    ExplorerRandom::ExplorerRandom(const Configuration& configuration):
-            Explorer(configuration){
+    ExplorerRandom::ExplorerRandom(std::vector<bool> knobs):
+            Explorer(knobs){
         srand(time(NULL));
     }
 
     KnobsValues ExplorerRandom::nextRelativeKnobsValues() const{
         KnobsValues r(KNOB_VALUE_RELATIVE);
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(!_configuration.getKnob((KnobType) i)->isLocked()){
+            if(generate((KnobType) i)){
                 r[(KnobType)i] = rand() % 100;
             }else{
                 /**
@@ -67,12 +67,12 @@ namespace nornir{
     void ExplorerRandom::reset(){;}
 
     ExplorerLowDiscrepancy::ExplorerLowDiscrepancy(
-                const Configuration& configuration,
+                std::vector<bool> knobs,
                 StrategyExploration explorationStrategy):
-            Explorer(configuration), _explorationStrategy(explorationStrategy){
+            Explorer(knobs), _explorationStrategy(explorationStrategy){
         uint d = 0;
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(!_configuration.getKnob((KnobType) i)->isLocked()){
+            if(generate((KnobType) i)){
                 ++d;
             }
         }
@@ -113,7 +113,7 @@ namespace nornir{
         gsl_qrng_get(_generator, _normalizedPoint);
         size_t nextCoordinate = 0;
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(!_configuration.getKnob((KnobType) i)->isLocked()){
+            if(generate((KnobType) i)){
                 r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
                 ++nextCoordinate;
             }else{
@@ -132,11 +132,11 @@ namespace nornir{
         gsl_qrng_init(_generator);
     }
 
-    ExplorerMultiple::ExplorerMultiple(const Configuration& configuration,
+    ExplorerMultiple::ExplorerMultiple(std::vector<bool> knobs,
                                        Explorer* explorer,
                                        KnobType kt,
                                        size_t numValues):
-                Explorer(configuration), _explorer(explorer), _kt(kt),
+                Explorer(knobs), _explorer(explorer), _kt(kt),
                 _numValues(numValues), _nextValue(0), _lastkv(explorer->nextRelativeKnobsValues()){
         ;
     }

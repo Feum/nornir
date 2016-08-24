@@ -323,12 +323,13 @@ KnobMapping::KnobMapping(const Parameters& p,
     for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
         _knobValues.push_back((MappingType) i);
     }
+    _realValue = MAPPING_TYPE_LINEAR; // This is just for initialization, is not locked.
 }
 
 template<> char const* enumStrings<MappingType>::data[] = {
     "LINEAR",
     "INTERLEAVED",
-    "CACHE OPTIMAL"
+    "CACHE_OPTIMAL"
 };
 
 void KnobMapping::changeValueReal(double v){
@@ -529,7 +530,6 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
     }
     for(size_t i = 0; i < availableFrequencies.size(); i++){
         _knobValues.push_back(availableFrequencies.at(i));
-
     }
 }
 
@@ -578,13 +578,11 @@ void KnobFrequency::applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& 
     vector<Domain*> unusedDomains = _cpufreqHandle->getDomainsComplete(unusedVc);
     for(size_t i = 0; i < unusedDomains.size(); i++){
         Domain* domain = unusedDomains.at(i);
-        if(!domain->setGovernor(GOVERNOR_POWERSAVE)){
-            if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
-               !domain->setLowestFrequencyUserspace()){
-                throw runtime_error("AdaptivityManagerFarm: Impossible to "
-                                    "set lowest frequency for unused "
-                                    "virtual cores.");
-            }
+        if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
+           !domain->setLowestFrequencyUserspace()){
+            throw runtime_error("AdaptivityManagerFarm: Impossible to "
+                                "set lowest frequency for unused "
+                                "virtual cores.");
         }
     }
 }

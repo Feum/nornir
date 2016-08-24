@@ -34,10 +34,12 @@
 namespace nornir{
 
 class Explorer{
+private:
+    std::vector<bool> _knobs;
 protected:
-    const Configuration& _configuration;
+    bool generate(KnobType kt) const{return _knobs.at((size_t) kt);}
 public:
-    Explorer(const Configuration& configuration);
+    Explorer(std::vector<bool> knobs);
     virtual ~Explorer(){;}
 
     /**
@@ -59,7 +61,7 @@ public:
  */
 class ExplorerRandom: public Explorer{
 public:
-    ExplorerRandom(const Configuration& configuration);
+    ExplorerRandom(std::vector<bool> knobs);
     virtual ~ExplorerRandom(){;}
     void reset();
     KnobsValues nextRelativeKnobsValues() const;
@@ -75,8 +77,9 @@ private:
     double* _normalizedPoint;
     StrategyExploration _explorationStrategy;
 public:
-    ExplorerLowDiscrepancy(const Configuration& configuration,
+    ExplorerLowDiscrepancy(std::vector<bool> knobs,
                            StrategyExploration explorationStrategy);
+
     virtual ~ExplorerLowDiscrepancy();
     void reset();
     KnobsValues nextRelativeKnobsValues() const;
@@ -93,7 +96,7 @@ private:
     mutable size_t _nextValue;
     mutable KnobsValues _lastkv;
 public:
-    ExplorerMultiple(const Configuration& configuration,
+    ExplorerMultiple(std::vector<bool> knobs,
                      Explorer* explorer,
                      KnobType kt,
                      size_t numValues);

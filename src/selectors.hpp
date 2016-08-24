@@ -239,13 +239,6 @@ protected:
      * Clears the predictors.
      */
     void clearPredictors();
-
-
-    /**
-     * Checks the accuracy of the predictions.
-     * @return True if the predictions were accurate, false otherwise.
-     */
-    bool isAccurate();
 public:
     SelectorPredictive(const Parameters& p,
                        const Configuration& configuration,
@@ -317,6 +310,7 @@ private:
     bool _firstPointGenerated;
     uint _contractViolations;
     uint _accuracyViolations;
+    uint _accuracyConsolidationLeft;
     std::unique_ptr<Predictor> getPredictor(PredictorType type,
                                             const Parameters& p,
                                             const Configuration& configuration,
@@ -335,6 +329,12 @@ public:
      * @return true if the phase changed, false otherwise.
      */
     bool phaseChanged() const;
+
+    /**
+     * Checks the accuracy of the predictions.
+     * @return True if the predictions were accurate, false otherwise.
+     */
+    bool isAccurate();
 };
 
 /**
