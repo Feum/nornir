@@ -76,6 +76,7 @@ private:
     gsl_qrng* _generator;
     double* _normalizedPoint;
     StrategyExploration _explorationStrategy;
+    mutable bool _firstPointGenerated;
 public:
     ExplorerLowDiscrepancy(std::vector<bool> knobs,
                            StrategyExploration explorationStrategy);

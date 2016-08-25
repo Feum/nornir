@@ -69,7 +69,7 @@ namespace nornir{
     ExplorerLowDiscrepancy::ExplorerLowDiscrepancy(
                 std::vector<bool> knobs,
                 StrategyExploration explorationStrategy):
-            Explorer(knobs), _explorationStrategy(explorationStrategy){
+            Explorer(knobs), _explorationStrategy(explorationStrategy), _firstPointGenerated(false){
         uint d = 0;
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
             if(generate((KnobType) i)){
@@ -110,19 +110,28 @@ namespace nornir{
 
     KnobsValues ExplorerLowDiscrepancy::nextRelativeKnobsValues() const{
         KnobsValues r(KNOB_VALUE_RELATIVE);
-        gsl_qrng_get(_generator, _normalizedPoint);
-        size_t nextCoordinate = 0;
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(generate((KnobType) i)){
-                r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
-                ++nextCoordinate;
-            }else{
-                /**
-                 * If we do not need to automatically find the value for this knob,
-                 * then it has only 0 or 1 possible value. Accordingly, we can set
-                 * it to any value. Here we set it to 100.0 for readability.
-                 */
-                r[(KnobType)i] = 100.0;
+        if(!_firstPointGenerated){
+            _firstPointGenerated = true;
+            for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+                r[(KnobType)i] = 0;
+            }
+            r[KNOB_TYPE_VIRTUAL_CORES] = 100.0;
+            r[KNOB_TYPE_FREQUENCY] = 100.0; //TODO Assicurarsi che sia diversa dalla conf corrente.
+        }else{
+            gsl_qrng_get(_generator, _normalizedPoint);
+            size_t nextCoordinate = 0;
+            for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+                if(generate((KnobType) i)){
+                    r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
+                    ++nextCoordinate;
+                }else{
+                    /**
+                     * If we do not need to automatically find the value for this knob,
+                     * then it has only 0 or 1 possible value. Accordingly, we can set
+                     * it to any value. Here we set it to 100.0 for readability.
+                     */
+                    r[(KnobType)i] = 100.0;
+                }
             }
         }
         return r;
