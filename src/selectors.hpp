@@ -310,7 +310,6 @@ private:
     bool _firstPointGenerated;
     uint _contractViolations;
     uint _accuracyViolations;
-    uint _accuracyConsolidationLeft;
     std::unique_ptr<Predictor> getPredictor(PredictorType type,
                                             const Parameters& p,
                                             const Configuration& configuration,

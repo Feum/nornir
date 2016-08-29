@@ -56,9 +56,9 @@ namespace nornir{
                 /**
                  * If we do not need to automatically find the value for this knob,
                  * then it has only 0 or 1 possible value. Accordingly, we can set
-                 * it to any value. Here we set it to 100.0 for readability.
+                 * it to any value.
                  */
-                r[(KnobType)i] = 100.0;
+                r[(KnobType)i] = 0;
             }
         }
         return r;
@@ -68,8 +68,10 @@ namespace nornir{
 
     ExplorerLowDiscrepancy::ExplorerLowDiscrepancy(
                 std::vector<bool> knobs,
-                StrategyExploration explorationStrategy):
-            Explorer(knobs), _explorationStrategy(explorationStrategy), _firstPointGenerated(false){
+                StrategyExploration explorationStrategy,
+                std::vector<KnobsValues> additionalPoints):
+            Explorer(knobs), _explorationStrategy(explorationStrategy),
+            _additionalPoints(additionalPoints){
         uint d = 0;
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
             if(generate((KnobType) i)){
@@ -110,13 +112,12 @@ namespace nornir{
 
     KnobsValues ExplorerLowDiscrepancy::nextRelativeKnobsValues() const{
         KnobsValues r(KNOB_VALUE_RELATIVE);
-        if(!_firstPointGenerated){
-            _firstPointGenerated = true;
-            for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-                r[(KnobType)i] = 0;
+        if(_additionalPoints.size()){
+            r = _additionalPoints.front();
+            if(!r.areRelative()){
+                throw std::runtime_error("Additional calibration points must be relative.");
             }
-            r[KNOB_TYPE_VIRTUAL_CORES] = 100.0;
-            r[KNOB_TYPE_FREQUENCY] = 100.0; //TODO Assicurarsi che sia diversa dalla conf corrente.
+            _additionalPoints.erase(_additionalPoints.begin());
         }else{
             gsl_qrng_get(_generator, _normalizedPoint);
             size_t nextCoordinate = 0;
@@ -128,9 +129,9 @@ namespace nornir{
                     /**
                      * If we do not need to automatically find the value for this knob,
                      * then it has only 0 or 1 possible value. Accordingly, we can set
-                     * it to any value. Here we set it to 100.0 for readability.
+                     * it to any value. 
                      */
-                    r[(KnobType)i] = 100.0;
+                    r[(KnobType)i] = 0;
                 }
             }
         }

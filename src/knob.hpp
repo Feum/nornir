@@ -287,10 +287,14 @@ private:
     KnobValueType _type;
     double _values[KNOB_TYPE_NUM];
 public:
-    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){
+    inline void reset(){
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
             _values[i] = 0;
         }
+    }
+
+    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){
+        reset();
     }
 
     void swap(KnobsValues& x){

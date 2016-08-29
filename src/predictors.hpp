@@ -324,6 +324,11 @@ private:
     double _chisq;
     std::vector<double> _coefficients;
     bool _preparationNeeded;
+    double _maxFreqBw;
+    double _minFreqBw;
+    double _minFrequency;
+    double _maxFrequency;
+    double _maxCores;
 public:
     PredictorUsl(PredictorType type,
                  const Parameters& p,

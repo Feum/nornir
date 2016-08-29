@@ -216,6 +216,9 @@ typedef enum{
     // Parameters are ok.
     VALIDATION_OK = 0,
 
+    // Generic error
+    VALIDATION_NO,
+
     // Frequency can be changed by the operating system and the flag
     // "constant_tsc" is not present on the CPU. Accordingly, since we
     // realy on getticks() to perform measurements, the amount of ticks
@@ -260,7 +263,7 @@ typedef enum{
     VALIDATION_NO_BLOCKING_THRESHOLD,
 
     // Parameters for Mishra predictors not specified.
-    VALIDATION_NO_MISHRA_PARAMETERS
+    VALIDATION_NO_MISHRA_PARAMETERS,
 }ParametersValidation;
 
 /**

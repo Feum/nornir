@@ -442,6 +442,12 @@ ParametersValidation Parameters::validatePredictor(){
           mishra.namesData.compare("") == 0)){
             return VALIDATION_NO_MISHRA_PARAMETERS;
     }
+    if((strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
+       strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING) &&
+       (strategyExploration != STRATEGY_EXPLORATION_HALTON && strategyExploration != STRATEGY_EXPLORATION_HALTON_REVERSE &&
+        strategyExploration != STRATEGY_EXPLORATION_RANDOM && strategyExploration != STRATEGY_EXPLORATION_SOBOL)){
+           return VALIDATION_NO;
+    }
     return VALIDATION_OK;
 }
 

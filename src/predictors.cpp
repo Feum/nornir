@@ -216,11 +216,6 @@ void RegressionDataPower::init(const KnobsValues& values){
 
         _dynamicPowerModel = dynamicPowerProp;
         ++_numPredictors;
-#if 0
-        std::cout << "VxUsed " << _voltagePerUsedSockets << std::endl;
-        std::cout << "VxUnused " << _voltagePerUnusedSockets << std::endl;
-        std::cout << "DynPow " << _dynamicPowerModel << std::endl;
-#endif
     }else{
         /**
          * Since I do not control the frequency, this model can be very
@@ -579,13 +574,16 @@ PredictorUsl::PredictorUsl(PredictorType type,
              const Configuration& configuration,
              const Smoother<MonitoredSample>* samples):
                     Predictor(type, p, configuration, samples),
-                    _ws(NULL), _x(NULL), _y(NULL), _chisq(0), _preparationNeeded(true){
+                    _ws(NULL), _x(NULL), _y(NULL), _chisq(0),
+                    _preparationNeeded(true), _maxFreqBw(0), _minFreqBw(0){
     if(type != PREDICTION_BANDWIDTH){
         throw std::runtime_error("PredictorUsl can only be used for bandwidth predictions.");
     }
     _c = gsl_vector_alloc(POLYNOMIAL_DEGREE_USL);
     _cov = gsl_matrix_alloc(POLYNOMIAL_DEGREE_USL, POLYNOMIAL_DEGREE_USL);
-
+    _minFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front();
+    _maxFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().back();
+    _maxCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getAllowedValues().back();
 }
 
 PredictorUsl::~PredictorUsl(){
@@ -604,11 +602,17 @@ bool PredictorUsl::readyForPredictions(){
 
 void PredictorUsl::refine(){
     double numCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
+    double frequency = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
     double bandwidth = getMaximumBandwidth();
-    if(_p.knobFrequencyEnabled){
-        // We always interpolate minimum frequency.
-        bandwidth *= _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front() /
-                     _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
+
+
+    if(frequency == _maxFrequency && numCores == _maxCores){
+        _maxFreqBw = bandwidth;
+        return;
+    }else if(frequency == _minFrequency && numCores == _maxCores){
+        _minFreqBw = bandwidth;
+    }else if(frequency != _minFrequency){
+        return;
     }
 
     // Checks if a y is already present for this x
@@ -673,12 +677,13 @@ double PredictorUsl::predict(const KnobsValues& configuration, double bandwidthI
     }
     result = (numCores / result);
 
-    if(_p.knobFrequencyEnabled){
-        // Now we have the bandwidth at minimum frequency, let's scale it up.
-        result *= (frequency /
-                  _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front());
+    if(frequency != _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()){
+        double minMaxScaling = _maxFreqBw / _minFreqBw;
+        double maxFreqPred = result * minMaxScaling;
+        return ((maxFreqPred - result)/(_maxFrequency - _minFrequency))*frequency + ((result*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
+    }else{
+        return result;
     }
-    return result;
 }
     
 /**************** PredictorSimple ****************/

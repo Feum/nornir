@@ -76,10 +76,18 @@ private:
     gsl_qrng* _generator;
     double* _normalizedPoint;
     StrategyExploration _explorationStrategy;
-    mutable bool _firstPointGenerated;
+    mutable std::vector<KnobsValues> _additionalPoints;
 public:
+    /**
+     * Constructor for a low discrepancy generator.
+     * @param knobs The knobs that must be explored.
+     * @param explorationStrategy The exploration strategy.
+     * @param additionalPoints Additional points to be visited. They will be visited in the same
+     *                         order they are specified in the vector (from 0 to n).
+     **/
     ExplorerLowDiscrepancy(std::vector<bool> knobs,
-                           StrategyExploration explorationStrategy);
+                           StrategyExploration explorationStrategy,
+                           std::vector<KnobsValues> additionalPoints = std::vector<KnobsValues>());
 
     virtual ~ExplorerLowDiscrepancy();
     void reset();
