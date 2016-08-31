@@ -189,6 +189,7 @@ void Parameters::setDefault(){
     synchronousWorkers = false;
     powerBudget = 0;
     maxCalibrationTime = 0;
+    maxCalibrationConfigurations = 0;
     maxPerformancePredictionError = 10.0;
     maxPowerPredictionError = 5.0;
     regressionAging = 0;
@@ -204,7 +205,7 @@ void Parameters::setDefault(){
     mishra.namesData = "";
     mishra.bandwidthData = "";
     mishra.powerData = "";
-
+    mishra.numSamples = 20;
     dataflow.orderedProcessing = false;
     dataflow.orderedOutput = false;
     dataflow.maxGraphs = 1000;
@@ -411,7 +412,7 @@ ParametersValidation Parameters::validateContract(){
         }break;
     }
 
-    if(maxCalibrationTime == 0 &&
+    if(maxCalibrationTime == 0 && maxCalibrationConfigurations &&
        (maxPerformancePredictionError <= 0      ||
         maxPerformancePredictionError > 100.0   ||
         maxPowerPredictionError <= 0    ||
@@ -567,6 +568,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, synchronousWorkers);
     SETVALUE(xt, Double, powerBudget);
     SETVALUE(xt, Double, maxCalibrationTime);
+    SETVALUE(xt, Uint, maxCalibrationConfigurations);
     SETVALUE(xt, Double, maxPerformancePredictionError);
     SETVALUE(xt, Double, maxPowerPredictionError);
     SETVALUE(xt, Uint, regressionAging);
@@ -583,6 +585,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, String, mishra.namesData);
     SETVALUE(xt, String, mishra.bandwidthData);
     SETVALUE(xt, String, mishra.powerData);
+    SETVALUE(xt, Uint, mishra.numSamples);
 
     SETVALUE(xt, Bool, dataflow.orderedProcessing);
     SETVALUE(xt, Bool, dataflow.orderedOutput);

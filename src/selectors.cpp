@@ -71,7 +71,7 @@ Selector::Selector(const Parameters& p,
     //TODO Fare meglio con mammut
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
 #if 0
-    // Input bandwidth smoother                                                                                                                                                                                      
+    // Input bandwidth smoother
     if(p.strategySmoothing == STRATEGY_SMOOTHING_EXPONENTIAL){
         _bandwidthIn = new MovingAverageExponential<double>(p.smoothingFactor);
     }else{
@@ -635,7 +635,7 @@ SelectorLearner::SelectorLearner(const Parameters& p,
                                 getPredictor(PREDICTION_BANDWIDTH, p, configuration, samples),
                                 getPredictor(PREDICTION_POWER, p, configuration, samples)),
              _explorer(NULL), _firstPointGenerated(false),
-             _contractViolations(0), _accuracyViolations(0){
+             _contractViolations(0), _accuracyViolations(0), _totalCalPoints(0){
     /***************************************/
     /*              Explorers              */
     /***************************************/
@@ -720,6 +720,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
     }else{
         if(isCalibrating()){
             refine();
+            ++_totalCalPoints;
         }
     }
 
@@ -755,11 +756,13 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             resetTotalCalibrationTime();
             _accuracyViolations = 0;
             _contractViolations = 0;
+            _totalCalPoints = 0;
             _forced = false;
             DEBUG("Phase changed, recalibrating.");
         }else if(_bandwidthIn->coefficientVariation() > 100.0){ //TODO Remove magic number
             /******************* Bandwidth change. *******************/
             refine();
+            ++_totalCalPoints;
             kv = getBestKnobsValues();
             updatePredictions(kv);
             _accuracyViolations = 0;
@@ -768,12 +771,14 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             _forced = false;
             DEBUG("Input bandwidth fluctuations, recomputing best solution.");
         }else if((!_p.maxCalibrationTime || getTotalCalibrationTime() < _p.maxCalibrationTime) &&
+                 (!_p.maxCalibrationConfigurations && _totalCalPoints < _p.maxCalibrationConfigurations) &&
                  ((!accurate && _accuracyViolations > _p.tolerableSamples) ||
                   (isBestSolutionFeasible() && !_forced && contractViolated && _contractViolations > _p.tolerableSamples))){
             /******************* More calibration points. *******************/
             kv = _explorer->nextRelativeKnobsValues();
             updatePredictions(kv);
             refine();
+            ++_totalCalPoints;
             startCalibration(totalTasks);
             _accuracyViolations = 0;
             _contractViolations = 0;
@@ -852,7 +857,7 @@ SelectorMishra::SelectorMishra(const Parameters& p,
         SelectorFixedExploration(p, configuration, samples,
                        std::unique_ptr<Predictor>(new PredictorMishra(PREDICTION_BANDWIDTH, p, configuration, samples)),
                        std::unique_ptr<Predictor>(new PredictorMishra(PREDICTION_POWER, p, configuration, samples)),
-                       20){
+                       p.mishra.numSamples){
     ;
 }
 

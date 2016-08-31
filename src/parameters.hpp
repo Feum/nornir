@@ -416,6 +416,10 @@ typedef struct{
      * one row per configuration. Data doesn't need to be normalized.
      */
     std::string powerData;
+    /**
+     * Number of samples to be used [default = 20].
+     */
+    uint numSamples;
 }MishraParameters;
 
 typedef struct{
@@ -702,8 +706,16 @@ public:
     // Maximum calibration time (milliseconds). 0 is no limit.
     // We will keep calibrating until the error is higher than the
     // max*PredictionError AND calibration time is lower than the
-    // maxCalibrationTime [default = 0.0].
+    // maxCalibrationTime  AND the number of visited configurations
+    // is lower than maxCalibrationConfigurations [default = 0.0].
     double maxCalibrationTime;
+
+    // Maximum number of configurations to explore during calibration
+    // phase. 0 is no limit. We will keep calibrating until the error is
+    // higher than the max*PredictionError AND calibration time is lower
+    // than the maxCalibrationTime AND the number of visited configurations
+    // is lower than maxCalibrationConfigurations [default = 0.0].
+    uint maxCalibrationConfigurations;
 
     // Maximum error percentage allowed for performance prediction.
     // [default = 10.0].
