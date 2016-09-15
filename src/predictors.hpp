@@ -177,7 +177,6 @@ protected:
 
     double getMaximumBandwidth() const;
     double getCurrentPower() const;
-    double getRealBandwidthFromMaximum(double maximum, double bandwidthIn) const;
 public:
     Predictor(PredictorType type,
               const Parameters& p,
@@ -219,7 +218,7 @@ public:
      * @param values The values.
      * @return The predicted value at a specific combination of real knobs values.
      */
-    virtual double predict(const KnobsValues& realValues, double bandwidthIn) = 0;
+    virtual double predict(const KnobsValues& realValues) = 0;
 
     /**
      * Returns the model error, i.e. the error between the observations and the
@@ -278,7 +277,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& configuration, double bandwidthIn);
+    double predict(const KnobsValues& configuration);
 
     double getInactivePowerParameter() const;
 };
@@ -305,7 +304,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& configuration, double bandwidthIn);
+    double predict(const KnobsValues& configuration);
 };
 
 /**
@@ -345,7 +344,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& configuration, double bandwidthIn);
+    double predict(const KnobsValues& configuration);
 };
 
 /*
@@ -373,7 +372,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& values, double bandwidthIn);
+    double predict(const KnobsValues& values);
 
     void refine();
 
@@ -409,7 +408,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& realValues, double bandwidthIn);
+    double predict(const KnobsValues& realValues);
 };
 
 /**
@@ -436,7 +435,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& realValues, double bandwidthIn);
+    double predict(const KnobsValues& realValues);
 };
 
 }

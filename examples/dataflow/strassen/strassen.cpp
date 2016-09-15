@@ -1,15 +1,9 @@
 /*
  * Dataflow implementaion of Strassen algorithm for matrix multiplication.
  *
- *  Created on: Sep 6, 2016
+ *  Created on 06/09/2016
  *  Author: Daniele De Sensi (d.desensi.software@gmail.com)
  *          Massimo Torquati (torquati@di.unipi.it)
- */
-
-/*
- * graph.cpp
- *
- * Created on: 30/04/2016
  *
  * =========================================================================
  *  Copyright (C) 2015-, Daniele De Sensi (d.desensi.software@gmail.com)
@@ -37,12 +31,34 @@
 #include <stdlib.h>
 #include "../../../src/dataflow/interpreter.hpp"
 
+#define FIXED_STREAM
+
 using namespace nornir::dataflow;
 
 const double THRESHOLD = 0.001;
 
 long CheckResults(long m, long n, const double *C, const double *C1)
 {
+
+#if 0
+    std::cout << "C: " << std::endl;
+    for(long i = 0; i < m; i++){
+        for(long j = 0; j < n ; j++){
+            std::cout << C[i*n+j] << ", ";
+        }
+        std::cout << std::endl;
+    }
+
+    std::cout << "C1: " << std::endl;
+    for(long i = 0; i <m; i++){
+        for(long j = 0;j < n ;j++){
+            std::cout << C1[i*n+j] << ", ";
+        }
+        std::cout << std::endl;
+    }
+
+#endif
+
     for (long i=0; i<m; i++)
         for (long j=0; j<n; j++) {
             long idx = i*n+j;
@@ -121,6 +137,18 @@ typedef struct{
     const double* B12;
     const double* B21;
     const double* B22;
+}TaskFixed;
+
+typedef struct{
+    const double* A11;
+    const double* A12;
+    const double* A21;
+    const double* A22;
+
+    const double* B11;
+    const double* B12;
+    const double* B21;
+    const double* B22;
 
     double* C;
 
@@ -133,29 +161,29 @@ typedef struct{
     double* P7;
 }Task;
 
-class MatrixStreamRate: public nornir::dataflow::InputStreamRate{
+class MatrixStream: public nornir::dataflow::InputStream{
 private:
-    long _m, _n, _p, _AN, _BN, _matrices;
+    long _id;
+    long _streamSize, _m, _n, _p, _AN, _BN;
+    bool _eos;
 public:
-    inline MatrixStreamRate(std::string fileName, long m, long n, long p,
-                            long AN, long BN,
-                            long matrices = 1000):InputStreamRate(fileName),
-                            _m(m), _n(n), _p(p), _AN(AN), _BN(BN), _matrices(matrices){
+    inline MatrixStream(long streamSize, long m, long n, long p,
+                        long AN, long BN): 
+         _id(0), _streamSize(streamSize), _m(m), _n(n), _p(p), _AN(AN), 
+          _BN(BN), _eos(false){
         ;
     }
 
-protected:
-    std::vector<void*> loadObjects(){
-        std::vector<void*>  objects;
-        for(size_t i = 0; i < (size_t) _matrices; i++){
-            Task* t = new Task();
-            memset(t, 0, sizeof(Task));
+    inline void* next(){
+        if(_id < _streamSize){
+            ++_id;
+            TaskFixed* t = new TaskFixed();
+            memset(t, 0, sizeof(TaskFixed));
             const double *A = (double*)malloc(_m*_p*sizeof(double));
             const double *B = (double*)malloc(_p*_n*sizeof(double));
             assert(A); assert(B);
 
             random_init(_m, _n, _p, const_cast<double*>(A), const_cast<double*>(B));
-            double *C = (double*)malloc(_m*_n*sizeof(double));
 
             t->A11 = &A[0];
             t->A12 = &A[_p/2];
@@ -167,7 +195,52 @@ protected:
             t->B21 = &B[_p/2*_BN];
             t->B22 = &B[_p/2*_BN+_n/2];
 
-            t->C = C;
+            return (void*) t;
+        }else{
+            _eos = true;
+            return NULL;
+        }
+    }
+
+    inline bool hasNext(){
+        return !_eos;
+    }
+};
+
+class MatrixStreamRate: public nornir::dataflow::InputStreamRate{
+private:
+    long _m, _n, _p, _AN, _BN, _matrices;
+public:
+    inline MatrixStreamRate(std::string fileName, long m, long n, long p,
+                            long AN, long BN,
+                            long matrices = 1):InputStreamRate(fileName),
+                            _m(m), _n(n), _p(p), _AN(AN), _BN(BN), _matrices(matrices){
+        ;
+    }
+
+protected:
+    std::vector<void*> loadObjects(){
+        std::vector<void*>  objects;
+        for(size_t i = 0; i < (size_t) _matrices; i++){
+            TaskFixed* t = new TaskFixed();
+            memset(t, 0, sizeof(TaskFixed));
+            const double *A = (double*)malloc(_m*_p*sizeof(double));
+            const double *B = (double*)malloc(_p*_n*sizeof(double));
+            assert(A); assert(B);
+
+            random_init(_m, _n, _p, const_cast<double*>(A), const_cast<double*>(B));
+
+            t->A11 = &A[0];
+            t->A12 = &A[_p/2];
+            t->A21 = &A[_m/2*_AN];
+            t->A22 = &A[_m/2*_AN+_p/2];
+
+            t->B11 = &B[0];
+            t->B12 = &B[_n/2];
+            t->B21 = &B[_p/2*_BN];
+            t->B22 = &B[_p/2*_BN+_n/2];
+
+            objects.push_back((void*) t);
         }
         return objects;
     }
@@ -187,26 +260,47 @@ public:
             CheckResults(_m, _n, t->C, C2);
             free(C2);
         }
+
+        free(t->C);
+        free(t->P1);
+        free(t->P2);
+        free(t->P3);
+        free(t->P4);
+        free(t->P5);
+        //free(t->P6);
+        //free(t->P7);
+#ifdef FIXED_STREAM
         delete t->A11;
         delete t->B11;
-        delete t->C;
-        delete t->P1;
-        delete t->P2;
-        delete t->P3;
-        delete t->P4;
-        delete t->P5;
-        delete t->P6;
-        delete t->P7;
+#endif
         delete t;
     }
 };
 
-Computable *IN, *P1Ins, *P2Ins, *P3Ins, *P4Ins, *P5Ins, *P6Ins, *P7Ins, *C11Ins, *C22Ins, *C12Ins, *C21Ins, *OUT;
+Computable *IN, *P1Ins, *P2Ins, *P3Ins, *P4Ins, *P5Ins, *P6Ins, *P7Ins, *C11C22Ins, *C12C21Ins, *OUT;
 
 class INCode: public Computable{
+private:
+    long _m, _n;
 public:
+    INCode(long m, long n):_m(m), _n(n){;}
+
     void compute(Data* d){
-        Task* t = (Task*) d->getInput();
+        TaskFixed* tf = (TaskFixed*) d->getInput();
+        Task* t = new Task();
+        memset(t, 0, sizeof(Task));
+
+        t->A11 = tf->A11;
+        t->A12 = tf->A12;
+        t->A21 = tf->A21;
+        t->A22 = tf->A22;
+
+        t->B11 = tf->B11;
+        t->B12 = tf->B12;
+        t->B21 = tf->B21;
+        t->B22 = tf->B22;
+
+        t->C = (double*)malloc(_m*_n*sizeof(double));
 
         d->setOutput((void*) t, P1Ins);
         d->setOutput((void*) t, P2Ins);
@@ -215,6 +309,9 @@ public:
         d->setOutput((void*) t, P5Ins);
         d->setOutput((void*) t, P6Ins);
         d->setOutput((void*) t, P7Ins);
+#ifdef FIXED_STREAM
+        delete tf;
+#endif
     }
 };
 
@@ -243,8 +340,7 @@ public:
 
         t->P1 = P1;
 
-        d->setOutput((void*) t, C11Ins);
-        d->setOutput((void*) t, C22Ins);
+        d->setOutput((void*) t, C11C22Ins);
     }
 };
 
@@ -261,18 +357,21 @@ public:
     void compute(Data* d){
         Task* t = (Task*) d->getInput();
 
+        //double *P2 = &(t->C[_m2*_CN]);
         double *P2 = (double*)malloc(_m2*_n2*sizeof(double));
         double *sumA = (double*)malloc(_m2*_p2*sizeof(double));
 
         mmsum(t->A21, _AN, t->A22, _AN, sumA, _p2, _m2, _p2); // S3
-        seqMatMult(_m2, _n2, _p2, sumA, _p2, t->B11, _BN, P2, _CN); // P2
+        //seqMatMult(_m2, _n2, _p2, sumA, _p2, t->B11, _BN, P2,_CN); // P2
+        seqMatMult(_m2, _n2, _p2, sumA, _p2, t->B11, _BN, P2, _n2);   // P2
+
 
         free(sumA);
 
         t->P2 = P2;
 
-        d->setOutput((void*) t, C22Ins);
-        d->setOutput((void*) t, C21Ins);
+        d->setOutput((void*) t, C11C22Ins);
+        d->setOutput((void*) t, C12C21Ins);
     }
 };
 
@@ -290,18 +389,20 @@ public:
     void compute(Data* d){
         Task* t = (Task*) d->getInput();
 
+        //double *P3 = &(t->C[_n2]); 
         double *P3 = (double*)malloc(_m2*_n2*sizeof(double));
         double *sumB= (double*)malloc(_p2*_n2*sizeof(double));
 
         mmsub(t->B12, _BN, t->B22, _BN, sumB, _n2, _p2, _n2); // S4
-        seqMatMult(_m2, _n2, _p2, t->A11, _AN, sumB, _n2, P3, _CN); // P3
+        //seqMatMult(_m2, _n2, _p2, t->A11, _AN, sumB, _n2, P3, _CN); // P3
+        seqMatMult(_m2, _n2, _p2, t->A11, _AN, sumB, _n2, P3, _n2);   // P3
 
         free(sumB);
 
         t->P3 = P3;
 
-        d->setOutput((void*) t, C22Ins);
-        d->setOutput((void*) t, C12Ins);
+        d->setOutput((void*) t, C11C22Ins);
+        d->setOutput((void*) t, C12C21Ins);
     }
 };
 
@@ -328,8 +429,8 @@ public:
 
         t->P4 = P4;
 
-        d->setOutput((void*) t, C11Ins);
-        d->setOutput((void*) t, C21Ins);
+        d->setOutput((void*) t, C11C22Ins);
+        d->setOutput((void*) t, C12C21Ins);
     }
 };
 
@@ -356,8 +457,8 @@ public:
 
         t->P5 = P5;
 
-        d->setOutput((void*) t, C11Ins);
-        d->setOutput((void*) t, C12Ins);
+        d->setOutput((void*) t, C11C22Ins);
+        d->setOutput((void*) t, C12C21Ins);
     }
 };
 
@@ -374,19 +475,19 @@ public:
     void compute(Data* d){
         Task* t = (Task*) d->getInput();
 
-        double *P6 = (double*)malloc(_m2*_n2*sizeof(double));
+        double *P6 = &(t->C[_m2*_CN+_n2]); //(double*)malloc(_m2*_n2*sizeof(double));
         double *sumA= (double*)malloc(_m2*_p2*sizeof(double));
         double *sumB= (double*)malloc(_p2*_n2*sizeof(double));
 
         mmsub(t->A21, _AN, t->A11, _AN, sumA, _p2, _m2, _p2); // S7
         mmsum(t->B11, _BN, t->B12, _BN, sumB, _n2, _p2, _n2); // S8
-        seqMatMult(_m2, _n2, _p2, sumA, _p2, sumB, _n2, P6, _CN);// P6
+        seqMatMult(_m2, _n2, _p2, sumA, _p2, sumB, _n2, P6, _CN); // P6
 
         free(sumA);free(sumB);
 
         t->P6 = P6;
 
-        d->setOutput((void*) t, C22Ins);
+        d->setOutput((void*) t, C11C22Ins);
     }
 };
 
@@ -403,130 +504,79 @@ public:
     void compute(Data* d){
         Task* t = (Task*) d->getInput();
 
-        double *P7 = (double*)malloc(_m2*_n2*sizeof(double));
+        double *P7 = &(t->C[0]); //(double*)malloc(_m2*_n2*sizeof(double));
         double *sumA= (double*)malloc(_m2*_p2*sizeof(double));
         double *sumB= (double*)malloc(_p2*_n2*sizeof(double));
 
         mmsub(t->A12, _AN, t->A22, _AN, sumA, _p2, _m2, _p2); // S9
         mmsum(t->B21, _BN, t->B22, _BN, sumB, _n2, _p2, _n2); // S10
-        seqMatMult(_m2, _n2, _p2, sumA, _p2, sumB, _n2, P7, _CN);// P7
+        seqMatMult(_m2, _n2, _p2, sumA, _p2, sumB, _n2, P7, _CN); // P7
 
         free(sumA);free(sumB);
 
         t->P7 = P7;
 
-        d->setOutput((void*) t, C11Ins);
+        d->setOutput((void*) t, C11C22Ins);
     }
 };
 
-class C11Code: public Computable{
+class C11C22Code: public Computable{
 private:
     long _m2, _n2, _CN;
 public:
-    C11Code(long m2, long n2, long CN):_m2(m2), _n2(n2), _CN(CN){;}
+    C11C22Code(long m2, long n2, long CN):_m2(m2), _n2(n2), _CN(CN){;}
 
     void compute(Data* d){
         Task* P1t = (Task*) d->getInput(P1Ins);
-        Task* P4t = (Task*) d->getInput(P4Ins);
-        Task* P5t = (Task*) d->getInput(P5Ins);
-        Task* P7t = (Task*) d->getInput(P7Ins);
         double *C11 = &(P1t->C[0]);
-        for(long i = 0; i < _m2; i++){
-            for(long j = 0; j< _n2; ++j) {
-                C11[i*_CN + j] = P1t->P1[i*_n2 + j] + P4t->P4[i*_n2 + j] - P5t->P5[i*_n2 + j] + P7t->P7[i*_n2 + j];
-            }
-        }
-        P1t->P4 = P4t->P4;
-        P1t->P5 = P5t->P5;
-        P1t->P7 = P7t->P7;
-        d->setOutput((void*) P1t, OUT);
-    }
-};
-
-class C12Code: public Computable{
-private:
-    long _m2, _n2, _CN;
-public:
-    C12Code(long m2, long n2, long CN):_m2(m2), _n2(n2), _CN(CN){;}
-
-    void compute(Data* d){
-        Task* P3t = (Task*) d->getInput(P3Ins);
-        Task* P5t = (Task*) d->getInput(P5Ins);
-        double *C12 = &(P3t->C[_n2]);
-        for(long i = 0; i < _m2; i++){
-            for(long j = 0; j< _n2; ++j) {
-                C12[i*_CN + j] = P3t->P3[i*_n2 + j] + P5t->P5[i*_n2 + j];
-            }
-        }
-        P3t->P5 = P5t->P5;
-        d->setOutput((void*) P3t, OUT);
-    }
-};
-
-class C21Code: public Computable{
-private:
-    long _m2, _n2, _CN;
-public:
-    C21Code(long m2, long n2, long CN):_m2(m2), _n2(n2), _CN(CN){;}
-
-    void compute(Data* d){
-        Task* P2t = (Task*) d->getInput(P2Ins);
-        Task* P4t = (Task*) d->getInput(P4Ins);
-        double *C21 = &(P2t->C[_m2*_CN]);
-        for(long i = 0; i < _m2; i++){
-            for(long j = 0; j< _n2; ++j) {
-                C21[i*_CN + j] = P2t->P2[i*_n2 + j] + P4t->P4[i*_n2 + j];
-            }
-        }
-        P2t->P4 = P4t->P4;
-        d->setOutput((void*) P2t, OUT);
-    }
-};
-
-class C22Code: public Computable{
-private:
-    long _m2, _n2, _CN;
-public:
-    C22Code(long m2, long n2, long CN):_m2(m2), _n2(n2), _CN(CN){;}
-
-    void compute(Data* d){
-        Task* P1t = (Task*) d->getInput(P1Ins);
-        Task* P2t = (Task*) d->getInput(P2Ins);
-        Task* P3t = (Task*) d->getInput(P3Ins);
-        Task* P6t = (Task*) d->getInput(P6Ins);
         double *C22 = &(P1t->C[_m2*_CN+_n2]);
         for(long i = 0; i < _m2; i++){
             for(long j = 0; j< _n2; ++j) {
-                C22[i*_CN + j] = P1t->P1[i*_n2 + j] - P2t->P2[i*_n2 + j] + P3t->P3[i*_n2 + j] + P6t->P6[i*_n2 + j];
+                C11[i*_CN + j] += P1t->P1[i*_n2 + j] + P1t->P4[i*_n2 + j] - P1t->P5[i*_n2 + j];
+                C22[i*_CN + j] += P1t->P1[i*_n2 + j] - P1t->P2[i*_n2 + j] + P1t->P3[i*_n2 + j];
             }
         }
-        P1t->P2 = P2t->P2;
-        P1t->P3 = P3t->P3;
-        P1t->P6 = P6t->P6;
         d->setOutput((void*) P1t, OUT);
+    }
+};
+
+class C12C21Code: public Computable{
+private:
+    long _m2, _n2, _CN;
+public:
+    C12C21Code(long m2, long n2, long CN):_m2(m2), _n2(n2), _CN(CN){;}
+
+    void compute(Data* d){
+        Task* P3t = (Task*) d->getInput(P3Ins);
+        double *C21 = &(P3t->C[_m2*_CN]);
+        double *C12 = &(P3t->C[_n2]);
+        for(long i = 0; i < _m2; i++){
+            for(long j = 0; j< _n2; ++j) {
+                //C12[i*_CN + j] += P3t->P5[i*_n2 + j];
+                //C21[i*_CN + j] += P3t->P4[i*_n2 + j];
+                C12[i*_CN + j] = P3t->P5[i*_n2 + j] + P3t->P3[i*_n2 + j];
+                C21[i*_CN + j] = P3t->P4[i*_n2 + j] + P3t->P2[i*_n2 + j];
+            }
+        }
+        d->setOutput((void*) P3t, OUT);
     }
 };
 
 class OUTCode: public Computable{
 public:
     void compute(Data* d){
-        Task* C11t = (Task*) d->getInput(C11Ins);
-        Task* C22t = (Task*) d->getInput(C22Ins);
-
-        // P1 already in C11t
-        C11t->P2 = C22t->P2;
-        C11t->P3 = C22t->P3;
-        // P4 already in C11t
-        // P5 already in C11t
-        C11t->P6 = C22t->P6;
-        // P7 already in C11t
-        d->setOutput((void*) C11t);
+        Task* C11C22t = (Task*) d->getInput(C11C22Ins);
+        d->setOutput((void*) C11C22t);
     }
 };
 
 int main(int argc, char** argv){
     if(argc < 5){
+#ifdef FIXED_STREAM
+        std::cerr << "Usage: " << argv[0] << " streamsize m n p" << std::endl;
+#else
         std::cerr << "Usage: " << argv[0] << " ratefile m n p" << std::endl;
+#endif
         return -1;
     }
 
@@ -535,11 +585,16 @@ int main(int argc, char** argv){
     long m2 = m/2, n2 = n/2, p2 = p/2;
 
     /* Create streams. */
+#ifdef FIXED_STREAM
+    MatrixStream inp(atoi(argv[1]), m, n, p, AN, BN);
+#else
     MatrixStreamRate inp(argv[1], m, n, p, AN, BN);
-    DemoOutputStream out(m, n, p, true);
+    inp.init();
+#endif
+    DemoOutputStream out(m, n, p, false);
 
     /* Create instructions. */
-    IN = new INCode();
+    IN = new INCode(m, n);
     P1Ins = new P1Code(m2, n2, p2, AN, BN, CN);
     P2Ins = new P2Code(m2, n2, p2, AN, BN, CN);
     P3Ins = new P3Code(m2, n2, p2, AN, BN, CN);
@@ -547,27 +602,31 @@ int main(int argc, char** argv){
     P5Ins = new P5Code(m2, n2, p2, AN, BN, CN);
     P6Ins = new P6Code(m2, n2, p2, AN, BN, CN);
     P7Ins = new P7Code(m2, n2, p2, AN, BN, CN);
-    C11Ins = new C11Code(m2, n2, CN);
-    C22Ins = new C22Code(m2, n2, CN);
-    C12Ins = new C12Code(m2, n2, CN);
-    C21Ins = new C21Code(m2, n2, CN);
+    C11C22Ins = new C11C22Code(m2, n2, CN);
+    C12C21Ins = new C12C21Code(m2, n2, CN);
     OUT = new OUTCode();
 
     /* Link instructions. */
     Mdfg graph;
     graph.link(IN, P1Ins); graph.link(IN, P2Ins); graph.link(IN, P3Ins);
     graph.link(IN, P4Ins); graph.link(IN, P5Ins); graph.link(IN, P6Ins); graph.link(IN, P7Ins);
-    graph.link(P1Ins, C11Ins); graph.link(P1Ins, C22Ins);
-    graph.link(P2Ins, C22Ins); graph.link(P2Ins, C21Ins);
-    graph.link(P3Ins, C22Ins); graph.link(P3Ins, C12Ins);
-    graph.link(P4Ins, C11Ins); graph.link(P4Ins, C21Ins);
-    graph.link(P5Ins, C11Ins); graph.link(P5Ins, C12Ins);
-    graph.link(P6Ins, C22Ins);
-    graph.link(P7Ins, C11Ins);
-    graph.link(C11Ins, OUT); graph.link(C22Ins, OUT); graph.link(C12Ins, OUT); graph.link(C21Ins, OUT);
+    graph.link(P1Ins, C11C22Ins);
+    graph.link(P2Ins, C11C22Ins); graph.link(P2Ins, C12C21Ins);
+    graph.link(P3Ins, C11C22Ins); graph.link(P3Ins, C12C21Ins);
+    graph.link(P4Ins, C11C22Ins); graph.link(P4Ins, C12C21Ins);
+    graph.link(P5Ins, C11C22Ins); graph.link(P5Ins, C12C21Ins);
+    graph.link(P6Ins, C11C22Ins);
+    graph.link(P7Ins, C11C22Ins);
+    graph.link(C11C22Ins, OUT); graph.link(C12C21Ins, OUT);
 
     /* Create interpreter. */
     nornir::Parameters par("parameters.xml");
+    nornir::Observer obs;
+    par.observer = &obs;
+#ifdef FIXED_STREAM
+    par.expectedTasksNumber = atoi(argv[1])*graph.getNumMdfi();
+    std::cout << "Expected tasks number: " << par.expectedTasksNumber << std::endl;
+#endif
     nornir::dataflow::Interpreter inter(&par, &graph, &inp, &out);
     inter.start();
     inter.wait();

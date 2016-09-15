@@ -96,7 +96,7 @@ public:
      * Updates the input bandwidth history with the current value.
      * MUST be called before calling getNextKnobsValues(...).
      */
-    void updateBandwidthIn();
+    virtual void updateBandwidthIn();
 
     /**
      * Returns the next values to be set for the knobs.
@@ -299,6 +299,7 @@ public:
                    const Smoother<MonitoredSample>* samples);
 
     KnobsValues getNextKnobsValues(u_int64_t totalTasks);
+    virtual void updateBandwidthIn();
 };
 
 /**

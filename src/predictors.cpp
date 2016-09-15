@@ -292,10 +292,6 @@ double Predictor::getCurrentPower() const{
     return _samples->average().watts;
 }
 
-double Predictor::getRealBandwidthFromMaximum(double maximum, double bandwidthIn) const{
-    return min(maximum, bandwidthIn);
-}
-
 PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
                                                      const Parameters& p,
                                                      const Configuration& configuration,
@@ -462,7 +458,7 @@ void PredictorLinearRegression::prepareForPredictions(){
     }
 }
 
-double PredictorLinearRegression::predict(const KnobsValues& values, double bandwidthIn){
+double PredictorLinearRegression::predict(const KnobsValues& values){
     _predictionInput->init(values);
 
     // One observation per column.
@@ -487,8 +483,7 @@ double PredictorLinearRegression::predict(const KnobsValues& values, double band
 
     _lr.Predict(predictionInputMlShed, result);
     if(_type == PREDICTION_BANDWIDTH){
-        double realBandwidth = getRealBandwidthFromMaximum(result.at(0), bandwidthIn);
-        res = 1.0 / realBandwidth;
+        res = 1.0 / result.at(0);
     }else{
         res = result.at(0);
     }
@@ -556,15 +551,14 @@ void PredictorLinearRegressionMapping::prepareForPredictions(){
     }
 }
 
-double PredictorLinearRegressionMapping::predict(const KnobsValues& configuration,
-                                                 double bandwidthIn){
+double PredictorLinearRegressionMapping::predict(const KnobsValues& configuration){
     double realValue = 0.0;
     if(configuration.areRelative()){
         _configuration.getKnob(KNOB_TYPE_MAPPING)->getRealFromRelative(configuration[KNOB_TYPE_MAPPING], realValue);
     }else{
         realValue = configuration[KNOB_TYPE_MAPPING];
     }
-    return _predictors[(MappingType) realValue]->predict(configuration, bandwidthIn);
+    return _predictors[(MappingType) realValue]->predict(configuration);
 }
 
 
@@ -661,7 +655,7 @@ void PredictorUsl::prepareForPredictions(){
     }
 }
 
-double PredictorUsl::predict(const KnobsValues& configuration, double bandwidthIn){
+double PredictorUsl::predict(const KnobsValues& configuration){
     double result = 0;
     double numCores = 0;
     double frequency = 0;
@@ -733,12 +727,11 @@ void PredictorAnalytical::clear(){
     ;
 }
 
-double PredictorAnalytical::predict(const KnobsValues& values, double bandwidthIn){
+double PredictorAnalytical::predict(const KnobsValues& values){
     switch(_type){
         case PREDICTION_BANDWIDTH:{
             double scalingFactor = getScalingFactor(values);
-            double predictedMaximum = getMaximumBandwidth() * scalingFactor;
-            return getRealBandwidthFromMaximum(predictedMaximum, bandwidthIn);
+            return getMaximumBandwidth() * scalingFactor;
         }break;
         case PREDICTION_POWER:{
             return getPowerPrediction(values);
@@ -849,7 +842,7 @@ void PredictorMishra::prepareForPredictions(){
     }
 }
 
-double PredictorMishra::predict(const KnobsValues& realValues, double bandwidthIn){
+double PredictorMishra::predict(const KnobsValues& realValues){
     auto it = _confIndexes.find(realValues);
     if(it == _confIndexes.end()){
         throw std::runtime_error("[Mishra] Impossible to find index for configuration.");
@@ -858,7 +851,7 @@ double PredictorMishra::predict(const KnobsValues& realValues, double bandwidthI
     if(confId >= _predictions.size()){
         throw std::runtime_error("[Mishra] Invalid configuration index: " + confId);
     }
-    return getRealBandwidthFromMaximum(_predictions.at(confId), bandwidthIn);
+    return _predictions.at(confId);
 }
 
 PredictorFullSearch::PredictorFullSearch(PredictorType type,
@@ -902,12 +895,12 @@ void PredictorFullSearch::prepareForPredictions(){
     ;
 }
 
-double PredictorFullSearch::predict(const KnobsValues& realValues, double bandwidthIn){
+double PredictorFullSearch::predict(const KnobsValues& realValues){
     if(!readyForPredictions()){
         throw std::runtime_error("prepareForPredictions: Not enough "
                                  "points are present");
     }
-    return getRealBandwidthFromMaximum(_values.at(realValues), bandwidthIn);
+    return _values.at(realValues);
 }
 
 }

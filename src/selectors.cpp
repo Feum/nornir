@@ -206,7 +206,6 @@ void Selector::updateBandwidthIn(){
     }
 }
 
-
 SelectorFixed::SelectorFixed(const Parameters& p,
          const Configuration& configuration,
          const Smoother<MonitoredSample>* samples):
@@ -265,7 +264,7 @@ double SelectorPredictive::getPrimaryPrediction(KnobsValues values){
                 maxBandwidth = observation->second.getMaximumBandwidth();
             }else{
                 _primaryPredictor->prepareForPredictions();
-                maxBandwidth = _primaryPredictor->predict(values, _bandwidthIn->average());
+                maxBandwidth = _primaryPredictor->predict(values);
             }
             return _bandwidthIn->average() / maxBandwidth * 100.0;
         }break;
@@ -276,16 +275,20 @@ double SelectorPredictive::getPrimaryPrediction(KnobsValues values){
                 maxBandwidth = observation->second.getMaximumBandwidth();
             }else{
                 _primaryPredictor->prepareForPredictions();
-                maxBandwidth = _primaryPredictor->predict(values, _bandwidthIn->average());
+                maxBandwidth = _primaryPredictor->predict(values);
             }
-            return min(maxBandwidth, _bandwidthIn->average());
+            if(_p.strategySelection == STRATEGY_SELECTION_ANALYTICAL){
+                return maxBandwidth;
+            }else{
+                return min(maxBandwidth, _bandwidthIn->average());
+            }
         }break;
         case CONTRACT_POWER_BUDGET:{
             if(observation != _observedValues.end()){
                 return observation->second.watts;
             }else{
                 _primaryPredictor->prepareForPredictions();
-                return _primaryPredictor->predict(values, _bandwidthIn->average());
+                return _primaryPredictor->predict(values);
             }
         }break;
         default:{
@@ -305,7 +308,7 @@ double SelectorPredictive::getSecondaryPrediction(KnobsValues values){
                 return observation->second.watts;
             }else{
                 _secondaryPredictor->prepareForPredictions();
-                return _secondaryPredictor->predict(values, _bandwidthIn->average());
+                return _secondaryPredictor->predict(values);
             }
         }break;
         case CONTRACT_POWER_BUDGET:{
@@ -314,7 +317,7 @@ double SelectorPredictive::getSecondaryPrediction(KnobsValues values){
                 maxBandwidth = observation->second.getMaximumBandwidth();
             }else{
                 _secondaryPredictor->prepareForPredictions();
-                maxBandwidth = _secondaryPredictor->predict(values, _bandwidthIn->average());
+                maxBandwidth = _secondaryPredictor->predict(values);
             }
             return min(maxBandwidth, _bandwidthIn->average());
         }break;
@@ -406,7 +409,10 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
     double bestSuboptimalValue = 0;
 
     switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
+        case CONTRACT_PERF_UTILIZATION:{
+            bestSuboptimalValue = _bandwidthIn->average() / _samples->average().bandwidth * 100.0;
+            bestSecondaryPrediction = numeric_limits<double>::max();
+        }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:{
             bestSuboptimalValue = _samples->average().bandwidth;
@@ -436,7 +442,7 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
         _secondaryPredictions[combinations.at(i)] = secondaryPrediction;
 #endif
 
-        //std::cout << currentValues << " " << primaryPrediction << " " << secondaryPrediction << std::endl;
+        std::cout << currentValues << " " << primaryPrediction << " " << secondaryPrediction << std::endl;
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
@@ -468,7 +474,9 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
 void SelectorPredictive::refine(){
     _primaryPredictor->refine();
     _secondaryPredictor->refine();
-    _observedValues[_configuration.getRealValues()] = _samples->average();
+    if(_p.strategySelection == STRATEGY_SELECTION_LEARNING){
+        _observedValues[_configuration.getRealValues()] = _samples->average();
+    }
 }
 
 void SelectorPredictive::updatePredictions(const KnobsValues& next){
@@ -567,10 +575,13 @@ SelectorAnalytical::SelectorAnalytical(const Parameters& p,
 
 KnobsValues SelectorAnalytical::getNextKnobsValues(u_int64_t totalTasks){
     _previousConfiguration = _configuration.getRealValues();
-    if(isContractViolated()){
+    if(isContractViolated() || ((_p.contractType == CONTRACT_PERF_BANDWIDTH || _p.contractType == CONTRACT_PERF_COMPLETION_TIME) && 
+                                std::abs((_samples->average().bandwidth - _p.requiredBandwidth)/_p.requiredBandwidth) > 0.05)){
         if(_violations > _p.tolerableSamples){
             _violations = 0;
-            return getBestKnobsValues();
+            KnobsValues kv = getBestKnobsValues();
+            _bandwidthIn->reset();
+            return kv;
         }else{
             ++_violations;
             return _configuration.getRealValues();
@@ -580,6 +591,15 @@ KnobsValues SelectorAnalytical::getNextKnobsValues(u_int64_t totalTasks){
             --_violations;
         }
         return _configuration.getRealValues();
+    }
+}
+
+void SelectorAnalytical::updateBandwidthIn(){
+    // For this selector we do not consider input bandwidth for contract different from the utilization one.
+    if(_p.contractType == CONTRACT_PERF_UTILIZATION){
+        Selector::updateBandwidthIn();
+    }else{
+        ;
     }
 }
 
@@ -771,7 +791,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             _forced = false;
             DEBUG("Input bandwidth fluctuations, recomputing best solution.");
         }else if((!_p.maxCalibrationTime || getTotalCalibrationTime() < _p.maxCalibrationTime) &&
-                 (!_p.maxCalibrationConfigurations && _totalCalPoints < _p.maxCalibrationConfigurations) &&
+                 (!_p.maxCalibrationConfigurations || _totalCalPoints < _p.maxCalibrationConfigurations) &&
                  ((!accurate && _accuracyViolations > _p.tolerableSamples) ||
                   (isBestSolutionFeasible() && !_forced && contractViolated && _contractViolations > _p.tolerableSamples))){
             /******************* More calibration points. *******************/
