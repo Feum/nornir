@@ -39,8 +39,16 @@ using mammut::Communicator;
 using mammut::Mammut;
 using mammut::utils::enumStrings;
 
-XmlTree::XmlTree(const string& fileName, const string& rootName){
+void XmlTree::init(const std::string& content, const std::string& rootName){
     rapidxml::xml_document<> xmlContent;
+    _fileContentChars = new char[content.size() + 1];
+    copy(content.begin(), content.end(), _fileContentChars);
+    _fileContentChars[content.size()] = '\0';
+    xmlContent.parse<0>(_fileContentChars);
+    _root = xmlContent.first_node(rootName.c_str());
+}
+
+XmlTree::XmlTree(const string& fileName, const string& rootName){
     ifstream file(fileName.c_str());
     if(!file){
         throw runtime_error("Impossible to read xml file " + fileName);
@@ -52,12 +60,12 @@ XmlTree::XmlTree(const string& fileName, const string& rootName){
     file.seekg(0, ios::beg);
     fileContent.assign((istreambuf_iterator<char>(file)),
                         istreambuf_iterator<char>());
-    _fileContentChars = new char[fileContent.size() + 1];
-    copy(fileContent.begin(), fileContent.end(), _fileContentChars);
-    _fileContentChars[fileContent.size()] = '\0';
-    xmlContent.parse<0>(_fileContentChars);
-    _root = xmlContent.first_node(rootName.c_str());
+    init(fileContent, rootName);
 }
+
+/*XmlTree::XmlTree(const std::string& content, const std::string& rootName){
+    init(content, rootName);
+}*/
 
 XmlTree::~XmlTree(){
     delete[] _fileContentChars;
@@ -149,21 +157,19 @@ void ArchData::loadXml(const string& archFileName){
 
 void Parameters::setDefault(){
     contractType = CONTRACT_NONE;
-    knobWorkers = KNOB_WORKERS_THREADS;
-    knobFrequencies = KNOB_FREQUENCY_YES;
-    knobMapping = KNOB_MAPPING_AUTO;
-    knobMappingEmitter = KNOB_SNODE_MAPPING_AUTO;
-    knobMappingCollector = KNOB_SNODE_MAPPING_AUTO;
-    knobHyperthreading = KNOB_HT_AUTO;
     triggerQBlocking = TRIGGER_Q_BLOCKING_NO;
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_SAME;
     strategySelection = STRATEGY_SELECTION_LEARNING;
-    strategyPrediction = STRATEGY_PREDICTION_REGRESSION_LINEAR;
-    strategyModelPerformance = STRATEGY_MODEL_AMDAHL;
+    strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_USL;
+    strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR;
     strategyExploration = STRATEGY_EXPLORATION_HALTON;
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
+    strategyCoresChange = STRATEGY_CORES_RETHREADING;
+    knobCoresEnabled = true;
+    knobMappingEnabled = true;
+    knobFrequencyEnabled = true;
     turboBoost = false;
     fastReconfiguration = true;
     migrateCollector = false;
@@ -183,9 +189,10 @@ void Parameters::setDefault(){
     synchronousWorkers = false;
     powerBudget = 0;
     maxCalibrationTime = 0;
+    maxCalibrationConfigurations = 0;
     maxPerformancePredictionError = 10.0;
     maxPowerPredictionError = 5.0;
-    regressionAging = 10;
+    regressionAging = 0;
     maxMonitoringOverhead = 1.0;
     thresholdQBlocking = -1;
     tolerableSamples = 0;
@@ -198,7 +205,7 @@ void Parameters::setDefault(){
     mishra.namesData = "";
     mishra.bandwidthData = "";
     mishra.powerData = "";
-
+    mishra.numSamples = 20;
     dataflow.orderedProcessing = false;
     dataflow.orderedOutput = false;
     dataflow.maxGraphs = 1000;
@@ -332,10 +339,9 @@ ParametersValidation Parameters::validateKnobFrequencies(){
     vector<VirtualCore*> virtualCores;
     virtualCores = mammut.getInstanceTopology()->getVirtualCores();
 
-    if(knobFrequencies == KNOB_FREQUENCY_YES &&
-       !(isGovernorAvailable(GOVERNOR_USERSPACE) &&
+    if(knobFrequencyEnabled && !(isGovernorAvailable(GOVERNOR_USERSPACE) &&
          availableFrequencies.size())){
-        knobFrequencies = KNOB_FREQUENCY_NO;
+        knobFrequencyEnabled = false;
     }
 
     for(size_t i = 0; i < virtualCores.size(); i++){
@@ -344,14 +350,12 @@ ParametersValidation Parameters::validateKnobFrequencies(){
         }
     }
 
-    if(knobFrequencies != KNOB_FREQUENCY_NO){
-        if(knobMapping == KNOB_MAPPING_NO){
-            return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
-        }
+    if(knobFrequencyEnabled && !knobMappingEnabled){
+        return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
     }
 
     if(fastReconfiguration &&
-       (!isHighestFrequencySettable() || knobFrequencies == KNOB_FREQUENCY_NO || 
+       (!isHighestFrequencySettable() ||
          strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_NONE)){
         fastReconfiguration = false;
     }
@@ -362,31 +366,6 @@ ParametersValidation Parameters::validateKnobFrequencies(){
         }else{
             mammut.getInstanceCpuFreq()->disableBoosting();
         }
-    }
-    return VALIDATION_OK;
-}
-
-ParametersValidation Parameters::validateKnobMapping(){
-    if(knobMapping == KNOB_MAPPING_AUTO){
-        knobMapping = KNOB_MAPPING_LINEAR;
-    }
-    return VALIDATION_OK;
-}
-
-ParametersValidation Parameters::validateKnobSnodeMapping(){
-    if(knobMappingEmitter == KNOB_SNODE_MAPPING_AUTO){
-        knobMappingEmitter = KNOB_SNODE_MAPPING_ALONE;
-    }
-
-    if(knobMappingCollector == KNOB_SNODE_MAPPING_AUTO){
-        knobMappingCollector = KNOB_SNODE_MAPPING_ALONE;
-    }
-    return VALIDATION_OK;
-}
-
-ParametersValidation Parameters::validateKnobHt(){
-    if(knobHyperthreading == KNOB_HT_AUTO){
-        knobHyperthreading = KNOB_HT_NO;
     }
     return VALIDATION_OK;
 }
@@ -433,7 +412,7 @@ ParametersValidation Parameters::validateContract(){
         }break;
     }
 
-    if(maxCalibrationTime == 0 &&
+    if(maxCalibrationTime == 0 && maxCalibrationConfigurations &&
        (maxPerformancePredictionError <= 0      ||
         maxPerformancePredictionError > 100.0   ||
         maxPowerPredictionError <= 0    ||
@@ -457,12 +436,18 @@ ParametersValidation Parameters::validateSelector(){
 
 
 ParametersValidation Parameters::validatePredictor(){
-    if(strategyPrediction == STRATEGY_PREDICTION_MISHRA &&
+    if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_MISHRA &&
          (mishra.bandwidthData.compare("") == 0 ||
           mishra.powerData.compare("") == 0 ||
           mishra.applicationName.compare("") == 0 ||
           mishra.namesData.compare("") == 0)){
             return VALIDATION_NO_MISHRA_PARAMETERS;
+    }
+    if((strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
+       strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING) &&
+       (strategyExploration != STRATEGY_EXPLORATION_HALTON && strategyExploration != STRATEGY_EXPLORATION_HALTON_REVERSE &&
+        strategyExploration != STRATEGY_EXPLORATION_RANDOM && strategyExploration != STRATEGY_EXPLORATION_SOBOL)){
+           return VALIDATION_NO;
     }
     return VALIDATION_OK;
 }
@@ -475,36 +460,10 @@ template<> char const* enumStrings<ContractType>::data[] = {
     "POWER_BUDGET"
 };
 
-template<> char const* enumStrings<KnobConfWorkers>::data[] = {
-    "NO",
-    "THREADS",
-    "MAPPING"
-};
-
-template<> char const* enumStrings<KnobConfFrequencies>::data[] = {
-    "NO",
-    "YES"
-};
-
-template<> char const* enumStrings<KnobConfMapping>::data[] = {
-    "NO",
-    "AUTO",
-    "LINEAR",
-    "CACHE_EFFICIENT"
-};
-
 template<> char const* enumStrings<TriggerConfQBlocking>::data[] = {
     "NO",
     "YES",
     "AUTO"
-};
-
-
-template<> char const* enumStrings<KnobConfHyperthreading>::data[] = {
-    "NO",
-    "AUTO",
-    "SOONER",
-    "LATER"
 };
 
 template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
@@ -523,14 +482,18 @@ template<> char const* enumStrings<StrategySelection>::data[] = {
     "MISHRA"
 };
 
-template<> char const* enumStrings<StrategyPrediction>::data[] = {
-    "REGRESSION_LINEAR",
+template<> char const* enumStrings<StrategyPredictionPerformance>::data[] = {
+    "AMDAHL",
+    "AMDAHL_MAPPING",
+    "USL",
+    "USL_MAPPING",
     "MISHRA"
 };
 
-template<> char const* enumStrings<StrategyModelPerformance>::data[] = {
-    "AMDAHL",
-    "USL"
+template<> char const* enumStrings<StrategyPredictionPower>::data[] = {
+    "LINEAR",
+    "LINEAR_MAPPING",
+    "MISHRA"
 };
 
 template<> char const* enumStrings<StrategyExploration>::data[] = {
@@ -539,13 +502,6 @@ template<> char const* enumStrings<StrategyExploration>::data[] = {
     "SOBOL",
     "HALTON",
     "HALTON_REVERSE"
-};
-
-template<> char const* enumStrings<KnobConfSNodeMapping>::data[] = {
-    "NO",
-    "AUTO",
-    "ALONE",
-    "COLLAPSED",
 };
 
 template<> char const* enumStrings<StrategySmoothing>::data[] = {
@@ -570,25 +526,28 @@ template<> char const* enumStrings<StrategyPersistence>::data[] = {
     "VARIATION"
 };
 
+template<> char const* enumStrings<StrategyCoresChange>::data[] = {
+    "RETHREADING",
+    "REMAPPING"
+};
+
 void Parameters::loadXml(const string& paramFileName){
     XmlTree xt(paramFileName, "adaptivityParameters");
 
     SETVALUE(xt, Enum, contractType);
-    SETVALUE(xt, Enum, knobWorkers);
-    SETVALUE(xt, Enum, knobMapping);
-    SETVALUE(xt, Enum, knobHyperthreading);
-    SETVALUE(xt, Enum, knobFrequencies);
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
     SETVALUE(xt, Enum, strategySelection);
-    SETVALUE(xt, Enum, strategyPrediction);
-    SETVALUE(xt, Enum, strategyModelPerformance);
+    SETVALUE(xt, Enum, strategyPredictionPerformance);
+    SETVALUE(xt, Enum, strategyPredictionPower);
     SETVALUE(xt, Enum, strategyExploration);
     SETVALUE(xt, Enum, strategySmoothing);
     SETVALUE(xt, Enum, strategyPolling);
     SETVALUE(xt, Enum, strategyPersistence);
-    SETVALUE(xt, Enum, knobMappingEmitter);
-    SETVALUE(xt, Enum, knobMappingCollector);
+    SETVALUE(xt, Enum, strategyCoresChange);
     SETVALUE(xt, Enum, triggerQBlocking);
+    SETVALUE(xt, Bool, knobCoresEnabled);
+    SETVALUE(xt, Bool, knobMappingEnabled);
+    SETVALUE(xt, Bool, knobFrequencyEnabled);
 
     SETVALUE(xt, Bool, turboBoost);
     SETVALUE(xt, Bool, fastReconfiguration);
@@ -609,6 +568,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, synchronousWorkers);
     SETVALUE(xt, Double, powerBudget);
     SETVALUE(xt, Double, maxCalibrationTime);
+    SETVALUE(xt, Uint, maxCalibrationConfigurations);
     SETVALUE(xt, Double, maxPerformancePredictionError);
     SETVALUE(xt, Double, maxPowerPredictionError);
     SETVALUE(xt, Uint, regressionAging);
@@ -625,6 +585,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, String, mishra.namesData);
     SETVALUE(xt, String, mishra.bandwidthData);
     SETVALUE(xt, String, mishra.powerData);
+    SETVALUE(xt, Uint, mishra.numSamples);
 
     SETVALUE(xt, Bool, dataflow.orderedProcessing);
     SETVALUE(xt, Bool, dataflow.orderedOutput);
@@ -663,6 +624,7 @@ Parameters::Parameters(const string& paramFileName,
         string confFileArch = confHomes.at(i) + string(CONFFILE_ARCH);
         string confFileVoltage = confHomes.at(i) + string(CONFFILE_VOLTAGE);
         string confFileVersion = confHomes.at(i) + string(CONFFILE_VERSION);
+
         if(existsFile(confFileArch) &&
            existsFile(confFileVoltage) &&
            existsFile(confFileVersion) &&
@@ -689,28 +651,10 @@ Parameters::~Parameters(){
 ParametersValidation Parameters::validate(){
     ParametersValidation r = VALIDATION_OK;
 
-    if(contractType == CONTRACT_NONE){
-        knobWorkers = KNOB_WORKERS_NO;
-        knobFrequencies = KNOB_FREQUENCY_NO;
-        knobMapping = KNOB_MAPPING_NO;
-    }
-
     setDefaultPost();
 
     /** Validate frequency knob. **/
     r = validateKnobFrequencies();
-    if(r != VALIDATION_OK){return r;}
-
-    /** Validate mapping knob. **/
-    r = validateKnobMapping();
-    if(r != VALIDATION_OK){return r;}
-
-    /** Validate service nodes mapping knob. **/
-    r = validateKnobSnodeMapping();
-    if(r != VALIDATION_OK){return r;}
-
-    /** Validate hyperthreading knob. **/
-    r = validateKnobHt();
     if(r != VALIDATION_OK){return r;}
 
     /** Validate triggers. **/
@@ -732,12 +676,6 @@ ParametersValidation Parameters::validate(){
     /** Validate predictors. **/
     r = validatePredictor();
     if(r != VALIDATION_OK){return r;}
-
-    /** Validate unsupported strategies. **/
-    if(knobHyperthreading == KNOB_HT_SOONER ||
-       knobMapping == KNOB_MAPPING_CACHE_EFFICIENT){
-        throw runtime_error("Not yet supported.");
-    }
 
     return VALIDATION_OK;
 }

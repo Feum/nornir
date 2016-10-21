@@ -40,25 +40,25 @@
 #endif
 
 namespace nornir{
-    Explorer::Explorer(const FarmConfiguration& configuration):_configuration(configuration){;}
+    Explorer::Explorer(std::vector<bool> knobs):_knobs(knobs){;}
 
-    ExplorerRandom::ExplorerRandom(const FarmConfiguration& configuration):
-            Explorer(configuration){
+    ExplorerRandom::ExplorerRandom(std::vector<bool> knobs):
+            Explorer(knobs){
         srand(time(NULL));
     }
 
     KnobsValues ExplorerRandom::nextRelativeKnobsValues() const{
         KnobsValues r(KNOB_VALUE_RELATIVE);
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(_configuration.getKnob((KnobType) i)->needsCalibration()){
+            if(generate((KnobType) i)){
                 r[(KnobType)i] = rand() % 100;
             }else{
                 /**
                  * If we do not need to automatically find the value for this knob,
                  * then it has only 0 or 1 possible value. Accordingly, we can set
-                 * it to any value. Here we set it to 100.0 for readability.
+                 * it to any value.
                  */
-                r[(KnobType)i] = 100.0;
+                r[(KnobType)i] = 0;
             }
         }
         return r;
@@ -67,12 +67,14 @@ namespace nornir{
     void ExplorerRandom::reset(){;}
 
     ExplorerLowDiscrepancy::ExplorerLowDiscrepancy(
-                const FarmConfiguration& configuration,
-                StrategyExploration explorationStrategy):
-            Explorer(configuration), _explorationStrategy(explorationStrategy){
+                std::vector<bool> knobs,
+                StrategyExploration explorationStrategy,
+                std::vector<KnobsValues> additionalPoints):
+            Explorer(knobs), _explorationStrategy(explorationStrategy),
+            _additionalPoints(additionalPoints){
         uint d = 0;
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(_configuration.getKnob((KnobType) i)->needsCalibration()){
+            if(generate((KnobType) i)){
                 ++d;
             }
         }
@@ -110,19 +112,27 @@ namespace nornir{
 
     KnobsValues ExplorerLowDiscrepancy::nextRelativeKnobsValues() const{
         KnobsValues r(KNOB_VALUE_RELATIVE);
-        gsl_qrng_get(_generator, _normalizedPoint);
-        size_t nextCoordinate = 0;
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            if(_configuration.getKnob((KnobType) i)->needsCalibration()){
-                r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
-                ++nextCoordinate;
-            }else{
-                /**
-                 * If we do not need to automatically find the value for this knob,
-                 * then it has only 0 or 1 possible value. Accordingly, we can set
-                 * it to any value. Here we set it to 100.0 for readability.
-                 */
-                r[(KnobType)i] = 100.0;
+        if(_additionalPoints.size()){
+            r = _additionalPoints.front();
+            if(!r.areRelative()){
+                throw std::runtime_error("Additional calibration points must be relative.");
+            }
+            _additionalPoints.erase(_additionalPoints.begin());
+        }else{
+            gsl_qrng_get(_generator, _normalizedPoint);
+            size_t nextCoordinate = 0;
+            for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+                if(generate((KnobType) i)){
+                    r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
+                    ++nextCoordinate;
+                }else{
+                    /**
+                     * If we do not need to automatically find the value for this knob,
+                     * then it has only 0 or 1 possible value. Accordingly, we can set
+                     * it to any value. 
+                     */
+                    r[(KnobType)i] = 0;
+                }
             }
         }
         return r;
@@ -130,5 +140,33 @@ namespace nornir{
 
     void ExplorerLowDiscrepancy::reset(){
         gsl_qrng_init(_generator);
+    }
+
+    ExplorerMultiple::ExplorerMultiple(std::vector<bool> knobs,
+                                       Explorer* explorer,
+                                       KnobType kt,
+                                       size_t numValues):
+                Explorer(knobs), _explorer(explorer), _kt(kt),
+                _numValues(numValues), _nextValue(0), _lastkv(explorer->nextRelativeKnobsValues()){
+        ;
+    }
+
+    ExplorerMultiple::~ExplorerMultiple(){
+        ;
+    }
+
+    void ExplorerMultiple::reset(){
+        _explorer->reset();
+    }
+
+    KnobsValues ExplorerMultiple::nextRelativeKnobsValues() const{
+        if(_nextValue == _numValues){
+            _nextValue = 0;
+            _lastkv = _explorer->nextRelativeKnobsValues();
+        }
+        KnobsValues kv = _lastkv;
+        kv[_kt] = _nextValue * (100.0 / (double) _numValues);
+        ++_nextValue;
+        return kv;
     }
 }

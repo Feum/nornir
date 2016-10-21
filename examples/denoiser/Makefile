@@ -25,7 +25,6 @@
 
 
 CXXFLAGS += -Wall `pkg-config --cflags opencv` #-DTRACE_FASTFLOW  -pg
-OPT     = -DNDEBUG -O3
 OPENCVLIB = `pkg-config --libs opencv` -pthread 
 LDLIBS 	+= $(OPENCVLIB)
 
@@ -34,11 +33,11 @@ TARGETS	= seqvideo video video_nocvthreads
 all: $(TARGETS)
 
 seqvideo: seqvideo.cpp
-	$(CXX) $(OPT) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
+	$(CXX) $(OPTIMIZE_FLAGS) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
 video: video.cpp
-	$(CXX) -DNO_DEFAULT_MAPPING $(OPT) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
+	$(CXX) -DNO_DEFAULT_MAPPING $(OPTIMIZE_FLAGS) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
 video_nocvthreads: video.cpp
-	$(CXX) -DNO_DEFAULT_MAPPING -DNO_CV_THREADS $(OPT) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
+	$(CXX) -DNO_DEFAULT_MAPPING -DNO_CV_THREADS $(OPTIMIZE_FLAGS) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
 clean: 
 	rm -f $(TARGETS)
 cleanall: clean

@@ -65,58 +65,6 @@ typedef enum{
     CONTRACT_POWER_BUDGET
 }ContractType;
 
-/// Cores knob.
-typedef enum{
-    // Never changes the number of threads or their mapping.
-    KNOB_WORKERS_NO = 0,
-
-    // Changes the number of threads used by the application.
-    KNOB_WORKERS_THREADS,
-
-    // Changes the mapping of the threads used by the application.
-    KNOB_WORKERS_MAPPING,
-}KnobConfWorkers;
-
-/// Frequency knob.
-typedef enum{
-    // Disables the possibility to dinamically change the frequencies.
-    KNOB_FREQUENCY_NO = 0,
-
-    // Enables the possibility to dinamically change the frequencies.
-    KNOB_FREQUENCY_YES,
-}KnobConfFrequencies;
-
-/// Mapping knob.
-typedef enum{
-    // Mapping decisions will be performed by the operating system.
-    KNOB_MAPPING_NO = 0,
-
-    // Best mapping decisions will be at runtime.
-    KNOB_MAPPING_AUTO,
-
-    // Tries to keep the threads as close as possible.
-    KNOB_MAPPING_LINEAR,
-
-    // Tries to make good use of the shared caches.
-    // Particularly useful when threads have large working sets.
-    KNOB_MAPPING_CACHE_EFFICIENT
-}KnobConfMapping;
-
-/// Hyperthreading knob.
-typedef enum{
-    // Hyperthreading is not used.
-    KNOB_HT_NO = 0,
-
-    // The runtime system will decide at runtime if use or not hyperthreading.
-    KNOB_HT_AUTO,
-
-    // Hyperthreading is used since the beginning.
-    KNOB_HT_SOONER,
-
-    // Hyperthreading is used only when we used all the physical cores.
-    KNOB_HT_LATER
-}KnobConfHyperthreading;
-
 /// Communication queues blocking/nonblocking.
 typedef enum{
     // Non blocking queue.
@@ -174,18 +122,23 @@ typedef enum{
     STRATEGY_SELECTION_MISHRA
 }StrategySelection;
 
-// Possible prediction strategies. Can only be specified if the selection
-// strategy is "LEARNING".
+// Possible prediction strategies for performance. Can only be specified if the
+// selection strategy is "LEARNING".
 typedef enum{
-    STRATEGY_PREDICTION_REGRESSION_LINEAR = 0,
-    STRATEGY_PREDICTION_MISHRA
-}StrategyPrediction;
+    STRATEGY_PREDICTION_PERFORMANCE_AMDAHL = 0,
+    STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING,
+    STRATEGY_PREDICTION_PERFORMANCE_USL,
+    STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING,
+    STRATEGY_PREDICTION_PERFORMANCE_MISHRA
+}StrategyPredictionPerformance;
 
-// Possible performance models to be used.
+// Possible prediction strategies for power consumption. Can only be specified
+// if the selection strategy is "LEARNING".
 typedef enum{
-    STRATEGY_MODEL_AMDAHL = 0, // Amdahl's Law
-    STRATEGY_MODEL_USL // Universal Scalability Law
-}StrategyModelPerformance;
+    STRATEGY_PREDICTION_POWER_LINEAR = 0,
+    STRATEGY_PREDICTION_POWER_LINEAR_MAPPING,
+    STRATEGY_PREDICTION_POWER_MISHRA
+}StrategyPredictionPower;
 
 /// Possible ways to select the calibration points. Can only be specified if
 /// the selection strategy is "LEARNING".
@@ -201,22 +154,6 @@ typedef enum{
     STRATEGY_EXPLORATION_HALTON,
     STRATEGY_EXPLORATION_HALTON_REVERSE,
 }StrategyExploration;
-
-/// Service nodes (emitter or collector) mapping knob.
-typedef enum{
-    // The service node is not explicitly mapped.
-    KNOB_SNODE_MAPPING_NO = 0,
-
-    // The mapping is automatically chosen by the runtime system.
-    KNOB_SNODE_MAPPING_AUTO,
-
-    // The service node is mapped on a physical core where no workers
-    // are mapped.
-    KNOB_SNODE_MAPPING_ALONE,
-
-    // The service node is mapped on a physical core together with a worker.
-    KNOB_SNODE_MAPPING_COLLAPSED,
-}KnobConfSNodeMapping;
 
 /// Possible ways to smooth the values.
 typedef enum{
@@ -265,10 +202,22 @@ typedef enum{
     STRATEGY_PERSISTENCE_VARIATION
 }StrategyPersistence;
 
+// Strategy to be applied when changing the number of cores.
+typedef enum{
+    // Changes the number of threads.
+    STRATEGY_CORES_RETHREADING = 0,
+
+    // Changes the mapping of the threads.
+    STRATEGY_CORES_REMAPPING
+}StrategyCoresChange;
+
 /// Possible parameters validation results.
 typedef enum{
     // Parameters are ok.
     VALIDATION_OK = 0,
+
+    // Generic error
+    VALIDATION_NO,
 
     // Frequency can be changed by the operating system and the flag
     // "constant_tsc" is not present on the CPU. Accordingly, since we
@@ -314,7 +263,7 @@ typedef enum{
     VALIDATION_NO_BLOCKING_THRESHOLD,
 
     // Parameters for Mishra predictors not specified.
-    VALIDATION_NO_MISHRA_PARAMETERS
+    VALIDATION_NO_MISHRA_PARAMETERS,
 }ParametersValidation;
 
 /**
@@ -324,6 +273,8 @@ class XmlTree{
 private:
     char* _fileContentChars;
     rapidxml::xml_node<>* _root;
+
+    void init(const std::string& content, const std::string& rootName);
 public:
     /**
      * Reads the XML tree contained in 'fileName' and starting
@@ -465,6 +416,10 @@ typedef struct{
      * one row per configuration. Data doesn't need to be normalized.
      */
     std::string powerData;
+    /**
+     * Number of samples to be used [default = 20].
+     */
+    uint numSamples;
 }MishraParameters;
 
 typedef struct{
@@ -575,24 +530,6 @@ private:
     ParametersValidation validateKnobFrequencies();
 
     /**
-     * Validates the mapping knob.
-     * @return The result of the validation.
-     */
-    ParametersValidation validateKnobMapping();
-
-    /**
-     * Validates the service nodes knob.
-     * @return The result of the validation.
-     */
-    ParametersValidation validateKnobSnodeMapping();
-
-    /**
-     * Validates the hyperthreading knob.
-     * @return The result of the validation.
-     */
-    ParametersValidation validateKnobHt();
-
-    /**
      * Validates the triggers.
      * @return The result of the validation.
      */
@@ -634,28 +571,8 @@ public:
     // [default = CONTRACT_NONE].
     ContractType contractType;
 
-    // The workers knob [default = KNOB_WORKERS_THREADS].
-    KnobConfWorkers knobWorkers;
-
-    // The frequency knob. It can be KNOB_FREQUENCY_YES
-    // only if knobMapping is different from KNOB_MAPPING_NO
-    // [default = KNOB_FREQUENCY_YES].
-    KnobConfFrequencies knobFrequencies;
-
-    //  The mapping knob [default = KNOB_MAPPING_AUTO].
-    KnobConfMapping knobMapping;
-
-    // Emitter mapping knob [default = KNOB_SNODE_MAPPING_AUTO].
-    KnobConfSNodeMapping knobMappingEmitter;
-
-    // Collector mapping knob [default = KNOB_SNODE_MAPPING_AUTO].
-    KnobConfSNodeMapping knobMappingCollector;
-
     // The Q blocking knob [default = KNOB_Q_BLOCKING_NO].
     TriggerConfQBlocking triggerQBlocking;
-
-    // The hyperthreading knob [default = KNOB_HT_AUTO].
-    KnobConfHyperthreading knobHyperthreading;
 
     // Strategy for unused virtual cores [default = STRATEGY_UNUSED_VC_SAME].
     StrategyUnusedVirtualCores strategyUnusedVirtualCores;
@@ -664,13 +581,15 @@ public:
     // to the requirements [default = STRATEGY_SELECTION_LEARNING].
     StrategySelection strategySelection;
 
-    // Strategy to be used to predict power and performance values.
+    // Strategy to be used to predict performance values.
     // Only valid when strategySelection is LEARNING
-    // [default = STRATEGY_PREDICTION_REGRESSION_LINEAR].
-    StrategyPrediction strategyPrediction;
+    // [default = STRATEGY_PREDICTION_PERFORMANCE_USL].
+    StrategyPredictionPerformance strategyPredictionPerformance;
 
-    // Model to be used for performance [default = STRATEGY_MODEL_AMDHAL].
-    StrategyModelPerformance strategyModelPerformance;
+    // Strategy to be used to predict power values.
+    // Only valid when strategySelection is LEARNING
+    // [default = STRATEGY_PREDICTION_POWER_LINEAR].
+    StrategyPredictionPower strategyPredictionPower;
 
     // Strategy to be used to select the points to be explored during
     // calibration. Only valid when strategySelection is LEARNING
@@ -685,6 +604,18 @@ public:
 
     // Persistence strategy [default = STRATEGY_PERSISTENCE_SAMPLES].
     StrategyPersistence strategyPersistence;
+
+    // Cores change strategy [default = STRATEGY_CORES_RETHREADING].
+    StrategyCoresChange strategyCoresChange;
+
+    // Flag to enable/disable cores knobs [default = true].
+    bool knobCoresEnabled;
+
+    // Flag to enable/disable mapping knob [default = true].
+    bool knobMappingEnabled;
+
+    // Flag to enable/disable frequency knob [default = true].
+    bool knobFrequencyEnabled;
 
     // Parameters for Mishra predictor.
     MishraParameters mishra;
@@ -775,8 +706,16 @@ public:
     // Maximum calibration time (milliseconds). 0 is no limit.
     // We will keep calibrating until the error is higher than the
     // max*PredictionError AND calibration time is lower than the
-    // maxCalibrationTime [default = 0.0].
+    // maxCalibrationTime  AND the number of visited configurations
+    // is lower than maxCalibrationConfigurations [default = 0.0].
     double maxCalibrationTime;
+
+    // Maximum number of configurations to explore during calibration
+    // phase. 0 is no limit. We will keep calibrating until the error is
+    // higher than the max*PredictionError AND calibration time is lower
+    // than the maxCalibrationTime AND the number of visited configurations
+    // is lower than maxCalibrationConfigurations [default = 0.0].
+    uint maxCalibrationConfigurations;
 
     // Maximum error percentage allowed for performance prediction.
     // [default = 10.0].
@@ -789,7 +728,7 @@ public:
     // The aging value for the linear regression predictor. If it has a value
     // of n, then we will only consider the last n configurations we collected
     // in order to perform predictions. If 0, no aging will be applied and all
-    // the previous samples will be considered [default = 10].
+    // the previous samples will be considered [default = 0].
     uint regressionAging;
 
     // The maximum percentage of monitoring overhead, in the range (0, 100).

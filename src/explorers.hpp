@@ -34,10 +34,12 @@
 namespace nornir{
 
 class Explorer{
+private:
+    std::vector<bool> _knobs;
 protected:
-    const FarmConfiguration& _configuration;
+    bool generate(KnobType kt) const{return _knobs.at((size_t) kt);}
 public:
-    Explorer(const FarmConfiguration& configuration);
+    Explorer(std::vector<bool> knobs);
     virtual ~Explorer(){;}
 
     /**
@@ -59,7 +61,7 @@ public:
  */
 class ExplorerRandom: public Explorer{
 public:
-    ExplorerRandom(const FarmConfiguration& configuration);
+    ExplorerRandom(std::vector<bool> knobs);
     virtual ~ExplorerRandom(){;}
     void reset();
     KnobsValues nextRelativeKnobsValues() const;
@@ -67,17 +69,47 @@ public:
 
 /**
  * Explorer that selects the configuration by using a low discrepancy
- * generator..
+ * generator.
  */
 class ExplorerLowDiscrepancy: public Explorer{
 private:
     gsl_qrng* _generator;
     double* _normalizedPoint;
     StrategyExploration _explorationStrategy;
+    mutable std::vector<KnobsValues> _additionalPoints;
 public:
-    ExplorerLowDiscrepancy(const FarmConfiguration& configuration,
-                           StrategyExploration explorationStrategy);
+    /**
+     * Constructor for a low discrepancy generator.
+     * @param knobs The knobs that must be explored.
+     * @param explorationStrategy The exploration strategy.
+     * @param additionalPoints Additional points to be visited. They will be visited in the same
+     *                         order they are specified in the vector (from 0 to n).
+     **/
+    ExplorerLowDiscrepancy(std::vector<bool> knobs,
+                           StrategyExploration explorationStrategy,
+                           std::vector<KnobsValues> additionalPoints = std::vector<KnobsValues>());
+
     virtual ~ExplorerLowDiscrepancy();
+    void reset();
+    KnobsValues nextRelativeKnobsValues() const;
+};
+
+/**
+ * Explorer to be used when building multiple models together.
+ */
+class ExplorerMultiple: public Explorer{
+private:
+    Explorer* _explorer;
+    KnobType _kt;
+    size_t _numValues;
+    mutable size_t _nextValue;
+    mutable KnobsValues _lastkv;
+public:
+    ExplorerMultiple(std::vector<bool> knobs,
+                     Explorer* explorer,
+                     KnobType kt,
+                     size_t numValues);
+    virtual ~ExplorerMultiple();
     void reset();
     KnobsValues nextRelativeKnobsValues() const;
 };

@@ -1,4 +1,4 @@
-APPS                 = ffprobe blackscholes
+APPS                 = strassen ffprobe blackscholes
 
 .PHONY: all clean cleanall
 

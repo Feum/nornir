@@ -34,15 +34,16 @@
 namespace nornir{
 
 typedef enum{
-    KNOB_TYPE_WORKERS = 0,
-    KNOB_TYPE_MAPPING,
+    KNOB_TYPE_VIRTUAL_CORES = 0, // Number of contexts to be used.
+    KNOB_TYPE_HYPERTHREADING, // Number of contexts to be used on each physical core.
+    KNOB_TYPE_MAPPING, // Mapping of threads on physical cores.
     KNOB_TYPE_FREQUENCY,
-    KNOB_TYPE_NUM // <---- This must always be the last value
+    KNOB_TYPE_NUM  // <---- This must always be the last value
 }KnobType;
 
 class Knob: public mammut::utils::NonCopyable{
 public:
-    Knob():_realValue(-1){;}
+    Knob():_realValue(-1), _locked(false){;}
 
     /**
      * Computes the real value corresponding to a specific
@@ -73,22 +74,38 @@ public:
     void setToMax();
 
     /**
+     * Locks this knob to a value.
+     * @param value The value.
+     */
+    void lock(double v);
+
+    /**
+     * Locks this knob to the maximum value.
+     */
+    void lockToMax();
+
+    /**
+     * Locks this knob to the minimum value.
+     */
+    void lockToMin();
+
+    /**
+     * Checks if the knob is locked.
+     * @return True if the knob is locked, false otherwise.
+     */
+    bool isLocked() const;
+
+    /**
      * Returns the current real value of this knob.
      * @return The current real value of this knob.
      */
     double getRealValue() const;
 
     /**
-     * Returns true if this knob needs to be calibrated.
-     * @return True if this knob needs to be calibrated.
-     */
-    virtual bool needsCalibration() const = 0;
-
-    /**
      * Returns a vector of allowed values for this knob.
      * @return A vector of allowed values for this knob.
      */
-    virtual std::vector<double> getAllowedValues() const = 0;
+    std::vector<double> getAllowedValues() const;
 
     virtual ~Knob(){;}
 protected:
@@ -99,32 +116,31 @@ protected:
     virtual void changeValueReal(double v) = 0;
 
     double _realValue;
+    bool _locked;
+    std::vector<double> _knobValues;
 };
 
-class KnobWorkers: public Knob{
+class KnobVirtualCores: public Knob{
+private:
+    Parameters _p;
+    uint _plus;
 public:
-    KnobWorkers(Parameters p, AdaptiveNode* emitter,
-                AdaptiveNode* collector, ff::ff_gatherer* gt,
-                const std::vector<AdaptiveNode*> workers,
-                const volatile bool* terminated);
+    KnobVirtualCores(Parameters p, uint plus = 0);
+    void changeValueReal(double v);
+    void changeMax(double v);
+};
 
-    bool needsCalibration() const;
+class KnobVirtualCoresFarm: public KnobVirtualCores{
+public:
+    KnobVirtualCoresFarm(Parameters p,
+                  AdaptiveNode* emitter, AdaptiveNode* collector,
+                  ff::ff_gatherer* gt,
+                  const std::vector<AdaptiveNode*> workers,
+                  const volatile bool* terminated);
+
     void changeValueReal(double v);
     std::vector<double> getAllowedValues() const;
-
-    /**
-     * Returns the number of cores on which the workers should be
-     * executed.
-     * @return The number of cores on which the workers should be
-     * executed.
-     */
-    uint getWorkersPhysicalCores() const;
-
-    /**
-     * Returns a vector containing all the active workers.
-     * @return A vector containing all the active workers.
-     */
-    const std::vector<AdaptiveNode*>& getActiveWorkers() const;
+    std::vector<AdaptiveNode*> getActiveWorkers() const;
 private:
     /**
      * Prepares the nodes to freeze.
@@ -154,102 +170,102 @@ private:
      */
     void notifyNewConfiguration(uint numWorkers);
 
-    KnobConfWorkers _confWorkers;
     AdaptiveNode* _emitter;
     AdaptiveNode* _collector;
     ff::ff_gatherer* _gt;
     const std::vector<AdaptiveNode*> _allWorkers;
     std::vector<AdaptiveNode*> _activeWorkers;
-    std::vector<double> _knobValues;
     const volatile bool* _terminated;
 };
+
+class KnobHyperThreading: public Knob{
+public:
+    KnobHyperThreading(Parameters p);
+    void changeValueReal(double v);
+};
+
+typedef enum{
+    MAPPING_TYPE_LINEAR = 0,
+    MAPPING_TYPE_INTERLEAVED, // One per CPU, round robin
+    //MAPPING_TYPE_CACHE_OPTIMAL,
+    MAPPING_TYPE_NUM // ATTENTION: This must be the last value.
+}MappingType;
 
 class KnobMapping: public Knob{
 public:
     KnobMapping(const Parameters& p,
-                AdaptiveNode* emitter,
-                AdaptiveNode* collector,
-                const KnobWorkers& knobWorkers);
-    bool needsCalibration() const;
+                const KnobVirtualCores& knobCores,
+                const KnobHyperThreading& knobHyperThreading);
     void changeValueReal(double v);
-    std::vector<double> getAllowedValues() const;
 
-    mammut::topology::VirtualCore* getEmitterVirtualCore() const;
-    mammut::topology::VirtualCore* getCollectorVirtualCore() const;
-    const std::vector<mammut::topology::VirtualCore*>& getWorkersVirtualCore() const;
+    virtual void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder) = 0;
+
+    void setAllowedCores(std::vector<mammut::topology::VirtualCore*> vc);
+
+    bool isAllowed(mammut::topology::VirtualCore*) const;
 
     const std::vector<mammut::topology::VirtualCore*>& getActiveVirtualCores() const;
     const std::vector<mammut::topology::VirtualCore*>& getUnusedVirtualCores() const;
-private:
-    /**
-     * Generates mapping indexes. They are indexes to be used on
-     * _availableVirtualCores vector to get the corresponding virtual core
-     * where a specific node must be mapped.
-     * @param emitterIndex The index of the emitter.
-     * @param firstWorkerIndex The index of the first worker (the others follow).
-     * @param collectorIndex The index of the collector (if present).
-     */
-    void getMappingIndexes(size_t& emitterIndex,
-                           size_t& firstWorkerIndex,
-                           size_t& collectorIndex);
-
-    /**
-     * Computes the mapping order of virtual cores for linear
-     * mapping.
-     */
-    void computeVcOrderLinear();
-
-    /**
-     * Performs a linear mapping of the nodes on the available virtual cores.
-     */
-    void performLinearMapping();
-
+protected:
     const Parameters& _p;
-    KnobConfMapping _confMapping;
-    KnobConfSNodeMapping _confEmitterMapping;
-    KnobConfSNodeMapping _confCollectorMapping;
-    KnobConfHyperthreading _confHyperthreading;
+    const KnobVirtualCores& _knobCores;
+    const KnobHyperThreading& _knobHyperThreading;
 
-    // The available virtual cores, sorted according to the mapping strategy.
-    std::vector<mammut::topology::VirtualCore*>& _vcOrder;
-    std::vector<mammut::topology::VirtualCore*> _vcOrderLinear;
-    std::vector<mammut::topology::VirtualCore*> _vcOrderCacheEfficient;
-
+    virtual size_t getNumVirtualCores();
+private:
     std::vector<mammut::topology::VirtualCore*> _activeVirtualCores;
     std::vector<mammut::topology::VirtualCore*> _unusedVirtualCores;
+    mammut::topology::Topology* _topologyHandler;
+    std::vector<mammut::topology::VirtualCore*> _allowedVirtualCores;
 
-    mammut::topology::VirtualCore* _emitterVirtualCore;
-    mammut::topology::VirtualCore* _collectorVirtualCore;
-    std::vector<mammut::topology::VirtualCore*> _workersVirtualCores;
+    std::vector<mammut::topology::VirtualCore*> computeVcOrderLinear();
+    std::vector<mammut::topology::VirtualCore*> computeVcOrderInterleaved();
+};
+
+class KnobMappingExternal: public KnobMapping{
+private:
+    mammut::task::ProcessHandler* _processHandler;
+public:
+    KnobMappingExternal(const Parameters& p,
+                const KnobVirtualCores& knobCores,
+                const KnobHyperThreading& knobHyperThreading);
+
+    void setPid(pid_t pid);
+
+    void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder);
+};
+
+class KnobMappingFarm: public KnobMapping{
+private:
     AdaptiveNode* _emitter;
     AdaptiveNode* _collector;
-    const KnobWorkers& _knobWorkers;
-    mammut::topology::Topology* _topologyHandler;
+protected:
+    size_t getNumVirtualCores();
+public:
+    KnobMappingFarm(const Parameters& p,
+                const KnobVirtualCoresFarm& knobCores,
+                const KnobHyperThreading& knobHyperThreading,
+                AdaptiveNode* emitter,
+                AdaptiveNode* collector);
+
+    void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder);
 };
 
 class KnobFrequency: public Knob{
 public:
-    KnobFrequency(KnobConfFrequencies confFrequency,
-                  const mammut::Mammut& mammut,
-                  bool useTurboBoost,
-                  StrategyUnusedVirtualCores unusedVc,
-                  const KnobMapping& knobMapping);
-    bool needsCalibration() const;
+    KnobFrequency(Parameters p, const KnobMapping& knobMapping);
     void changeValueReal(double v);
-    std::vector<double> getAllowedValues() const;
 private:
     void applyUnusedVCStrategySame(const std::vector<mammut::topology::VirtualCore*>& unusedVc, mammut::cpufreq::Frequency v);
     void applyUnusedVCStrategyOff(const std::vector<mammut::topology::VirtualCore*>& unusedVc);
     void applyUnusedVCStrategyLowestFreq(const std::vector<mammut::topology::VirtualCore*>& unusedVc);
     void applyUnusedVCStrategy(mammut::cpufreq::Frequency v);
 
-    KnobConfFrequencies _confFrequency;
-    std::vector<double> _allowedValues;
+    Parameters _p;
+    const KnobMapping& _knobMapping;
     mammut::cpufreq::CpuFreq* _frequencyHandler;
     mammut::topology::Topology* _topologyHandler;
     mammut::cpufreq::CpuFreq* _cpufreqHandle;
-    StrategyUnusedVirtualCores _unusedVc;
-    const KnobMapping& _knobMapping;
 };
 
 
@@ -271,10 +287,14 @@ private:
     KnobValueType _type;
     double _values[KNOB_TYPE_NUM];
 public:
-    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){
+    inline void reset(){
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
             _values[i] = 0;
         }
+    }
+
+    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){
+        reset();
     }
 
     void swap(KnobsValues& x){

@@ -456,7 +456,6 @@ public:
     void wait(){
         if(_manager){
             _manager->join();
-            delete _manager;
         }
         if(_nodesCreated){
             if(_farm->getEmitter()){
@@ -469,6 +468,9 @@ public:
                 delete _farm->getCollector();
             }
         }
+	if(_manager){
+	    delete _manager;
+	}
     }
 
     /**

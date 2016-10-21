@@ -28,46 +28,44 @@
 #ifndef NORNIR_CONFIGURATION_HPP_
 #define NORNIR_CONFIGURATION_HPP_
 
+#include "ffincs.hpp"
 #include "knob.hpp"
 #include "node.hpp"
 #include "parameters.hpp"
+#include "stats.hpp"
 #include "trigger.hpp"
 
 #include "external/Mammut/mammut/utils.hpp"
 
 namespace nornir{
 
-class FarmConfiguration: public mammut::utils::NonCopyable {
-private:
+class Configuration: public mammut::utils::NonCopyable {
+protected:
     Knob* _knobs[KNOB_TYPE_NUM];
     Trigger* _triggers[TRIGGER_TYPE_NUM];
+private:
     const Parameters& _p;
+    bool _combinationsCreated;
     std::vector<KnobsValues> _combinations;
     bool _knobsChangeNeeded;
-    uint _numServiceNodes;
     ReconfigurationStats _reconfigurationStats;
 
     void combinations(std::vector<std::vector<double> > array, size_t i,
                       std::vector<double> accum);
 
-    bool workersWillChange(const KnobsValues& values) const;
+    bool virtualCoresWillChange(const KnobsValues& values) const;
 
     ticks startReconfigurationStatsKnob() const;
 
-    void stopReconfigurationStatsKnob(ticks start, KnobType type, bool workersChanged);
+    void stopReconfigurationStatsKnob(ticks start, KnobType type, bool vcChanged);
 
     ticks startReconfigurationStatsTotal() const;
 
     void stopReconfigurationStatsTotal(ticks start);
 public:
-    FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
-            AdaptiveNode* collector, ff::ff_gatherer* gt,
-            std::vector<AdaptiveNode*> workers,
-            Smoother<MonitoredSample> const* samples,
-            volatile bool* terminated);
+    Configuration(const Parameters& p);
 
-
-    ~FarmConfiguration();
+    virtual ~Configuration() = 0;
 
     /**
      * Returns true if the values of this configuration are equal to those
@@ -82,6 +80,11 @@ public:
      * @return True if the knobs values need to be changed, false otherwise.
      */
     bool knobsChangeNeeded() const;
+
+    /**
+     * Creates all the possible knobs combinations.
+     */
+    void createAllRealCombinations();
 
     /**
      * Gets all the possible combinations of knobs values.
@@ -100,7 +103,7 @@ public:
      * @param t The type of the knob to return.
      * @return The specified knob.
      */
-    const Knob* getKnob(KnobType t) const;
+    Knob* getKnob(KnobType t) const;
 
     /**
      * Sets all the knobs to their maximum.
@@ -132,21 +135,41 @@ public:
     void trigger();
 
     /**
-     * Returns the number of service nodes.
-     * @return The number of service nodes.
-     **/
-    inline uint getNumServiceNodes() const{return _numServiceNodes;}
-
-    /**
      * Returns the reconfiguration statistics.
      * @return The reconfiguration statistics.
      */
     inline ReconfigurationStats getReconfigurationStats() const{
         return _reconfigurationStats;
     }
+
+    virtual uint getNumServiceNodes() const{return 0;}
 };
 
-KnobsValues getRealValues(const FarmConfiguration& configuration, const KnobsValues& values);
+class ConfigurationExternal: public Configuration{
+public:
+    ConfigurationExternal(const Parameters& p);
+};
+
+class ConfigurationFarm: public Configuration{
+private:
+    uint _numServiceNodes;
+public:
+    ConfigurationFarm(const Parameters& p,
+                      Smoother<MonitoredSample> const* samples,
+                      AdaptiveNode* emitter,
+                      std::vector<AdaptiveNode*> workers,
+                      AdaptiveNode* collector,
+                      ff::ff_gatherer* gt,
+                      volatile bool* terminated);
+
+    inline uint getNumServiceNodes() const{
+        return _numServiceNodes;
+    }
+};
+
+KnobsValues getRealValues(const Configuration& configuration, const KnobsValues& values);
+
+std::vector<AdaptiveNode*> convertWorkers(ff::svector<ff::ff_node*> w);
 
 }
 #endif /* NORNIR_CONFIGURATION_HPP_ */

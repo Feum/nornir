@@ -1,4 +1,4 @@
-TARGET               = farm farm_ffcompat farm_accelerator_1 farm_accelerator_2 farm_accelerator_3 farm_accelerator_4 simulator
+TARGET               = application_external farm farm_ffcompat farm_accelerator_1 farm_accelerator_2 farm_accelerator_3 farm_accelerator_4
 INCS += -I$(realpath ../src)
 
 .PHONY: all clean cleanall

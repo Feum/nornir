@@ -30,8 +30,15 @@
 
 #include "./ffincs.hpp"
 #include "./parameters.hpp"
+#include "utils.hpp"
 
 #include "external/Mammut/mammut/mammut.hpp"
+
+
+PUSH_WARNING
+GCC_DISABLE_WARNING(unused-variable)
+#include "external/orlog/src/orlog.hpp"
+POP_WARNING
 
 #undef DEBUG
 #undef DEBUGB
@@ -45,44 +52,6 @@ typedef enum{
     NODE_TYPE_WORKER,
     NODE_TYPE_COLLECTOR
 }NodeType;
-
-
-/*!
- * \internal
- * \struct NodeSample
- * \brief Represents a sample of values taken from an adaptive node.
- *
- * This struct represents a sample of values taken from an adaptive node.
- */
-typedef struct WorkerSample{
-    // The percentage ([0, 100]) of time that the node spent on svc().
-    double loadPercentage;
-
-    // The number of computed tasks.
-    double tasksCount;
-
-    // The average service time (in ticks).
-    double latency;
-
-    // The bandwidth of the node.
-    double bandwidthTotal;
-
-    WorkerSample():loadPercentage(0), tasksCount(0),
-                   latency(0), bandwidthTotal(0){;}
-
-    WorkerSample& operator+=(const WorkerSample& rhs){
-        loadPercentage += rhs.loadPercentage;
-        tasksCount += rhs.tasksCount;
-        latency += rhs.latency;
-        bandwidthTotal += rhs.bandwidthTotal;
-        return *this;
-    }
-}NodeSample;
-
-inline WorkerSample operator+(WorkerSample lhs, const WorkerSample& rhs){
-    lhs += rhs;
-    return lhs;
-}
 
 /*!
  * \internal
@@ -128,8 +97,8 @@ class AdaptiveNode: public ff::ff_node{
 private:
     template <typename L, typename G>
     friend class ManagerFarm;
-    friend class KnobWorkers;
-    friend class KnobMapping;
+    friend class KnobVirtualCoresFarm;
+    friend class KnobMappingFarm;
     friend class TriggerQBlocking;
 
     volatile bool _started;
@@ -139,7 +108,7 @@ private:
     // We push the pointer to a position in the _managementRequests array.
     // In our case is always _managementRequests[i].type == i
     ManagementRequest _managementRequests[MGMT_REQ_NUM];
-    WorkerSample _sampleResponse;
+    orlog::ApplicationSample _sampleResponse;
     double _ticksPerNs;
     ticks _startTicks;
     ticks _ticksWork;
@@ -172,11 +141,6 @@ private:
     void initPostRun();
 
     /**
-     * Cleans then node.
-     */
-    void clean();
-
-    /**
      * Moves this node on a specific virtual core.
      * @param vc The virtual core where this nodes must be moved.
      */
@@ -194,7 +158,7 @@ private:
      *               time 'askForSample' has been called.
      * @param avgLatency The average latency.
      */
-    void getSampleResponse(WorkerSample& sample, double avgLatency);
+    void getSampleResponse(orlog::ApplicationSample& sample, double avgLatency);
 
     /**
      * Asks the node to reset the current sample.

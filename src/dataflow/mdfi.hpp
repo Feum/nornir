@@ -40,7 +40,7 @@ namespace nornir{
 namespace dataflow{
 
 
-#define MAX_INSTRUCTION_INPUTS 2
+#define MAX_INSTRUCTION_INPUTS 8
 
 /**Macro data flow instruction.**/
 class Mdfi{

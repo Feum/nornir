@@ -101,13 +101,6 @@ void AdaptiveNode::initPostRun(){
     _thread = _tasksManager->getThreadHandler(getpid(), tid);
 }
 
-void AdaptiveNode::clean(){
-    if(_thread){
-        _tasksManager->releaseThreadHandler(_thread);
-        _thread = NULL;
-    }
-}
-
 void AdaptiveNode::move(VirtualCore* vc){
     if(_thread){
         _thread->move(vc);
@@ -120,7 +113,7 @@ void AdaptiveNode::move(const vector<const VirtualCore*>& virtualCores){
     }
 }
 
-void AdaptiveNode::getSampleResponse(WorkerSample& sample, double avgLatency){
+void AdaptiveNode::getSampleResponse(orlog::ApplicationSample& sample, double avgLatency){
     while(_responseQ.empty()){
         if(*_terminated){
             return;
@@ -357,7 +350,10 @@ AdaptiveNode::AdaptiveNode():
 }
 
 AdaptiveNode::~AdaptiveNode(){
-    clean();
+    if(_thread){
+        _tasksManager->releaseThreadHandler(_thread);
+        _thread = NULL;
+    }
 }
 
 void AdaptiveNode::terminate(){

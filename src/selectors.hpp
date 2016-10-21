@@ -49,11 +49,16 @@ private:
     bool _calibrating;
 protected:
     const Parameters& _p;
-    const FarmConfiguration& _configuration;
+    const Configuration& _configuration;
     const Smoother<MonitoredSample>* _samples;
     size_t _numCalibrationPoints;
     KnobsValues _previousConfiguration;
     Smoother<double>* _bandwidthIn;
+    bool _forced;
+    bool _forcedReturned;
+    KnobsValues _forcedConfiguration;
+    bool _calibrationCoordination;
+    bool _calibrationAllowed;
 
     /**
      * Checks if a specific primary value respects the required contract.
@@ -73,25 +78,25 @@ protected:
      * @param totalTasks The total number of tasks processed up to now.
      */
     void startCalibration(uint64_t totalTasks);
-
-    /**
-     * Checks if the application phase changed.
-     * @return true if the phase changed, false otherwise.
-     */
-    bool phaseChanged() const;
 public:
     Selector(const Parameters& p,
-             const FarmConfiguration& configuration,
+             const Configuration& configuration,
              const Smoother<MonitoredSample>* samples);
 
     virtual ~Selector(){;}
 
 
     /**
+     * Forces the selector on a specific configuration.
+     * @param kv The configuration.
+     */
+    void forceConfiguration(KnobsValues& kv);
+
+    /**
      * Updates the input bandwidth history with the current value.
      * MUST be called before calling getNextKnobsValues(...).
      */
-    void updateBandwidthIn();
+    virtual void updateBandwidthIn();
 
     /**
      * Returns the next values to be set for the knobs.
@@ -132,6 +137,17 @@ public:
      * Resets the total calibration time.
      */
     void resetTotalCalibrationTime();
+
+    /**
+     * If this function is called, the selector needs to coordinate with a
+     * centralised manager before performing calibrations.
+     */
+    void setCalibrationCoordination();
+
+    /**
+     * Allows the selector to start calibration.
+     */
+    void allowCalibration();
 };
 
 /**
@@ -140,7 +156,7 @@ public:
 class SelectorFixed: public Selector{
 public:
     SelectorFixed(const Parameters& p,
-             const FarmConfiguration& configuration,
+             const Configuration& configuration,
              const Smoother<MonitoredSample>* samples);
 
     ~SelectorFixed();
@@ -148,17 +164,23 @@ public:
     KnobsValues getNextKnobsValues(u_int64_t totalTasks);
 };
 
+class ManagerMulti;
+
 /**
  * A generic selector that uses the predictions of ALL the configurations
  * to find the best one.
  */
 class SelectorPredictive: public Selector{
+    friend class ManagerMulti;
 private:
     std::unique_ptr<Predictor> _primaryPredictor;
     std::unique_ptr<Predictor> _secondaryPredictor;
     bool _feasible;
     // Association between REAL values and observed data.
     std::map<KnobsValues, MonitoredSample> _observedValues;
+    std::map<KnobsValues, double> _primaryPredictions;
+    std::map<KnobsValues, double> _secondaryPredictions;
+
     /**
      * Checks if x is a best suboptimal monitored value than y.
      * @param x The first monitored value.
@@ -217,16 +239,9 @@ protected:
      * Clears the predictors.
      */
     void clearPredictors();
-
-
-    /**
-     * Checks the accuracy of the predictions.
-     * @return True if the predictions were accurate, false otherwise.
-     */
-    bool isAccurate();
 public:
     SelectorPredictive(const Parameters& p,
-                       const FarmConfiguration& configuration,
+                       const Configuration& configuration,
                        const Smoother<MonitoredSample>* samples,
                        std::unique_ptr<Predictor> bandwidthPredictor,
                        std::unique_ptr<Predictor> powerPredictor);
@@ -254,6 +269,22 @@ public:
      * @return The secondary prediction for a given configuration.
      */
     double getSecondaryPrediction(KnobsValues values);
+
+    /**
+     * Returns a map with all the primary predictions.
+     * @return A map with all the primary predictions.
+     */
+    const std::map<KnobsValues, double>& getPrimaryPredictions() const;
+
+    /**
+     * Returns a map with all the secondary predictions.
+     * @return A map with all the secondary predictions.
+     */
+    const std::map<KnobsValues, double>& getSecondaryPredictions() const;
+
+    Predictor* getPrimaryPredictor() const{return _primaryPredictor.get();}
+
+    Predictor* getSecondaryPredictor() const{return _secondaryPredictor.get();}
 };
 
 /**
@@ -264,10 +295,11 @@ private:
     uint _violations;
 public:
     SelectorAnalytical(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
     KnobsValues getNextKnobsValues(u_int64_t totalTasks);
+    virtual void updateBandwidthIn();
 };
 
 /**
@@ -279,15 +311,31 @@ private:
     bool _firstPointGenerated;
     uint _contractViolations;
     uint _accuracyViolations;
+    uint _totalCalPoints;
+    std::unique_ptr<Predictor> getPredictor(PredictorType type,
+                                            const Parameters& p,
+                                            const Configuration& configuration,
+                                            const Smoother<MonitoredSample>* samples) const;
 public:
     SelectorLearner(const Parameters& p,
-                       const FarmConfiguration& configuration,
+                       const Configuration& configuration,
                        const Smoother<MonitoredSample>* samples);
 
     ~SelectorLearner();
 
     KnobsValues getNextKnobsValues(u_int64_t totalTasks);
 
+    /**
+     * Checks if the application phase changed.
+     * @return true if the phase changed, false otherwise.
+     */
+    bool phaseChanged() const;
+
+    /**
+     * Checks the accuracy of the predictions.
+     * @return True if the predictions were accurate, false otherwise.
+     */
+    bool isAccurate();
 };
 
 /**
@@ -300,7 +348,7 @@ private:
     std::vector<KnobsValues> _confToExplore;
 public:
     SelectorFixedExploration(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples,
                    std::unique_ptr<Predictor> bandwidthPredictor,
                    std::unique_ptr<Predictor> powerPredictor,
@@ -321,7 +369,7 @@ public:
 class SelectorMishra: public SelectorFixedExploration{
 public:
     SelectorMishra(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
     ~SelectorMishra();
@@ -333,7 +381,7 @@ public:
 class SelectorFullSearch: public SelectorFixedExploration{
 public:
     SelectorFullSearch(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
     ~SelectorFullSearch();
@@ -358,14 +406,14 @@ private:
     double _currentBw, _leftBw, _rightBw;
     KnobsValues _optimalKv;
     bool _improved;
-    std::vector<double> _allowedWorkers;
+    std::vector<double> _allowedCores;
 
     mammut::cpufreq::Frequency findNearestFrequency(mammut::cpufreq::Frequency f) const;
     void goRight();
     void goLeft();
 public:
     SelectorLiMartinez(const Parameters& p,
-                         const FarmConfiguration& configuration,
+                         const Configuration& configuration,
                          const Smoother<MonitoredSample>* samples);
     ~SelectorLiMartinez();
 

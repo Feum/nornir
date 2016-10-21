@@ -37,60 +37,19 @@
 
 namespace nornir{
 
-FarmConfiguration::FarmConfiguration(const Parameters& p, AdaptiveNode* emitter,
-        AdaptiveNode* collector, ff::ff_gatherer* gt,
-        std::vector<AdaptiveNode*> workers,
-        Smoother<MonitoredSample> const* samples,
-        volatile bool* terminated):
-        _p(p),
-        _knobsChangeNeeded(false){
-    /************************************************************/
-    /*                           KNOBS                          */
-    /************************************************************/
-    _knobs[KNOB_TYPE_WORKERS] = new KnobWorkers(p, emitter,
-                                                collector, gt, workers,
-                                                terminated);
-    _knobs[KNOB_TYPE_MAPPING] = new KnobMapping(p,
-                                                emitter,
-                                                collector,
-                                                *((KnobWorkers*)_knobs[KNOB_TYPE_WORKERS]));
-    _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p.knobFrequencies,
-                                                    p.mammut,
-                                                    p.turboBoost,
-                                                    p.strategyUnusedVirtualCores,
-                                                    *((KnobMapping*)_knobs[KNOB_TYPE_MAPPING]));
-
-    std::vector<std::vector<double>> values;
-    std::vector<double> accum;
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        values.push_back(_knobs[i]->getAllowedValues());
-        if(_knobs[i]->needsCalibration()){
-            _knobsChangeNeeded = true;
-        }
-    }
-    combinations(values, 0, accum);
-
-    /************************************************************/
-    /*                         TRIGGERS                         */
-    /************************************************************/
-    _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
-                                                              p.thresholdQBlocking,
-                                                              samples,
-                                                              emitter);
-
-    _numServiceNodes = 0;
-    if(emitter){++_numServiceNodes;}
-    if(collector){++_numServiceNodes;}
+Configuration::Configuration(const Parameters& p):
+    _p(p), _combinationsCreated(false), _knobsChangeNeeded(false){
+    ;
 }
 
-FarmConfiguration::~FarmConfiguration(){
+Configuration::~Configuration(){
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         delete _knobs[i];
     }
 }
 
 //TODO: Works even if a std::vector is empty? (i.e. a knob has no values)
-void FarmConfiguration::combinations(std::vector<std::vector<double> > array, size_t i, std::vector<double> accum){
+void Configuration::combinations(std::vector<std::vector<double> > array, size_t i, std::vector<double> accum){
     if(i == array.size()){
         KnobsValues kv(KNOB_VALUE_REAL);
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
@@ -107,7 +66,7 @@ void FarmConfiguration::combinations(std::vector<std::vector<double> > array, si
     }
 }
 
-bool FarmConfiguration::equal(KnobsValues values) const{
+bool Configuration::equal(KnobsValues values) const{
     if(values.areReal()){
         return values == getRealValues();
     }else{
@@ -122,25 +81,42 @@ bool FarmConfiguration::equal(KnobsValues values) const{
     }
 }
 
-bool FarmConfiguration::knobsChangeNeeded() const{
+bool Configuration::knobsChangeNeeded() const{
     return _knobsChangeNeeded;
 }
 
-const std::vector<KnobsValues>& FarmConfiguration::getAllRealCombinations() const{
+void Configuration::createAllRealCombinations(){
+    std::vector<std::vector<double>> values;
+    std::vector<double> accum;
+    _combinations.clear();
+    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        values.push_back(_knobs[i]->getAllowedValues());
+        if(!_knobs[i]->isLocked()){
+            _knobsChangeNeeded = true;
+        }
+    }
+    combinations(values, 0, accum);
+    _combinationsCreated = true;
+}
+
+const std::vector<KnobsValues>& Configuration::getAllRealCombinations() const{
+    if(!_combinationsCreated){
+        throw std::runtime_error("[configuration.cpp] Combinations not created yet.");
+    }
     return _combinations;
 }
 
-void FarmConfiguration::setFastReconfiguration(){
+void Configuration::setFastReconfiguration(){
     if(_p.fastReconfiguration){
         ((KnobFrequency*) _knobs[KNOB_TYPE_FREQUENCY])->setRelativeValue(100.0);
     }
 }
 
-const Knob* FarmConfiguration::getKnob(KnobType t) const{
+Knob* Configuration::getKnob(KnobType t) const{
     return _knobs[t];
 }
 
-void FarmConfiguration::maxAllKnobs(){
+void Configuration::maxAllKnobs(){
     if(_p.contractType == CONTRACT_NONE || !_knobsChangeNeeded){
         return;
     }
@@ -150,11 +126,11 @@ void FarmConfiguration::maxAllKnobs(){
     }
 }
 
-double FarmConfiguration::getRealValue(KnobType t) const{
+double Configuration::getRealValue(KnobType t) const{
     return _knobs[t]->getRealValue();
 }
 
-KnobsValues FarmConfiguration::getRealValues() const{
+KnobsValues Configuration::getRealValues() const{
     KnobsValues kv(KNOB_VALUE_REAL);
     for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
         kv[(KnobType) i] = getRealValue((KnobType) i);
@@ -162,31 +138,31 @@ KnobsValues FarmConfiguration::getRealValues() const{
     return kv;
 }
 
-bool FarmConfiguration::workersWillChange(const KnobsValues& values) const{
+bool Configuration::virtualCoresWillChange(const KnobsValues& values) const{
     double newNumWorkers = 0;
     if(values.areRelative()){
-        assert(_knobs[KNOB_TYPE_WORKERS]->getRealFromRelative(values[KNOB_TYPE_WORKERS], newNumWorkers));
+        assert(_knobs[KNOB_TYPE_VIRTUAL_CORES]->getRealFromRelative(values[KNOB_TYPE_VIRTUAL_CORES], newNumWorkers));
     }else{
-        newNumWorkers = values[KNOB_TYPE_WORKERS];
+        newNumWorkers = values[KNOB_TYPE_VIRTUAL_CORES];
     }
-    return newNumWorkers != _knobs[KNOB_TYPE_WORKERS]->getRealValue();
+    return newNumWorkers != _knobs[KNOB_TYPE_VIRTUAL_CORES]->getRealValue();
 }
 
-ticks FarmConfiguration::startReconfigurationStatsKnob() const{
+ticks Configuration::startReconfigurationStatsKnob() const{
     if(_p.statsReconfiguration){
         return getticks();
     }
     return 0;
 }
 
-ticks FarmConfiguration::startReconfigurationStatsTotal() const{
+ticks Configuration::startReconfigurationStatsTotal() const{
     return startReconfigurationStatsKnob();
 }
 
-void FarmConfiguration::stopReconfigurationStatsKnob(ticks start, KnobType type,
-                                                  bool workersChanged){
+void Configuration::stopReconfigurationStatsKnob(ticks start, KnobType type,
+                                                  bool vcChanged){
     if(_p.statsReconfiguration){
-        if(type == KNOB_TYPE_WORKERS && !workersChanged){
+        if(type == KNOB_TYPE_VIRTUAL_CORES && !vcChanged){
             // We do not add statistics about workers reconfiguration
             // since they did not changed.
             ;
@@ -198,7 +174,7 @@ void FarmConfiguration::stopReconfigurationStatsKnob(ticks start, KnobType type,
     }
 }
 
-void FarmConfiguration::stopReconfigurationStatsTotal(ticks start){
+void Configuration::stopReconfigurationStatsTotal(ticks start){
     if(_p.statsReconfiguration){
         double ms = ticksToMilliseconds(getticks() - start,
                                         _p.archData.ticksPerNs);
@@ -206,8 +182,8 @@ void FarmConfiguration::stopReconfigurationStatsTotal(ticks start){
     }
 }
 
-void FarmConfiguration::setValues(const KnobsValues& values){
-    bool workersChanged = workersWillChange(values);
+void Configuration::setValues(const KnobsValues& values){
+    bool vcChanged = virtualCoresWillChange(values);
 
     ticks totalStart = startReconfigurationStatsTotal();
     setFastReconfiguration();
@@ -216,14 +192,22 @@ void FarmConfiguration::setValues(const KnobsValues& values){
 
         // Start of the real reconfiguration
         if(values.areReal()){
-            _knobs[i]->setRealValue(values[(KnobType)i]);
+            if(_knobs[i]->isLocked()){
+                _knobs[i]->setRealValue(_knobs[i]->getRealValue());
+            }else{
+                _knobs[i]->setRealValue(values[(KnobType)i]);
+            }
         }else if(values.areRelative()){
-            _knobs[i]->setRelativeValue(values[(KnobType)i]);
+            if(_knobs[i]->isLocked()){
+                _knobs[i]->setRelativeValue(0); // Only one value possible, any relative value would be ok.
+            }else{
+                _knobs[i]->setRelativeValue(values[(KnobType)i]);
+            }
         }else{
             throw std::runtime_error("KnobsValues with undefined type.");
         }
         // End of the real reconfiguration
-        stopReconfigurationStatsKnob(reconfigurationStart, (KnobType) i, workersChanged);
+        stopReconfigurationStatsKnob(reconfigurationStart, (KnobType) i, vcChanged);
     }
 
     stopReconfigurationStatsTotal(totalStart);
@@ -231,13 +215,62 @@ void FarmConfiguration::setValues(const KnobsValues& values){
     DEBUG("Changed knobs values.");
 }
 
-void FarmConfiguration::trigger(){
+void Configuration::trigger(){
     for(size_t i = 0; i < TRIGGER_TYPE_NUM; i++){
-        _triggers[i]->trigger();
+        if(_triggers[i]){
+            _triggers[i]->trigger();
+        }
     }
 }
 
-KnobsValues getRealValues(const FarmConfiguration& configuration, const KnobsValues& values){
+
+ConfigurationExternal::ConfigurationExternal(const Parameters& p):
+        Configuration(p){
+
+    _knobs[KNOB_TYPE_VIRTUAL_CORES] = new KnobVirtualCores(p);
+    _knobs[KNOB_TYPE_HYPERTHREADING] = new KnobHyperThreading(p);
+    _knobs[KNOB_TYPE_MAPPING] = new KnobMappingExternal(p,
+                                                *((KnobVirtualCores*) _knobs[KNOB_TYPE_VIRTUAL_CORES]),
+                                                *((KnobHyperThreading*) _knobs[KNOB_TYPE_HYPERTHREADING]));
+    _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p,
+                                                    *((KnobMappingExternal*) _knobs[KNOB_TYPE_MAPPING]));
+
+    _triggers[TRIGGER_TYPE_Q_BLOCKING] = NULL;
+}
+
+
+ConfigurationFarm::ConfigurationFarm(const Parameters& p,
+                                     Smoother<MonitoredSample> const* samples,
+                                     AdaptiveNode* emitter,
+                                     std::vector<AdaptiveNode*> workers,
+                                     AdaptiveNode* collector,
+                                     ff::ff_gatherer* gt,
+                                     volatile bool* terminated):
+        Configuration(p), _numServiceNodes(0){
+
+    _knobs[KNOB_TYPE_VIRTUAL_CORES] = new KnobVirtualCoresFarm(p,
+                                          emitter, collector, gt, workers,
+                                          terminated);
+
+    _knobs[KNOB_TYPE_HYPERTHREADING] = new KnobHyperThreading(p);
+    _knobs[KNOB_TYPE_MAPPING] = new KnobMappingFarm(p,
+                                                *((KnobVirtualCoresFarm*) _knobs[KNOB_TYPE_VIRTUAL_CORES]),
+                                                *((KnobHyperThreading*) _knobs[KNOB_TYPE_HYPERTHREADING]),
+                                                emitter, collector);
+    _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p,
+                                                    *((KnobMappingFarm*) _knobs[KNOB_TYPE_MAPPING]));
+
+    _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
+                                                              p.thresholdQBlocking,
+                                                              samples,
+                                                              emitter);
+
+    if(emitter){++_numServiceNodes;}
+    if(collector){++_numServiceNodes;}
+}
+
+
+KnobsValues getRealValues(const Configuration& configuration, const KnobsValues& values){
     KnobsValues real(KNOB_VALUE_REAL);
 
     if(values.areRelative()){
@@ -250,6 +283,14 @@ KnobsValues getRealValues(const FarmConfiguration& configuration, const KnobsVal
         real = values;
     }
     return real;
+}
+
+std::vector<AdaptiveNode*> convertWorkers(ff::svector<ff::ff_node*> w){
+    std::vector<AdaptiveNode*> r;
+    for(size_t i = 0; i < w.size(); i++){
+        r.push_back(dynamic_cast<AdaptiveNode*>(w[i]));
+    }
+    return r;
 }
 
 }

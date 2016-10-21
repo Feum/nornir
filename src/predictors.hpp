@@ -32,13 +32,12 @@
 #ifndef NORNIR_PREDICTORS_HPP_
 #define NORNIR_PREDICTORS_HPP_
 
-#define MAX_RHO 95
-
 #include "configuration.hpp"
 #include "utils.hpp"
 
 #include "external/Mammut/mammut/mammut.hpp"
 
+#include <gsl/gsl_multifit.h>
 #include <mlpack/core.hpp>
 #include <mlpack/methods/linear_regression/linear_regression.hpp>
 #include "external/leo/leo.h" // Must be included after mlpack
@@ -55,7 +54,7 @@ class KnobsValues;
 class RegressionData{
 protected:
     const Parameters& _p;
-    const FarmConfiguration& _configuration;
+    const Configuration& _configuration;
     const Smoother<MonitoredSample>* _samples;
     mammut::topology::Topology* _topology;
     uint _cpus;
@@ -63,10 +62,10 @@ protected:
     uint _phyCoresPerCpu;
     uint _virtCoresPerPhyCores;
 
-    double getUsedPhysicalCores(double numWorkers, bool includeServiceNodes);
+    double getUsedPhysicalCores(double numWorkers);
 public:
     RegressionData(const Parameters& p,
-                   const FarmConfiguration& configuration,
+                   const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
     /**
@@ -106,22 +105,12 @@ private:
     double _invScalFactorFreq;
     double _invScalFactorFreqAndCores;
 
-    // Usl data.
-    double _constArg;
-    double _alfaArg;
-    double _betaArg;
-
     uint _numPredictors;
-
-    void initAmdahl(const KnobsValues& values);
-    void initUsl(const KnobsValues& values);
-    void toArmaRowAmdahl(size_t rowId, arma::mat& matrix) const;
-    void toArmaRowUsl(size_t rowId, arma::mat& matrix) const;
 public:
     void init(const KnobsValues& values);
 
     RegressionDataServiceTime(const Parameters& p,
-                              const FarmConfiguration& configuration,
+                              const Configuration& configuration,
                               const Smoother<MonitoredSample>* samples);
 
     uint getNumPredictors() const;
@@ -141,18 +130,29 @@ private:
     double _voltagePerUsedSockets;
     double _voltagePerUnusedSockets;
     unsigned int _additionalContextes;
+    mammut::cpufreq::Frequency _lowestFrequency;
 
     uint _numPredictors;
 public:
     void init(const KnobsValues& values);
 
     RegressionDataPower(const Parameters& p,
-                        const FarmConfiguration& configuration,
+                        const Configuration& configuration,
                         const Smoother<MonitoredSample>* samples);
 
     uint getNumPredictors() const;
 
     void toArmaRow(size_t rowId, arma::mat& matrix) const;
+
+    /**
+     * Set the position of the inactive power parameter into the parameters
+     * vector into the variable passed as parameter.
+     * @param pos The position of the inactive power parameter into the parameters
+     * vector.
+     * @return True if there inactive power is considered by the model, false
+     * otherwise (e.g. if only one CPU is present on the machine).
+     */
+    bool getInactivePowerPosition(size_t& pos) const;
 };
 
 
@@ -171,17 +171,16 @@ class Predictor{
 protected:
     PredictorType _type;
     const Parameters& _p;
-    const FarmConfiguration& _configuration;
+    const Configuration& _configuration;
     const Smoother<MonitoredSample>* _samples;
     double _modelError;
 
     double getMaximumBandwidth() const;
     double getCurrentPower() const;
-    double getRealBandwidthFromMaximum(double maximum, double bandwidthIn) const;
 public:
     Predictor(PredictorType type,
               const Parameters& p,
-              const FarmConfiguration& configuration,
+              const Configuration& configuration,
               const Smoother<MonitoredSample>* samples);
 
     virtual ~Predictor();
@@ -219,7 +218,7 @@ public:
      * @param values The values.
      * @return The predicted value at a specific combination of real knobs values.
      */
-    virtual double predict(const KnobsValues& realValues, double bandwidthIn) = 0;
+    virtual double predict(const KnobsValues& realValues) = 0;
 
     /**
      * Returns the model error, i.e. the error between the observations and the
@@ -236,7 +235,7 @@ typedef struct{
 }Observation;
 
 /*
- * Represents a linear regression predictor.
+ * A linear regression predictor for <Cores, Frequency> configurations.
  */
 class PredictorLinearRegression: public Predictor{
 private:
@@ -255,13 +254,17 @@ private:
 
     bool _preparationNeeded;
 
-    bool _singular;
+    // Identifier of rows that have been removed to let the dataMl matrix
+    // invertible.
+    std::vector<size_t> _removedRows;
+
+    uint _otherApplicationsCores;
 
     double getCurrentResponse() const;
 public:
     PredictorLinearRegression(PredictorType type,
                               const Parameters& p,
-                              const FarmConfiguration& configuration,
+                              const Configuration& configuration,
                               const Smoother<MonitoredSample>* samples);
 
     ~PredictorLinearRegression();
@@ -274,7 +277,74 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& configuration, double bandwidthIn);
+    double predict(const KnobsValues& configuration);
+
+    double getInactivePowerParameter() const;
+};
+
+/**
+ * A linear regression predictor for <Cores, Frequency, Mapping> configurations.
+ */
+class PredictorLinearRegressionMapping: public Predictor{
+private:
+    Predictor* _predictors[MAPPING_TYPE_NUM];
+public:
+    PredictorLinearRegressionMapping(PredictorType type,
+                              const Parameters& p,
+                              const Configuration& configuration,
+                              const Smoother<MonitoredSample>* samples);
+
+    ~PredictorLinearRegressionMapping();
+
+    void clear();
+
+    bool readyForPredictions();
+
+    void refine();
+
+    void prepareForPredictions();
+
+    double predict(const KnobsValues& configuration);
+};
+
+/**
+ * A predictor that uses Universal Scalability Law to predict application
+ * performance.
+ */
+#define POLYNOMIAL_DEGREE_USL 3 // Second degree polynomial
+
+class PredictorUsl: public Predictor{
+private:
+    std::vector<double> _xs;
+    std::vector<double> _ys;
+    gsl_multifit_linear_workspace *_ws;
+    gsl_matrix *_cov, *_x;
+    gsl_vector *_y, *_c;
+    double _chisq;
+    std::vector<double> _coefficients;
+    bool _preparationNeeded;
+    double _maxFreqBw;
+    double _minFreqBw;
+    double _minFrequency;
+    double _maxFrequency;
+    double _maxCores;
+public:
+    PredictorUsl(PredictorType type,
+                 const Parameters& p,
+                 const Configuration& configuration,
+                 const Smoother<MonitoredSample>* samples);
+
+    ~PredictorUsl();
+
+    void clear();
+
+    bool readyForPredictions();
+
+    void refine();
+
+    void prepareForPredictions();
+
+    double predict(const KnobsValues& configuration);
 };
 
 /*
@@ -288,20 +358,21 @@ class PredictorAnalytical: public Predictor{
 private:
     uint _phyCores;
     uint _phyCoresPerCpu;
+    uint _cpus;
 
     double getScalingFactor(const KnobsValues& values);
     double getPowerPrediction(const KnobsValues& values);
 public:
     PredictorAnalytical(PredictorType type,
                     const Parameters& p,
-                    const FarmConfiguration& configuration,
+                    const Configuration& configuration,
                     const Smoother<MonitoredSample>* samples);
 
     bool readyForPredictions();
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& values, double bandwidthIn);
+    double predict(const KnobsValues& values);
 
     void refine();
 
@@ -324,7 +395,7 @@ private:
 public:
     PredictorMishra(PredictorType type,
               const Parameters& p,
-              const FarmConfiguration& configuration,
+              const Configuration& configuration,
               const Smoother<MonitoredSample>* samples);
 
     ~PredictorMishra();
@@ -337,7 +408,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& realValues, double bandwidthIn);
+    double predict(const KnobsValues& realValues);
 };
 
 /**
@@ -351,7 +422,7 @@ private:
 public:
     PredictorFullSearch(PredictorType type,
               const Parameters& p,
-              const FarmConfiguration& configuration,
+              const Configuration& configuration,
               const Smoother<MonitoredSample>* samples);
 
     ~PredictorFullSearch();
@@ -364,7 +435,7 @@ public:
 
     void prepareForPredictions();
 
-    double predict(const KnobsValues& realValues, double bandwidthIn);
+    double predict(const KnobsValues& realValues);
 };
 
 }

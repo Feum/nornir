@@ -1,5 +1,5 @@
 /*
- * utils.cpp
+ * stats.cpp
  *
  * Created on: 09/07/2015
  *
@@ -26,11 +26,11 @@
  */
 
 /*!
- * \file utils.cpp
- * \brief Implementation of various utilities.
+ * \file stats.cpp
+ * \brief Statistics collection utilities.
  **/
 
-#include "utils.hpp"
+#include "stats.hpp"
 
 namespace nornir{
 
@@ -58,7 +58,7 @@ Observer::Observer(string statsFile, string calibrationFile, string summaryFile)
         throw runtime_error("Observer: Impossible to open file.");
     }
     _statsFile << "TimestampMillisecs" << "\t";
-    _statsFile << "[[EmitterVc][WorkersVc][CollectorVc]]" << "\t";
+    _statsFile << "[VirtualCores]" << "\t";
     _statsFile << "Workers" << "\t";
     _statsFile << "Frequency" << "\t";
     _statsFile << "CurrentBandwidth" << "\t";
@@ -109,9 +109,7 @@ void Observer::addJoules(Joules j){
 void Observer::observe(unsigned int timeStamp,
                      size_t workers,
                      Frequency frequency,
-                     const VirtualCore* emitterVirtualCore,
-                     const vector<VirtualCore*>& workersVirtualCore,
-                     const VirtualCore* collectorVirtualCore,
+                     const vector<VirtualCore*>& virtualCores,
                      double currentBandwidth,
                      double smoothedBandwidth,
                      double coeffVarBandwidth,
@@ -125,18 +123,8 @@ void Observer::observe(unsigned int timeStamp,
     _lastTimestamp = timeStamp;
     _statsFile << timeStamp - _startMonitoringMs << "\t";
     _statsFile << "[";
-    if(emitterVirtualCore){
-        _statsFile << "[" << emitterVirtualCore->getVirtualCoreId() << "]";
-    }
-
-    _statsFile << "[";
-    for(size_t i = 0; i < workersVirtualCore.size(); i++){
-        _statsFile << workersVirtualCore.at(i)->getVirtualCoreId() << ",";
-    }
-    _statsFile << "]";
-
-    if(collectorVirtualCore){
-        _statsFile << "[" << collectorVirtualCore->getVirtualCoreId() << "]";
+    for(size_t i = 0; i < virtualCores.size(); i++){
+        _statsFile << virtualCores.at(i)->getVirtualCoreId() << ",";
     }
     _statsFile << "]" << "\t";
 
@@ -179,9 +167,9 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
     for(size_t i = 0; i < calibrationStats.size(); i++){
         totalCalibration += calibrationStats.at(i);
     }
-    
+
     if(durationMs == totalCalibration.duration){
-        durationMs += 0.001; // Just to avoid division by 0 
+        durationMs += 0.001; // Just to avoid division by 0
     }
 
     _summaryFile << (_totalJoules - totalCalibration.joules) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
@@ -216,3 +204,4 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
 }
 
 }
+
