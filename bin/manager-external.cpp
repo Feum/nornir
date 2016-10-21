@@ -3,6 +3,9 @@
  *
  * Created on: 21/06/2016
  *
+ * This executable starts a manager which can monitor applications not written
+ * with the Nornir framework.
+ *
  * =========================================================================
  *  Copyright (C) 2015-, Daniele De Sensi (d.desensi.software@gmail.com)
  *

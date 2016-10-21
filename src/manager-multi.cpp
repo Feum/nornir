@@ -52,21 +52,6 @@ using namespace mammut::cpufreq;
 
 namespace nornir{
 
-template<typename A, typename B>
-std::pair<B, A> flipPair(const std::pair<A,B> &p)
-{
-    return std::pair<B, A>(p.second, p.first);
-}
-
-template<typename A, typename B>
-std::multimap<B, A> flipMap(const std::map<A,B> &src)
-{
-    std::multimap<B, A> dst;
-    std::transform(src.begin(), src.end(), std::inserter(dst, dst.begin()),
-                   flipPair<A,B>);
-    return dst;
-}
-
 ManagerMulti::ManagerMulti():_qIn(10), _qOut(10){
     _qIn.init();
     _qOut.init();
@@ -177,9 +162,13 @@ void ManagerMulti::updateAllocations(Manager* m){
         }
     }
     std::vector<KnobsValues> allocation;
+    // First insert the solutions that satisfies the primary bound (sorted from 
+    // the best to the worst secondary value).
     for(auto it = sortedSecondary.begin(); it != sortedSecondary.end();  it++){
         allocation.push_back(it->second);
     }
+    // Then we insert the unfeasible solutions (i.e. that violate the primary bound)
+    // sorted from the closer to the farther from the bound.
     for(auto it = unfeasible.begin(); it != unfeasible.end();  it++){
         allocation.push_back(it->second);
     }
@@ -192,9 +181,9 @@ void ManagerMulti::updateAllocations(){
     }
     std::vector<std::vector<size_t>> values;
     std::vector<size_t> accum;
-    for(size_t i = 0; i < _allocations.size(); i++){
+    for(auto it = _allocations.begin(); it != _allocations.end(); it++){
         std::vector<size_t> tmp;
-        for(size_t j = 0; j < _allocations.begin()->second.size(); j++){
+        for(size_t j = 0; j < it->second.size(); j++){
             tmp.push_back(j);
         }
         values.push_back(tmp);
@@ -229,6 +218,14 @@ std::vector<size_t> ManagerMulti::findBestAllocation(){
         size_t weight = 0;
         bool validAllocation = true;
         for(auto it = _allocations.begin(); it != _allocations.end(); it++){
+            // At the moment we are considering as quality metric the sum of 
+            // the positions of the chosen configurations in the corresponding priority lists
+            // (the lower the better).
+            // If we have 3 managers and we select the second choice for manager A, the 
+            // tenth choice for manager B and the fifth choice for manager C, then this 
+            // specific allocation will have a quality of 2+10+5 = 17. Accordingly, in
+            // this specific case the best allocation would be the one with weight 3, i.e.
+            // the one in which to each manager we assign its first (most preferred) choice.
             weight += allocation.at(pos);
             KnobsValues kv = it->second.at(allocation.at(pos));
             size_t numCores;
@@ -256,8 +253,6 @@ std::vector<size_t> ManagerMulti::findBestAllocation(){
         if(numPhysicalCores > _allCores.size()){
             validAllocation = false;
         }
-        // We want the configuration such that the sum of the indexes
-        // is minimal.
         if(validAllocation && weight < minWeight){
             minWeight = weight;
             best = allocation;
@@ -337,11 +332,10 @@ void ManagerMulti::run(){
         if(_qIn.pop((void**) &m)){
             DEBUG("New manager arrived.");
             // New manager.
-            /*
             assert(m->_p.contractType == CONTRACT_PERF_BANDWIDTH ||
                    m->_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
                    m->_p.contractType == CONTRACT_PERF_UTILIZATION);
-            */
+
             assert(m->_p.strategySelection == STRATEGY_SELECTION_LEARNING);
             assert(m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
                     m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||

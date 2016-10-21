@@ -1,7 +1,15 @@
 /*
- * client.cpp
+ * monitor.cpp
  *
  * Created on: 03/07/2016
+ *
+ * This file contains the client code for monitoring a local application and sending
+ * the monitoring data to an external manager (server).
+ * Firs of all, we try to open the EXTERNAL_CHANNEL_NAME channel, whose name
+ * is fixed and known by all the clients and by the server. On this channel,
+ * the client sends its PID. Then, all the communications between this specific
+ * client (i.e. application) and the server will be done on a separate channel
+ * (identified by the PID).
  *
  * =========================================================================
  *  Copyright (C) 2015-, Daniele De Sensi (d.desensi.software@gmail.com)
