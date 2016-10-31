@@ -1,4 +1,4 @@
-APPS                 = blackscholes-multi canneal mandelbrot blackscholes pbzip2 denoiser dataflow
+APPS                 = canneal mandelbrot blackscholes pbzip2 denoiser dataflow
 
 .PHONY: all clean cleanall
 
