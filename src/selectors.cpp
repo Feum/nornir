@@ -612,7 +612,7 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
         case PREDICTION_BANDWIDTH:{
             switch(p.strategyPredictionPerformance){
                 case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL:{
-                	if(_p.knobMappingEnabled){
+                	if(p.knobMappingEnabled){
                 		predictor = new PredictorRegressionMapping<PredictorLinearRegression>(type, p, configuration, samples);
                 	}else{
                 		predictor = new PredictorLinearRegression(type, p, configuration, samples);
@@ -620,7 +620,7 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
                 }break;
                 case STRATEGY_PREDICTION_PERFORMANCE_USL:
                 case STRATEGY_PREDICTION_PERFORMANCE_USLP:{
-                	if(_p.knobMappingEnabled){
+                	if(p.knobMappingEnabled){
                 		predictor = new PredictorRegressionMapping<PredictorUsl>(type, p, configuration, samples);
                 	}else{
                 		predictor = new PredictorUsl(type, p, configuration, samples);
