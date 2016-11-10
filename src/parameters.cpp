@@ -460,19 +460,18 @@ ParametersValidation Parameters::validateSelector(){
         return VALIDATION_NO_MISHRA_PARAMETERS;
     }
 
-	// Check if the knob enabled can be managed by the selector specified.
-	for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-		if(_knobEnabled[i] && !knobsSupportSelector[strategySelection][i]){
-			return VALIDATION_NO;
+
+    if(strategySelection != STRATEGY_SELECTION_LEARNING){
+		// Check if the knob enabled can be managed by the selector specified.
+		for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+			if(_knobEnabled[i] && !knobsSupportSelector[strategySelection][i]){
+				return VALIDATION_NO;
+			}
 		}
-	}
-
-
-	/*********************************************/
-	/*            Validate predictors.           */
-	/*********************************************/
-
-	if(strategySelection == STRATEGY_SELECTION_LEARNING){
+    }else{
+		/*********************************************/
+		/*            Validate predictors.           */
+		/*********************************************/
 		bool knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_NUM][KNOB_TYPE_NUM];
 		bool knobsSupportPower[STRATEGY_PREDICTION_POWER_NUM][KNOB_TYPE_NUM];
 
