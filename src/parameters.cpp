@@ -498,6 +498,11 @@ ParametersValidation Parameters::validateSelector(){
 		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_FREQUENCY] = true;
 		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_MAPPING] = true;
 		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_HYPERTHREADING] = false;
+		// USLP
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_TYPE_VIRTUAL_CORES] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_TYPE_FREQUENCY] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_TYPE_MAPPING] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_TYPE_HYPERTHREADING] = false;
 
 		/******************************************/
 		/*              Power models.             */
@@ -532,7 +537,8 @@ ParametersValidation Parameters::validateSelector(){
 		// Currently, USL predictors only works with low discrepancy explorators.
 		// TODO: This is because the additional exploration points at the moment
 		// can only be added to the low discrepancy generators.
-		if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL &&
+		if((strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
+			strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP) &&
 		   (strategyExploration != STRATEGY_EXPLORATION_HALTON && strategyExploration != STRATEGY_EXPLORATION_HALTON_REVERSE &&
 			strategyExploration != STRATEGY_EXPLORATION_RANDOM && strategyExploration != STRATEGY_EXPLORATION_SOBOL)){
 			   return VALIDATION_NO;
@@ -576,6 +582,7 @@ template<> char const* enumStrings<StrategySelection>::data[] = {
 template<> char const* enumStrings<StrategyPredictionPerformance>::data[] = {
     "AMDAHL",
     "USL",
+	"USLP",
     "MISHRA",
 	"NUM" // <- Must always be the last
 };

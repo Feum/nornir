@@ -361,6 +361,7 @@ private:
     bool _preparationNeeded;
     double _maxFreqBw;
     double _minFreqBw;
+    double _minFreqCoresBw;
     double _minFrequency;
     double _maxFrequency;
     double _maxCores;

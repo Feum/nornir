@@ -618,7 +618,8 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
                 		predictor = new PredictorLinearRegression(type, p, configuration, samples);
                 	}
                 }break;
-                case STRATEGY_PREDICTION_PERFORMANCE_USL:{
+                case STRATEGY_PREDICTION_PERFORMANCE_USL:
+                case STRATEGY_PREDICTION_PERFORMANCE_USLP:{
                 	if(_p.knobMappingEnabled){
                 		predictor = new PredictorRegressionMapping<PredictorUsl>(type, p, configuration, samples);
                 	}else{
@@ -669,8 +670,17 @@ SelectorLearner::SelectorLearner(const Parameters& p,
     vector<KnobsValues> additionalPoints;
     knobsFlags.resize(KNOB_TYPE_NUM, false);
 
-    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL){
-        KnobsValues kv(KNOB_VALUE_RELATIVE);
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
+       _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+    	KnobsValues kv(KNOB_VALUE_RELATIVE);
+        // For the precise version of USL, we need to also take the bandwidth with
+        // parallelism degree equal to one.
+        if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+            kv.reset();
+            kv[KNOB_TYPE_VIRTUAL_CORES] = 0.0;
+            kv[KNOB_TYPE_FREQUENCY] = 0.0;
+            additionalPoints.push_back(kv);
+        }
         kv[KNOB_TYPE_VIRTUAL_CORES] = 100.0;
         kv[KNOB_TYPE_FREQUENCY] = 100;
         additionalPoints.push_back(kv);
@@ -707,9 +717,11 @@ SelectorLearner::SelectorLearner(const Parameters& p,
         }
     }
 
-    if((_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
-       _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
-       _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR) && _p.knobMappingEnabled){
+    if(_p.knobMappingEnabled &&
+       (_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
+        _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
+	    _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP ||
+        _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR)){
         _explorer = new ExplorerMultiple(knobsFlags, _explorer, KNOB_TYPE_MAPPING, MAPPING_TYPE_NUM);
     }
 }

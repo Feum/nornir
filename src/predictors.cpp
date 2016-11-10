@@ -510,7 +510,8 @@ PredictorUsl::PredictorUsl(PredictorType type,
              const Smoother<MonitoredSample>* samples):
                     Predictor(type, p, configuration, samples),
                     _ws(NULL), _x(NULL), _y(NULL), _chisq(0),
-                    _preparationNeeded(true), _maxFreqBw(0), _minFreqBw(0){
+                    _preparationNeeded(true), _maxFreqBw(0), _minFreqBw(0),
+					_minFreqCoresBw(0){
     if(type != PREDICTION_BANDWIDTH){
         throw std::runtime_error("PredictorUsl can only be used for bandwidth predictions.");
     }
@@ -544,25 +545,40 @@ void PredictorUsl::refine(){
     if(frequency == _maxFrequency && numCores == _maxCores){
         _maxFreqBw = bandwidth;
         return;
-    }else if(frequency == _minFrequency && numCores == _maxCores){
-        _minFreqBw = bandwidth;
+    }else if(frequency == _minFrequency){
+    	if(numCores == _maxCores){
+    		_minFreqBw = bandwidth;
+    	}else if(numCores == 1){
+    		_minFreqCoresBw = bandwidth;
+    	}else{
+    		throw std::runtime_error("Fatal error in PredictorUsl::refine().");
+    	}
     }else if(frequency != _minFrequency){
         return;
+    }
+
+    double x, y;
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+    	x = numCores - 1;
+    	y = ((_minFreqCoresBw * numCores)/bandwidth) - 1;
+    }else{
+    	x = numCores - 1;
+    	y = numCores / bandwidth;
     }
 
     // Checks if a y is already present for this x
     int pos = -1;
     for(size_t i = 0; i < _xs.size(); i++){
-        if(_xs[i] == numCores - 1){
+        if(_xs[i] == x){
             pos = i;
             break;
         }
     }
     if(pos == -1){
-        _xs.push_back(numCores - 1);
-        _ys.push_back(numCores / bandwidth);
+        _xs.push_back(x);
+        _ys.push_back(y);
     }else{
-        _ys.at(pos) = numCores / bandwidth;
+        _ys.at(pos) = y;
     }
     _preparationNeeded = true;
 }
@@ -572,27 +588,46 @@ void PredictorUsl::prepareForPredictions(){
         if(!readyForPredictions()){
             throw std::runtime_error("PredictorUsl: Not yet ready for predictions.");
         }
-        _x = gsl_matrix_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
+
+        uint maxPolDegree = POLYNOMIAL_DEGREE_USL;
+        if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        	maxPolDegree -= 1; //To remove x^0 value.
+        }
+
+        _x = gsl_matrix_alloc(_xs.size(), maxPolDegree);
         _y = gsl_vector_alloc(_xs.size());
         size_t i = 0, j = 0;
         for(i = 0; i < _xs.size(); i++) {
             for(j = 0; j < POLYNOMIAL_DEGREE_USL; j++) {
+            	if(j == 0 && _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+            		continue; //To skip x^0 value.
+            	}
                 gsl_matrix_set(_x, i, j, pow(_xs.at(i), j));
             }
             gsl_vector_set(_y, i, _ys.at(i));
         }
 
-        _ws = gsl_multifit_linear_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
+        _ws = gsl_multifit_linear_alloc(_xs.size(), maxPolDegree);
         gsl_multifit_linear(_x, _y, _c, _cov, &_chisq, _ws);
 
         _coefficients.clear();
-        for(i = 0; i < POLYNOMIAL_DEGREE_USL; i++){
+        for(i = 0; i < maxPolDegree; i++){
             _coefficients.push_back(gsl_vector_get(_c, i));
         }
         gsl_matrix_free(_x);
         gsl_vector_free(_y);
         gsl_multifit_linear_free(_ws);
         _preparationNeeded = false;
+    }else{
+    	if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+    		std::cout << "B1Pred(actual): " << _minFreqCoresBw << std::endl;
+            std::cout << "Contention: " << _coefficients[0] - _coefficients[1] << std::endl;
+            std::cout << "Coherency: " << (double) _coefficients[1]/(_coefficients[0] - _coefficients[1]) << std::endl;
+    	}else{
+            std::cout << "B1Pred: " << 1.0 / _coefficients[0] << std::endl;
+            std::cout << "Contention: " << (_coefficients[1] - _coefficients[2])/((double) _coefficients[0]) << std::endl;
+            std::cout << "Coherency: " << (double) _coefficients[2]/(_coefficients[1] - _coefficients[2]) << std::endl;
+    	}
     }
 }
 
@@ -610,14 +645,20 @@ double PredictorUsl::predict(const KnobsValues& configuration){
     for(size_t i = 0; i < _coefficients.size(); i++){
         result += _coefficients.at(i)*std::pow(numCores - 1, i);
     }
-    result = (numCores / result);
+
+    double bandwidth;
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+    	bandwidth = (numCores * _minFreqCoresBw)/(result + 1);
+    }else{
+    	bandwidth = (numCores / result);
+    }
 
     if(frequency != _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()){
         double minMaxScaling = _maxFreqBw / _minFreqBw;
-        double maxFreqPred = result * minMaxScaling;
-        return ((maxFreqPred - result)/(_maxFrequency - _minFrequency))*frequency + ((result*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
+        double maxFreqPred = bandwidth * minMaxScaling;
+        return ((maxFreqPred - bandwidth)/(_maxFrequency - _minFrequency))*frequency + ((bandwidth*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
     }else{
-        return result;
+        return bandwidth;
     }
 }
     

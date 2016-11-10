@@ -29,14 +29,14 @@
  * 		strategySelection = STRATEGY_SELECTION_ANALYTICAL
  * 		knobMappingEnabled = false
  * 		(Actually was a simpler selection strategy than the current one).
+ * 	- PPL2016:
+ * 		strategySelection = STRATEGY_SELECTION_ANALYTICAL
+ * 		knobMappingEnabled = false
  * - PDP2016:
  * 		strategySelection =  STRATEGY_SELECTION_LEARNING
  * 		strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_AMDAHL
  * 		strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
  * 		strategyExploration = (Many of them)
- * 		knobMappingEnabled = false
- * 	- PPL2016:
- * 		strategySelection = STRATEGY_SELECTION_ANALYTICAL
  * 		knobMappingEnabled = false
  * 	- TACO2016:
  * 		strategySelection = STRATEGY_SELECTION_LEARNING
@@ -168,6 +168,7 @@ typedef enum{
 typedef enum{
     STRATEGY_PREDICTION_PERFORMANCE_AMDAHL = 0,
     STRATEGY_PREDICTION_PERFORMANCE_USL,
+	STRATEGY_PREDICTION_PERFORMANCE_USLP, // <- More precise than USL but needs one additional calibration point.
     STRATEGY_PREDICTION_PERFORMANCE_MISHRA,
 	STRATEGY_PREDICTION_PERFORMANCE_NUM // <- This must always be the last.
 }StrategyPredictionPerformance;
