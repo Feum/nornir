@@ -351,6 +351,7 @@ public:
 
 class PredictorUsl: public Predictor{
 private:
+	double _maxPolDegree;
     std::vector<double> _xs;
     std::vector<double> _ys;
     gsl_multifit_linear_workspace *_ws;

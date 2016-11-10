@@ -509,14 +509,18 @@ PredictorUsl::PredictorUsl(PredictorType type,
              const Configuration& configuration,
              const Smoother<MonitoredSample>* samples):
                     Predictor(type, p, configuration, samples),
+					_maxPolDegree(POLYNOMIAL_DEGREE_USL),
                     _ws(NULL), _x(NULL), _y(NULL), _chisq(0),
                     _preparationNeeded(true), _maxFreqBw(0), _minFreqBw(0),
 					_minFreqCoresBw(0){
     if(type != PREDICTION_BANDWIDTH){
         throw std::runtime_error("PredictorUsl can only be used for bandwidth predictions.");
     }
-    _c = gsl_vector_alloc(POLYNOMIAL_DEGREE_USL);
-    _cov = gsl_matrix_alloc(POLYNOMIAL_DEGREE_USL, POLYNOMIAL_DEGREE_USL);
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+    	_maxPolDegree -= 1; //To remove x^0 value.
+    }
+    _c = gsl_vector_alloc(_maxPolDegree);
+    _cov = gsl_matrix_alloc(_maxPolDegree, _maxPolDegree);
     _minFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front();
     _maxFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().back();
     _maxCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getAllowedValues().back();
@@ -533,7 +537,7 @@ void PredictorUsl::clear(){
 }
 
 bool PredictorUsl::readyForPredictions(){
-    return _xs.size() >= POLYNOMIAL_DEGREE_USL;
+    return _xs.size() >= _maxPolDegree;
 }
 
 void PredictorUsl::refine(){
@@ -587,16 +591,11 @@ void PredictorUsl::prepareForPredictions(){
             throw std::runtime_error("PredictorUsl: Not yet ready for predictions.");
         }
 
-        uint maxPolDegree = POLYNOMIAL_DEGREE_USL;
-        if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-        	maxPolDegree -= 1; //To remove x^0 value.
-        }
-
-        _x = gsl_matrix_alloc(_xs.size(), maxPolDegree);
+        _x = gsl_matrix_alloc(_xs.size(), _maxPolDegree);
         _y = gsl_vector_alloc(_xs.size());
         size_t i = 0, j = 0;
         for(i = 0; i < _xs.size(); i++) {
-            for(j = 0; j < maxPolDegree; j++) {
+            for(j = 0; j < _maxPolDegree; j++) {
             	double degree = j;
             	if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
             		degree += 1; //To skip x^0 value.
@@ -606,11 +605,11 @@ void PredictorUsl::prepareForPredictions(){
             gsl_vector_set(_y, i, _ys.at(i));
         }
 
-        _ws = gsl_multifit_linear_alloc(_xs.size(), maxPolDegree);
+        _ws = gsl_multifit_linear_alloc(_xs.size(), _maxPolDegree);
         gsl_multifit_linear(_x, _y, _c, _cov, &_chisq, _ws);
 
         _coefficients.clear();
-        for(i = 0; i < maxPolDegree; i++){
+        for(i = 0; i < _maxPolDegree; i++){
             _coefficients.push_back(gsl_vector_get(_c, i));
         }
         gsl_matrix_free(_x);
