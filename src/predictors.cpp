@@ -550,8 +550,6 @@ void PredictorUsl::refine(){
     		_minFreqBw = bandwidth;
     	}else if(numCores == 1){
     		_minFreqCoresBw = bandwidth;
-    	}else{
-    		throw std::runtime_error("Fatal error in PredictorUsl::refine().");
     	}
     }else if(frequency != _minFrequency){
         return;
