@@ -338,11 +338,8 @@ void ManagerMulti::run(){
 
             assert(m->_p.strategySelection == STRATEGY_SELECTION_LEARNING);
             assert(m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
-                    m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||
                     m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
-                    m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING ||
-                    m->_p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR ||
-                    m->_p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR_MAPPING);
+                    m->_p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR);
 
             _activeManagers.push_back(m);
             _allocatedCores[m] = vector<PhysicalCoreId>();

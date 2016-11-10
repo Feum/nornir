@@ -33,14 +33,6 @@
 
 namespace nornir{
 
-typedef enum{
-    KNOB_TYPE_VIRTUAL_CORES = 0, // Number of contexts to be used.
-    KNOB_TYPE_HYPERTHREADING, // Number of contexts to be used on each physical core.
-    KNOB_TYPE_MAPPING, // Mapping of threads on physical cores.
-    KNOB_TYPE_FREQUENCY,
-    KNOB_TYPE_NUM  // <---- This must always be the last value
-}KnobType;
-
 class Knob: public mammut::utils::NonCopyable{
 public:
     Knob():_realValue(-1), _locked(false){;}

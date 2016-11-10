@@ -166,10 +166,10 @@ void Parameters::setDefault(){
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
-    strategyCoresChange = STRATEGY_CORES_RETHREADING;
     knobCoresEnabled = true;
     knobMappingEnabled = true;
     knobFrequencyEnabled = true;
+    knobHyperthreadingEnabled = false;
     turboBoost = false;
     fastReconfiguration = true;
     migrateCollector = false;
@@ -350,10 +350,6 @@ ParametersValidation Parameters::validateKnobFrequencies(){
         }
     }
 
-    if(knobFrequencyEnabled && !knobMappingEnabled){
-        return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
-    }
-
     if(fastReconfiguration &&
        (!isHighestFrequencySettable() ||
          strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_NONE)){
@@ -424,6 +420,38 @@ ParametersValidation Parameters::validateContract(){
 }
 
 ParametersValidation Parameters::validateSelector(){
+	bool knobsSupportSelector[STRATEGY_SELECTION_NUM][KNOB_TYPE_NUM];
+	if(strategySelection == STRATEGY_SELECTION_NUM){
+		return VALIDATION_NO;
+	}
+
+	// ANALYTICAL
+	knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_TYPE_VIRTUAL_CORES] = true;
+	knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_TYPE_FREQUENCY] = true;
+	knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_TYPE_MAPPING] = false;
+	knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_TYPE_HYPERTHREADING] = false;
+
+	// FULLSEARCH
+	knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_TYPE_VIRTUAL_CORES] = true;
+	knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_TYPE_FREQUENCY] = true;
+	knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_TYPE_MAPPING] = true;
+	knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_TYPE_HYPERTHREADING] = true;
+
+	// For learning we do not check since it depends from the predictors choice.
+	// (we will check in validatePredictors())
+
+	// LIMARTINEZ
+	knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_TYPE_VIRTUAL_CORES] = true;
+	knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_TYPE_FREQUENCY] = true;
+	knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_TYPE_MAPPING] = false;
+	knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_TYPE_HYPERTHREADING] = false;
+
+	// MISHRA
+	knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_TYPE_VIRTUAL_CORES] = true;
+	knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_TYPE_FREQUENCY] = true;
+	knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_TYPE_MAPPING] = false;
+	knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_TYPE_HYPERTHREADING] = false;
+
     if(strategySelection == STRATEGY_SELECTION_MISHRA &&
        (mishra.bandwidthData.compare("") == 0 ||
         mishra.powerData.compare("") == 0 ||
@@ -431,24 +459,86 @@ ParametersValidation Parameters::validateSelector(){
         mishra.namesData.compare("") == 0)){
         return VALIDATION_NO_MISHRA_PARAMETERS;
     }
-    return VALIDATION_OK;
-}
+
+	// Check if the knob enabled can be managed by the selector specified.
+	for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+		if(_knobEnabled[i] && !knobsSupportSelector[strategySelection][i]){
+			return VALIDATION_NO;
+		}
+	}
 
 
-ParametersValidation Parameters::validatePredictor(){
-    if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_MISHRA &&
-         (mishra.bandwidthData.compare("") == 0 ||
-          mishra.powerData.compare("") == 0 ||
-          mishra.applicationName.compare("") == 0 ||
-          mishra.namesData.compare("") == 0)){
-            return VALIDATION_NO_MISHRA_PARAMETERS;
-    }
-    if((strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
-       strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING) &&
-       (strategyExploration != STRATEGY_EXPLORATION_HALTON && strategyExploration != STRATEGY_EXPLORATION_HALTON_REVERSE &&
-        strategyExploration != STRATEGY_EXPLORATION_RANDOM && strategyExploration != STRATEGY_EXPLORATION_SOBOL)){
-           return VALIDATION_NO;
-    }
+	/*********************************************/
+	/*            Validate predictors.           */
+	/*********************************************/
+
+	if(strategySelection == STRATEGY_SELECTION_LEARNING){
+		bool knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_NUM][KNOB_TYPE_NUM];
+		bool knobsSupportPower[STRATEGY_PREDICTION_POWER_NUM][KNOB_TYPE_NUM];
+
+		if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_NUM ||
+		   strategyPredictionPower == STRATEGY_PREDICTION_POWER_NUM){
+			return VALIDATION_NO;
+		}
+		/******************************************/
+		/*          Performance models.           */
+		/******************************************/
+		// AMDAHL
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_TYPE_VIRTUAL_CORES] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_TYPE_FREQUENCY] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_TYPE_MAPPING] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_TYPE_HYPERTHREADING] = false;
+		// MISHRA
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_TYPE_VIRTUAL_CORES] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_TYPE_FREQUENCY] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_TYPE_MAPPING] = false;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_TYPE_HYPERTHREADING] = false;
+		// USL
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_VIRTUAL_CORES] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_FREQUENCY] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_MAPPING] = true;
+		knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_HYPERTHREADING] = false;
+
+		/******************************************/
+		/*              Power models.             */
+		/******************************************/
+		// LINEAR
+		knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_TYPE_VIRTUAL_CORES] = true;
+		knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_TYPE_FREQUENCY] = true;
+		knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_TYPE_MAPPING] = true;
+		knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_TYPE_HYPERTHREADING] = false;
+		// MISHRA
+		knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_TYPE_VIRTUAL_CORES] = true;
+		knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_TYPE_FREQUENCY] = true;
+		knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_TYPE_MAPPING] = false;
+		knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_TYPE_HYPERTHREADING] = false;
+
+		// Check if the knob enabled can be managed by the predictors specified.
+		for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+			if(_knobEnabled[i] && (!knobsSupportPerformance[strategyPredictionPerformance][i] ||
+								  !knobsSupportPower[strategyPredictionPower][i])){
+				return VALIDATION_NO;
+			}
+		}
+
+		if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_MISHRA &&
+			 (mishra.bandwidthData.compare("") == 0 ||
+			  mishra.powerData.compare("") == 0 ||
+			  mishra.applicationName.compare("") == 0 ||
+			  mishra.namesData.compare("") == 0)){
+				return VALIDATION_NO_MISHRA_PARAMETERS;
+		}
+
+		// Currently, USL predictors only works with low discrepancy explorators.
+		// TODO: This is because the additional exploration points at the moment
+		// can only be added to the low discrepancy generators.
+		if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL &&
+		   (strategyExploration != STRATEGY_EXPLORATION_HALTON && strategyExploration != STRATEGY_EXPLORATION_HALTON_REVERSE &&
+			strategyExploration != STRATEGY_EXPLORATION_RANDOM && strategyExploration != STRATEGY_EXPLORATION_SOBOL)){
+			   return VALIDATION_NO;
+		}
+	}
+
     return VALIDATION_OK;
 }
 
@@ -479,21 +569,21 @@ template<> char const* enumStrings<StrategySelection>::data[] = {
     "ANALYTICAL",
     "FULLSEARCH",
     "LIMARTINEZ",
-    "MISHRA"
+    "MISHRA",
+	"NUM" // <- Must always be the last
 };
 
 template<> char const* enumStrings<StrategyPredictionPerformance>::data[] = {
     "AMDAHL",
-    "AMDAHL_MAPPING",
     "USL",
-    "USL_MAPPING",
-    "MISHRA"
+    "MISHRA",
+	"NUM" // <- Must always be the last
 };
 
 template<> char const* enumStrings<StrategyPredictionPower>::data[] = {
     "LINEAR",
-    "LINEAR_MAPPING",
-    "MISHRA"
+    "MISHRA",
+	"NUM" // <- Must always be the last
 };
 
 template<> char const* enumStrings<StrategyExploration>::data[] = {
@@ -526,11 +616,6 @@ template<> char const* enumStrings<StrategyPersistence>::data[] = {
     "VARIATION"
 };
 
-template<> char const* enumStrings<StrategyCoresChange>::data[] = {
-    "RETHREADING",
-    "REMAPPING"
-};
-
 void Parameters::loadXml(const string& paramFileName){
     XmlTree xt(paramFileName, "adaptivityParameters");
 
@@ -543,11 +628,11 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, strategySmoothing);
     SETVALUE(xt, Enum, strategyPolling);
     SETVALUE(xt, Enum, strategyPersistence);
-    SETVALUE(xt, Enum, strategyCoresChange);
     SETVALUE(xt, Enum, triggerQBlocking);
     SETVALUE(xt, Bool, knobCoresEnabled);
     SETVALUE(xt, Bool, knobMappingEnabled);
     SETVALUE(xt, Bool, knobFrequencyEnabled);
+    SETVALUE(xt, Bool, knobHyperthreadingEnabled);
 
     SETVALUE(xt, Bool, turboBoost);
     SETVALUE(xt, Bool, fastReconfiguration);
@@ -653,6 +738,11 @@ ParametersValidation Parameters::validate(){
 
     setDefaultPost();
 
+	_knobEnabled[KNOB_TYPE_FREQUENCY] = knobFrequencyEnabled;
+	_knobEnabled[KNOB_TYPE_VIRTUAL_CORES] = knobCoresEnabled;
+	_knobEnabled[KNOB_TYPE_MAPPING] = knobMappingEnabled;
+	_knobEnabled[KNOB_TYPE_HYPERTHREADING] = knobHyperthreadingEnabled;
+
     /** Validate frequency knob. **/
     r = validateKnobFrequencies();
     if(r != VALIDATION_OK){return r;}
@@ -673,11 +763,11 @@ ParametersValidation Parameters::validate(){
     r = validateSelector();
     if(r != VALIDATION_OK){return r;}
 
-    /** Validate predictors. **/
-    r = validatePredictor();
-    if(r != VALIDATION_OK){return r;}
-
     return VALIDATION_OK;
+}
+
+bool Parameters::isKnobEnabled(KnobType k) const{
+	return _knobEnabled[k];
 }
 
 }

@@ -350,7 +350,6 @@ bool Manager::persist() const{
 void Manager::lockKnobs() const{
     if(!_p.knobCoresEnabled){
         _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->lockToMax();
-        _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMax();
     }
     if(!_p.knobMappingEnabled){
         _configuration->getKnob(KNOB_TYPE_MAPPING)->lock(MAPPING_TYPE_LINEAR);
@@ -358,40 +357,8 @@ void Manager::lockKnobs() const{
     if(!_p.knobFrequencyEnabled){
         _configuration->getKnob(KNOB_TYPE_FREQUENCY)->lockToMax();
     }
-
-    switch(_p.strategySelection){
-        case STRATEGY_SELECTION_ANALYTICAL:{
-            _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-            _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
-        }break;
-        case STRATEGY_SELECTION_LEARNING:{
-            switch(_p.strategyPredictionPerformance){
-                case STRATEGY_PREDICTION_PERFORMANCE_MISHRA:
-                case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL:
-                case STRATEGY_PREDICTION_PERFORMANCE_USL:{
-                    _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-                    _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
-                }break;
-                case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING:
-                case STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING:{
-                    _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-                }break;
-            }
-        }break;
-        case STRATEGY_SELECTION_LIMARTINEZ:{
-            _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-            _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
-        }break;
-        case STRATEGY_SELECTION_MISHRA:{
-            _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-            _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
-        }break;
-        case STRATEGY_SELECTION_FULLSEARCH:{
-            ;
-        }break;
-        default:{
-            throw std::runtime_error("Selector not yet implemented.");
-        }break;
+    if(!_p.knobHyperthreadingEnabled){
+    	_configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
     }
 }
 
@@ -578,8 +545,6 @@ ManagerExternal::ManagerExternal(const std::string& orlogChannel,
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
-    // Only remapping is possible for external applications. 
-    _p.strategyCoresChange = STRATEGY_CORES_REMAPPING;
     // For external application we do not care if synchronous of not (we count iterations).   
     _p.synchronousWorkers = false;
 }
@@ -592,8 +557,6 @@ ManagerExternal::ManagerExternal(nn::socket& orlogSocket,
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
-    // Only remapping is possible for external applications. 
-    _p.strategyCoresChange = STRATEGY_CORES_REMAPPING;
     // For external application we do not care if synchronous of not (we count iterations).
     _p.synchronousWorkers = false;
 }

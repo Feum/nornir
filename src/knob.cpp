@@ -335,6 +335,7 @@ template<> char const* enumStrings<MappingType>::data[] = {
 void KnobMapping::changeValueReal(double v){
     DEBUG("[Mapping] Changing real value to: " << enumToString<MappingType>((MappingType)v));
 
+    // Its length will be equal to _knobCores.getRealValue()
     vector<VirtualCore*> vcOrder;
     switch((MappingType) v){
         case MAPPING_TYPE_LINEAR:{

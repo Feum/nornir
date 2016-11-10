@@ -95,7 +95,8 @@ public:
 };
 
 /**
- * Explorer to be used when building multiple models together.
+ * Explorer to be used when building multiple models together
+ * (like in the mapping case).
  */
 class ExplorerMultiple: public Explorer{
 private:

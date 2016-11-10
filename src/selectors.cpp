@@ -612,13 +612,18 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
         case PREDICTION_BANDWIDTH:{
             switch(p.strategyPredictionPerformance){
                 case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL:{
-                    predictor = new PredictorLinearRegression(type, p, configuration, samples);
-                }break;
-                case STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING:{
-                    predictor = new PredictorLinearRegressionMapping(type, p, configuration, samples);
+                	if(_p.knobMappingEnabled){
+                		predictor = new PredictorRegressionMapping<PredictorLinearRegression>(type, p, configuration, samples);
+                	}else{
+                		predictor = new PredictorLinearRegression(type, p, configuration, samples);
+                	}
                 }break;
                 case STRATEGY_PREDICTION_PERFORMANCE_USL:{
-                    predictor = new PredictorUsl(type, p, configuration, samples);
+                	if(_p.knobMappingEnabled){
+                		predictor = new PredictorRegressionMapping<PredictorUsl>(type, p, configuration, samples);
+                	}else{
+                		predictor = new PredictorUsl(type, p, configuration, samples);
+                	}
                 }break;
                 case STRATEGY_PREDICTION_PERFORMANCE_MISHRA:{
                     predictor = new PredictorMishra(type, p, configuration, samples);
@@ -631,10 +636,11 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
         case PREDICTION_POWER:{
             switch(p.strategyPredictionPower){
                 case STRATEGY_PREDICTION_POWER_LINEAR:{
-                    predictor = new PredictorLinearRegression(type, p, configuration, samples);
-                }break;
-                case STRATEGY_PREDICTION_POWER_LINEAR_MAPPING:{
-                    predictor = new PredictorLinearRegressionMapping(type, p, configuration, samples);
+                	if(_p.knobMappingEnabled){
+                		predictor = new PredictorRegressionMapping<PredictorLinearRegression>(type, p, configuration, samples);
+                	}else{
+                		predictor = new PredictorLinearRegression(type, p, configuration, samples);
+                	}
                 }break;
                 case STRATEGY_PREDICTION_POWER_MISHRA:{
                     predictor = new PredictorMishra(type, p, configuration, samples);
@@ -663,8 +669,7 @@ SelectorLearner::SelectorLearner(const Parameters& p,
     vector<KnobsValues> additionalPoints;
     knobsFlags.resize(KNOB_TYPE_NUM, false);
 
-    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
-       _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING){
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL){
         KnobsValues kv(KNOB_VALUE_RELATIVE);
         kv[KNOB_TYPE_VIRTUAL_CORES] = 100.0;
         kv[KNOB_TYPE_FREQUENCY] = 100;
@@ -674,14 +679,16 @@ SelectorLearner::SelectorLearner(const Parameters& p,
         kv[KNOB_TYPE_FREQUENCY] = 0.0;
         additionalPoints.push_back(kv);
 
+        // I only need to explore on virtual cores.
         knobsFlags[KNOB_TYPE_VIRTUAL_CORES] = true;
-    }else if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||
-       _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR_MAPPING){
+    }else if((_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
+              _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR)){
+    	// I only need to explore on virtual cores and frequency.
         knobsFlags[KNOB_TYPE_VIRTUAL_CORES] = true;
         knobsFlags[KNOB_TYPE_FREQUENCY] = true;
     }else{
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            knobsFlags[i] = !_configuration.getKnob((KnobType) i)->isLocked();
+            knobsFlags[i] = _p.isKnobEnabled((KnobType) i);
         }
     }
 
@@ -700,9 +707,9 @@ SelectorLearner::SelectorLearner(const Parameters& p,
         }
     }
 
-    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING ||
-       _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING ||
-       _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR_MAPPING){
+    if((_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
+       _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
+       _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR) && _p.knobMappingEnabled){
         _explorer = new ExplorerMultiple(knobsFlags, _explorer, KNOB_TYPE_MAPPING, MAPPING_TYPE_NUM);
     }
 }

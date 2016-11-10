@@ -176,6 +176,11 @@ protected:
 
     /**
      * Returns the execution time of the application (milliseconds).
+     * - For ManagerFarm, it will be the execution time of the farm.
+     * - For ManagerExternal, it will be the execution time between the construction
+     * of the Application object and the call of the 'terminate' function on it
+     * (application side).
+     * - For ManagerBlackbox, it will be the execution time of the entire application.
      */
     virtual ulong getExecutionTime() = 0;
 

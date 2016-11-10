@@ -283,28 +283,64 @@ public:
 };
 
 /**
- * A linear regression predictor for <Cores, Frequency, Mapping> configurations.
+ * A regression predictor for <Cores, Frequency, Mapping> configurations.
+ * It works by using one predictor for each mapping.
  */
-class PredictorLinearRegressionMapping: public Predictor{
+template <class P>
+class PredictorRegressionMapping: public Predictor{
 private:
     Predictor* _predictors[MAPPING_TYPE_NUM];
 public:
-    PredictorLinearRegressionMapping(PredictorType type,
+    PredictorRegressionMapping(PredictorType type,
                               const Parameters& p,
                               const Configuration& configuration,
-                              const Smoother<MonitoredSample>* samples);
+                              const Smoother<MonitoredSample>* samples):
+                            	  Predictor(type, p, configuration, samples){
+    	for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+    		_predictors[i] = new P(type, p, configuration, samples);
+    	}
+	}
 
-    ~PredictorLinearRegressionMapping();
+    ~PredictorRegressionMapping(){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            delete _predictors[i];
+        }
+    }
 
-    void clear();
+    void clear(){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            _predictors[i]->clear();
+        }
+    }
 
-    bool readyForPredictions();
+    bool readyForPredictions(){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            if(!_predictors[i]->readyForPredictions()){
+                return false;
+            }
+        }
+        return true;
+    }
 
-    void refine();
+    void refine(){
+    	_predictors[(MappingType) _configuration.getRealValue(KNOB_TYPE_MAPPING)]->refine();
+    }
 
-    void prepareForPredictions();
+    void prepareForPredictions(){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            _predictors[i]->prepareForPredictions();
+        }
+    }
 
-    double predict(const KnobsValues& configuration);
+    double predict(const KnobsValues& configuration){
+        double realValue = 0.0;
+        if(configuration.areRelative()){
+            _configuration.getKnob(KNOB_TYPE_MAPPING)->getRealFromRelative(configuration[KNOB_TYPE_MAPPING], realValue);
+        }else{
+            realValue = configuration[KNOB_TYPE_MAPPING];
+        }
+        return _predictors[(MappingType) realValue]->predict(configuration);
+    }
 };
 
 /**

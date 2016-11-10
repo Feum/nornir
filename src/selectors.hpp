@@ -288,7 +288,7 @@ public:
 };
 
 /**
- * Selector described in PDP2015 paper.
+ * Selector described in PPL2016 paper (a simpler version was present in PDP2015 paper).
  */
 class SelectorAnalytical: public SelectorPredictive{
 private:

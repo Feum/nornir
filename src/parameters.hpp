@@ -23,6 +23,36 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  *
  * =========================================================================
+ *
+ * Strategies used/developed for different papers:
+ * - PDP2015:
+ * 		strategySelection = STRATEGY_SELECTION_ANALYTICAL
+ * 		knobMappingEnabled = false
+ * 		(Actually was a simpler selection strategy than the current one).
+ * - PDP2016:
+ * 		strategySelection =  STRATEGY_SELECTION_LEARNING
+ * 		strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_AMDAHL
+ * 		strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
+ * 		strategyExploration = (Many of them)
+ * 		knobMappingEnabled = false
+ * 	- PPL2016:
+ * 		strategySelection = STRATEGY_SELECTION_ANALYTICAL
+ * 		knobMappingEnabled = false
+ * 	- TACO2016:
+ * 		strategySelection = STRATEGY_SELECTION_LEARNING
+ * 		strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_USL
+ * 		strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
+ * 		strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_LOWEST_FREQUENCY
+ * 		strategyExploration = STRATEGY_EXPLORATION_HALTON
+ * 		knobMappingEnabled = true
+ *
+ * 		In addition to that, we also developed and compared with:
+ * 			strategySelection = STRATEGY_SELECTION_MISHRA
+ * 			strategySelection = STRATEGY_SELECTION_FULLSEARCH
+ * 			strategySelection = STRATEGY_SELECTION_LIMARTINEZ
+ * 		and also with
+ *	 		knobMappingEnabled = false
+ *
  */
 
 
@@ -41,6 +71,15 @@ namespace nornir{
 #define MANAGER_VIRTUAL_CORE (VirtualCoreId) 0
 
 class Observer;
+
+// Possible knobs
+typedef enum{
+    KNOB_TYPE_VIRTUAL_CORES = 0, // Number of contexts to be used.
+    KNOB_TYPE_HYPERTHREADING, // Number of contexts to be used on each physical core.
+    KNOB_TYPE_MAPPING, // Mapping of threads on physical cores.
+    KNOB_TYPE_FREQUENCY,
+    KNOB_TYPE_NUM  // <---- This must always be the last value
+}KnobType;
 
 /// Possible contracts requested by the user.
 typedef enum{
@@ -119,25 +158,26 @@ typedef enum{
     // "A Probabilistic Graphical Model-based Approach for Minimizing
     // Energy Under Performance Constraints" - Mishra, Nikita and Zhang, Huazhe
     // and Lafferty, John D. and Hoffmann, Henry
-    STRATEGY_SELECTION_MISHRA
+    STRATEGY_SELECTION_MISHRA,
+
+	STRATEGY_SELECTION_NUM // <- Must always be the last.
 }StrategySelection;
 
 // Possible prediction strategies for performance. Can only be specified if the
 // selection strategy is "LEARNING".
 typedef enum{
     STRATEGY_PREDICTION_PERFORMANCE_AMDAHL = 0,
-    STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING,
     STRATEGY_PREDICTION_PERFORMANCE_USL,
-    STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING,
-    STRATEGY_PREDICTION_PERFORMANCE_MISHRA
+    STRATEGY_PREDICTION_PERFORMANCE_MISHRA,
+	STRATEGY_PREDICTION_PERFORMANCE_NUM // <- This must always be the last.
 }StrategyPredictionPerformance;
 
 // Possible prediction strategies for power consumption. Can only be specified
 // if the selection strategy is "LEARNING".
 typedef enum{
     STRATEGY_PREDICTION_POWER_LINEAR = 0,
-    STRATEGY_PREDICTION_POWER_LINEAR_MAPPING,
-    STRATEGY_PREDICTION_POWER_MISHRA
+    STRATEGY_PREDICTION_POWER_MISHRA,
+	STRATEGY_PREDICTION_POWER_NUM // <- This must always be the last.
 }StrategyPredictionPower;
 
 /// Possible ways to select the calibration points. Can only be specified if
@@ -201,15 +241,6 @@ typedef enum{
     // Coefficient of variation.
     STRATEGY_PERSISTENCE_VARIATION
 }StrategyPersistence;
-
-// Strategy to be applied when changing the number of cores.
-typedef enum{
-    // Changes the number of threads.
-    STRATEGY_CORES_RETHREADING = 0,
-
-    // Changes the mapping of the threads.
-    STRATEGY_CORES_REMAPPING
-}StrategyCoresChange;
 
 /// Possible parameters validation results.
 typedef enum{
@@ -457,6 +488,8 @@ typedef struct{
  */
 class Parameters{
 private:
+    bool _knobEnabled[KNOB_TYPE_NUM];
+
     /**
      * Sets default parameters
      */
@@ -548,12 +581,6 @@ private:
     ParametersValidation validateSelector();
 
     /**
-     * Validates the predictor.
-     * @return The result of the validation.
-     */
-    ParametersValidation validatePredictor();
-
-    /**
      * Loads the content of the parameters with the content
      * of an XML file.
      * @param fileName The name of the XML file.
@@ -605,9 +632,6 @@ public:
     // Persistence strategy [default = STRATEGY_PERSISTENCE_SAMPLES].
     StrategyPersistence strategyPersistence;
 
-    // Cores change strategy [default = STRATEGY_CORES_RETHREADING].
-    StrategyCoresChange strategyCoresChange;
-
     // Flag to enable/disable cores knobs [default = true].
     bool knobCoresEnabled;
 
@@ -616,6 +640,9 @@ public:
 
     // Flag to enable/disable frequency knob [default = true].
     bool knobFrequencyEnabled;
+
+    // Flag to enable/disable hyperthreading knob [default = false].
+    bool knobHyperthreadingEnabled;
 
     // Parameters for Mishra predictor.
     MishraParameters mishra;
@@ -761,7 +788,7 @@ public:
     // A vector containing the number of cores not allowed to be used.
     // E.g. if it contains the number 3, then the runtime will
     // never use  3 cores. It can only be specified when
-    // knobWorkers is different from KNOB_WORKERS_NO [default = empty].
+    // knobCoresEnabled is true [default = empty].
     std::vector<uint> disallowedNumCores;
 
     // If true, the manager will run on a physical core by itself.
@@ -807,6 +834,14 @@ public:
      * @return The validation result.
      */
     ParametersValidation validate();
+
+    /**
+     * Check if a specific knob is enabled.
+     * ATTENTION: Can only be called after validate().
+     * @param k The knob to check.
+     * @return true if the specified knob is enabled, false otherwise.
+     */
+    bool isKnobEnabled(KnobType k) const;
 };
 
 }

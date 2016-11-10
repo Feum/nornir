@@ -503,65 +503,6 @@ double PredictorLinearRegression::getInactivePowerParameter() const{
     }
 }
 
-/*************************************************/
-/*        PredictorLinearRegressionMapping       */
-/*************************************************/
-PredictorLinearRegressionMapping::PredictorLinearRegressionMapping(PredictorType type,
-                          const Parameters& p,
-                          const Configuration& configuration,
-                          const Smoother<MonitoredSample>* samples):
-            Predictor(type, p, configuration, samples){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        if(type == PREDICTION_BANDWIDTH){
-            _predictors[i] = new PredictorUsl(type, p, configuration, samples);
-        }else{
-            _predictors[i] = new PredictorLinearRegression(type, p, configuration, samples);
-        }
-    }
-}
-
-PredictorLinearRegressionMapping::~PredictorLinearRegressionMapping(){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        delete _predictors[i];
-    }
-}
-
-void PredictorLinearRegressionMapping::clear(){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        _predictors[i]->clear();
-    }
-}
-
-bool PredictorLinearRegressionMapping::readyForPredictions(){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        if(!_predictors[i]->readyForPredictions()){
-            return false;
-        }
-    }
-    return true;
-}
-
-void PredictorLinearRegressionMapping::refine(){
-    _predictors[(MappingType) _configuration.getRealValue(KNOB_TYPE_MAPPING)]->refine();
-}
-
-void PredictorLinearRegressionMapping::prepareForPredictions(){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        _predictors[i]->prepareForPredictions();
-    }
-}
-
-double PredictorLinearRegressionMapping::predict(const KnobsValues& configuration){
-    double realValue = 0.0;
-    if(configuration.areRelative()){
-        _configuration.getKnob(KNOB_TYPE_MAPPING)->getRealFromRelative(configuration[KNOB_TYPE_MAPPING], realValue);
-    }else{
-        realValue = configuration[KNOB_TYPE_MAPPING];
-    }
-    return _predictors[(MappingType) realValue]->predict(configuration);
-}
-
-
 /**************** PredictorUSL ****************/
 PredictorUsl::PredictorUsl(PredictorType type,
              const Parameters& p,
