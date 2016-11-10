@@ -637,7 +637,7 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
         case PREDICTION_POWER:{
             switch(p.strategyPredictionPower){
                 case STRATEGY_PREDICTION_POWER_LINEAR:{
-                	if(_p.knobMappingEnabled){
+                	if(p.knobMappingEnabled){
                 		predictor = new PredictorRegressionMapping<PredictorLinearRegression>(type, p, configuration, samples);
                 	}else{
                 		predictor = new PredictorLinearRegression(type, p, configuration, samples);
