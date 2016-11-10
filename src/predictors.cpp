@@ -596,11 +596,12 @@ void PredictorUsl::prepareForPredictions(){
         _y = gsl_vector_alloc(_xs.size());
         size_t i = 0, j = 0;
         for(i = 0; i < _xs.size(); i++) {
-            for(j = 0; j < POLYNOMIAL_DEGREE_USL; j++) {
-            	if(j == 0 && _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-            		continue; //To skip x^0 value.
+            for(j = 0; j < maxPolDegree; j++) {
+            	double degree = j;
+            	if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+            		degree += 1; //To skip x^0 value.
             	}
-                gsl_matrix_set(_x, i, j, pow(_xs.at(i), j));
+                gsl_matrix_set(_x, i, j, pow(_xs.at(i), degree));
             }
             gsl_vector_set(_y, i, _ys.at(i));
         }
