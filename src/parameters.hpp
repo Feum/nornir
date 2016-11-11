@@ -775,7 +775,7 @@ public:
     uint tolerableSamples;
 
     // Maximum size for the internal queues of the farm.
-    // If 0, nothing will be modified [default = 1].
+    // 0 corresponds to infinite size [default = 1].
     ulong qSize;
 
     // If different from zero:
