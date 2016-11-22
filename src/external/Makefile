@@ -20,7 +20,6 @@ endif
 
 clean:
 	$(MAKE) -C leo clean
-	$(MAKE) -C queues clean
 cleanall:
 	$(MAKE) -C leo cleanall
-	$(MAKE) -C queues cleanall
+

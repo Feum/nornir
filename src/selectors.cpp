@@ -347,7 +347,8 @@ bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
             // Concerning utilization factors, if both are suboptimal,
-            // we prefer the closest to the lower bound.
+            // we prefer the closest to the lower bound (preferring the one
+            // lower than lower bound).
             double distanceX, distanceY;
             distanceX = _p.underloadThresholdFarm - x;
             distanceY = _p.underloadThresholdFarm - y;
