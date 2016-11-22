@@ -180,7 +180,8 @@ protected:
      * - For ManagerExternal, it will be the execution time between the construction
      * of the Application object and the call of the 'terminate' function on it
      * (application side).
-     * - For ManagerBlackbox, it will be the execution time of the entire application.
+     * - For ManagerBlackBox, it will be the execution time from the point where
+     *   the manager is created to the end of the application.
      */
     virtual ulong getExecutionTime() = 0;
 
@@ -290,14 +291,13 @@ private:
     void updateWattsCorrection();
 };
 
-
 class ManagerExternal: public Manager{
 private:
     orlog::Monitor _monitor;
     pid_t _pid;
 public:
     /**
-     * Creates an adaptivity manager for an external application.
+     * Creates an adaptivity manager for an external INSTRUMENTED application.
      * @param orlogChannel The name of the Orlog channel.
      * @param adaptivityParameters The parameters to be used for
      * adaptivity decisions.
@@ -328,6 +328,33 @@ protected:
     void clean();
     ulong getExecutionTime();
 };
+
+class ManagerBlackBox: public Manager{
+private:
+    pid_t _pid;
+    double _startTime;
+    mammut::task::ProcessHandler* _process;
+public:
+    /**
+     * Creates an adaptivity manager for an external NON-INSTRUMENTED application.
+     * @param adaptivityParameters The parameters to be used for
+     * adaptivity decisions.
+     */
+    ManagerBlackBox(pid_t pid, Parameters adaptivityParameters);
+
+    /**
+     * Destroyes this adaptivity manager.
+     */
+    ~ManagerBlackBox();
+protected:
+    void waitForStart();
+    void askSample();
+    void getSample(orlog::ApplicationSample& sample);
+    void manageConfigurationChange();
+    void clean();
+    ulong getExecutionTime();
+};
+
 
 
 /*!

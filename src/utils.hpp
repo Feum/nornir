@@ -221,6 +221,13 @@ inline MonitoredSample squareRoot(const MonitoredSample& x){
     return r;
 }
 
+inline void zero(MonitoredSample& x){
+	x.watts = 0;
+	x.utilisation = 0;
+	x.bandwidth = 0;
+	x.latency = 0;
+}
+
 inline void regularize(MonitoredSample& x){
     if(x.watts < 0){x.watts = 0;}
     if(x.utilisation < 0){x.utilisation = 0;}
@@ -232,6 +239,10 @@ inline double squareRoot(const double& x){
     return x?sqrt(x):0;
 }
 
+inline void zero(double& x){
+	x = 0;
+}
+
 inline void regularize(double& x){
     if(x < 0){x = 0;}
 }
@@ -241,6 +252,7 @@ inline void regularize(double& x){
  * Requirement: There must exists the following functions:
  *   - 'T squareRoot(const T&)' to compute the square root.
  *   - 'void regularize(T&)' to set the values < 0 to zero.
+ *   - 'void zero(T&)' to set to zero.
  */
 template <typename T> class Smoother{
     template<typename V>
@@ -332,6 +344,15 @@ public:
     MovingAverageSimple(size_t span):_span(span), _nextIndex(0),
                                      _storedValues(0){
         _windowImpl.resize(_span);
+        zero(_lastSample);
+        zero(_oldAverage);
+        zero(_average);
+        zero(_oldTmpVariance);
+        zero(_tmpVariance);
+        zero(_oldVariance);
+        zero(_variance);
+        zero(_standardDeviation);
+        zero(_coefficientVariation);
     }
 
     double getSmoothingFactor() const{
@@ -434,6 +455,11 @@ public:
             throw std::runtime_error("Alpha must be between 0 and 1 "
                                      "(included)");
         }
+        zero(_lastSample);
+        zero(_average);
+        zero(_variance);
+        zero(_standardDeviation);
+        zero(_coefficientVariation);
     }
 
     double getSmoothingFactor() const{
