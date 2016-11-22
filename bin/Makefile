@@ -1,4 +1,4 @@
-TARGET               = manager-single manager-external
+TARGET               = manager-single manager-external manager-blackbox
 
 .PHONY: all clean cleanall
 
