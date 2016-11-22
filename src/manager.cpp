@@ -358,7 +358,7 @@ void Manager::lockKnobs() const{
         _configuration->getKnob(KNOB_TYPE_FREQUENCY)->lockToMax();
     }
     if(!_p.knobHyperthreadingEnabled){
-    	_configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
+        _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
     }
 }
 
@@ -593,8 +593,8 @@ ulong ManagerExternal::getExecutionTime(){
 }
 
 ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters adaptivityParameters):
-		Manager(adaptivityParameters), _pid(pid),
-		_startTime(getMillisecondsTime()), _process(NULL){
+        Manager(adaptivityParameters), _pid(pid),
+        _startTime(getMillisecondsTime()), _process(NULL){
     Manager::_configuration = new ConfigurationExternal(_p);
     lockKnobs();
     _configuration->createAllRealCombinations();
@@ -604,8 +604,8 @@ ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters adaptivityParameters):
     // Check supported contracts.
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
        _p.contractType == CONTRACT_PERF_BANDWIDTH ||
-	   _p.contractType == CONTRACT_PERF_UTILIZATION){
-    	throw std::runtime_error("ManagerBlackBox. Unsupported contract.");
+       _p.contractType == CONTRACT_PERF_UTILIZATION){
+        throw std::runtime_error("ManagerBlackBox. Unsupported contract.");
     }
 }
 
@@ -619,21 +619,21 @@ ManagerBlackBox::~ManagerBlackBox(){
 }
 
 void ManagerBlackBox::waitForStart(){
-	// Check that the process is active.
-	while(!(_process = _p.mammut.getInstanceTask()->getProcessHandler(_pid))){
-		;
-	}
+    // Check that the process is active.
+    while(!(_process = _p.mammut.getInstanceTask()->getProcessHandler(_pid))){
+        ;
+    }
 }
 void ManagerBlackBox::askSample(){
-	// We do not need to ask for black box.
-	;
+    // We do not need to ask for black box.
+    ;
 }
 
 void ManagerBlackBox::getSample(orlog::ApplicationSample& sample){
-	sample.bandwidthTotal = _process->getAndResetIPC();
-	sample.latency = -1; // Not used.
-	sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
-	sample.tasksCount = 0; // We do not know how many iterations have been performed.
+    sample.bandwidthTotal = _process->getAndResetIPC();
+    sample.latency = -1; // Not used.
+    sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
+    sample.tasksCount = 0; // We do not know how many iterations have been performed.
 }
 
 void ManagerBlackBox::manageConfigurationChange(){;}
@@ -641,7 +641,7 @@ void ManagerBlackBox::manageConfigurationChange(){;}
 void ManagerBlackBox::clean(){;}
 
 ulong ManagerBlackBox::getExecutionTime(){
-	return getMillisecondsTime() - _startTime;
+    return getMillisecondsTime() - _startTime;
 }
 
 }

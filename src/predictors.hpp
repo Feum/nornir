@@ -295,11 +295,11 @@ public:
                               const Parameters& p,
                               const Configuration& configuration,
                               const Smoother<MonitoredSample>* samples):
-                            	  Predictor(type, p, configuration, samples){
-    	for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-    		_predictors[i] = new P(type, p, configuration, samples);
-    	}
-	}
+                                  Predictor(type, p, configuration, samples){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            _predictors[i] = new P(type, p, configuration, samples);
+        }
+    }
 
     ~PredictorRegressionMapping(){
         for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
@@ -323,7 +323,7 @@ public:
     }
 
     void refine(){
-    	_predictors[(MappingType) _configuration.getRealValue(KNOB_TYPE_MAPPING)]->refine();
+        _predictors[(MappingType) _configuration.getRealValue(KNOB_TYPE_MAPPING)]->refine();
     }
 
     void prepareForPredictions(){
@@ -351,7 +351,7 @@ public:
 
 class PredictorUsl: public Predictor{
 private:
-	double _maxPolDegree;
+    double _maxPolDegree;
     std::vector<double> _xs;
     std::vector<double> _ys;
     gsl_multifit_linear_workspace *_ws;

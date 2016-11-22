@@ -222,10 +222,10 @@ inline MonitoredSample squareRoot(const MonitoredSample& x){
 }
 
 inline void zero(MonitoredSample& x){
-	x.watts = 0;
-	x.utilisation = 0;
-	x.bandwidth = 0;
-	x.latency = 0;
+    x.watts = 0;
+    x.utilisation = 0;
+    x.bandwidth = 0;
+    x.latency = 0;
 }
 
 inline void regularize(MonitoredSample& x){
@@ -240,7 +240,7 @@ inline double squareRoot(const double& x){
 }
 
 inline void zero(double& x){
-	x = 0;
+    x = 0;
 }
 
 inline void regularize(double& x){

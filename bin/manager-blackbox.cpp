@@ -50,23 +50,24 @@ using namespace nornir;
 #endif
 
 int main(int argc, char * argv[]){
-	if(argc < 3){
-		std::cerr << "Usage: " << argv[0] << " ParametersFile Executable [Args]" << std::endl;
-		return -1;
-	}
-	pid_t pid = fork();
-	if(pid){
-		// Manager
-		ManagerBlackBox m(pid, argv[1]);
-		m.start();
-		m.join();
-	}else{
-		// Application
-	    extern char** environ;
-		if(execve(argv[2], &(argv[2]), environ) == -1){
-			std::cerr << "Impossible to run the specified executable." << std::endl;
-			return -1;
-		}
-	}
+    if(argc < 3){
+        std::cerr << "Usage: " << argv[0] << " ParametersFile Executable [Args]" << std::endl;
+        return -1;
+    }
+    pid_t pid = fork();
+    if(pid){
+        // Manager
+        Parameters p(argv[1]);
+        ManagerBlackBox m(pid, &p);
+        m.start();
+        m.join();
+    }else{
+        // Application
+        extern char** environ;
+        if(execve(argv[2], &(argv[2]), environ) == -1){
+            std::cerr << "Impossible to run the specified executable." << std::endl;
+            return -1;
+        }
+    }
 }
 

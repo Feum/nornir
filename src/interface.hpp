@@ -468,9 +468,9 @@ public:
                 delete _farm->getCollector();
             }
         }
-	if(_manager){
-	    delete _manager;
-	}
+        if(_manager){
+            delete _manager;
+        }
     }
 
     /**

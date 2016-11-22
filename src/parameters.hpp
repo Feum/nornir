@@ -26,32 +26,32 @@
  *
  * Strategies used/developed for different papers:
  * - PDP2015:
- * 		strategySelection = STRATEGY_SELECTION_ANALYTICAL
- * 		knobMappingEnabled = false
- * 		(Actually was a simpler selection strategy than the current one).
- * 	- PPL2016:
- * 		strategySelection = STRATEGY_SELECTION_ANALYTICAL
- * 		knobMappingEnabled = false
+ *         strategySelection = STRATEGY_SELECTION_ANALYTICAL
+ *         knobMappingEnabled = false
+ *         (Actually was a simpler selection strategy than the current one).
+ *     - PPL2016:
+ *         strategySelection = STRATEGY_SELECTION_ANALYTICAL
+ *         knobMappingEnabled = false
  * - PDP2016:
- * 		strategySelection =  STRATEGY_SELECTION_LEARNING
- * 		strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_AMDAHL
- * 		strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
- * 		strategyExploration = (Many of them)
- * 		knobMappingEnabled = false
- * 	- TACO2016:
- * 		strategySelection = STRATEGY_SELECTION_LEARNING
- * 		strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_USL
- * 		strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
- * 		strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_LOWEST_FREQUENCY
- * 		strategyExploration = STRATEGY_EXPLORATION_HALTON
- * 		knobMappingEnabled = true
+ *         strategySelection =  STRATEGY_SELECTION_LEARNING
+ *         strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_AMDAHL
+ *         strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
+ *         strategyExploration = (Many of them)
+ *         knobMappingEnabled = false
+ *     - TACO2016:
+ *         strategySelection = STRATEGY_SELECTION_LEARNING
+ *         strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_USL
+ *         strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
+ *         strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_LOWEST_FREQUENCY
+ *         strategyExploration = STRATEGY_EXPLORATION_HALTON
+ *         knobMappingEnabled = true
  *
- * 		In addition to that, we also developed and compared with:
- * 			strategySelection = STRATEGY_SELECTION_MISHRA
- * 			strategySelection = STRATEGY_SELECTION_FULLSEARCH
- * 			strategySelection = STRATEGY_SELECTION_LIMARTINEZ
- * 		and also with
- *	 		knobMappingEnabled = false
+ *         In addition to that, we also developed and compared with:
+ *             strategySelection = STRATEGY_SELECTION_MISHRA
+ *             strategySelection = STRATEGY_SELECTION_FULLSEARCH
+ *             strategySelection = STRATEGY_SELECTION_LIMARTINEZ
+ *         and also with
+ *             knobMappingEnabled = false
  *
  */
 
@@ -160,7 +160,7 @@ typedef enum{
     // and Lafferty, John D. and Hoffmann, Henry
     STRATEGY_SELECTION_MISHRA,
 
-	STRATEGY_SELECTION_NUM // <- Must always be the last.
+    STRATEGY_SELECTION_NUM // <- Must always be the last.
 }StrategySelection;
 
 // Possible prediction strategies for performance. Can only be specified if the
@@ -168,9 +168,9 @@ typedef enum{
 typedef enum{
     STRATEGY_PREDICTION_PERFORMANCE_AMDAHL = 0,
     STRATEGY_PREDICTION_PERFORMANCE_USL,
-	STRATEGY_PREDICTION_PERFORMANCE_USLP, // <- More precise than USL but needs one additional calibration point.
+    STRATEGY_PREDICTION_PERFORMANCE_USLP, // <- More precise than USL but needs one additional calibration point.
     STRATEGY_PREDICTION_PERFORMANCE_MISHRA,
-	STRATEGY_PREDICTION_PERFORMANCE_NUM // <- This must always be the last.
+    STRATEGY_PREDICTION_PERFORMANCE_NUM // <- This must always be the last.
 }StrategyPredictionPerformance;
 
 // Possible prediction strategies for power consumption. Can only be specified
@@ -178,7 +178,7 @@ typedef enum{
 typedef enum{
     STRATEGY_PREDICTION_POWER_LINEAR = 0,
     STRATEGY_PREDICTION_POWER_MISHRA,
-	STRATEGY_PREDICTION_POWER_NUM // <- This must always be the last.
+    STRATEGY_PREDICTION_POWER_NUM // <- This must always be the last.
 }StrategyPredictionPower;
 
 /// Possible ways to select the calibration points. Can only be specified if

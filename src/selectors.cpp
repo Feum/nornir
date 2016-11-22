@@ -613,19 +613,19 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
         case PREDICTION_BANDWIDTH:{
             switch(p.strategyPredictionPerformance){
                 case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL:{
-                	if(p.knobMappingEnabled){
-                		predictor = new PredictorRegressionMapping<PredictorLinearRegression>(type, p, configuration, samples);
-                	}else{
-                		predictor = new PredictorLinearRegression(type, p, configuration, samples);
-                	}
+                    if(p.knobMappingEnabled){
+                        predictor = new PredictorRegressionMapping<PredictorLinearRegression>(type, p, configuration, samples);
+                    }else{
+                        predictor = new PredictorLinearRegression(type, p, configuration, samples);
+                    }
                 }break;
                 case STRATEGY_PREDICTION_PERFORMANCE_USL:
                 case STRATEGY_PREDICTION_PERFORMANCE_USLP:{
-                	if(p.knobMappingEnabled){
-                		predictor = new PredictorRegressionMapping<PredictorUsl>(type, p, configuration, samples);
-                	}else{
-                		predictor = new PredictorUsl(type, p, configuration, samples);
-                	}
+                    if(p.knobMappingEnabled){
+                        predictor = new PredictorRegressionMapping<PredictorUsl>(type, p, configuration, samples);
+                    }else{
+                        predictor = new PredictorUsl(type, p, configuration, samples);
+                    }
                 }break;
                 case STRATEGY_PREDICTION_PERFORMANCE_MISHRA:{
                     predictor = new PredictorMishra(type, p, configuration, samples);
@@ -638,11 +638,11 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
         case PREDICTION_POWER:{
             switch(p.strategyPredictionPower){
                 case STRATEGY_PREDICTION_POWER_LINEAR:{
-                	if(p.knobMappingEnabled){
-                		predictor = new PredictorRegressionMapping<PredictorLinearRegression>(type, p, configuration, samples);
-                	}else{
-                		predictor = new PredictorLinearRegression(type, p, configuration, samples);
-                	}
+                    if(p.knobMappingEnabled){
+                        predictor = new PredictorRegressionMapping<PredictorLinearRegression>(type, p, configuration, samples);
+                    }else{
+                        predictor = new PredictorLinearRegression(type, p, configuration, samples);
+                    }
                 }break;
                 case STRATEGY_PREDICTION_POWER_MISHRA:{
                     predictor = new PredictorMishra(type, p, configuration, samples);
@@ -673,7 +673,7 @@ SelectorLearner::SelectorLearner(const Parameters& p,
 
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
        _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-    	KnobsValues kv(KNOB_VALUE_RELATIVE);
+        KnobsValues kv(KNOB_VALUE_RELATIVE);
         // For the precise version of USL, we need to also take the bandwidth with
         // parallelism degree equal to one.
         if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
@@ -694,7 +694,7 @@ SelectorLearner::SelectorLearner(const Parameters& p,
         knobsFlags[KNOB_TYPE_VIRTUAL_CORES] = true;
     }else if((_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
               _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR)){
-    	// I only need to explore on virtual cores and frequency.
+        // I only need to explore on virtual cores and frequency.
         knobsFlags[KNOB_TYPE_VIRTUAL_CORES] = true;
         knobsFlags[KNOB_TYPE_FREQUENCY] = true;
     }else{
@@ -721,7 +721,7 @@ SelectorLearner::SelectorLearner(const Parameters& p,
     if(_p.knobMappingEnabled &&
        (_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
         _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
-	    _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP ||
+        _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP ||
         _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR)){
         _explorer = new ExplorerMultiple(knobsFlags, _explorer, KNOB_TYPE_MAPPING, MAPPING_TYPE_NUM);
     }

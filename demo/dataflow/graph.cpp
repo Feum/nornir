@@ -34,12 +34,12 @@ using namespace nornir::dataflow;
 class DemoInputStream: public nornir::dataflow::InputStream{
 private:
     size_t _currentElem;
-	size_t _streamSize;
-	bool _eos;
+    size_t _streamSize;
+    bool _eos;
 public:
     inline DemoInputStream(size_t streamSize):
-	        _currentElem(0), _streamSize(streamSize), _eos(false){
-	    srand(time(NULL));
+            _currentElem(0), _streamSize(streamSize), _eos(false){
+        srand(time(NULL));
     }
 
     inline void* next(){

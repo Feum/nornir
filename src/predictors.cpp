@@ -509,15 +509,15 @@ PredictorUsl::PredictorUsl(PredictorType type,
              const Configuration& configuration,
              const Smoother<MonitoredSample>* samples):
                     Predictor(type, p, configuration, samples),
-					_maxPolDegree(POLYNOMIAL_DEGREE_USL),
+                    _maxPolDegree(POLYNOMIAL_DEGREE_USL),
                     _ws(NULL), _x(NULL), _y(NULL), _chisq(0),
                     _preparationNeeded(true), _maxFreqBw(0), _minFreqBw(0),
-					_minFreqCoresBw(0){
+                    _minFreqCoresBw(0){
     if(type != PREDICTION_BANDWIDTH){
         throw std::runtime_error("PredictorUsl can only be used for bandwidth predictions.");
     }
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-    	_maxPolDegree -= 1; //To remove x^0 value.
+        _maxPolDegree -= 1; //To remove x^0 value.
     }
     _c = gsl_vector_alloc(_maxPolDegree);
     _cov = gsl_matrix_alloc(_maxPolDegree, _maxPolDegree);
@@ -550,22 +550,22 @@ void PredictorUsl::refine(){
         _maxFreqBw = bandwidth;
         return;
     }else if(frequency == _minFrequency){
-    	if(numCores == _maxCores){
-    		_minFreqBw = bandwidth;
-    	}else if(numCores == 1){
-    		_minFreqCoresBw = bandwidth;
-    	}
+        if(numCores == _maxCores){
+            _minFreqBw = bandwidth;
+        }else if(numCores == 1){
+            _minFreqCoresBw = bandwidth;
+        }
     }else if(frequency != _minFrequency){
         return;
     }
 
     double x, y;
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-    	x = numCores - 1;
-    	y = ((_minFreqCoresBw * numCores)/bandwidth) - 1;
+        x = numCores - 1;
+        y = ((_minFreqCoresBw * numCores)/bandwidth) - 1;
     }else{
-    	x = numCores - 1;
-    	y = numCores / bandwidth;
+        x = numCores - 1;
+        y = numCores / bandwidth;
     }
 
     // Checks if a y is already present for this x
@@ -596,10 +596,10 @@ void PredictorUsl::prepareForPredictions(){
         size_t i = 0, j = 0;
         for(i = 0; i < _xs.size(); i++) {
             for(j = 0; j < _maxPolDegree; j++) {
-            	double degree = j;
-            	if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-            		degree += 1; //To skip x^0 value.
-            	}
+                double degree = j;
+                if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+                    degree += 1; //To skip x^0 value.
+                }
                 gsl_matrix_set(_x, i, j, pow(_xs.at(i), degree));
             }
             gsl_vector_set(_y, i, _ys.at(i));
@@ -617,15 +617,15 @@ void PredictorUsl::prepareForPredictions(){
         gsl_multifit_linear_free(_ws);
         _preparationNeeded = false;
     }else{
-    	if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-    		std::cout << "B1Pred(actual): " << _minFreqCoresBw << std::endl;
+        if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+            std::cout << "B1Pred(actual): " << _minFreqCoresBw << std::endl;
             std::cout << "Contention: " << _coefficients[0] - _coefficients[1] << std::endl;
             std::cout << "Coherency: " << (double) _coefficients[1]/(_coefficients[0] - _coefficients[1]) << std::endl;
-    	}else{
+        }else{
             std::cout << "B1Pred: " << 1.0 / _coefficients[0] << std::endl;
             std::cout << "Contention: " << (_coefficients[1] - _coefficients[2])/((double) _coefficients[0]) << std::endl;
             std::cout << "Coherency: " << (double) _coefficients[2]/(_coefficients[1] - _coefficients[2]) << std::endl;
-    	}
+        }
     }
 }
 
@@ -646,9 +646,9 @@ double PredictorUsl::predict(const KnobsValues& configuration){
 
     double bandwidth;
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-    	bandwidth = (numCores * _minFreqCoresBw)/(result + 1);
+        bandwidth = (numCores * _minFreqCoresBw)/(result + 1);
     }else{
-    	bandwidth = (numCores / result);
+        bandwidth = (numCores / result);
     }
 
     if(frequency != _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()){
