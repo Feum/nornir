@@ -38,7 +38,7 @@
  *         strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
  *         strategyExploration = (Many of them)
  *         knobMappingEnabled = false
- *     - TACO2016:
+ * - TACO2016:
  *         strategySelection = STRATEGY_SELECTION_LEARNING
  *         strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_USL
  *         strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR

@@ -58,6 +58,8 @@ int main(int argc, char * argv[]){
     if(pid){
         // Manager
         Parameters p(argv[1]);
+        Observer o;
+        p.observer = &o;
         ManagerBlackBox m(pid, &p);
         m.start();
         m.join();

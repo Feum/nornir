@@ -630,7 +630,7 @@ void ManagerBlackBox::askSample(){
 }
 
 void ManagerBlackBox::getSample(orlog::ApplicationSample& sample){
-    sample.bandwidthTotal = _process->getAndResetIPC();
+    sample.bandwidthTotal = _process->getAndResetCycles();
     sample.latency = -1; // Not used.
     sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
     sample.tasksCount = 0; // We do not know how many iterations have been performed.

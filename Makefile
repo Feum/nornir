@@ -21,6 +21,10 @@ all:
 	$(MAKE) -C microbench checksupported
 clean: 
 	$(MAKE) -C src clean
+	$(MAKE) -C demo clean
+	$(MAKE) -C examples clean
+	$(MAKE) -C microbench clean
+	$(MAKE) -C bin clean
 demo:
 	$(MAKE) -C demo 
 	$(MAKE) -C examples
@@ -31,6 +35,7 @@ cleanall:
 	$(MAKE) -C demo cleanall
 	$(MAKE) -C examples cleanall
 	$(MAKE) -C microbench cleanall
+	$(MAKE) -C bin cleanall
 install:
 	$(MAKE) -C src install
 uninstall:
