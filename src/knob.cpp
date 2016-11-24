@@ -462,7 +462,11 @@ KnobMappingExternal::KnobMappingExternal(const Parameters& p,
 }
 
 void KnobMappingExternal::setPid(pid_t pid){
-    _processHandler = _p.mammut.getInstanceTask()->getProcessHandler(pid);
+    setProcessHandler(_p.mammut.getInstanceTask()->getProcessHandler(pid));
+}
+
+void KnobMappingExternal::setProcessHandler(task::ProcessHandler* processHandler){
+    _processHandler = processHandler;
 }
 
 void KnobMappingExternal::move(const vector<VirtualCore*>& vcOrder){

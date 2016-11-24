@@ -621,7 +621,7 @@ ManagerBlackBox::~ManagerBlackBox(){
 void ManagerBlackBox::waitForStart(){
     // We know for sure that when the Manager is created the process
     // already started.
-    ;
+    ((KnobMappingExternal*)_configuration->getKnob(KNOB_TYPE_MAPPING))->setProcessHandler(_process);
 }
 void ManagerBlackBox::askSample(){
     // We do not need to ask for black box.

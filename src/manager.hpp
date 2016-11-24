@@ -149,7 +149,8 @@ protected:
 #endif
 
     /**
-     * Wait for the application to start.
+     * Wait for the application to start and
+     * sets the ProcessHandler to KnobMappingExternal if necessary.
      */
     virtual void waitForStart() = 0;
 

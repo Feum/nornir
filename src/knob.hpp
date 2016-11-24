@@ -223,7 +223,7 @@ public:
                 const KnobHyperThreading& knobHyperThreading);
 
     void setPid(pid_t pid);
-
+    void setProcessHandler(mammut::task::ProcessHandler* processHandler);
     void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder);
 };
 
