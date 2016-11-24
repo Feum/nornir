@@ -592,9 +592,9 @@ ulong ManagerExternal::getExecutionTime(){
     return _monitor.getExecutionTime();
 }
 
-ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters adaptivityParameters):
-        Manager(adaptivityParameters), _pid(pid),
-        _startTime(getMillisecondsTime()), _process(NULL){
+ManagerBlackBox::ManagerBlackBox(mammut::task::ProcessHandler* process, Parameters adaptivityParameters):
+        Manager(adaptivityParameters), _process(process),
+        _startTime(getMillisecondsTime()), _lastTime(_startTime){
     Manager::_configuration = new ConfigurationExternal(_p);
     lockKnobs();
     _configuration->createAllRealCombinations();
@@ -619,10 +619,9 @@ ManagerBlackBox::~ManagerBlackBox(){
 }
 
 void ManagerBlackBox::waitForStart(){
-    // Check that the process is active.
-    while(!(_process = _p.mammut.getInstanceTask()->getProcessHandler(_pid))){
-        ;
-    }
+    // We know for sure that when the Manager is created the process
+    // already started.
+    ;
 }
 void ManagerBlackBox::askSample(){
     // We do not need to ask for black box.
@@ -630,10 +629,12 @@ void ManagerBlackBox::askSample(){
 }
 
 void ManagerBlackBox::getSample(orlog::ApplicationSample& sample){
-    sample.bandwidthTotal = _process->getAndResetCycles();
+    double now = getMillisecondsTime();
+    sample.bandwidthTotal = _process->getAndResetCycles() / (now - _lastTime);
     sample.latency = -1; // Not used.
     sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
     sample.tasksCount = 0; // We do not know how many iterations have been performed.
+    _lastTime = now;
 }
 
 void ManagerBlackBox::manageConfigurationChange(){;}

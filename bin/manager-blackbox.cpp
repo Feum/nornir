@@ -55,16 +55,23 @@ int main(int argc, char * argv[]){
         return -1;
     }
     pid_t pid = fork();
+    bool started = false, handlerCreated = false;;
     if(pid){
         // Manager
         Parameters p(argv[1]);
         Observer o;
         p.observer = &o;
-        ManagerBlackBox m(pid, &p);
+        while(!started){;}
+        ManagerBlackBox m(p.mammut.getInstanceTask()->getProcessHandler(pid), &p);
+        handlerCreated = true;
         m.start();
         m.join();
     }else{
         // Application
+        started = true;
+        // If the handler is not created, we would not catch the counters of
+        // the threads/processes created by this process
+        while(!handlerCreated){;}
         extern char** environ;
         if(execve(argv[2], &(argv[2]), environ) == -1){
             std::cerr << "Impossible to run the specified executable." << std::endl;

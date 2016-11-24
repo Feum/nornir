@@ -331,16 +331,18 @@ protected:
 
 class ManagerBlackBox: public Manager{
 private:
-    pid_t _pid;
     double _startTime;
     mammut::task::ProcessHandler* _process;
+    double _lastTime;
 public:
     /**
      * Creates an adaptivity manager for an external NON-INSTRUMENTED application.
+     * @param process The process handler. The process must already be running
+     * when this constructor is called.
      * @param adaptivityParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerBlackBox(pid_t pid, Parameters adaptivityParameters);
+    ManagerBlackBox(mammut::task::ProcessHandler* process, Parameters adaptivityParameters);
 
     /**
      * Destroyes this adaptivity manager.
