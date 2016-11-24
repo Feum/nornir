@@ -331,8 +331,8 @@ protected:
 
 class ManagerBlackBox: public Manager{
 private:
-    double _startTime;
     mammut::task::ProcessHandler* _process;
+    double _startTime;
     double _lastTime;
 public:
     /**

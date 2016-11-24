@@ -59,10 +59,10 @@ int main(int argc, char * argv[]){
     }
     pid_t pid = fork();
 
-    started = mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
-                   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    handlerCreated = mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
-                          MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    started = (bool*) mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
+                           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    handlerCreated = (bool*) mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
+                                  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     *started = false;
     *handlerCreated = false;
 
