@@ -115,9 +115,8 @@ protected:
 class KnobVirtualCores: public Knob{
 private:
     Parameters _p;
-    uint _plus;
 public:
-    KnobVirtualCores(Parameters p, uint plus = 0);
+    KnobVirtualCores(Parameters p);
     void changeValueReal(double v);
     void changeMax(double v);
 };

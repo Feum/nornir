@@ -251,6 +251,10 @@ typedef enum{
     // Generic error
     VALIDATION_NO,
 
+    // Some of the knobs enabled by the user is not supported
+    // by the selection algorithm he chosen.
+    VALIDATION_UNSUPPORTED_KNOBS,
+
     // Frequency can be changed by the operating system and the flag
     // "constant_tsc" is not present on the CPU. Accordingly, since we
     // realy on getticks() to perform measurements, the amount of ticks

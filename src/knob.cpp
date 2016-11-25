@@ -143,9 +143,9 @@ std::vector<double> Knob::getAllowedValues() const{
     return _knobValues;
 }
 
-KnobVirtualCores::KnobVirtualCores(Parameters p, uint plus):_p(p), _plus(plus){
+KnobVirtualCores::KnobVirtualCores(Parameters p):_p(p){
     std::vector<VirtualCore*> virtualCores = _p.mammut.getInstanceTopology()->getVirtualCores();
-    changeMax(virtualCores.size() - _plus);
+    changeMax(24 /*virtualCores.size()*/);
 }
 
 void KnobVirtualCores::changeValueReal(double v){;}
@@ -193,9 +193,8 @@ KnobVirtualCoresFarm::KnobVirtualCoresFarm(Parameters p,
                              ff::ff_gatherer* gt,
                              const std::vector<AdaptiveNode*> workers,
                              const volatile bool* terminated):
-                KnobVirtualCores(p, (emitter?1:0) + (collector?1:0)),
-        _emitter(emitter), _collector(collector),
-        _gt(gt), _allWorkers(workers), _terminated(terminated){
+            KnobVirtualCores(p), _emitter(emitter), _collector(collector),
+            _gt(gt), _allWorkers(workers), _terminated(terminated){
     _realValue = _allWorkers.size();
     _knobValues.clear();
     for(size_t i = 0; i < _allWorkers.size(); i++){

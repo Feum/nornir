@@ -32,6 +32,7 @@
 #include <iostream>
 #include <fstream>
 #include <sys/mman.h>
+#include <sys/wait.h>
 #include <stdlib.h>
 #include "../src/manager.hpp"
 
@@ -50,45 +51,53 @@ using namespace nornir;
 #define DEBUGB(x)
 #endif
 
-static bool *started, *handlerCreated;
+static volatile bool *started, *handlerCreated;
 
 int main(int argc, char * argv[]){
     if(argc < 3){
         std::cerr << "Usage: " << argv[0] << " ParametersFile Executable [Args]" << std::endl;
         return -1;
     }
-    pid_t pid = fork();
-
-    started = (bool*) mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
-                           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    handlerCreated = (bool*) mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
-                                  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    started = (volatile bool*) mmap(NULL, sizeof(volatile bool), PROT_READ | PROT_WRITE,
+                                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    handlerCreated = (volatile bool*) mmap(NULL, sizeof(volatile bool), PROT_READ | PROT_WRITE,
+                                           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     *started = false;
     *handlerCreated = false;
 
-    if(pid){
+    pid_t pid = fork();
+
+    if(pid == -1){
+        std::cerr << "Fork failed." << std::endl;
+        return -1;
+    }else if(pid){
         // Manager
         Parameters p(argv[1]);
         Observer o;
         p.observer = &o;
+        std::cout << "Waiting for start. " << std::endl;
         while(!*started){;}
+        std::cout << "Started." << std::endl;
+
         ManagerBlackBox m(p.mammut.getInstanceTask()->getProcessHandler(pid), p);
         *handlerCreated = true;
         m.start();
         m.join();
+        waitpid(pid, NULL, 0);
     }else{
         // Application
         *started = true;
         // If the handler is not created, we would not catch the counters of
         // the threads/processes created by this process
         while(!*handlerCreated){;}
-        munmap(started, sizeof(bool));
-        munmap(handlerCreated, sizeof(bool));
+        munmap((void*) started, sizeof(volatile bool));
+        munmap((void*) handlerCreated, sizeof(volatile bool));
         extern char** environ;
         if(execve(argv[2], &(argv[2]), environ) == -1){
             std::cerr << "Impossible to run the specified executable." << std::endl;
             return -1;
         }
+        return -1; // execve never returns (except in the error case above).
     }
 }
 

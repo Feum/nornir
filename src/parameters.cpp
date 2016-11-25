@@ -465,7 +465,7 @@ ParametersValidation Parameters::validateSelector(){
         // Check if the knob enabled can be managed by the selector specified.
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
             if(_knobEnabled[i] && !knobsSupportSelector[strategySelection][i]){
-                return VALIDATION_NO;
+                return VALIDATION_UNSUPPORTED_KNOBS;
             }
         }
     }else{
@@ -521,7 +521,7 @@ ParametersValidation Parameters::validateSelector(){
         for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
             if(_knobEnabled[i] && (!knobsSupportPerformance[strategyPredictionPerformance][i] ||
                                   !knobsSupportPower[strategyPredictionPower][i])){
-                return VALIDATION_NO;
+                return VALIDATION_UNSUPPORTED_KNOBS;
             }
         }
 

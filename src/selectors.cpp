@@ -253,6 +253,14 @@ SelectorPredictive::~SelectorPredictive(){
     ;
 }
 
+double SelectorPredictive::getRealBandwidth(double predicted) const{
+    if(_bandwidthIn->size()){
+        return min(predicted, _bandwidthIn->average());
+    }else{
+        return predicted;
+    }
+}
+
 double SelectorPredictive::getPrimaryPrediction(KnobsValues values){
     auto observation = _observedValues.find(getRealValues(_configuration, values));
 
@@ -277,11 +285,7 @@ double SelectorPredictive::getPrimaryPrediction(KnobsValues values){
                 _primaryPredictor->prepareForPredictions();
                 maxBandwidth = _primaryPredictor->predict(values);
             }
-            if(_p.strategySelection == STRATEGY_SELECTION_ANALYTICAL){
-                return maxBandwidth;
-            }else{
-                return min(maxBandwidth, _bandwidthIn->average());
-            }
+            return getRealBandwidth(maxBandwidth);
         }break;
         case CONTRACT_POWER_BUDGET:{
             if(observation != _observedValues.end()){
@@ -319,7 +323,7 @@ double SelectorPredictive::getSecondaryPrediction(KnobsValues values){
                 _secondaryPredictor->prepareForPredictions();
                 maxBandwidth = _secondaryPredictor->predict(values);
             }
-            return min(maxBandwidth, _bandwidthIn->average());
+            return getRealBandwidth(maxBandwidth);
         }break;
         default:{
             throw std::runtime_error("Unknown contract.");
