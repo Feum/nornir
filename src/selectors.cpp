@@ -443,7 +443,7 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
         _secondaryPredictions[combinations.at(i)] = secondaryPrediction;
 #endif
 
-        std::cout << currentValues << " " << primaryPrediction << " " << secondaryPrediction << std::endl;
+        //std::cout << currentValues << " " << primaryPrediction << " " << secondaryPrediction << std::endl;
         if(isFeasiblePrimaryValue(primaryPrediction, true)){
             if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
                 bestValues = currentValues;
