@@ -145,7 +145,7 @@ std::vector<double> Knob::getAllowedValues() const{
 
 KnobVirtualCores::KnobVirtualCores(Parameters p):_p(p){
     std::vector<VirtualCore*> virtualCores = _p.mammut.getInstanceTopology()->getVirtualCores();
-    changeMax(24 /*virtualCores.size()*/);
+    changeMax(virtualCores.size());
 }
 
 void KnobVirtualCores::changeValueReal(double v){;}
