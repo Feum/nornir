@@ -42,6 +42,7 @@
 #include <limits>
 #include <string>
 #include <stdlib.h>
+#include <sys/wait.h>
 
 #undef DEBUG
 #undef DEBUGB
@@ -628,9 +629,19 @@ void ManagerBlackBox::askSample(){
     ;
 }
 
+static bool isRunning(pid_t pid) {
+    return !waitpid(pid, NULL, WNOHANG);
+}
+
 void ManagerBlackBox::getSample(orlog::ApplicationSample& sample){
     double now = getMillisecondsTime();
-    sample.bandwidthTotal = _process->getAndResetCycles() / (now - _lastTime);
+    double cycles;
+    if(!isRunning(_process->getId())){
+        _terminated = true;
+        return;
+    }
+    _process->getAndResetCycles(cycles);
+    sample.bandwidthTotal = cycles / (now - _lastTime);
     sample.latency = -1; // Not used.
     sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
     sample.tasksCount = 0; // We do not know how many iterations have been performed.

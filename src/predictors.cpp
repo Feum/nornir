@@ -640,8 +640,14 @@ double PredictorUsl::predict(const KnobsValues& configuration){
         _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealFromRelative(configuration[KNOB_TYPE_VIRTUAL_CORES], numCores);
         _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealFromRelative(configuration[KNOB_TYPE_FREQUENCY], frequency);
     }
+    double exp;
     for(size_t i = 0; i < _coefficients.size(); i++){
-        result += _coefficients.at(i)*std::pow(numCores - 1, i);
+        exp = i;
+        if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+            // I do not have the constant factor b0*(x^0)
+            exp += 1;
+        }
+        result += _coefficients.at(i)*std::pow(numCores - 1, exp);
     }
 
     double bandwidth;

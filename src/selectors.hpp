@@ -257,6 +257,15 @@ public:
     virtual KnobsValues getNextKnobsValues(u_int64_t totalTasks) = 0;
 
     /**
+     * Given a prediction, returns the real predicted bandwidth, i.e.
+     * the minimum between the prediction and the input bandwidth.
+     * @param prediction The predicted bandwidth.
+     * @return The real predicted bandwidth, i.e.
+     * the minimum between the prediction and the input bandwidth.
+     */
+    double getRealBandwidth(double predicted) const;
+
+    /**
      * Return the primary prediction for a given configuration.
      * @param values The knobs values.
      * @return The primary prediction for a given configuration.
