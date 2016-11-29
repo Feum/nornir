@@ -4,7 +4,9 @@
  * Created on: 21/06/2016
  *
  * This executable starts a manager which can monitor applications not written
- * with the Nornir framework.
+ * with the Nornir framework. Albeit more of such applications can run concurrently,
+ * no coordination between them is provided. The result may thus be inconsistent.
+ * Please use this binary to control at most one application at a time.
  *
  * =========================================================================
  *  Copyright (C) 2015-, Daniele De Sensi (d.desensi.software@gmail.com)

@@ -593,6 +593,11 @@ ulong ManagerExternal::getExecutionTime(){
     return _monitor.getExecutionTime();
 }
 
+ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters adaptivityParameters):
+    ManagerBlackBox(adaptivityParameters.mammut.getInstanceTask()->getProcessHandler(pid), adaptivityParameters){
+    ;
+}
+
 ManagerBlackBox::ManagerBlackBox(mammut::task::ProcessHandler* process, Parameters adaptivityParameters):
         Manager(adaptivityParameters), _process(process),
         _startTime(getMillisecondsTime()), _lastTime(_startTime){

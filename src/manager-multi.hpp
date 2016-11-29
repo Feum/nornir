@@ -44,7 +44,6 @@ private:
     // Mammut handlers.
     mammut::Mammut _m;
     mammut::topology::Topology* _topology;
-    mammut::cpufreq::CpuFreq* _cpufreq;
     // Queue between the external world and the global manager.
     ff::SWSR_Ptr_Buffer _qIn;
     // Queue between the global manager and the external world.

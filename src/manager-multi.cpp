@@ -56,7 +56,6 @@ ManagerMulti::ManagerMulti():_qIn(10), _qOut(10){
     _qIn.init();
     _qOut.init();
     _topology = _m.getInstanceTopology();
-    _cpufreq = _m.getInstanceCpuFreq();
     vector<PhysicalCore*> allPc = _topology->getPhysicalCores();
     for(size_t i = 0; i < allPc.size(); i++){
         _allCores.push_back(allPc.at(i)->getPhysicalCoreId());

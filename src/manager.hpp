@@ -338,6 +338,14 @@ private:
 public:
     /**
      * Creates an adaptivity manager for an external NON-INSTRUMENTED application.
+     * @param pid The identifier of an already running process.
+     * @param adaptivityParameters The parameters to be used for
+     * adaptivity decisions.
+     */
+    ManagerBlackBox(pid_t pid, Parameters adaptivityParameters);
+
+    /**
+     * Creates an adaptivity manager for an external NON-INSTRUMENTED application.
      * @param process The process handler. The process must already be running
      * when this constructor is called.
      * @param adaptivityParameters The parameters to be used for

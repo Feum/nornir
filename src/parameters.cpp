@@ -341,7 +341,7 @@ ParametersValidation Parameters::validateKnobFrequencies(){
 
     if(knobFrequencyEnabled && !(isGovernorAvailable(GOVERNOR_USERSPACE) &&
          availableFrequencies.size())){
-        knobFrequencyEnabled = false;
+        return VALIDATION_NO_MANUAL_DVFS;
     }
 
     for(size_t i = 0; i < virtualCores.size(); i++){
@@ -353,7 +353,7 @@ ParametersValidation Parameters::validateKnobFrequencies(){
     if(fastReconfiguration &&
        (!isHighestFrequencySettable() ||
          strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_NONE)){
-        fastReconfiguration = false;
+        return VALIDATION_NO_FAST_RECONF;
     }
 
     if(mammut.getInstanceCpuFreq()->isBoostingSupported()){

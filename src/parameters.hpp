@@ -255,6 +255,13 @@ typedef enum{
     // by the selection algorithm he chosen.
     VALIDATION_UNSUPPORTED_KNOBS,
 
+    // On this architecture is not possible to manually change
+    // the frequency.
+    VALIDATION_NO_MANUAL_DVFS,
+
+    // On this architecture fast reconfiguration is not available.
+    VALIDATION_NO_FAST_RECONF,
+
     // Frequency can be changed by the operating system and the flag
     // "constant_tsc" is not present on the CPU. Accordingly, since we
     // realy on getticks() to perform measurements, the amount of ticks

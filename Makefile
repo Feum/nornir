@@ -4,11 +4,11 @@ export NORNIR_PATH_INCLUDE   = $(NORNIR_PATH)/include/nornir
 
 export CC                    = gcc
 export CXX                   = g++ 
-export OPTIMIZE_FLAGS        = -finline-functions  -O3 #-DPOOL
+export OPTIMIZE_FLAGS        = -finline-functions -O3 #-DPOOL
 export DEBUG_FLAGS           = #-DDEBUG_PREDICTORS -DDEBUG_SELECTORS #-DDEBUG_DF_STREAM -DDEBUG_NODE -DDEBUG_KNOB -DDEBUG_MANAGER
 export CXXFLAGS              = -Wall -pedantic --std=c++11 $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
 export LDLIBS                =  -lnornir -pthread -lrt -lm -lmlpack -llapack -lblas -lgsl -lgslcblas -larmadillo -lorlog -lanl
-export INCS                  = -I$(realpath ./src/external/fastflow) -I/usr/include/libxml2
+export INCS                  = -I$(realpath ./src/external/fastflow) -I$(realpath ./src/external/tclap-1.2.1/include) -I/usr/include/libxml2
 export LDFLAGS               = -L$(realpath .)/src -L$(realpath .)/src/external/orlog/src
 
 .PHONY: all demo clean cleanall install uninstall microbench bin
