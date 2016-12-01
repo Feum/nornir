@@ -196,6 +196,10 @@ void Manager::run(){
     }
 }
 
+void Manager::terminate(){
+    _terminated = true;
+}
+
 void Manager::inhibit(){
     _inhibited = true;
 }
@@ -635,7 +639,7 @@ void ManagerBlackBox::askSample(){
 }
 
 static bool isRunning(pid_t pid) {
-    return !waitpid(pid, NULL, WNOHANG);
+    return !kill(pid, 0);
 }
 
 void ManagerBlackBox::getSample(orlog::ApplicationSample& sample){

@@ -94,6 +94,11 @@ public:
      * ATTENTION: The user must not call this one but 'start()'.
      */
     void run();
+
+    /** 
+     * Forces the manager to terminate.
+     **/
+    void terminate();
 protected:
     // Flag for checking farm termination.
     volatile bool _terminated;

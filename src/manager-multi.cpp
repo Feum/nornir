@@ -333,7 +333,8 @@ void ManagerMulti::run(){
             // New manager.
             assert(m->_p.contractType == CONTRACT_PERF_BANDWIDTH ||
                    m->_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
-                   m->_p.contractType == CONTRACT_PERF_UTILIZATION);
+                   m->_p.contractType == CONTRACT_PERF_UTILIZATION ||
+                   m->_p.contractType == CONTRACT_NONE);
 
             assert(m->_p.strategySelection == STRATEGY_SELECTION_LEARNING);
             assert(m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||

@@ -66,14 +66,20 @@ typedef struct ScheduledProgram{
 }ScheduledProgram;
 
 std::ostream& operator <<(std::ostream& os, const ScheduledProgram& instance){
-    os << "Starts at: " << instance.start << std::endl;
-    os << "Parameters: " << instance.parametersFile << std::endl;
-    os << "Program: ";
+    os << "Starts at: [" << instance.start << "] ";
+    os << "Parameters: [" << instance.parametersFile << "] ";
+    os << "Program: [";
     for(size_t i = 0; i < instance.program.size(); i++){
         os << instance.program[i] << " ";
     }
-    os << std::endl;
+    os << "]";
     return os;
+}
+
+static std::string pidToString(pid_t pid){
+    stringstream out;
+    out << pid;
+    return out.str();
 }
 
 int main(int argc, char * argv[]){
@@ -92,8 +98,16 @@ int main(int argc, char * argv[]){
                                                   "the following syntax:\n"
                                                   "StartTime ParametersFile ProgramPath ProgramArguments\n"
                                                   "The start time is a relative offset starting from the start of this "
-                                                  "executable.", false, "", "string", cmd);
+                                                  "executable. The lines must be sorted increasly by start time.", 
+                                                  false, "", "string", cmd);
         cmd.parse(argc, argv);
+
+#if 1
+        if(pidFlag.getValue().size()){
+            std::cerr << "[ERROR] -p not still supported (due to problems in reading performance counters for non-child processes." << std::endl;
+            return -1;
+        }
+#endif
 
         /* Validate parameters. */
         if(!pidFlag.getValue().size() &&
@@ -128,6 +142,7 @@ int main(int argc, char * argv[]){
             DEBUG("Read schedule: " << sp);
             scheduledPrograms.push_back(sp);
         }
+        scheduleFile.close();
     }catch (TCLAP::ArgException &e){
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
         return -1;
@@ -138,15 +153,24 @@ int main(int argc, char * argv[]){
     if(pids.size() + scheduledPrograms.size() > 1){
         multiManagerNeeded = true;
         mm.start();
+        DEBUG("Multi manager started.");
     }
 
     /* First we add the already running pid. */
     for(size_t i = 0; i < pids.size(); i++){
-        ManagerBlackBox* m = new ManagerBlackBox(pids.at(i), pidsParameters.at(i));
+        Parameters p(pidsParameters.at(i));
+        std::string logPrefix = pidToString(pids.at(i));
+        Observer o(logPrefix + "_stats.csv",
+                   logPrefix + "_calibration.csv",
+                   logPrefix + "_summary.csv");
+        p.observer = &o;
+        ManagerBlackBox* m = new ManagerBlackBox(pids.at(i), p);
         if(multiManagerNeeded){
             mm.addManager(m);
+            DEBUG("Added PID: " << pids.at(i) << " to the multimanager.");
         }else{
             m->start();
+            DEBUG("Started PID: " << pids.at(i));
             m->join();
             delete m;
         }
@@ -166,8 +190,9 @@ int main(int argc, char * argv[]){
         sleep(sp.start - lastStart);
         lastStart = sp.start;
 
-        handlerCreated = (volatile bool*) mmap(NULL, sizeof(volatile bool), PROT_READ | PROT_WRITE,
-                                          MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        void* mmem = (void*) mmap(NULL, sizeof(ManagerBlackBox), PROT_READ | PROT_WRITE,
+                                  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
         pid_t pid = fork();
         if(pid == -1){
             std::cerr << "Fork failed." << std::endl;
@@ -175,17 +200,17 @@ int main(int argc, char * argv[]){
         }else if(pid){
             /* Father - Manager. */
             sp.pid = pid;
+            while(!*started){;}
             Parameters p(sp.parametersFile);
-            string s;
             stringstream out;
-            out << pid;
-            std::string logPrefix = out.str() + "_" + sp.program.at(0);
+            out << sp.start;
+            std::string logPrefix = out.str() + "_" + mammut::utils::split(sp.program.at(0), '/').back();
             Observer o(logPrefix + "_stats.csv",
                        logPrefix + "_calibration.csv",
                        logPrefix + "_summary.csv");
             p.observer = &o;
             while(!*started){;}
-            ManagerBlackBox* m = new ManagerBlackBox(p.mammut.getInstanceTask()->getProcessHandler(pid), p);
+            ManagerBlackBox* m = new (mmem) ManagerBlackBox(p.mammut.getInstanceTask()->getProcessHandler(pid), p);
             *handlerCreated = true;
             if(multiManagerNeeded){
                 mm.addManager(m);
@@ -195,42 +220,52 @@ int main(int argc, char * argv[]){
                 m->start();
                 m->join();
                 waitpid(pid, NULL, 0);
-                delete m;
+                m->~ManagerBlackBox(); // Because created with placement new
             }
+            DEBUG("Started scheduled: " << sp.program[0] << " with pid " << pid);
         }else{
             /* Child - Application */
             *started = true;
             // If the handler is not created, we would not catch the counters of
             // the threads/processes created by this process
             while(!*handlerCreated){;}
+            extern char** environ;
+            char** arguments = new char*[sp.program.size() + 1];
+            for(size_t i = 0; i < sp.program.size(); i++){
+                arguments[i] = new char[sp.program[i].size() + 1];
+                strcpy(arguments[i], sp.program[i].c_str());
+            }
+            arguments[sp.program.size()] = NULL;
+            DEBUG("Running program " << sp.program[0]);
             /* Resets flag for next scheduled application. */
             *started = false;
             *handlerCreated = false;
-            extern char** environ;
-            char** arguments = new char*[sp.program.size() - 1];
-            for(size_t i = 1; i < sp.program.size(); i++){
-                arguments[i - 1] = new char[sp.program[i].size() + 1];
-                strcpy(arguments[i - 1], sp.program[i].c_str());
-            }
-            if(execve(sp.program[0].c_str(), arguments, environ) == -1){
-                std::cerr << "Impossible to run the specified executable." << std::endl;
+            if(execve(arguments[0], arguments, environ) == -1){
+                std::cerr << "Impossible to run the specified executable. Terminating the manager." << std::endl;
+                ((ManagerBlackBox*) mmem)->terminate();
                 return -1;
             }
             return -1; // execve never returns (except in the error case above).
         }
     }
 
+    DEBUG("All specified programs have been added to the monitoring system. Waiting for their termination...");
     /* All programs scheduled, now wait for termination and clean. */
-    for(size_t i = 0; i < pids.size() + scheduledPrograms.size(); i++){
-        Manager* m;
-        while((m = mm.getTerminatedManager()) == NULL){
-            sleep(1);
-        }
-        if(multiManagerNeeded){
-            delete m;
-        }
-    }
     if(multiManagerNeeded){
+        for(size_t i = 0; i < pids.size() + scheduledPrograms.size(); i++){
+            Manager* m;
+            while((m = mm.getTerminatedManager()) == NULL){
+                sleep(1);
+            }
+            DEBUG("One program terminated.");
+            // TODO:
+            //if(scheduledProgram(pid)){
+            //    m->~ManagerBlackBox(); // Because we used placement new
+            //}else{
+            //    delete m;
+            //}
+        }
+    
         for(size_t i = 0; i < scheduledPrograms.size(); i++){
             waitpid(scheduledPrograms[i].pid, NULL, 0);
         }
