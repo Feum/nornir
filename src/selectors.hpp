@@ -68,6 +68,13 @@ protected:
     bool isFeasiblePrimaryValue(double value, bool conservative) const;
 
     /**
+     * Checks if the current configuration is the most performing one.
+     * @return true if the current configuration is the most performing one,
+     *         false otherwise.
+     */
+    virtual bool isMaxPerformanceConfiguration() const = 0;
+
+    /**
      * Checks if the contract is violated.
      * @return true if the contract has been violated, false otherwise.
      */
@@ -176,6 +183,8 @@ private:
     std::unique_ptr<Predictor> _primaryPredictor;
     std::unique_ptr<Predictor> _secondaryPredictor;
     bool _feasible;
+    KnobsValues _maxPerformanceConfiguration;
+    double _maxPerformance;
     // Association between REAL values and observed data.
     std::map<KnobsValues, MonitoredSample> _observedValues;
     std::map<KnobsValues, double> _primaryPredictions;
@@ -197,6 +206,15 @@ private:
 protected:
     double _primaryPrediction;
     double _secondaryPrediction;
+
+    /**
+     * Updates the most performing configuration considering the predictions
+     * made for a new configuration.
+     * @param values The values of the new configuration.
+     * @param primaryValue The primary predicted value.
+     * @param secondaryValue The secondary predicted value.
+     */
+    void updateMaxPerformanceConfiguration(KnobsValues values, double primaryValue, double secondaryValue);
 
     /**
      * Computes the best relative knobs values for the farm.
@@ -239,6 +257,8 @@ protected:
      * Clears the predictors.
      */
     void clearPredictors();
+
+    bool isMaxPerformanceConfiguration() const;
 public:
     SelectorPredictive(const Parameters& p,
                        const Configuration& configuration,
@@ -416,10 +436,13 @@ private:
     KnobsValues _optimalKv;
     bool _improved;
     std::vector<double> _allowedCores;
+    bool _optimalFound;
 
     mammut::cpufreq::Frequency findNearestFrequency(mammut::cpufreq::Frequency f) const;
     void goRight();
     void goLeft();
+protected:
+    bool isMaxPerformanceConfiguration() const;
 public:
     SelectorLiMartinez(const Parameters& p,
                          const Configuration& configuration,

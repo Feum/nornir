@@ -99,6 +99,10 @@ typedef enum{
     // the configuration with minimum energy consumption is chosen.
     CONTRACT_PERF_COMPLETION_TIME,
 
+    // The maximum bandwidth is requested. No considerations about power consumption
+    // will be done.
+    CONTRACT_PERF_MAX,
+
     // A specific maximum cores power is requested. Under this constraint, the
     // configuration with best performance is chosen.
     CONTRACT_POWER_BUDGET

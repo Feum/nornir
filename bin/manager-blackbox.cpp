@@ -54,26 +54,33 @@ using namespace nornir;
 #endif
 
 static volatile bool *started, *handlerCreated;
-
 struct ScheduledProgram;
 
 typedef struct ScheduledProgram{
     friend std::ostream& operator <<(std::ostream& os, const ScheduledProgram& instance);
     double start;
-    std::string parametersFile;
+    double minPerfRequired;
     std::vector<std::string> program;
     pid_t pid;
 }ScheduledProgram;
 
 std::ostream& operator <<(std::ostream& os, const ScheduledProgram& instance){
     os << "Starts at: [" << instance.start << "] ";
-    os << "Parameters: [" << instance.parametersFile << "] ";
+    os << "Minimum performance required: [" << instance.minPerfRequired << "] ";
     os << "Program: [";
     for(size_t i = 0; i < instance.program.size(); i++){
         os << instance.program[i] << " ";
     }
     os << "]";
     return os;
+}
+
+void initializeParameters(Parameters& p){
+    p.contractType = CONTRACT_PERF_MAX;
+    p.samplingIntervalCalibration = 100;
+    p.samplingIntervalSteady = 1000;
+    p.strategySelection = STRATEGY_SELECTION_LEARNING;
+    p.strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_USLP;
 }
 
 static std::string pidToString(pid_t pid){
@@ -84,60 +91,72 @@ static std::string pidToString(pid_t pid){
 
 int main(int argc, char * argv[]){
     std::vector<long> pids;
-    std::vector<std::string> pidsParameters;
+    std::vector<double> pidPerfs;
     std::vector<ScheduledProgram> scheduledPrograms;
+    std::string logDir;
+    double powerCap;
     try {
         TCLAP::CmdLine cmd("Runs Nornir on already existing processes, coordinating "
                            "their requirements. It is also possible to specify new "
                            "programs to be ran. One parameter between --pid or "
                            "--schedule must be specified.", ' ', "1.0");
-        TCLAP::MultiArg<long> pidFlag("p", "pid", "PID of a running process.", false, "long", cmd);
-        TCLAP::MultiArg<std::string> parametersFlag("r", "parameters", "Parameters for a running process.", false, "string", cmd);
-        TCLAP::ValueArg<std::string> scheduleFlag("s", "schedule", "Name of the file containing the schedule of "
+        TCLAP::ValueArg<std::string> logArg("l", "logdir", "Directory where the log files will be stored. (default = ./logs)", false, "./logs/", "string", cmd);
+        TCLAP::ValueArg<double> capArg("c", "cap", "Power cap, expressed in watts. If 0, no power cap will "
+                                       "be applied and we will just maximise performance for each submitted "
+                                       "application. (default = 0).", false, 0, "double", cmd);
+        TCLAP::MultiArg<long> pidArg("p", "pid", "PID of a running process.", false, "long", cmd);
+        TCLAP::MultiArg<double> perfArg("m", "minperf", "Minimum performance required (one value for each PID, in the same "
+                                     "order. It is expressed as a percentage of the maximum achievable performance. For "
+                                     "example, a value of 80 means that we would like to do not decrease the performance "
+                                     "of the application below the 80% of its maximum. 0 means no specific requirement.",
+                                     false, "double", cmd);
+        TCLAP::ValueArg<std::string> scheduleArg("s", "schedule", "Name of the file containing the schedule of "
                                                   "the programs to be run. The file has multiple lines, each one with "
                                                   "the following syntax:\n"
-                                                  "StartTime ParametersFile ProgramPath ProgramArguments\n"
+                                                  "StartTime MinPerformanceRequired ProgramPath ProgramArguments\n"
                                                   "The start time is a relative offset starting from the start of this "
-                                                  "executable. The lines must be sorted increasly by start time.", 
+                                                  "executable.\n"
+                                                  "MinPerformanceRequired is a value in the range [0, 100] "
+                                                  "representing the minimum required performance, expressed as a percentage "
+                                                  "of the maximum achievable performance. For example, a value of 80 means "
+                                                  "that we would like to do not decrease the performance of the application "
+                                                  "below the 80% of its maximum. 0 means no specific requirement.\n"
+                                                  "The lines must be sorted increasingly by start time.",
                                                   false, "", "string", cmd);
         cmd.parse(argc, argv);
 
-#if 1
-        if(pidFlag.getValue().size()){
-            std::cerr << "[ERROR] -p not still supported (due to problems in reading performance counters for non-child processes." << std::endl;
-            return -1;
-        }
-#endif
-
         /* Validate parameters. */
-        if(!pidFlag.getValue().size() &&
-           !scheduleFlag.getValue().compare("")){
+        if(!pidArg.getValue().size() &&
+           !scheduleArg.getValue().compare("")){
             std::cerr << "[ERROR] One between --run, --pid or --schedule must be specified." << std::endl;
             return -1;
         }
 
-        if(pidFlag.getValue().size() !=
-           parametersFlag.getValue().size()){
-            std::cerr << "[ERROR] Number of pids and number of specified parameters must be equal." << std::endl;
+        if(pidArg.getValue().size() !=
+           perfArg.getValue().size()){
+            std::cerr << "[ERROR] You must specify one minimum performance requirement for each pid." << std::endl;
             return -1;
         }
 
+        logDir = logArg.getValue();
+        powerCap = capArg.getValue();
+        pids = pidArg.getValue();
+        pidPerfs = perfArg.getValue();
         /* Load schedule. */
-        pids = pidFlag.getValue();
-        pidsParameters = parametersFlag.getValue();
-        std::ifstream scheduleFile(scheduleFlag.getValue());
+        std::ifstream scheduleFile(scheduleArg.getValue());
         std::string line;
         while(std::getline(scheduleFile, line)){
             std::vector<std::string> fields;
             fields = mammut::utils::split(line, ' ');
             if(fields.size() < 3){
                 std::cerr << "Invalid scheduled line: " << line << ". You must at least "
-                             "specify the scheduled time, parameters file and program name." << std::endl;
+                             "specify the scheduled time, minimum performance required "
+                             "and program name." << std::endl;
                 return -1;
             }
             ScheduledProgram sp;
             sp.start = mammut::utils::stringToDouble(fields[0]);
-            sp.parametersFile = fields[1];
+            sp.minPerfRequired = mammut::utils::stringToDouble(fields[1]);
             sp.program = std::vector<std::string>(fields.begin() + 2, fields.end());
             DEBUG("Read schedule: " << sp);
             scheduledPrograms.push_back(sp);
@@ -148,7 +167,7 @@ int main(int argc, char * argv[]){
         return -1;
     }
 
-    ManagerMulti mm;
+    ManagerMulti mm(powerCap);
     bool multiManagerNeeded = false;
     if(pids.size() + scheduledPrograms.size() > 1){
         multiManagerNeeded = true;
@@ -158,16 +177,18 @@ int main(int argc, char * argv[]){
 
     /* First we add the already running pid. */
     for(size_t i = 0; i < pids.size(); i++){
-        Parameters p(pidsParameters.at(i));
-        std::string logPrefix = pidToString(pids.at(i));
+        Parameters p;
+        initializeParameters(p);
+        std::string logPrefix = logDir + "/" + pidToString(pids.at(i));
         Observer o(logPrefix + "_stats.csv",
                    logPrefix + "_calibration.csv",
                    logPrefix + "_summary.csv");
         p.observer = &o;
         ManagerBlackBox* m = new ManagerBlackBox(pids.at(i), p);
         if(multiManagerNeeded){
-            mm.addManager(m);
-            DEBUG("Added PID: " << pids.at(i) << " to the multimanager.");
+            mm.addManager(m, pidPerfs.at(i));
+            DEBUG("Added PID: " << pids.at(i) <<
+                  " to the multimanager with minPerf " << pidPerfs.at(i));
         }else{
             m->start();
             DEBUG("Started PID: " << pids.at(i));
@@ -201,19 +222,20 @@ int main(int argc, char * argv[]){
             /* Father - Manager. */
             sp.pid = pid;
             while(!*started){;}
-            Parameters p(sp.parametersFile);
+            Parameters p;
+            initializeParameters(p);
             stringstream out;
             out << sp.start;
-            std::string logPrefix = out.str() + "_" + mammut::utils::split(sp.program.at(0), '/').back();
+            std::string logPrefix = logDir + "/" + out.str() + "_" + mammut::utils::split(sp.program.at(0), '/').back();
             Observer o(logPrefix + "_stats.csv",
                        logPrefix + "_calibration.csv",
                        logPrefix + "_summary.csv");
             p.observer = &o;
             while(!*started){;}
-            ManagerBlackBox* m = new (mmem) ManagerBlackBox(p.mammut.getInstanceTask()->getProcessHandler(pid), p);
+            ManagerBlackBox* m = new (mmem) ManagerBlackBox(pid, p);
             *handlerCreated = true;
             if(multiManagerNeeded){
-                mm.addManager(m);
+                mm.addManager(m, sp.minPerfRequired);
                 // Wait for the child to reset the flags.
                 while(*handlerCreated){;}
             }else{
@@ -253,17 +275,16 @@ int main(int argc, char * argv[]){
     /* All programs scheduled, now wait for termination and clean. */
     if(multiManagerNeeded){
         for(size_t i = 0; i < pids.size() + scheduledPrograms.size(); i++){
-            Manager* m;
+            ManagerBlackBox* m;
             while((m = mm.getTerminatedManager()) == NULL){
                 sleep(1);
             }
             DEBUG("One program terminated.");
-            // TODO:
-            //if(scheduledProgram(pid)){
-            //    m->~ManagerBlackBox(); // Because we used placement new
-            //}else{
-            //    delete m;
-            //}
+            if(mammut::utils::contains(pids, (long) m->getPid())){
+                delete m;
+            }else{
+                m->~ManagerBlackBox(); // Because we used placement new
+            }
         }
     
         for(size_t i = 0; i < scheduledPrograms.size(); i++){

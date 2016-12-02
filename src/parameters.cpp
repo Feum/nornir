@@ -396,6 +396,9 @@ ParametersValidation Parameters::validateContract(){
                 return VALIDATION_WRONG_CONTRACT_PARAMETERS;
             }
         }break;
+        case CONTRACT_PERF_MAX:{
+            ;
+        }break;
         case CONTRACT_POWER_BUDGET:{
             if(powerBudget <= 0 ||
                strategySelection == STRATEGY_SELECTION_ANALYTICAL ||
@@ -552,6 +555,7 @@ template<> char const* enumStrings<ContractType>::data[] = {
     "PERF_UTILIZATION",
     "PERF_BANDWIDTH",
     "PERF_COMPLETION_TIME",
+    "PERF_MAX",
     "POWER_BUDGET"
 };
 

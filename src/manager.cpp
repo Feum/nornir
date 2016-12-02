@@ -104,6 +104,11 @@ void Manager::run(){
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
         _remainingTasks = _p.expectedTasksNumber;
         _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
+    }else if(_p.contractType == CONTRACT_PERF_MAX){
+        // In this way all the configurations will be suboptimal and
+        // we will select the less suboptimal one, i.e. the closest
+        // to the requirement, i.e. the most performing one.
+        _p.requiredBandwidth = std::numeric_limits<double>::max();
     }
 
     waitForStart();
@@ -237,43 +242,6 @@ void Manager::allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> i
     _configuration->createAllRealCombinations();
 }
 
-void Manager::removeWattsCorrection(){
-    _wattsCorrection = 0;
-}
-
-void Manager::updateWattsCorrection(){
-    removeWattsCorrection();
-    getAndResetJoules();
-    usleep(100*(double)MAMMUT_MICROSECS_IN_MILLISEC);
-    Joules watts = getAndResetJoules() / 0.1;
-
-    if(_samples->size()){
-        _wattsCorrection = watts - _samples->average().watts;
-    }else{
-        double pred = 0;
-        switch(_p.contractType){
-            case CONTRACT_PERF_BANDWIDTH:
-            case CONTRACT_PERF_COMPLETION_TIME:
-            case CONTRACT_PERF_UTILIZATION:{
-                pred = ((SelectorPredictive*) _selector)->getSecondaryPrediction(_configuration->getRealValues());
-            }break;
-            case CONTRACT_POWER_BUDGET:{
-                pred = ((SelectorPredictive*) _selector)->getPrimaryPrediction(_configuration->getRealValues());
-            }break;
-            default:{
-                throw std::runtime_error("Unknown contract type.");
-            }
-        }
-        if(pred > watts){
-            _wattsCorrection = pred - watts;
-        }else{
-            _wattsCorrection = watts - pred;
-        }
-    }
-    _samples->reset();
-    _lastStoredSampleMs = getMillisecondsTime();
-}
-
 void Manager::updateRequiredBandwidth() {
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
         double now = getMillisecondsTime();
@@ -301,7 +269,8 @@ double Manager::getPrimaryValue(const MonitoredSample& sample) const{
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
+        case CONTRACT_PERF_COMPLETION_TIME:
+        case CONTRACT_PERF_MAX:{
             return sample.bandwidth;
         }break;
         case CONTRACT_POWER_BUDGET:{
@@ -320,6 +289,12 @@ double Manager::getSecondaryValue(const MonitoredSample& sample) const{
         case CONTRACT_PERF_COMPLETION_TIME:{
             return sample.watts;
         }break;
+        case CONTRACT_PERF_MAX:{
+            // In this case we just ignore the power consumption.
+            // By putting it to 0, we force the algorithm to select
+            // the most performing configuration.
+            return 0;
+        }
         case CONTRACT_POWER_BUDGET:{
             return sample.bandwidth;
         }break;
@@ -598,25 +573,20 @@ ulong ManagerExternal::getExecutionTime(){
 }
 
 ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters adaptivityParameters):
-    ManagerBlackBox(adaptivityParameters.mammut.getInstanceTask()->getProcessHandler(pid), adaptivityParameters){
-    ;
-}
-
-ManagerBlackBox::ManagerBlackBox(mammut::task::ProcessHandler* process, Parameters adaptivityParameters):
-        Manager(adaptivityParameters), _process(process),
-        _startTime(getMillisecondsTime()), _lastTime(_startTime){
-    Manager::_configuration = new ConfigurationExternal(_p);
-    lockKnobs();
-    _configuration->createAllRealCombinations();
-    _selector = createSelector();
-    // For external application we do not care if synchronous of not (we count iterations).
-    _p.synchronousWorkers = false;
-    // Check supported contracts.
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
-       _p.contractType == CONTRACT_PERF_BANDWIDTH ||
-       _p.contractType == CONTRACT_PERF_UTILIZATION){
-        throw std::runtime_error("ManagerBlackBox. Unsupported contract.");
-    }
+            Manager(adaptivityParameters), _process(adaptivityParameters.mammut.getInstanceTask()->getProcessHandler(pid)),
+            _startTime(getMillisecondsTime()), _lastTime(_startTime){
+        Manager::_configuration = new ConfigurationExternal(_p);
+        lockKnobs();
+        _configuration->createAllRealCombinations();
+        _selector = createSelector();
+        // For external application we do not care if synchronous of not (we count iterations).
+        _p.synchronousWorkers = false;
+        // Check supported contracts.
+        if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
+           _p.contractType == CONTRACT_PERF_BANDWIDTH ||
+           _p.contractType == CONTRACT_PERF_UTILIZATION){
+            throw std::runtime_error("ManagerBlackBox. Unsupported contract.");
+        }
 }
 
 ManagerBlackBox::~ManagerBlackBox(){
@@ -626,6 +596,10 @@ ManagerBlackBox::~ManagerBlackBox(){
     if(_selector){
         delete _selector;
     }
+}
+
+pid_t ManagerBlackBox::getPid() const{
+    return _process->getId();
 }
 
 void ManagerBlackBox::waitForStart(){

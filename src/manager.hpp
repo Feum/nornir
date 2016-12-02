@@ -146,9 +146,6 @@ protected:
 
     // The configuration selector.
     Selector* _selector;
-
-    // Watts correction value for multiple applications scenario.
-    Joules _wattsCorrection;
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
@@ -291,10 +288,6 @@ private:
     std::vector<PhysicalCoreId> getUsedCores();
 
     void allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> ids);
-
-    void removeWattsCorrection();
-
-    void updateWattsCorrection();
 };
 
 class ManagerExternal: public Manager{
@@ -350,18 +343,15 @@ public:
     ManagerBlackBox(pid_t pid, Parameters adaptivityParameters);
 
     /**
-     * Creates an adaptivity manager for an external NON-INSTRUMENTED application.
-     * @param process The process handler. The process must already be running
-     * when this constructor is called.
-     * @param adaptivityParameters The parameters to be used for
-     * adaptivity decisions.
-     */
-    ManagerBlackBox(mammut::task::ProcessHandler* process, Parameters adaptivityParameters);
-
-    /**
      * Destroyes this adaptivity manager.
      */
     ~ManagerBlackBox();
+
+    /**
+     * Returns the pid of the monitored process.
+     * @return The pid of the monitored process.
+     */
+    pid_t getPid() const;
 protected:
     void waitForStart();
     void askSample();

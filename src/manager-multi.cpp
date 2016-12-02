@@ -49,10 +49,23 @@ using namespace mammut::cpufreq;
 #define DEBUGB(x)
 #endif
 
-
 namespace nornir{
 
-ManagerMulti::ManagerMulti():_qIn(10), _qOut(10){
+class SubmittedManager{
+public:
+    Manager* manager;
+    double minPerf;
+    SubmittedManager(Manager* m, double minP):manager(m), minPerf(minP){;}
+};
+
+#define MAX_POWER_VIOLATION_SECONDS 10
+
+ManagerMulti::ManagerMulti(double powerCap):
+        _powerCap(powerCap), _qIn(10), _qOut(10),
+        _power(new MovingAverageSimple<double>(MAX_POWER_VIOLATION_SECONDS)){
+    if(_powerCap < 0){
+        throw std::runtime_error("[ManagerMulti]: powerCap must be >= 0.");
+    }
     _qIn.init();
     _qOut.init();
     _topology = _m.getInstanceTopology();
@@ -62,9 +75,14 @@ ManagerMulti::ManagerMulti():_qIn(10), _qOut(10){
     }
 }
 
-void ManagerMulti::addManager(Manager* m){
+ManagerMulti::~ManagerMulti(){
+    delete _power;
+}
+
+void ManagerMulti::addManager(Manager* m, double minPerformanceRequired){
     // Send the new manager
-    while(!_qIn.push(m)){;}
+    SubmittedManager* sm = new SubmittedManager(m, minPerformanceRequired);
+    while(!_qIn.push(sm)){;}
 }
 
 Manager* ManagerMulti::getTerminatedManager(){
@@ -77,8 +95,8 @@ Manager* ManagerMulti::getTerminatedManager(){
 }
 
 void ManagerMulti::inhibitAll(Manager* except){
-    for(size_t i = 0; i < _activeManagers.size(); i++){
-        Manager* currentManager = _activeManagers.at(i);
+    for(auto it : _managerData){
+        Manager* currentManager = it.first;
         if(currentManager != except){
             currentManager->inhibit();
         }
@@ -86,8 +104,8 @@ void ManagerMulti::inhibitAll(Manager* except){
 }
 
 void ManagerMulti::disinhibitAll(){
-    for(size_t i = 0; i < _activeManagers.size(); i++){
-        _activeManagers.at(i)->disinhibit();
+    for(auto it : _managerData){
+        it.first->disinhibit();
     }
 }
 
@@ -95,8 +113,8 @@ vector<PhysicalCoreId> ManagerMulti::getAvailablePhysicalCores() const{
     vector<PhysicalCoreId> availablePc;
     for(size_t i = 0; i < _allCores.size(); i++){
         bool alreadyAllocated = false;
-        for(auto it = _allocatedCores.begin(); it != _allocatedCores.end(); it++){
-            if(utils::contains(it->second, _allCores.at(i))){
+        for(auto it : _managerData){
+            if(utils::contains(it.second.allocatedCores, _allCores.at(i))){
                 alreadyAllocated = true;
                 break;
             }
@@ -108,39 +126,25 @@ vector<PhysicalCoreId> ManagerMulti::getAvailablePhysicalCores() const{
     return availablePc;
 }
 
-map<KnobsValues, double> ManagerMulti::invertMap(const map<KnobsValues, double>& map) const{
-    std::map<KnobsValues, double> mapr;
-    for(auto it = map.begin(); it != map.end(); it++){
-        mapr[it->first] = 1.0 / it->second;
-    }
-    return mapr;
-}
-
 void ManagerMulti::updateAllocations(Manager* m){
     std::map<KnobsValues, double> primaryValues;
     std::map<KnobsValues, double> secondaryValues;
 
-    /**
-     *  We want lower=better for both metrics. 
-     *    For power consumption it is already true. 
-     *    For bandwidth we need to invert it since it is higher=better.
-     **/
     double primaryBound = 0.0;
-    switch(m->_p.contractType){
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_BANDWIDTH:{
-            primaryBound = 1.0 / m->_p.requiredBandwidth;
-            primaryValues = invertMap(((SelectorPredictive*) m->_selector)->getPrimaryPredictions());
-            secondaryValues = ((SelectorPredictive*) m->_selector)->getSecondaryPredictions();
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            primaryBound = m->_p.powerBudget;
-            secondaryValues = invertMap(((SelectorPredictive*) m->_selector)->getSecondaryPredictions());
-            primaryValues = ((SelectorPredictive*) m->_selector)->getPrimaryPredictions();
-        }break;
-        default:{
-            throw std::runtime_error("updateAllocations: Contract type not supported.");
-        }break;
+    double maxPerformance = 0.0;
+    primaryBound = m->_p.requiredBandwidth;
+    primaryValues = ((SelectorPredictive*) m->_selector)->getPrimaryPredictions();
+    secondaryValues = ((SelectorPredictive*) m->_selector)->getSecondaryPredictions();
+    for(auto it : primaryValues){
+        if(it.second > maxPerformance){
+            maxPerformance = it.second;
+        }
+    }
+    ManagerData md = _managerData[m];
+    if(m->_p.contractType == CONTRACT_PERF_MAX){
+        md.minPerf = (md.minPerfReqPerc/100.0) * maxPerformance;
+    }else{
+        md.minPerf = (md.minPerfReqPerc/100.0) * m->_p.requiredBandwidth;
     }
 
     std::multimap<double, KnobsValues> unfeasible;
@@ -151,38 +155,38 @@ void ManagerMulti::updateAllocations(Manager* m){
             // Insert the corresponding entry in secondaryValues
             sortedSecondary.insert(std::pair<double, KnobsValues>(secondaryValues.at(kv), kv));
             // Delete the corresponding entry in primaryValues
-            auto del = it;
-            it++;
-            primaryValues.erase(del);
+            it = primaryValues.erase(it);
         }else{
             // Insert unfeasible solutions according to their distance from the bound
-            unfeasible.insert(std::pair<double, KnobsValues>(it->second - primaryBound, kv));
+            unfeasible.insert(std::pair<double, KnobsValues>(primaryBound - it->second, kv));
             it++;
         }
     }
-    std::vector<KnobsValues> allocation;
+    std::vector<std::pair<KnobsValues, double> > allocation;
     // First insert the solutions that satisfies the primary bound (sorted from 
     // the best to the worst secondary value).
     for(auto it = sortedSecondary.begin(); it != sortedSecondary.end();  it++){
-        allocation.push_back(it->second);
+        double perf = primaryValues[it->second];
+        allocation.push_back(std::pair<KnobsValues, double>(it->second, perf));
     }
     // Then we insert the unfeasible solutions (i.e. that violate the primary bound)
     // sorted from the closer to the farther from the bound.
-    for(auto it = unfeasible.begin(); it != unfeasible.end();  it++){
-        allocation.push_back(it->second);
+    for(auto it = unfeasible.begin(); it != unfeasible.end(); it++){
+        double perf = primaryValues[it->second];
+        allocation.push_back(std::pair<KnobsValues, double>(it->second, perf));
     }
-    _allocations[m] = allocation;
+    _managerData[m].allocations = allocation;
 }
 
 void ManagerMulti::updateAllocations(){
-    for(size_t i = 0; i < _activeManagers.size(); i++){
-        updateAllocations(_activeManagers[i]);
+    for(auto it : _managerData){
+        updateAllocations(it.first);
     }
     std::vector<std::vector<size_t>> values;
     std::vector<size_t> accum;
-    for(auto it = _allocations.begin(); it != _allocations.end(); it++){
+    for(auto it : _managerData){
         std::vector<size_t> tmp;
-        for(size_t j = 0; j < it->second.size(); j++){
+        for(size_t j = 0; j < it.second.allocations.size(); j++){
             tmp.push_back(j);
         }
         values.push_back(tmp);
@@ -204,36 +208,53 @@ void ManagerMulti::combinations(std::vector<std::vector<size_t> > array, size_t 
     }
 }
 
+static double getQuality(const std::vector<size_t>& indexes){
+    // At the moment we are considering as quality metric the sum of
+    // the positions of the chosen configurations in the corresponding priority lists
+    // (the lower the better).
+    // If we have 3 managers and we select the second choice for manager A, the
+    // tenth choice for manager B and the fifth choice for manager C, then this
+    // specific allocation will have a quality of 2+10+5 = 17. Accordingly, in
+    // this specific case the best allocation would be the one with weight 3, i.e.
+    // the one in which to each manager we assign its first (most preferred) choice.
+    // We could also consider other metrics (e.g. average).
+    double r;
+    for(size_t x : indexes){
+        r += x;
+    }
+    return r;
+}
+
 std::vector<size_t> ManagerMulti::findBestAllocation(){
     updateAllocations();
-    std::vector<size_t> best;
-    size_t minWeight = std::numeric_limits<size_t>::max();
-    for(size_t i = 0; i < _allocationsCombinations.size(); i++){
-        std::vector<size_t> allocation = _allocationsCombinations.at(i);
+    Manager* currentManager;
+    const ManagerData& currentManagerData;
+    KnobsValues kv;
+    size_t numCores;
+    Frequency currentFreq;
+    // Feasible solutions, sorted from the best to the worst
+    std::multimap<double, std::vector<size_t> > feasibleSolutions;
+    for(std::vector<size_t> indexes : _allocationsCombinations){
         size_t pos = 0;
-        if(!allocation.size()){return best;}
+        if(!indexes.size()){
+            throw std::runtime_error("FATAL ERROR: No indexes.");
+        }
         Frequency previousFreq = 0;
         size_t numPhysicalCores = 0;
-        size_t weight = 0;
         bool validAllocation = true;
-        for(auto it = _allocations.begin(); it != _allocations.end(); it++){
-            // At the moment we are considering as quality metric the sum of 
-            // the positions of the chosen configurations in the corresponding priority lists
-            // (the lower the better).
-            // If we have 3 managers and we select the second choice for manager A, the 
-            // tenth choice for manager B and the fifth choice for manager C, then this 
-            // specific allocation will have a quality of 2+10+5 = 17. Accordingly, in
-            // this specific case the best allocation would be the one with weight 3, i.e.
-            // the one in which to each manager we assign its first (most preferred) choice.
-            weight += allocation.at(pos);
-            KnobsValues kv = it->second.at(allocation.at(pos));
-            size_t numCores;
-            Frequency currentFreq;
+        std::pair<KnobsValues, double> allocation;
+        size_t allocationPosition;
+        for(auto it : _managerData){
+            currentManager = it.first;
+            currentManagerData = it.second;
+            allocationPosition = indexes.at(pos);
+            allocation = currentManagerData.allocations.at(allocationPosition);
+            kv = allocation.first;
             if(kv.areRelative()){
                 double tmp;
-                assert(it->first->_configuration->getKnob(KNOB_TYPE_FREQUENCY)->getRealFromRelative(kv[KNOB_TYPE_FREQUENCY], tmp));
+                assert(currentManager->_configuration->getKnob(KNOB_TYPE_FREQUENCY)->getRealFromRelative(kv[KNOB_TYPE_FREQUENCY], tmp));
                 currentFreq = tmp;
-                assert(it->first->_configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealFromRelative(kv[KNOB_TYPE_VIRTUAL_CORES], tmp));
+                assert(currentManager->_configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealFromRelative(kv[KNOB_TYPE_VIRTUAL_CORES], tmp));
                 numCores = tmp;
             }else{
                 currentFreq = kv[KNOB_TYPE_FREQUENCY];
@@ -244,23 +265,58 @@ std::vector<size_t> ManagerMulti::findBestAllocation(){
                 validAllocation = false;
                 break;
             }
+
             previousFreq = currentFreq;
             numPhysicalCores += numCores;
-            numPhysicalCores += it->first->_configuration->getNumServiceNodes();
+            numPhysicalCores += currentManager->_configuration->getNumServiceNodes();
             ++pos;
         }
         if(numPhysicalCores > _allCores.size()){
             validAllocation = false;
         }
-        if(validAllocation && weight < minWeight){
-            minWeight = weight;
-            best = allocation;
+        double weight = getQuality(indexes);
+        if(validAllocation){
+            feasibleSolutions[weight] = indexes;
+        }else{
+            // Just to avoid having an empty map where there are
+            // no feasible solutions.
+            feasibleSolutions[std::numeric_limits<double>::max()] = indexes;
         }
     }
-    if(minWeight == std::numeric_limits<size_t>::max()){
-        throw std::runtime_error("No valid allocations found.");
+
+    // First try to find a solution that doesn't violate
+    // any additional requirement. If does not exists,
+    // just return the one with minimum weight.
+    for(auto indexes : feasibleSolutions){
+        size_t pos = 0;
+        size_t allocationPosition;
+        std::pair<KnobsValues, double> allocation;
+        bool feasible = true;
+        for(auto it : _managerData){
+            currentManager = it.first;
+            currentManagerData = it.second;
+            allocationPosition = indexes.second.at(pos);
+            allocation = currentManagerData.allocations.at(allocationPosition);
+            // Check that we still satisfy the additional requirement
+            // set on the global manager.
+            if(allocation.second < currentManagerData.minPerf){
+                feasible = false;
+                break;
+            }
+            ++pos;
+        }
+        // Since they are ordered from the best to the worst,
+        // as soon as we find a feasible one we return.
+        if(feasible){
+            return indexes;
+        }
     }
-    return best;
+
+    DEBUG("No feasible solutions found.");
+    // If we are here, there are no solutions that satisfy the
+    // additional performance constraints, so we return the
+    // one with minimum weight.
+    return feasibleSolutions.begin()->second;
 }
 
 void ManagerMulti::applyNewAllocation(){
@@ -269,9 +325,9 @@ void ManagerMulti::applyNewAllocation(){
     size_t pos = 0;
     size_t nextCoreId = 0;
     Manager* man;
-    for(auto it = _allocations.begin(); it != _allocations.end(); it++){
-        man = it->first;
-        KnobsValues kv = it->second.at(alloc.at(pos));
+    for(auto it : _managerData){
+        man = it.first;
+        KnobsValues kv = it.second.allocations.at(alloc.at(pos)).first;
         DEBUG("Allocations: " << it->second);
         DEBUG("Allocation: " << man << " " << kv << " " << ((SelectorPredictive*)man->_selector)->getPrimaryPrediction(kv) << " " << ((SelectorPredictive*)man->_selector)->getSecondaryPrediction(kv));
         size_t numCores;
@@ -299,42 +355,25 @@ void ManagerMulti::applyNewAllocation(){
     }
 }
 
-void ManagerMulti::applyWattsCorrection(){
-    for(size_t i = 0; i < _activeManagers.size(); i++){
-        _activeManagers.at(i)->updateWattsCorrection();
-    }
-}
-
-PredictorLinearRegression* ManagerMulti::getPowerPredictor(Manager* m) const{
-    switch(m->_p.contractType){
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_UTILIZATION:{
-            return ((PredictorLinearRegression*) ((SelectorPredictive*) m->_selector)->getSecondaryPredictor());
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            return ((PredictorLinearRegression*) ((SelectorPredictive*) m->_selector)->getPrimaryPredictor());
-        }break;
-        default:{
-            throw std::runtime_error("Unknown contract type.");
-        }
-    }
-}
-
-double ManagerMulti::getInactivePowerParameter(Manager* m) const{
-    return getPowerPredictor(m)->getInactivePowerParameter();
-}
-
 void ManagerMulti::run(){
+    mammut::energy::Counter* joulesCounter = _m.getInstanceEnergy()->getCounter();
+    double lastSampleTime = mammut::utils::getMillisecondsTime();
+    double lastJoules = joulesCounter->getJoules();
+    double currentSampleTime, currentJoules, currentWatts;
     while(true){
         Manager* m;
-        if(_qIn.pop((void**) &m)){
+        SubmittedManager* sm;
+        if(_qIn.pop((void**) &sm)){
+            m = sm->manager;
+            ManagerData md;
+            md.minPerfReqPerc = sm->minPerf;
+            delete sm;
             DEBUG("New manager arrived.");
             // New manager.
-            assert(m->_p.contractType == CONTRACT_PERF_BANDWIDTH ||
-                   m->_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
-                   m->_p.contractType == CONTRACT_PERF_UTILIZATION ||
-                   m->_p.contractType == CONTRACT_NONE);
+            // It is meaningless to control power for individual applications if
+            // other applications are running on the system and want to be
+            // controlled as well.
+            assert(m->_p.contractType != CONTRACT_POWER_BUDGET);
 
             assert(m->_p.strategySelection == STRATEGY_SELECTION_LEARNING);
             assert(m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
@@ -342,9 +381,8 @@ void ManagerMulti::run(){
                     m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP ||
                     m->_p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR);
 
-            _activeManagers.push_back(m);
-            _allocatedCores[m] = vector<PhysicalCoreId>();
-            if(_activeManagers.size() > 1){
+            _managerData[m] = md;
+            if(_managerData.size() > 1){
                 inhibitAll(m); //TODO: Inhibition should freeze the application.
             }
             DEBUG("All the other managers have been inhibited.");
@@ -359,47 +397,37 @@ void ManagerMulti::run(){
             while(m->_selector->isCalibrating() || !m->_selector->getTotalCalibrationTime()){;}
             DEBUG("Calibration terminated.");
 
-            DEBUG(m << " Inactive power parameter: " << getInactivePowerParameter(m));
-
-            if(_activeManagers.size() > 1){
+            if(_managerData.size() > 1){
                 applyNewAllocation();
                 DEBUG("Best allocation applied.");
                 // TODO Add external contributions to perf models.
-                //applyWattsCorrection();
                 // Disinhibit all the managers
                 disinhibitAll();
                 DEBUG("All managers disinhibited.");
             }
         }else{
-            _allocatedCores.clear();
             // Manage already present managers.
-            for(size_t i = 0; i < _activeManagers.size(); ){
-                Manager* m = _activeManagers.at(i);
+            for(auto it = _managerData.begin(); it != _managerData.end() ; ){
+                Manager* m = it->first;
                 if(!m->running()){
                     // Manager terminated
-                    std::vector<PhysicalCoreId> released = m->getUsedCores();
-                    _allocatedCores.erase(m);
-                    _activeManagers.erase(_activeManagers.begin() + i);
-                    if(_activeManagers.size()){
-                        //applyWattsCorrection(); //TODO Possible contention on samples
-                    }
+                    it = _managerData.erase(it);
+                    // TODO Remove external contributions from perf models.
                     while(!_qOut.push((void*) m)){;}
                 }else{
-                    i++;
+                    ++it;
                     if(m->_selector->isCalibrating()){
                         DEBUG("Manager " << m << " wants to calibrate.");
-                        if(_activeManagers.size() > 1){
+                        if(_managerData.size() > 1){
                             inhibitAll(m);
                         }
                         m->_selector->allowCalibration();
                         while(m->_selector->isCalibrating()){;}
                         DEBUG("Calibration terminated.");
-                        DEBUG(m << " Inactive power parameter: " << getInactivePowerParameter(m));
-                        if(_activeManagers.size() > 1){
+                        if(_managerData.size() > 1){
                             applyNewAllocation();
                             DEBUG("Best allocation applied.");
                             // TODO Add external contributions to perf models.
-                            //applyWattsCorrection();
                             // Disinhibit all the other managers
                             disinhibitAll();
                             DEBUG("All managers disinhibited.");
@@ -410,11 +438,24 @@ void ManagerMulti::run(){
                             pc = m->getUsedCores();
                         }while(pc.size() == 0);
                         DEBUG("Manager " << m << " uses cores: " << pc);
-                        _allocatedCores[m] = pc;
+                        _managerData[m].allocatedCores = pc;
                         m->allowPhysicalCores(pc);
                     }
                 }
             }
+        }
+        currentJoules = joulesCounter->getJoules();
+        currentSampleTime = mammut::utils::getMillisecondsTime();
+        currentWatts = (currentJoules - lastJoules)/((currentSampleTime - lastSampleTime)/1000.0);
+        lastSampleTime = currentSampleTime;
+        lastJoules = currentJoules;
+        _power->add(currentWatts);
+        // TODO In realtà bisognerebbe controllare che non lo sforiamo
+        // per un periodo consecutivo sostenuto
+        if(_power->average() > _powerCap){
+            DEBUG("Cap violated (" << _power->average() << ">" << _powerCap << ". "
+                  "Falling back to RAP.");
+            ; //TODO Fallback to RAPL
         }
         sleep(1);
     }
