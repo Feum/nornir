@@ -161,6 +161,8 @@ public:
  * Always returns the current configuration.
  */
 class SelectorFixed: public Selector{
+protected:
+    bool isMaxPerformanceConfiguration() const{return false;} // Never used by this selector
 public:
     SelectorFixed(const Parameters& p,
              const Configuration& configuration,

@@ -90,8 +90,7 @@ Manager::Manager(Parameters adaptivityParameters):
         _lastStoredSampleMs(0),
         _inhibited(false),
         _configuration(NULL),
-        _selector(NULL),
-        _wattsCorrection(0)
+        _selector(NULL)
 {
     ;
 }
@@ -421,7 +420,7 @@ void Manager::observe(){
     double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
     _lastStoredSampleMs = now;
 
-    sample.watts = joules / durationSecs - _wattsCorrection;
+    sample.watts = joules / durationSecs;
     // ATTENTION: Bandwidth is not the number of task since the
     //            last observation but the number of expected
     //            tasks that will be processed in 1 second.
@@ -513,8 +512,8 @@ void Manager::logObservation(){
                              _samples->coefficientVariation().bandwidth,
                              ms.latency,
                              ms.utilisation,
-                             _samples->getLastSample().watts + _wattsCorrection,
-                             ms.watts + _wattsCorrection);
+                             _samples->getLastSample().watts,
+                             ms.watts);
     }
 }
 

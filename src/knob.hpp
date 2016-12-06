@@ -307,6 +307,8 @@ public:
         return *this;
     }
 
+    inline bool areUndefined() const{return _type == KNOB_VALUE_UNDEF;}
+
     inline bool areRelative() const{return _type == KNOB_VALUE_RELATIVE;}
 
     inline bool areReal() const{return _type == KNOB_VALUE_REAL;}

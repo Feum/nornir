@@ -688,19 +688,13 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Uint, dataflow.maxInterpreters);
 }
 
-Parameters::Parameters(Communicator* const communicator):
-      mammut(communicator){
-    setDefault();
-}
-
 #define CONFIGURATION_VERSION "\"1.0.0\""
 #define CONFPATH_LEN_MAX 512
 #define CONFFILE_VERSION "/nornir/version.csv"
 #define CONFFILE_ARCH "/nornir/archdata.xml"
 #define CONFFILE_VOLTAGE "/nornir/voltage.csv"
 
-Parameters::Parameters(const string& paramFileName,
-                       Communicator* const communicator):
+Parameters::Parameters(Communicator* const communicator):
       mammut(communicator){
     setDefault();
 
@@ -734,7 +728,12 @@ Parameters::Parameters(const string& paramFileName,
     if(!found){
         throw runtime_error("Impossible to find configuration files. Please run 'sudo make microbench' from the nornir root folder.");
     }
+}
 
+Parameters::Parameters(const string& paramFileName,
+                       Communicator* const communicator):
+      mammut(communicator){
+    setDefault();
     /** Loading parameters. **/
     loadXml(paramFileName);
 }

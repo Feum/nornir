@@ -228,7 +228,6 @@ static double getQuality(const std::vector<size_t>& indexes){
 std::vector<size_t> ManagerMulti::findBestAllocation(){
     updateAllocations();
     Manager* currentManager;
-    const ManagerData& currentManagerData;
     KnobsValues kv;
     size_t numCores;
     Frequency currentFreq;
@@ -246,7 +245,7 @@ std::vector<size_t> ManagerMulti::findBestAllocation(){
         size_t allocationPosition;
         for(auto it : _managerData){
             currentManager = it.first;
-            currentManagerData = it.second;
+            const ManagerData& currentManagerData = it.second;
             allocationPosition = indexes.at(pos);
             allocation = currentManagerData.allocations.at(allocationPosition);
             kv = allocation.first;
@@ -276,11 +275,11 @@ std::vector<size_t> ManagerMulti::findBestAllocation(){
         }
         double weight = getQuality(indexes);
         if(validAllocation){
-            feasibleSolutions[weight] = indexes;
+            feasibleSolutions.insert(std::pair<double, std::vector<size_t> > (weight, indexes));
         }else{
             // Just to avoid having an empty map where there are
             // no feasible solutions.
-            feasibleSolutions[std::numeric_limits<double>::max()] = indexes;
+            feasibleSolutions.insert(std::pair<double, std::vector<size_t> > (std::numeric_limits<double>::max(), indexes));
         }
     }
 
@@ -294,7 +293,7 @@ std::vector<size_t> ManagerMulti::findBestAllocation(){
         bool feasible = true;
         for(auto it : _managerData){
             currentManager = it.first;
-            currentManagerData = it.second;
+            const ManagerData& currentManagerData = it.second;
             allocationPosition = indexes.second.at(pos);
             allocation = currentManagerData.allocations.at(allocationPosition);
             // Check that we still satisfy the additional requirement
@@ -308,7 +307,7 @@ std::vector<size_t> ManagerMulti::findBestAllocation(){
         // Since they are ordered from the best to the worst,
         // as soon as we find a feasible one we return.
         if(feasible){
-            return indexes;
+            return indexes.second;
         }
     }
 

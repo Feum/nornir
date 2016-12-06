@@ -32,10 +32,12 @@
 #include <iostream>
 #include <fstream>
 #include <sys/mman.h>
+#include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <stdlib.h>
 #include "../src/manager.hpp"
 #include "../src/manager-multi.hpp"
+#include "../src/external/Mammut/mammut/external/papi-5.5.1/src/papi.h"
 #include <tclap/CmdLine.h>
 
 using namespace nornir;
@@ -53,7 +55,6 @@ using namespace nornir;
 #define DEBUGB(x)
 #endif
 
-static volatile bool *started, *handlerCreated;
 struct ScheduledProgram;
 
 typedef struct ScheduledProgram{
@@ -142,6 +143,18 @@ int main(int argc, char * argv[]){
         powerCap = capArg.getValue();
         pids = pidArg.getValue();
         pidPerfs = perfArg.getValue();
+
+        if(pids.size()){
+            std::cerr << "Sorry, --pid is still not supported. This is mainly due to difficulties in attaching to an already running "
+                         "(non child) process to read the counters. Moreover, even if we could attach, we would not be able to monitor "
+                         "the already created childrens/threads." << std::endl;
+        }
+        
+        if(!mammut::utils::existsDirectory(logDir)){
+            std::cerr << "Specified logging directory doesn't exist. Please create it before running." << std::endl;
+            return -1;
+        }
+
         /* Load schedule. */
         std::ifstream scheduleFile(scheduleArg.getValue());
         std::string line;
@@ -198,10 +211,16 @@ int main(int argc, char * argv[]){
     }
 
     /* Then we start following the schedule. */
-    started = (volatile bool*) mmap(NULL, sizeof(volatile bool), PROT_READ | PROT_WRITE,
+    bool* started = (bool*) mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
                            MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    handlerCreated = (volatile bool*) mmap(NULL, sizeof(volatile bool), PROT_READ | PROT_WRITE,
+    bool* handlerCreated = (bool*) mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
                                   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+    if(started == MAP_FAILED || handlerCreated == MAP_FAILED){
+        std::cerr << "mmap failed."<< std::endl;
+        return -1;
+    }
+
     *started = false;
     *handlerCreated = false;
     double lastStart = 0;
@@ -213,6 +232,10 @@ int main(int argc, char * argv[]){
 
         void* mmem = (void*) mmap(NULL, sizeof(ManagerBlackBox), PROT_READ | PROT_WRITE,
                                   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        if(mmem == MAP_FAILED){
+            std::cerr << "mmap failed." << std::endl;
+            return -1;
+        }
 
         pid_t pid = fork();
         if(pid == -1){
@@ -221,7 +244,6 @@ int main(int argc, char * argv[]){
         }else if(pid){
             /* Father - Manager. */
             sp.pid = pid;
-            while(!*started){;}
             Parameters p;
             initializeParameters(p);
             stringstream out;
@@ -232,8 +254,10 @@ int main(int argc, char * argv[]){
                        logPrefix + "_summary.csv");
             p.observer = &o;
             while(!*started){;}
+
             ManagerBlackBox* m = new (mmem) ManagerBlackBox(pid, p);
             *handlerCreated = true;
+
             if(multiManagerNeeded){
                 mm.addManager(m, sp.minPerfRequired);
                 // Wait for the child to reset the flags.
@@ -251,6 +275,7 @@ int main(int argc, char * argv[]){
             // If the handler is not created, we would not catch the counters of
             // the threads/processes created by this process
             while(!*handlerCreated){;}
+
             extern char** environ;
             char** arguments = new char*[sp.program.size() + 1];
             for(size_t i = 0; i < sp.program.size(); i++){
@@ -276,7 +301,7 @@ int main(int argc, char * argv[]){
     if(multiManagerNeeded){
         for(size_t i = 0; i < pids.size() + scheduledPrograms.size(); i++){
             ManagerBlackBox* m;
-            while((m = mm.getTerminatedManager()) == NULL){
+            while((m = (ManagerBlackBox*) mm.getTerminatedManager()) == NULL){
                 sleep(1);
             }
             DEBUG("One program terminated.");

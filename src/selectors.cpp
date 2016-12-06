@@ -241,7 +241,8 @@ SelectorPredictive::SelectorPredictive(const Parameters& p,
     switch(p.contractType){
         case CONTRACT_PERF_UTILIZATION:
         case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
+        case CONTRACT_PERF_COMPLETION_TIME:
+        case CONTRACT_PERF_MAX:{
             _primaryPredictor = std::move(bandwidthPredictor);
             _secondaryPredictor = std::move(powerPredictor);
         }break;
@@ -380,7 +381,7 @@ bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
         }break;
         case CONTRACT_PERF_BANDWIDTH:
         case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_BANDWIDTH:{
+        case CONTRACT_PERF_MAX:{
             // Concerning bandwidths, if both are suboptimal,
             // we prefer the higher one.
             return x > y;
@@ -560,6 +561,7 @@ void SelectorPredictive::clearPredictors(){
 }
 
 bool SelectorPredictive::isMaxPerformanceConfiguration() const{
+    if(_maxPerformanceConfiguration.areUndefined()){return false;}
     if(!_maxPerformanceConfiguration.areReal()){
         throw std::runtime_error("[FATAL ERROR] _maxPerformanceConfiguration must be of type REAL.");
     }
@@ -597,6 +599,11 @@ bool SelectorLearner::isAccurate(){
     double performanceError = 100.0, powerError = 100.0;
     performanceError = std::abs((maxBandwidth - predictedMaxBandwidth) / maxBandwidth*100.0);
     powerError = std::abs((power - predictedPower) / power*100.0);
+
+    // In maximum performance contracts we do not predict power consumption.
+    if(_p.contractType == CONTRACT_PERF_MAX){
+        powerError = 0;
+    }
 
     DEBUG("Perf error: " << performanceError);
     DEBUG("Power error: " << powerError);
