@@ -77,6 +77,17 @@ typedef struct{
     std::vector<double> powerErrors;
 }SimulationResult;
 
+// How to react to the calibration of other applications
+// in order to do not interfere too much with them.
+typedef enum{
+    // Do nothing
+    CALIBRATION_SHRINK_NONE = 0,
+    // Move all the threads of the processor on the same core.
+    CALIBRATION_SHRINK_AGGREGATE,
+    // Pause the process.
+    CALIBRATION_SHRINK_PAUSE,
+}CalibrationShrink;
+
 /*!
  * \class Manager
  * \brief This class manages the adaptivity parallel applications.
@@ -146,6 +157,9 @@ protected:
 
     // The configuration selector.
     Selector* _selector;
+
+    // Pid of the monitored process.
+    pid_t _pid;
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
@@ -279,6 +293,27 @@ private:
 
     void disinhibit();
 
+    void shrink(CalibrationShrink type);
+
+    void stretch(CalibrationShrink type);
+
+    virtual void shrinkPause() = 0;
+
+    virtual void stretchPause() = 0;
+
+    /**
+     * Updates the prediction models by letting them now
+     * that there is an interference caused by another application.
+     */
+    void updateModelsInterference();
+
+
+    /**
+     * Wait until the models have been updated and they are
+     * ready to be used.
+     */
+    void waitModelsInterferenceUpdate();
+
     /**
      * Returns the vector of physical cores used by the manager.
      * The vector is empty if the manager still didn't finished the calibration.
@@ -287,13 +322,14 @@ private:
      */
     std::vector<PhysicalCoreId> getUsedCores();
 
-    void allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> ids);
+    void allowCores(std::vector<mammut::topology::VirtualCoreId> ids);
 };
 
 class ManagerExternal: public Manager{
 private:
     orlog::Monitor _monitor;
-    pid_t _pid;
+    void shrinkPause();
+    void stretchPause();
 public:
     /**
      * Creates an adaptivity manager for an external INSTRUMENTED application.
@@ -333,6 +369,8 @@ private:
     mammut::task::ProcessHandler* _process;
     double _startTime;
     double _lastTime;
+    void shrinkPause();
+    void stretchPause();
 public:
     /**
      * Creates an adaptivity manager for an external NON-INSTRUMENTED application.
@@ -418,6 +456,8 @@ private:
     void manageConfigurationChange();
     void clean();
     ulong getExecutionTime();
+    void shrinkPause();
+    void stretchPause();
 };
 
 }

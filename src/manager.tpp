@@ -115,6 +115,7 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters param
         _emitter(dynamic_cast<AdaptiveNode*>(_farm->getEmitter())),
         _collector(dynamic_cast<AdaptiveNode*>(_farm->getCollector())),
         _activeWorkers(convertWorkers(_farm->getWorkers())){
+	Manager::_pid = getpid();
     Manager::_configuration = new ConfigurationFarm(_p, _samples, _emitter,
                                                    _activeWorkers,
                                                    _collector, _farm->getgt(),
@@ -204,7 +205,20 @@ ulong ManagerFarm<lb_t, gt_t>::getExecutionTime(){
     return _farm->ffTime();
 }
 
-#define PAR_BEGIN_ENV "__PAR_BEGIN"
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::shrinkPause(){
+	KnobVirtualCoresFarm* k = ((KnobVirtualCoresFarm*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES));
+	k->prepareToFreeze();
+	k->freeze();
+}
+
+template <typename lb_t, typename gt_t>
+void ManagerFarm<lb_t, gt_t>::stretchPause(){
+	KnobVirtualCoresFarm* k = ((KnobVirtualCoresFarm*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES));
+	size_t v = k->getRealValue();
+	k->prepareToRun(v);
+	k->run(v);
+}
 
 typedef struct{
     double numCores;
@@ -267,17 +281,6 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
     }
 
     waitForStart();
-#if 0
-    /** Creates the parallel section begin file. **/
-    char* default_in_roi = (char*) malloc(sizeof(char)*256);
-    default_in_roi[0] = '\0';
-    default_in_roi = strcat(default_in_roi, getenv("HOME"));
-    default_in_roi = strcat(default_in_roi, "/roi_in");
-    setenv(PAR_BEGIN_ENV, default_in_roi, 0);
-    free(default_in_roi);
-    FILE* in_roi = fopen(getenv(PAR_BEGIN_ENV), "w");
-    fclose(in_roi);
-#endif
 
     if(_counter){
         _counter->reset();
@@ -402,10 +405,6 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
             startSample = getMillisecondsTime();
         }
     }
-
-#if 0
-    unlink(getenv(PAR_BEGIN_ENV));
-#endif
 
     *terminate = true;
     clean();

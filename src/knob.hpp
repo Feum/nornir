@@ -122,6 +122,8 @@ public:
 };
 
 class KnobVirtualCoresFarm: public KnobVirtualCores{
+    template <typename lb_t, typename gt_t>
+    friend class ManagerFarm;
 public:
     KnobVirtualCoresFarm(Parameters p,
                   AdaptiveNode* emitter, AdaptiveNode* collector,
@@ -192,6 +194,8 @@ public:
     virtual void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder) = 0;
 
     void setAllowedCores(std::vector<mammut::topology::VirtualCore*> vc);
+
+    std::vector<mammut::topology::VirtualCore*> getAllowedCores() const;
 
     bool isAllowed(mammut::topology::VirtualCore*) const;
 

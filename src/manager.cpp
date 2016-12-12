@@ -90,7 +90,8 @@ Manager::Manager(Parameters adaptivityParameters):
         _lastStoredSampleMs(0),
         _inhibited(false),
         _configuration(NULL),
-        _selector(NULL)
+        _selector(NULL),
+        _pid(0)
 {
     ;
 }
@@ -180,6 +181,10 @@ void Manager::run(){
                 _configuration->trigger();
                 startSample = getMillisecondsTime();
             }
+        }else{
+            // If inhibited, we need to discard the previous samples
+            // (they were taken with less/more applications running).
+            _samples->reset();
         }
     }
 
@@ -212,27 +217,78 @@ void Manager::disinhibit(){
     _inhibited = false;
 }
 
-std::vector<PhysicalCoreId> Manager::getUsedCores(){
-    if(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){
-        return std::vector<PhysicalCoreId>();
-    }else{
-        vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getActiveVirtualCores();
-        vector<PhysicalCoreId> pcid;
-        for(size_t i = 0; i < vc.size(); i++){
-            PhysicalCoreId pci = vc.at(i)->getPhysicalCoreId();
-            if(!contains(pcid, pci)){
-                pcid.push_back(pci);
+void Manager::shrink(CalibrationShrink type){
+    switch(type){
+        case CALIBRATION_SHRINK_AGGREGATE:{
+            if(_pid){
+                _task->getProcessHandler(_pid)->move(_topology->getVirtualCores().back());
             }
-        }
-        return pcid;
+        }break;
+        case CALIBRATION_SHRINK_PAUSE:{
+            shrinkPause();
+        }break;
+        default:{
+            ;
+        }break;
     }
 }
 
-void Manager::allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> ids){
+void Manager::stretch(CalibrationShrink type){
+    switch(type){
+        case CALIBRATION_SHRINK_AGGREGATE:{
+            if(_pid){
+                std::vector<VirtualCore*> allowedCores = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getAllowedCores();
+                _task->getProcessHandler(_pid)->move(allowedCores);
+            }
+        }break;
+        case CALIBRATION_SHRINK_PAUSE:{
+            stretchPause();
+        }break;
+        default:{
+            ;
+        }break;
+    }
+}
+
+void Manager::updateModelsInterference(){
+    if(_p.strategySelection != STRATEGY_SELECTION_LEARNING){
+        throw std::runtime_error("updateModelsInterference can only be "
+                "used on LEARNING selectors.");
+    }
+    // Temporarely disinhibit.
+    _samples->reset();
+    disinhibit();
+    ((SelectorLearner*) _selector)->updateModelsInterference();
+}
+
+void Manager::waitModelsInterferenceUpdate(){
+    if(_p.strategySelection != STRATEGY_SELECTION_LEARNING){
+        throw std::runtime_error("waitModelsInterferenceUpdate can only be "
+                        "used on LEARNING selectors.");
+    }
+    while(!((SelectorLearner*) _selector)->areModelsUpdated()){;}
+    // Inhibit again.
+    inhibit();
+}
+
+std::vector<VirtualCoreId> Manager::getUsedCores(){
+    if(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){
+        return std::vector<VirtualCoreId>();
+    }else{
+        vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getActiveVirtualCores();
+        vector<VirtualCoreId> vcid;
+        for(size_t i = 0; i < vc.size(); i++){
+            vcid.push_back(vc[i]->getVirtualCoreId());
+        }
+        return vcid;
+    }
+}
+
+void Manager::allowCores(std::vector<mammut::topology::VirtualCoreId> ids){
     vector<VirtualCore*> vc = _topology->getVirtualCores();
     vector<VirtualCore*> allowedVc;
     for(size_t i = 0; i < vc.size(); i++){
-        if(contains(ids, vc.at(i)->getPhysicalCoreId())){
+        if(contains(ids, vc.at(i)->getVirtualCoreId())){
             allowedVc.push_back(vc.at(i));
         }
     }
@@ -519,7 +575,7 @@ void Manager::logObservation(){
 
 ManagerExternal::ManagerExternal(const std::string& orlogChannel,
                                  Parameters adaptivityParameters):
-        Manager(adaptivityParameters), _monitor(orlogChannel), _pid(0){
+        Manager(adaptivityParameters), _monitor(orlogChannel){
     Manager::_configuration = new ConfigurationExternal(_p);
     lockKnobs();
     _configuration->createAllRealCombinations();
@@ -531,7 +587,7 @@ ManagerExternal::ManagerExternal(const std::string& orlogChannel,
 ManagerExternal::ManagerExternal(nn::socket& orlogSocket,
                                  int chid,
                                  Parameters adaptivityParameters):
-            Manager(adaptivityParameters), _monitor(orlogSocket, chid), _pid(0){
+            Manager(adaptivityParameters), _monitor(orlogSocket, chid){
     Manager::_configuration = new ConfigurationExternal(_p);
     lockKnobs();
     _configuration->createAllRealCombinations();
@@ -550,7 +606,7 @@ ManagerExternal::~ManagerExternal(){
 }
 
 void ManagerExternal::waitForStart(){
-    _pid = _monitor.waitStart();
+    Manager::_pid = _monitor.waitStart();
     ((KnobMappingExternal*)_configuration->getKnob(KNOB_TYPE_MAPPING))->setPid(_pid);
 }
 
@@ -571,9 +627,18 @@ ulong ManagerExternal::getExecutionTime(){
     return _monitor.getExecutionTime();
 }
 
+void ManagerExternal::shrinkPause(){
+    kill(_pid, SIGSTOP);
+}
+
+void ManagerExternal::stretchPause(){
+    kill(_pid, SIGCONT);
+}
+
 ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters adaptivityParameters):
             Manager(adaptivityParameters), _process(adaptivityParameters.mammut.getInstanceTask()->getProcessHandler(pid)),
             _startTime(getMillisecondsTime()), _lastTime(_startTime){
+        Manager::_pid = pid;
         Manager::_configuration = new ConfigurationExternal(_p);
         lockKnobs();
         _configuration->createAllRealCombinations();
@@ -598,7 +663,7 @@ ManagerBlackBox::~ManagerBlackBox(){
 }
 
 pid_t ManagerBlackBox::getPid() const{
-    return _process->getId();
+    return _pid;
 }
 
 void ManagerBlackBox::waitForStart(){
@@ -636,6 +701,16 @@ void ManagerBlackBox::clean(){;}
 
 ulong ManagerBlackBox::getExecutionTime(){
     return getMillisecondsTime() - _startTime;
+}
+
+void ManagerBlackBox::shrinkPause(){
+    pid_t pid = _process->getId();
+    kill(pid, SIGSTOP);
+}
+
+void ManagerBlackBox::stretchPause(){
+    pid_t pid = _process->getId();
+    kill(pid, SIGCONT);
 }
 
 }

@@ -370,6 +370,10 @@ void KnobMapping::setAllowedCores(std::vector<mammut::topology::VirtualCore*> vc
     _allowedVirtualCores = vc;
 }
 
+std::vector<mammut::topology::VirtualCore*> KnobMapping::getAllowedCores() const{
+    return _allowedVirtualCores;
+}
+
 bool KnobMapping::isAllowed(mammut::topology::VirtualCore* v) const{
     if(!_allowedVirtualCores.size()){
         return true;

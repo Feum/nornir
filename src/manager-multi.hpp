@@ -51,6 +51,23 @@
 
 namespace nornir{
 
+typedef enum{
+    QUALITY_ESTIMATION_PERFORMANCE = 0,
+    QUALITY_ESTIMATION_PREFERENCE,
+}QualityEstimation;
+
+typedef struct ManagerMultiConfiguration{
+    double powerCap;
+    bool useVirtualCores;
+    CalibrationShrink shrink;
+    QualityEstimation qualityEstimation;
+
+    ManagerMultiConfiguration():
+        powerCap(0), useVirtualCores(false),
+        shrink(CALIBRATION_SHRINK_NONE), qualityEstimation(QUALITY_ESTIMATION_PERFORMANCE)
+    {;}
+}ManagerMultiConfiguration;
+
 // Contains data associated to each running manager.
 typedef struct{
     // Minimum performance requirement percentage [0, 100].
@@ -71,14 +88,14 @@ private:
     // Mammut handlers.
     mammut::Mammut _m;
     mammut::topology::Topology* _topology;
-    // Specified power cap. If 0, no power cap have been specified.
-    double _powerCap;
+    // Configuration parameters.
+    ManagerMultiConfiguration _configuration;
     // Queue between the external world and the global manager.
     ff::SWSR_Ptr_Buffer _qIn;
     // Queue between the global manager and the external world.
     ff::SWSR_Ptr_Buffer _qOut;
     // A list of identifiers of all the cores available on the machine.
-    std::vector<mammut::topology::PhysicalCoreId> _allCores;
+    std::vector<mammut::topology::VirtualCoreId> _allCores;
     // For each manager, we keep some data.
     std::map<Manager*, ManagerData> _managerData;
     // Contains all the combinations between the possible allocations.
@@ -97,6 +114,18 @@ private:
     // Moving average on power consumption.
     Smoother<double>* _power;
 
+    /**
+     * Allows a specific manager to calibrate.
+     * @param m The manager.
+     */
+    void allowCalibration(Manager* m);
+
+    /**
+     * Waits for a manager calibration.
+     * @param m The manger.
+     */
+    void waitForCalibration(Manager* m);
+
     /** 
      * Inhibits all the active managers except the one specified.
      * While inhibited, a manager ignores all the fluctuations on the
@@ -111,10 +140,16 @@ private:
     void disinhibitAll();
 
     /**
+     * Shrinks all the managers except the specified one.
+     * @param except The manager that MUST NOT be shrunk.
+     */
+    void shrinkAll(Manager* except);
+
+    /**
      * Returns a list of available physical cores identifiers.
      * @return A list of available physical cores identifiers.
      **/
-    std::vector<mammut::topology::PhysicalCoreId> getAvailablePhysicalCores() const;
+    std::vector<mammut::topology::PhysicalCoreId> getAvailableCores() const;
 
     /**
      * Updates the list of preferred allocations of a specific manager.
@@ -146,15 +181,42 @@ private:
      * Applies the best found allocation.
      **/
     void applyNewAllocation();
+
+    /**
+     * Given an allocation vector. Returns its quality.
+     * It must be the highest the better.
+     * @param indexes The allocation vector.
+     * @return The quality of the allocation.
+     */
+    double getQuality(const std::vector<size_t>& indexes) const;
+
+    /**
+     * Estimates the power consumption of a given allocation.
+     * @param indexes The allocation vector.
+     * @return The power consumption estimation.
+     */
+    double estimatePower(const std::vector<size_t>& indexes) const;
+
+    /**
+     * Calibrates the application associated to a specific manager
+     * (starting it if required).
+     * @param m The manager to be calibrated.
+     * @param start If true, the manager will be started. If false,
+     * the manager is supposed to be already running.
+     */
+    void calibrate(Manager* m, bool start = false);
+
+    /**
+     * Checks if a specified manager is supported.
+     * @param m The manager to be checked.
+     */
+    void checkManagerSupported(Manager* m);
 public:
     /**
      * Creates a global manager.
-     * @param powerCap The power cap to enforce on the entire system.
-     *        If not specified or if == 0, no power cap will be considered
-     *        and only the user requirements will be enforced.
-     *        Power caps < 0 are not allowed.
+     * @param configuration Configuration parameters for the global manager.
      **/
-    ManagerMulti(double powerCap = 0);
+    ManagerMulti(ManagerMultiConfiguration configuration = ManagerMultiConfiguration());
 
     /**
      * Destroys the global manager.

@@ -337,16 +337,36 @@ public:
  * A generic online learner selector.
  */
 class SelectorLearner: public SelectorPredictive{
+    friend class Manager;
 private:
     Explorer* _explorer;
     bool _firstPointGenerated;
     uint _contractViolations;
     uint _accuracyViolations;
     uint _totalCalPoints;
+
+    // Stuff used for interference adjustment.
+    KnobsValues _beforeInterferenceConf;
+    bool _updatingInterference;
+    std::vector<KnobsValues> _interferenceUpdatePoints;
+
     std::unique_ptr<Predictor> getPredictor(PredictorType type,
                                             const Parameters& p,
                                             const Configuration& configuration,
                                             const Smoother<MonitoredSample>* samples) const;
+
+    /**
+     * Starts producing data in order to update the models by
+     * considering that another application is interfering with
+     * this one.
+     */
+    void updateModelsInterference();
+
+    /**
+     * Returns true if the models have been updated and they are
+     * ready to be used.
+     */
+    bool areModelsUpdated() const;
 public:
     SelectorLearner(const Parameters& p,
                        const Configuration& configuration,

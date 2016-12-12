@@ -512,7 +512,8 @@ PredictorUsl::PredictorUsl(PredictorType type,
                     _maxPolDegree(POLYNOMIAL_DEGREE_USL),
                     _ws(NULL), _x(NULL), _y(NULL), _chisq(0),
                     _preparationNeeded(true), _maxFreqBw(0), _minFreqBw(0),
-                    _minFreqCoresBw(0){
+                    _minFreqCoresBw(0), _minFreqCoresBwNew(0), _n1(0), _n2(0),
+                    _minFreqN1Bw(0), _minFreqN2Bw(0){
     if(type != PREDICTION_BANDWIDTH){
         throw std::runtime_error("PredictorUsl can only be used for bandwidth predictions.");
     }
@@ -616,12 +617,17 @@ void PredictorUsl::prepareForPredictions(){
         gsl_vector_free(_y);
         gsl_multifit_linear_free(_ws);
         _preparationNeeded = false;
-    }else{
+
         if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+            // b = _coefficients[0]
+            // a = _coefficients[1]
             std::cout << "B1Pred(actual): " << _minFreqCoresBw << std::endl;
             std::cout << "Contention: " << _coefficients[0] - _coefficients[1] << std::endl;
             std::cout << "Coherency: " << (double) _coefficients[1]/(_coefficients[0] - _coefficients[1]) << std::endl;
         }else{
+            // bwseq = 1.0 / _coefficients[0]
+            // b = _coefficients[1]
+            // a = _coefficients[2]
             std::cout << "B1Pred: " << 1.0 / _coefficients[0] << std::endl;
             std::cout << "Contention: " << (_coefficients[1] - _coefficients[2])/((double) _coefficients[0]) << std::endl;
             std::cout << "Coherency: " << (double) _coefficients[2]/(_coefficients[1] - _coefficients[2]) << std::endl;
@@ -657,13 +663,127 @@ double PredictorUsl::predict(const KnobsValues& configuration){
         bandwidth = (numCores / result);
     }
 
-    if(frequency != _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()){
+    if(frequency != _minFrequency){
         double minMaxScaling = _maxFreqBw / _minFreqBw;
         double maxFreqPred = bandwidth * minMaxScaling;
         return ((maxFreqPred - bandwidth)/(_maxFrequency - _minFrequency))*frequency + ((bandwidth*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
     }else{
         return bandwidth;
     }
+}
+
+double PredictorUsl::getMinFreqCoresBw() const{
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        return _minFreqCoresBw;
+    }else{
+        return 1.0 / _coefficients[0];
+    }
+}
+
+double PredictorUsl::geta() const{
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        return _coefficients[1];
+    }else{
+        return _coefficients[2];
+    }
+}
+
+double PredictorUsl::getb() const{
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        return _coefficients[0];
+    }else{
+        return _coefficients[1];
+    }
+}
+
+void PredictorUsl::seta(double a){
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        _coefficients[1] = a;
+    }else{
+        _coefficients[2] = a;
+    }
+}
+
+void PredictorUsl::setb(double b){
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        _coefficients[0] = b;
+    }else{
+        _coefficients[1] = b;
+    }
+}
+
+double PredictorUsl::getTheta(RecordInterferenceArgument n){
+    int numCores;
+    int bw;
+    if(n == RECONFARG_N1){
+        numCores = _n1;
+        bw = _minFreqN1Bw;
+    }else{
+        numCores = _n2;
+        bw = _minFreqN2Bw;
+    }
+    KnobsValues kv(KNOB_VALUE_REAL);
+    kv[KNOB_TYPE_FREQUENCY] = _minFrequency;
+    kv[KNOB_TYPE_VIRTUAL_CORES] = numCores;
+    return (((getMinFreqCoresBw()*numCores)/predict(kv)) - 1) - (((_minFreqCoresBwNew*numCores)/bw) - 1);
+}
+
+void PredictorUsl::updateInterference(){
+    double numCores = _configuration.getRealValue(KNOB_TYPE_VIRTUAL_CORES);
+    double frequency = _configuration.getRealValue(KNOB_TYPE_FREQUENCY);
+    double bandwidth = _samples->average().bandwidth;
+    // TODO: At the moment I'm assuming that interferences does not change the
+    // slope when we fix number of cores and we change the frequency.
+    if(frequency != _minFrequency){
+        // We compute the 'old' bandwidth at minimum frequency
+        KnobsValues kv(KNOB_VALUE_REAL);
+        kv[KNOB_TYPE_FREQUENCY] = _minFrequency;
+        kv[KNOB_TYPE_VIRTUAL_CORES] = numCores;
+        double minFreqPred = predict(kv);
+        kv[KNOB_TYPE_FREQUENCY] = frequency;
+        double currentFreqPred = predict(kv);
+        double prop = bandwidth / currentFreqPred;
+        bandwidth = prop*minFreqPred;
+    }
+
+    if(numCores == 1){
+        _minFreqCoresBwNew = bandwidth;
+    }else if(!_n1){
+        _n1 = numCores;
+        _minFreqN1Bw = bandwidth;
+    }else{
+        _n2 = numCores;
+        _minFreqN2Bw = bandwidth;
+    }
+}
+
+void PredictorUsl::updateCoefficients(){
+    double newB, newA, firstPartB, secondPartB;
+    firstPartB = ((_n2 - 1)/(_n2 - _n1)*(_n1 - 1))*
+                 (getLambda(RECONFARG_N1) - getTheta(RECONFARG_N1));
+    secondPartB = ((_n1 - 1)/(_n2 - _n1)*(_n2 - 1))*
+                  (getLambda(RECONFARG_N2) - getTheta(RECONFARG_N2));
+    newB = firstPartB - secondPartB;
+    newA = (getLambda(RECONFARG_N2) - getTheta(RECONFARG_N2) - newB*(_n2 - 1))/
+            pow(_n2 - 1, 2);
+    seta(newA);
+    setb(newB);
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL){
+        _minFreqCoresBw = _minFreqCoresBwNew;
+        _n1 = 0;
+        _n2 = 0;
+        _minFreqCoresBwNew = 0;
+    }
+}
+
+double PredictorUsl::getLambda(RecordInterferenceArgument n) const{
+    int numCores;
+    if(n == RECONFARG_N1){
+        numCores = _n1;
+    }else{
+        numCores = _n2;
+    }
+    return getb()*(numCores - 1) + geta()*(numCores - 1)*(numCores - 1);
 }
     
 /**************** PredictorSimple ****************/

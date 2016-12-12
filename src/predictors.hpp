@@ -349,6 +349,11 @@ public:
  */
 #define POLYNOMIAL_DEGREE_USL 3 // Second degree polynomial
 
+typedef enum{
+    RECONFARG_N1 = 0,
+    RECONFARG_N2,
+}RecordInterferenceArgument;
+
 class PredictorUsl: public Predictor{
 private:
     double _maxPolDegree;
@@ -366,6 +371,21 @@ private:
     double _minFrequency;
     double _maxFrequency;
     double _maxCores;
+
+    // The following variables are used to update
+    // the model after an external interference (typical
+    // another application running on the system).
+    double _minFreqCoresBwNew;
+    double _n1, _n2;
+    double _minFreqN1Bw, _minFreqN2Bw;
+
+    double getMinFreqCoresBw() const;
+    double geta() const;
+    double getb() const;
+    void seta(double a);
+    void setb(double b);
+    double getTheta(RecordInterferenceArgument n);
+    double getLambda(RecordInterferenceArgument n) const;
 public:
     PredictorUsl(PredictorType type,
                  const Parameters& p,
@@ -383,6 +403,24 @@ public:
     void prepareForPredictions();
 
     double predict(const KnobsValues& configuration);
+
+    /**
+     * Updates the data required to modify the model
+     * in order to consider the interference.
+     * The selector should act in the following way:
+     *  Move to N1 -> updateInterference -> Move to N2 ->
+     *  updateInterference -> Move to 1 -> updateInterference
+     */
+    void updateInterference();
+
+    /**
+     * Updates the prediction coefficients after an external
+     * interference has been detected. It must only be called
+     * after that the following functions updateInterference
+     * has been called 3 times. Between two successive calls, the
+     * number of cores used must be changed. N1->N2->Seq
+     */
+    void updateCoefficients();
 };
 
 /*

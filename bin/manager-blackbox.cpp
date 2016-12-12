@@ -180,7 +180,9 @@ int main(int argc, char * argv[]){
         return -1;
     }
 
-    ManagerMulti mm(powerCap);
+    ManagerMultiConfiguration mmc;
+    mmc.powerCap = powerCap;
+    ManagerMulti mm(mmc);
     bool multiManagerNeeded = false;
     if(pids.size() + scheduledPrograms.size() > 1){
         multiManagerNeeded = true;

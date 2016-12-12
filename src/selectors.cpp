@@ -723,7 +723,8 @@ SelectorLearner::SelectorLearner(const Parameters& p,
                                 getPredictor(PREDICTION_BANDWIDTH, p, configuration, samples),
                                 getPredictor(PREDICTION_POWER, p, configuration, samples)),
              _explorer(NULL), _firstPointGenerated(false),
-             _contractViolations(0), _accuracyViolations(0), _totalCalPoints(0){
+             _contractViolations(0), _accuracyViolations(0), _totalCalPoints(0),
+             _updatingInterference(false){
     /***************************************/
     /*              Explorers              */
     /***************************************/
@@ -794,13 +795,28 @@ SelectorLearner::~SelectorLearner(){
 }
 
 KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
+    KnobsValues kv;
+    if(_updatingInterference){
+        // It can only be done for PERF_* contract (so is primary) and on USL predictors.
+        // (Check already done when the flag is set).
+        PredictorUsl* pred = ((PredictorUsl*) getPrimaryPredictor());
+        pred->updateInterference();
+        if(!_interferenceUpdatePoints.empty()){
+            kv = _interferenceUpdatePoints.back();
+            _interferenceUpdatePoints.pop_back();
+            return kv;
+        }else{
+            _updatingInterference = false;
+            pred->updateCoefficients();
+            return _beforeInterferenceConf;
+        }
+    }
     _previousConfiguration = _configuration.getRealValues();
     if(_forced && !_forcedReturned){
         _forcedReturned = true;
         return _forcedConfiguration;
     }
 
-    KnobsValues kv;
     bool contractViolated = isContractViolated();
     bool accurate = isAccurate();
 
@@ -906,6 +922,32 @@ bool SelectorLearner::phaseChanged() const{
     // For multi applications scenario we ignore power consumption variation.
     return _samples->coefficientVariation().latency > 20.0 ||
            (!_calibrationCoordination && _samples->coefficientVariation().watts > 20.0);
+}
+
+void SelectorLearner::updateModelsInterference(){
+    if(_p.contractType != CONTRACT_PERF_BANDWIDTH ||
+       _p.contractType != CONTRACT_PERF_COMPLETION_TIME ||
+       _p.contractType != CONTRACT_PERF_MAX ||
+       _p.contractType != CONTRACT_PERF_UTILIZATION ||
+       _p.strategyPredictionPerformance != STRATEGY_PREDICTION_PERFORMANCE_USL ||
+       _p.strategyPredictionPerformance != STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        throw std::runtime_error("updateModelForInterference is only supported for "
+                                 "PERF_* contracts and for USL* performance predictors.");
+    }
+    _beforeInterferenceConf = _configuration.getRealValues();
+    _updatingInterference = true;
+    // We only add 2 points (the third is the current one).
+    KnobsValues kv(KNOB_VALUE_RELATIVE);
+    kv[KNOB_TYPE_FREQUENCY] = 0;
+
+    kv[KNOB_TYPE_VIRTUAL_CORES] = 0.5;
+    _interferenceUpdatePoints.push_back(kv);
+    kv[KNOB_TYPE_VIRTUAL_CORES] = 0;
+    _interferenceUpdatePoints.push_back(kv);
+}
+
+bool SelectorLearner::areModelsUpdated() const{
+    return !_updatingInterference;
 }
 
 SelectorFixedExploration::SelectorFixedExploration(const Parameters& p,
