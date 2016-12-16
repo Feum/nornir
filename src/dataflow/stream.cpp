@@ -27,7 +27,7 @@
 
 #include "stream.hpp"
 
-#include "../external/Mammut/mammut/mammut.hpp"
+#include "../external/mammut/mammut/mammut.hpp"
 
 #undef DEBUG
 #undef DEBUGB
@@ -97,6 +97,7 @@ InputStreamRate::InputStreamRate(const std::string& fileName):
 
     Mammut m;
     CpuFreq* frequency = m.getInstanceCpuFreq();
+    frequency->removeTurboFrequencies();
     vector<Domain*> domains = frequency->getDomains();
     _clockFrequency = 0;
     for(size_t i = 0; i < domains.size(); i++){

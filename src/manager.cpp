@@ -33,9 +33,9 @@
 #include "./node.hpp"
 #include "./utils.hpp"
 
-#include "external/Mammut/mammut/module.hpp"
-#include "external/Mammut/mammut/utils.hpp"
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/module.hpp"
+#include "external/mammut/mammut/utils.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -93,7 +93,7 @@ Manager::Manager(Parameters adaptivityParameters):
         _selector(NULL),
         _pid(0)
 {
-    ;
+    _cpufreq->removeTurboFrequencies();
 }
 
 Manager::~Manager(){

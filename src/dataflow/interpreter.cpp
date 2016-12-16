@@ -26,7 +26,7 @@
  */
 
 #include "interpreter.hpp"
-#include "../external/Mammut/mammut/mammut.hpp"
+#include "../external/mammut/mammut/mammut.hpp"
 #include <map>
 
 using namespace mammut;

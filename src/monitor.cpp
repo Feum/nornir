@@ -38,7 +38,7 @@
 
 #include "parameters.hpp"
 #include "monitor.hpp"
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 namespace nornir{
 

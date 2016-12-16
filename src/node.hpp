@@ -32,7 +32,7 @@
 #include "./parameters.hpp"
 #include "utils.hpp"
 
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 
 PUSH_WARNING

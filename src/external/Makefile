@@ -2,8 +2,8 @@
 
 all:
 # Build mammut
-ifeq ("$(wildcard ./Mammut/mammut/libmammut.a)","")
-	$(MAKE) -C Mammut
+ifeq ("$(wildcard ./mammut/mammut/libmammut.a)","")
+	$(MAKE) -C mammut
 endif
 # Build leo
 ifeq ("$(wildcard ./leo/leo.o)","")

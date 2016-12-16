@@ -28,7 +28,7 @@
  */
 
 #include <iostream>
-#include "../src/external/Mammut/mammut/mammut.hpp"
+#include "../src/external/mammut/mammut/mammut.hpp"
 
 using namespace std;
 using namespace mammut;

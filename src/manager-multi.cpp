@@ -26,7 +26,7 @@
  */
 
 #include "manager-multi.hpp"
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 #include <map>
 #include <signal.h>

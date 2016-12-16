@@ -33,7 +33,7 @@
 #include "predictors.hpp"
 #include "manager.hpp"
 
-#include "external/Mammut/mammut/cpufreq/cpufreq.hpp"
+#include "external/mammut/mammut/cpufreq/cpufreq.hpp"
 
 #undef DEBUG
 #undef DEBUGB
@@ -153,8 +153,9 @@ RegressionDataServiceTime::RegressionDataServiceTime(const Parameters& p,
         _invScalFactorFreqAndCores(0),
         _numPredictors(0){
     _phyCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
-    _minFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->
-                                                    getAvailableFrequencies().at(0);
+    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().at(0);
+    d->removeTurboFrequencies();
+    _minFrequency = d->getAvailableFrequencies().at(0);
     init(_configuration.getRealValues());
 }
 
@@ -238,7 +239,9 @@ RegressionDataPower::RegressionDataPower(const Parameters& p,
     _phyCoresPerCpu = _topology->getCpu(0)->getPhysicalCores().size();
     _virtCoresPerPhyCores = _topology->getPhysicalCore(0)->getVirtualCores().size();
     _strategyUnused = _p.strategyUnusedVirtualCores;
-    _lowestFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().front()->getAvailableFrequencies().front();
+    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().front();
+    d->removeTurboFrequencies();
+    _lowestFrequency = d->getAvailableFrequencies().front();
     init(_configuration.getRealValues());
 }
 
@@ -522,8 +525,10 @@ PredictorUsl::PredictorUsl(PredictorType type,
     }
     _c = gsl_vector_alloc(_maxPolDegree);
     _cov = gsl_matrix_alloc(_maxPolDegree, _maxPolDegree);
-    _minFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front();
-    _maxFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().back();
+    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().at(0);
+    d->removeTurboFrequencies();
+    _minFrequency = d->getAvailableFrequencies().front();
+    _maxFrequency = d->getAvailableFrequencies().back();
 }
 
 PredictorUsl::~PredictorUsl(){

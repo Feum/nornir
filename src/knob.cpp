@@ -28,9 +28,9 @@
 #include "knob.hpp"
 #include "parameters.hpp"
 
-#include "external/Mammut/mammut/mammut.hpp"
-#include "external/Mammut/mammut/utils.hpp"
-#include "external/Mammut/mammut/cpufreq/cpufreq.hpp"
+#include "external/mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/utils.hpp"
+#include "external/mammut/mammut/cpufreq/cpufreq.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -522,6 +522,7 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
         _topologyHandler(_p.mammut.getInstanceTopology()),
         _cpufreqHandle(_p.mammut.getInstanceCpuFreq()){
 
+    _frequencyHandler->removeTurboFrequencies();
     std::vector<mammut::cpufreq::Frequency> availableFrequencies;
     availableFrequencies = _frequencyHandler->getDomains().at(0)->getAvailableFrequencies();
     _realValue = availableFrequencies.front();

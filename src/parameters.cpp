@@ -272,6 +272,7 @@ vector<Frequency> Parameters::getAvailableFrequencies(){
     vector<Frequency> frequencies;
     CpuFreq* cpuFreq = mammut.getInstanceCpuFreq();
     if(cpuFreq){
+        cpuFreq->removeTurboFrequencies();
         vector<Domain*> fDomains = cpuFreq->getDomains();
         if(fDomains.size()){
             frequencies = fDomains.front()->getAvailableFrequencies();

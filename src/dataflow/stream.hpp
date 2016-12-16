@@ -28,7 +28,7 @@
 #ifndef NORNIR_DF_STREAM_HPP_
 #define NORNIR_DF_STREAM_HPP_
 
-#include "../../src/external/Mammut/mammut/utils.hpp"
+#include "../../src/external/mammut/mammut/utils.hpp"
 #include "../../src/external/fastflow/ff/utils.hpp"
 
 #include <cstdlib>

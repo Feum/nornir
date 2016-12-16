@@ -35,7 +35,7 @@
 #include "configuration.hpp"
 #include "utils.hpp"
 
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 #include <gsl/gsl_multifit.h>
 #include <mlpack/core.hpp>

@@ -33,7 +33,7 @@
 #ifndef NORNIR_UTILS_HPP_
 #define NORNIR_UTILS_HPP_
 
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 #include <fstream>
 #include <iostream>

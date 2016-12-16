@@ -32,7 +32,7 @@
 #include "explorers.hpp"
 #include "configuration.hpp"
 #include "knob.hpp"
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 #include <memory>
 

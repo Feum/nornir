@@ -37,7 +37,7 @@
 #include <stdlib.h>
 #include "../src/manager.hpp"
 #include "../src/manager-multi.hpp"
-#include "../src/external/Mammut/mammut/external/papi-5.5.1/src/papi.h"
+#include "../src/external/mammut/mammut/external/papi-5.5.1/src/papi.h"
 #include <tclap/CmdLine.h>
 
 using namespace nornir;

@@ -63,8 +63,8 @@
 
 #include <cmath>
 #include <fstream>
-#include "external/Mammut/mammut/utils.hpp"
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/utils.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 namespace nornir{
 
