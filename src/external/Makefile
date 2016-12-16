@@ -1,6 +1,7 @@
 .PHONY = all
 
 all:
+	cd Mammut && git checkout 8d2c36cd20b653f7f58123b6b6ac5e5b69624e6b
 	$(MAKE) -C Mammut
 	$(MAKE) -C leo
 	$(MAKE) -C queues msqueue
