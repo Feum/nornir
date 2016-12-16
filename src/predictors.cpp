@@ -524,7 +524,6 @@ PredictorUsl::PredictorUsl(PredictorType type,
     _cov = gsl_matrix_alloc(_maxPolDegree, _maxPolDegree);
     _minFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front();
     _maxFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().back();
-    _maxCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getAllowedValues().back();
 }
 
 PredictorUsl::~PredictorUsl(){
@@ -546,12 +545,12 @@ void PredictorUsl::refine(){
     double frequency = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
     double bandwidth = getMaximumBandwidth();
 
-
-    if(frequency == _maxFrequency && numCores == _maxCores){
+    double maxCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getAllowedValues().size();
+    if(frequency == _maxFrequency && numCores == maxCores){
         _maxFreqBw = bandwidth;
         return;
     }else if(frequency == _minFrequency){
-        if(numCores == _maxCores){
+        if(numCores == maxCores){
             _minFreqBw = bandwidth;
         }else if(numCores == 1){
             _minFreqCoresBw = bandwidth;

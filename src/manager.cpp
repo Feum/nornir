@@ -130,6 +130,7 @@ void Manager::run(){
     if(_counter){
         _counter->reset();
     }
+    //TODO RESET BANDWIDTHIN
     _lastStoredSampleMs = getMillisecondsTime();
     if(_p.observer){
         _p.observer->_startMonitoringMs = _lastStoredSampleMs;

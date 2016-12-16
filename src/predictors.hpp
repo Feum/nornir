@@ -370,7 +370,6 @@ private:
     double _minFreqCoresBw;
     double _minFrequency;
     double _maxFrequency;
-    double _maxCores;
 
     // The following variables are used to update
     // the model after an external interference (typical

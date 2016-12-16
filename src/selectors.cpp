@@ -925,12 +925,12 @@ bool SelectorLearner::phaseChanged() const{
 }
 
 void SelectorLearner::updateModelsInterference(){
-    if(_p.contractType != CONTRACT_PERF_BANDWIDTH ||
-       _p.contractType != CONTRACT_PERF_COMPLETION_TIME ||
-       _p.contractType != CONTRACT_PERF_MAX ||
-       _p.contractType != CONTRACT_PERF_UTILIZATION ||
-       _p.strategyPredictionPerformance != STRATEGY_PREDICTION_PERFORMANCE_USL ||
-       _p.strategyPredictionPerformance != STRATEGY_PREDICTION_PERFORMANCE_USLP){
+    if((_p.contractType != CONTRACT_PERF_BANDWIDTH &&
+       _p.contractType != CONTRACT_PERF_COMPLETION_TIME &&
+       _p.contractType != CONTRACT_PERF_MAX &&
+       _p.contractType != CONTRACT_PERF_UTILIZATION) ||
+       (_p.strategyPredictionPerformance != STRATEGY_PREDICTION_PERFORMANCE_USL &&
+        _p.strategyPredictionPerformance != STRATEGY_PREDICTION_PERFORMANCE_USLP)){
         throw std::runtime_error("updateModelForInterference is only supported for "
                                  "PERF_* contracts and for USL* performance predictors.");
     }

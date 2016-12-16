@@ -41,12 +41,13 @@ using namespace mammut::cpufreq;
  * It works only if we have htlevel == 1.
  */
 
-#ifdef DEBUG_MANAGER_MULTI
 #undef DEBUG
+#undef DEBUGB
+
+#ifdef DEBUG_MANAGER_MULTI
 #define DEBUG(x) do { cerr << "[ManagerMulti] " << x << endl; } while (0)
 #define DEBUGB(x) do {x;} while(0)
 #else
-#undef DEBUG
 #define DEBUG(x)
 #define DEBUGB(x)
 #endif
@@ -107,7 +108,8 @@ Manager* ManagerMulti::getTerminatedManager(){
 
 void ManagerMulti::allowCalibration(Manager* m){
     DEBUG("Manager (" << m << ") wants to calibrate.");
-    m->allowCores(getAvailableCores());
+    vector<VirtualCoreId> cores = getAvailableCores();
+    m->allowCores(cores);
     DEBUG("Manager (" << m << ") can calibrate on: " << cores);
     m->_selector->allowCalibration();
 }
@@ -211,7 +213,7 @@ void ManagerMulti::updateAllocations(Manager* m){
     std::multimap<double, KnobsValues> sortedSecondary;
     for(auto it = primaryValues.begin(); it != primaryValues.end(); ){
         KnobsValues kv = it->first;
-        if(it->second <= primaryBound){
+        if(it->second >= primaryBound){
             // Insert the corresponding entry in secondaryValues
             // since is a map, they will be kept sorted from the lower power consuming
             // to the higher power consuming.
@@ -393,9 +395,11 @@ std::vector<size_t> ManagerMulti::findBestAllocation(){
         }
 
         if(validAllocation){
+            DEBUG("Allocation " << indexes << " has quality " << getQuality(indexes));
             feasibleSolutions.insert(std::pair<double, std::vector<size_t> >
                 (getQuality(indexes), indexes));
         }else{
+            DEBUG("Allocation " << indexes << " is not valid.");
             // Just to avoid having an empty map where there are
             // no feasible solutions. If it is not valid, we consider
             // the quality as negative.
@@ -450,7 +454,7 @@ void ManagerMulti::applyNewAllocation(){
     for(auto it : _managerData){
         man = it.first;
         KnobsValues kv = it.second.allocations.at(alloc.at(pos)).first;
-        DEBUG("Allocations: " << it->second);
+        //DEBUG("Allocations: " << it.second.allocations);
         DEBUG("Allocation: " << man << " " << kv << " " << ((SelectorPredictive*)man->_selector)->getPrimaryPrediction(kv) << " " << ((SelectorPredictive*)man->_selector)->getSecondaryPrediction(kv));
         size_t numCores;
         if(kv.areRelative()){
@@ -500,7 +504,7 @@ void ManagerMulti::run(){
         if(_qIn.pop((void**) &sm)){
             ManagerData md;
             Manager* m = sm->manager;
-            DEBUG("Manager (" << m << ") arrived.");
+            DEBUG("Manager (" << m << ") arrived with contract " << m->_p.contractType);
             md.minPerfReqPerc = sm->minPerf;
             _managerData[m] = md;
             m->_selector->setCalibrationCoordination();
@@ -540,7 +544,7 @@ void ManagerMulti::run(){
         // TODO In realtà bisognerebbe controllare che non lo sforiamo
         // per un periodo consecutivo sostenuto
         if(_power->average() > _configuration.powerCap){
-            DEBUG("Cap violated (" << _power->average() << ">" << _powerCap << ". "
+            DEBUG("Cap violated (" << _power->average() << ">" << _configuration.powerCap << ". "
                   "Falling back to RAP.");
             ; //TODO Fallback to RAPL
         }
