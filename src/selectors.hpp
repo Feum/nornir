@@ -47,6 +47,7 @@ private:
     mammut::energy::Counter* _joulesCounter;
     double _totalCalibrationTime;
     bool _calibrating;
+    bool _ignoreViolations;
 protected:
     const Parameters& _p;
     const Configuration& _configuration;
@@ -155,6 +156,16 @@ public:
      * Allows the selector to start calibration.
      */
     void allowCalibration();
+
+    /**
+     * Ignore the contract violations.
+     */
+    void ignoreViolations();
+
+    /**
+     * Considers the contract violations.
+     */
+    void acceptViolations();
 };
 
 /**

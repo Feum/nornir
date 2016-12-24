@@ -51,6 +51,13 @@
 
 namespace nornir{
 
+using AllocationIndexes = std::vector<size_t>;
+using Allocation = std::pair<KnobsValues, double>;
+using AllocationFlip = std::pair<double, KnobsValues>;
+
+static inline KnobsValues& getKnobs(const Allocation& a){return a.first;}
+static inline double getPrediction(const Allocation& a){return a.second;}
+
 typedef enum{
     QUALITY_ESTIMATION_PERFORMANCE = 0,
     QUALITY_ESTIMATION_PREFERENCE,
@@ -80,7 +87,7 @@ typedef struct{
     // from the most preferred to the least preferred.
     // To each KnobValue, we associate the corresponding predicted
     // performance.
-    std::vector<std::pair<KnobsValues, double> > allocations;
+    std::vector<Allocation> allocations;
 }ManagerData;
 
 class ManagerMulti: public mammut::utils::Thread{
@@ -110,7 +117,7 @@ private:
     // - To the first manager in _managerData map, its 2° preferred allocation is assigned
     // - To the second manager in _managerData map, its 9° preferred allocation is assigned
     // - To the third manager in _managerData map, its 4° preferred allocation is assigned
-    std::vector<std::vector<size_t> > _allocationsCombinations;
+    std::vector<AllocationIndexes> _allocationsCombinations;
     // Moving average on power consumption.
     Smoother<double>* _power;
 
@@ -130,9 +137,10 @@ private:
      * Inhibits all the active managers except the one specified.
      * While inhibited, a manager ignores all the fluctuations on the
      * performance and/or power consumption.
-     * @param except The manager that MUST NOT be inhibited.
+     * @param except The manager that MUST NOT be inhibited. If NULL,
+     * all the mangers will be inhibited.
      **/
-    void inhibitAll(Manager* except);
+    void inhibitAll(Manager* except = NULL);
 
     /**
      * Disinhibits all the active managers.
@@ -163,19 +171,32 @@ private:
     void updateAllocations();
 
     /**
+     * Updates the performance models of all the mangers after that a manager
+     * started/terminated its execution.
+     */
+    void updateModels();
+
+    /**
      * Computes all the possible allocations. 
      * @param array A vector containing all the possible values for each element.
      * @param i This is a recursive function. When called for the first time it must be 0.
      * @param accum This is a recursive functin. When called for the first time it must be empty.
      **/
-    void combinations(std::vector<std::vector<size_t> > array, size_t i, std::vector<size_t> accum);
+    void combinations(std::vector<AllocationIndexes> array, size_t i, AllocationIndexes accum);
+
+    /**
+     * Computes a map of valid allocations, sorted from the worst to the best.
+     * @param validAllocations A map of valid allocations, sorted from
+     * the worst to the best.
+     */
+    void getValidAllocations(std::multimap<double, AllocationIndexes>& validAllocations) const;
 
     /**
      * Finds the best allocation.
      * @return A vector of indexes (one per manager). Each index is the position of
      * the chosen allocation inside the corresponding allocations vector.
      */
-    std::vector<size_t> findBestAllocation();
+    AllocationIndexes findBestAllocation();
 
     /**
      * Applies the best found allocation.
@@ -188,14 +209,14 @@ private:
      * @param indexes The allocation vector.
      * @return The quality of the allocation.
      */
-    double getQuality(const std::vector<size_t>& indexes) const;
+    double getQuality(const AllocationIndexes& indexes) const;
 
     /**
      * Estimates the power consumption of a given allocation.
      * @param indexes The allocation vector.
      * @return The power consumption estimation.
      */
-    double estimatePower(const std::vector<size_t>& indexes) const;
+    double estimatePower(const AllocationIndexes& indexes) const;
 
     /**
      * Calibrates the application associated to a specific manager
@@ -211,6 +232,20 @@ private:
      * @param m The manager to be checked.
      */
     void checkManagerSupported(Manager* m);
+
+    /**
+     * Allows a manager to run on some specific cores.
+     * @param m The manager.
+     * @param cores The vector containing the virtual cores identifiers.
+     */
+    void allowCores(Manager* m, const std::vector<VirtualCoreId>& cores);
+
+    /**
+     * Checks if a specified allocation is valid.
+     * @param indexes The allocation.
+     * @return true if the allocation is valid, false otherwise.
+     */
+    bool isValidAllocation(const AllocationIndexes& indexes) const;
 public:
     /**
      * Creates a global manager.

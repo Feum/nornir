@@ -82,6 +82,8 @@ void initializeParameters(Parameters& p){
     p.samplingIntervalSteady = 1000;
     p.strategySelection = STRATEGY_SELECTION_LEARNING;
     p.strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_USLP;
+    p.knobMappingEnabled = false;
+    p.knobHyperthreadingEnabled = false;
 }
 
 static std::string pidToString(pid_t pid){
@@ -96,6 +98,7 @@ int main(int argc, char * argv[]){
     std::vector<ScheduledProgram> scheduledPrograms;
     std::string logDir;
     double powerCap;
+    double startTime = mammut::utils::getMillisecondsTime();
     try {
         TCLAP::CmdLine cmd("Runs Nornir on already existing processes, coordinating "
                            "their requirements. It is also possible to specify new "
@@ -197,7 +200,8 @@ int main(int argc, char * argv[]){
         std::string logPrefix = logDir + "/" + pidToString(pids.at(i));
         Observer o(logPrefix + "_stats.csv",
                    logPrefix + "_calibration.csv",
-                   logPrefix + "_summary.csv");
+                   logPrefix + "_summary.csv",
+                   mammut::utils::getMillisecondsTime() - startTime);
         p.observer = &o;
         ManagerBlackBox* m = new ManagerBlackBox(pids.at(i), p);
         if(multiManagerNeeded){
@@ -253,7 +257,8 @@ int main(int argc, char * argv[]){
             std::string logPrefix = logDir + "/" + out.str() + "_" + mammut::utils::split(sp.program.at(0), '/').back();
             Observer o(logPrefix + "_stats.csv",
                        logPrefix + "_calibration.csv",
-                       logPrefix + "_summary.csv");
+                       logPrefix + "_summary.csv",
+                       mammut::utils::getMillisecondsTime() - startTime);
             p.observer = &o;
             while(!*started){;}
 

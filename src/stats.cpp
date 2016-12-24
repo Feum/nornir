@@ -45,10 +45,14 @@ double Observer::calibrationDurationToPerc(const CalibrationStats& cs,
     return ((double)cs.duration / (double)durationMs) * 100.0;
 }
 
-Observer::Observer(string statsFile, string calibrationFile, string summaryFile):
+Observer::Observer(string statsFile,
+                   string calibrationFile,
+                   string summaryFile,
+                   unsigned int timeOffset):
         _startMonitoringMs(0),
         _totalJoules(0),
-        _lastTimestamp(0){
+        _lastTimestamp(0),
+        _timeOffset(timeOffset){
     _statsFile.open(statsFile.c_str());
     _calibrationFile.open(calibrationFile.c_str());
     _summaryFile.open(summaryFile.c_str());
@@ -121,7 +125,7 @@ void Observer::observe(unsigned int timeStamp,
         _lastTimestamp = _startMonitoringMs;
     }
     _lastTimestamp = timeStamp;
-    _statsFile << timeStamp - _startMonitoringMs << "\t";
+    _statsFile << timeStamp - _startMonitoringMs + _timeOffset << "\t";
     _statsFile << "[";
     for(size_t i = 0; i < virtualCores.size(); i++){
         _statsFile << virtualCores.at(i)->getVirtualCoreId() << ",";

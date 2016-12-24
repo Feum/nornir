@@ -59,6 +59,7 @@ Selector::Selector(const Parameters& p,
         _calibrationStartTasks(0),
         _totalCalibrationTime(0),
         _calibrating(false),
+        _ignoreViolations(false),
         _p(p),
         _configuration(configuration),
         _samples(samples),
@@ -119,6 +120,7 @@ bool Selector::isFeasiblePrimaryValue(double value, bool conservative) const{
 }
 
 bool Selector::isContractViolated() const{
+    if(_ignoreViolations){return false;}
     double primaryValue = 0.0;
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
@@ -185,6 +187,14 @@ void Selector::setCalibrationCoordination(){
 
 void Selector::allowCalibration(){
     _calibrationAllowed = true;
+}
+
+void Selector::ignoreViolations(){
+    _ignoreViolations = true;
+}
+
+void Selector::acceptViolations(){
+    _ignoreViolations = false;
 }
 
 std::vector<CalibrationStats> Selector::getCalibrationsStats() const{

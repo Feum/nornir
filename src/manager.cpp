@@ -273,29 +273,22 @@ void Manager::waitModelsInterferenceUpdate(){
 }
 
 std::vector<VirtualCoreId> Manager::getUsedCores(){
-    if(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){
-        return std::vector<VirtualCoreId>();
-    }else{
-        vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getActiveVirtualCores();
-        vector<VirtualCoreId> vcid;
-        for(size_t i = 0; i < vc.size(); i++){
-            vcid.push_back(vc[i]->getVirtualCoreId());
-        }
-        return vcid;
+    while(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){;}
+    vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getActiveVirtualCores();
+    vector<VirtualCoreId> vcid;
+    for(VirtualCore* v : vc){
+        vcid.push_back(v->getVirtualCoreId());
     }
+    return vcid;
 }
 
 void Manager::allowCores(std::vector<mammut::topology::VirtualCoreId> ids){
-    vector<VirtualCore*> vc = _topology->getVirtualCores();
     vector<VirtualCore*> allowedVc;
-    for(size_t i = 0; i < vc.size(); i++){
-        if(contains(ids, vc.at(i)->getVirtualCoreId())){
-            allowedVc.push_back(vc.at(i));
-        }
+    for(auto id : ids){
+        allowedVc.push_back(_topology->getVirtualCore(id));
     }
     ((KnobVirtualCores*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES))->changeMax(ids.size() - _configuration->getNumServiceNodes());
     ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->setAllowedCores(allowedVc);
-    _configuration->createAllRealCombinations();
 }
 
 void Manager::updateRequiredBandwidth() {

@@ -316,7 +316,8 @@ private:
 
     /**
      * Returns the vector of physical cores used by the manager.
-     * The vector is empty if the manager still didn't finished the calibration.
+     * If the manager is still calibrating, it waits until
+     * the manager finishes the calibration.
      *
      * @return The vector of physical cores used by the manager.
      */

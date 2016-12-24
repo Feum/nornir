@@ -161,6 +161,7 @@ private:
     unsigned int _startMonitoringMs;
     mammut::energy::Joules _totalJoules;
     unsigned int _lastTimestamp;
+    unsigned int _timeOffset;
 
     void addJoules(mammut::energy::Joules j);
 
@@ -169,7 +170,8 @@ private:
 public:
     Observer(std::string statsFile = "stats.csv",
              std::string calibrationFile = "calibration.csv",
-             std::string summaryFile = "summary.csv");
+             std::string summaryFile = "summary.csv",
+             unsigned int timeOffset = 0);
 
     virtual ~Observer();
 
