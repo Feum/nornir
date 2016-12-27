@@ -54,9 +54,7 @@ namespace nornir{
 using AllocationIndexes = std::vector<size_t>;
 using Allocation = std::pair<KnobsValues, double>;
 using AllocationFlip = std::pair<double, KnobsValues>;
-
-static inline KnobsValues& getKnobs(const Allocation& a){return a.first;}
-static inline double getPrediction(const Allocation& a){return a.second;}
+using ValidAllocations = std::vector<std::pair<double, const AllocationIndexes*> >;
 
 typedef enum{
     QUALITY_ESTIMATION_PERFORMANCE = 0,
@@ -71,7 +69,7 @@ typedef struct ManagerMultiConfiguration{
 
     ManagerMultiConfiguration():
         powerCap(0), useVirtualCores(false),
-        shrink(CALIBRATION_SHRINK_NONE), qualityEstimation(QUALITY_ESTIMATION_PERFORMANCE)
+        shrink(CALIBRATION_SHRINK_AGGREGATE), qualityEstimation(QUALITY_ESTIMATION_PERFORMANCE)
     {;}
 }ManagerMultiConfiguration;
 
@@ -81,8 +79,8 @@ typedef struct{
     double minPerfReqPerc;
     // Minimum performance (absolute value).
     double minPerf;
-    // List of physical cores identifiers used by the manager.
-    std::vector<mammut::topology::PhysicalCoreId> allocatedCores;
+    // List of virtual cores identifiers used by the manager.
+    std::vector<mammut::topology::VirtualCoreId> allocatedCores;
     // A vector of desirable allocations. This vector is sorted
     // from the most preferred to the least preferred.
     // To each KnobValue, we associate the corresponding predicted
@@ -154,10 +152,10 @@ private:
     void shrinkAll(Manager* except);
 
     /**
-     * Returns a list of available physical cores identifiers.
-     * @return A list of available physical cores identifiers.
+     * Returns a list of available virtual cores identifiers.
+     * @return A list of available virtual cores identifiers.
      **/
-    std::vector<mammut::topology::PhysicalCoreId> getAvailableCores() const;
+    std::vector<mammut::topology::VirtualCoreId> getAvailableCores() const;
 
     /**
      * Updates the list of preferred allocations of a specific manager.
@@ -186,10 +184,10 @@ private:
 
     /**
      * Computes a map of valid allocations, sorted from the worst to the best.
-     * @param validAllocations A map of valid allocations, sorted from
-     * the worst to the best.
+     * @param validAllocations A vector of valid allocations, it will be sorted from
+     * the best (highest quality) to the worst (lowest quality).
      */
-    void getValidAllocations(std::multimap<double, AllocationIndexes>& validAllocations) const;
+    void getValidAllocations(ValidAllocations& validAllocations) const;
 
     /**
      * Finds the best allocation.

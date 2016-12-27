@@ -303,14 +303,14 @@ public:
      * @param values The knobs values.
      * @return The primary prediction for a given configuration.
      */
-    double getPrimaryPrediction(KnobsValues values);
+    double getPrimaryPrediction(const KnobsValues& values);
 
     /**
      * Return the secondary prediction for a given configuration.
      * @param values The knobs values.
      * @return The secondary prediction for a given configuration.
      */
-    double getSecondaryPrediction(KnobsValues values);
+    double getSecondaryPrediction(const KnobsValues& values);
 
     /**
      * Returns a map with all the primary predictions.

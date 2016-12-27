@@ -81,10 +81,10 @@ typedef struct{
 // in order to do not interfere too much with them.
 typedef enum{
     // Do nothing
-    CALIBRATION_SHRINK_NONE = 0,
-    // Move all the threads of the processor on the same core.
+    CALIBRATION_SHRINK_NONE = 0, //TODO: New managers arrived to the multimanager may not have space to calibrate.
+    // Move all the threads on the same core.
     CALIBRATION_SHRINK_AGGREGATE,
-    // Pause the process.
+    // Move all the threads on the same core and pause the process.
     CALIBRATION_SHRINK_PAUSE,
 }CalibrationShrink;
 

@@ -144,6 +144,7 @@ bool Selector::isContractViolated() const{
 }
 
 void Selector::startCalibration(uint64_t totalTasks){
+    DEBUG("Starting calibration.");
     _calibrating = true;
     if(_calibrationCoordination){
         while(!_calibrationAllowed){;}
@@ -158,6 +159,7 @@ void Selector::startCalibration(uint64_t totalTasks){
 }
 
 void Selector::stopCalibration(uint64_t totalTasks){
+    DEBUG("Stopping calibration.");
     _calibrating = false;
     if(_numCalibrationPoints){
         CalibrationStats cs;
@@ -265,6 +267,15 @@ SelectorPredictive::SelectorPredictive(const Parameters& p,
         }break;
     }
     _maxPerformance = -1;
+#if STORE_PREDICTIONS
+    // Just to let the multi manager work even if this manager terminates
+    // before making some predictions.
+    const vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
+    for(size_t i = 0; i < combinations.size(); i++){
+        _primaryPredictions[combinations.at(i)] = -1;
+        _secondaryPredictions[combinations.at(i)] = -1;
+    }
+#endif
 }
 
 SelectorPredictive::~SelectorPredictive(){
@@ -279,7 +290,7 @@ double SelectorPredictive::getRealBandwidth(double predicted) const{
     }
 }
 
-double SelectorPredictive::getPrimaryPrediction(KnobsValues values){
+double SelectorPredictive::getPrimaryPrediction(const KnobsValues& values){
     auto observation = _observedValues.find(getRealValues(_configuration, values));
 
     // Get real bandwidth from maximum
@@ -320,7 +331,7 @@ double SelectorPredictive::getPrimaryPrediction(KnobsValues values){
     }
 }
 
-double SelectorPredictive::getSecondaryPrediction(KnobsValues values){
+double SelectorPredictive::getSecondaryPrediction(const KnobsValues& values){
     auto observation = _observedValues.find(getRealValues(_configuration, values));
 
     switch(_p.contractType){
@@ -486,16 +497,16 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
 
     _feasible = false;
 
-    vector<KnobsValues> combinations = _configuration.getAllRealCombinations();
+    const vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
     for(size_t i = 0; i < combinations.size(); i++){
-        KnobsValues currentValues = combinations.at(i);
+        const KnobsValues& currentValues = combinations.at(i);
         primaryPrediction = getPrimaryPrediction(currentValues);
         secondaryPrediction = getSecondaryPrediction(currentValues);
 
         updateMaxPerformanceConfiguration(currentValues, primaryPrediction, secondaryPrediction);
 #if STORE_PREDICTIONS
-        _primaryPredictions[combinations.at(i)] = primaryPrediction;
-        _secondaryPredictions[combinations.at(i)] = secondaryPrediction;
+        _primaryPredictions[currentValues] = primaryPrediction;
+        _secondaryPredictions[currentValues] = secondaryPrediction;
 #endif
 
         //std::cout << currentValues << " " << primaryPrediction << " " << secondaryPrediction << std::endl;

@@ -198,11 +198,10 @@ int main(int argc, char * argv[]){
         Parameters p;
         initializeParameters(p);
         std::string logPrefix = logDir + "/" + pidToString(pids.at(i));
-        Observer o(logPrefix + "_stats.csv",
-                   logPrefix + "_calibration.csv",
-                   logPrefix + "_summary.csv",
-                   mammut::utils::getMillisecondsTime() - startTime);
-        p.observer = &o;
+        p.observer = new Observer(logPrefix + "_stats.csv",
+                                  logPrefix + "_calibration.csv",
+                                  logPrefix + "_summary.csv",
+                                  mammut::utils::getMillisecondsTime() - startTime);
         ManagerBlackBox* m = new ManagerBlackBox(pids.at(i), p);
         if(multiManagerNeeded){
             mm.addManager(m, pidPerfs.at(i));
@@ -213,13 +212,14 @@ int main(int argc, char * argv[]){
             DEBUG("Started PID: " << pids.at(i));
             m->join();
             delete m;
+            delete p.observer;
         }
     }
 
     /* Then we start following the schedule. */
-    bool* started = (bool*) mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
+    volatile bool* started = (bool*) mmap(NULL, sizeof(volatile bool), PROT_READ | PROT_WRITE,
                            MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    bool* handlerCreated = (bool*) mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE,
+    volatile bool* handlerCreated = (bool*) mmap(NULL, sizeof(volatile bool), PROT_READ | PROT_WRITE,
                                   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
     if(started == MAP_FAILED || handlerCreated == MAP_FAILED){
@@ -232,7 +232,7 @@ int main(int argc, char * argv[]){
     double lastStart = 0;
 
     for(size_t i = 0; i < scheduledPrograms.size(); i++){
-        ScheduledProgram sp = scheduledPrograms[i];
+        ScheduledProgram& sp = scheduledPrograms[i];
         sleep(sp.start - lastStart);
         lastStart = sp.start;
 
@@ -255,11 +255,10 @@ int main(int argc, char * argv[]){
             stringstream out;
             out << sp.start;
             std::string logPrefix = logDir + "/" + out.str() + "_" + mammut::utils::split(sp.program.at(0), '/').back();
-            Observer o(logPrefix + "_stats.csv",
-                       logPrefix + "_calibration.csv",
-                       logPrefix + "_summary.csv",
-                       mammut::utils::getMillisecondsTime() - startTime);
-            p.observer = &o;
+            p.observer = new Observer(logPrefix + "_stats.csv",
+                                      logPrefix + "_calibration.csv",
+                                      logPrefix + "_summary.csv",
+                                      mammut::utils::getMillisecondsTime() - startTime);
             while(!*started){;}
 
             ManagerBlackBox* m = new (mmem) ManagerBlackBox(pid, p);
@@ -274,8 +273,9 @@ int main(int argc, char * argv[]){
                 m->join();
                 waitpid(pid, NULL, 0);
                 m->~ManagerBlackBox(); // Because created with placement new
+                delete p.observer;
             }
-            DEBUG("Started scheduled: " << sp.program[0] << " with pid " << pid);
+            DEBUG("Started scheduled: " << sp.program[0] << " with pid " << pid << " on manager " << m);
         }else{
             /* Child - Application */
             *started = true;
@@ -306,21 +306,23 @@ int main(int argc, char * argv[]){
     DEBUG("All specified programs have been added to the monitoring system. Waiting for their termination...");
     /* All programs scheduled, now wait for termination and clean. */
     if(multiManagerNeeded){
+        for(size_t i = 0; i < scheduledPrograms.size(); i++){
+            waitpid(scheduledPrograms[i].pid, NULL, 0);
+            DEBUG(scheduledPrograms[i].pid << " PID terminated (" << scheduledPrograms[i].program << ")");
+        }
+
         for(size_t i = 0; i < pids.size() + scheduledPrograms.size(); i++){
             ManagerBlackBox* m;
             while((m = (ManagerBlackBox*) mm.getTerminatedManager()) == NULL){
                 sleep(1);
             }
-            DEBUG("One program terminated.");
+            DEBUG("Manager (" << m << ") terminated.");
             if(mammut::utils::contains(pids, (long) m->getPid())){
                 delete m;
             }else{
                 m->~ManagerBlackBox(); // Because we used placement new
             }
-        }
-    
-        for(size_t i = 0; i < scheduledPrograms.size(); i++){
-            waitpid(scheduledPrograms[i].pid, NULL, 0);
+            //delete m->_p.observer;
         }
     }
 }

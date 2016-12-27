@@ -267,7 +267,13 @@ void Manager::waitModelsInterferenceUpdate(){
         throw std::runtime_error("waitModelsInterferenceUpdate can only be "
                         "used on LEARNING selectors.");
     }
-    while(!((SelectorLearner*) _selector)->areModelsUpdated()){;}
+    while(!((SelectorLearner*) _selector)->areModelsUpdated() && !_terminated){
+        // If in the meanwhile the selector is waiting for calibration,
+        // allow him to calibrate.
+        if(_selector->isCalibrating()){
+           _selector->allowCalibration();
+        }
+    }
     // Inhibit again.
     inhibit();
 }
