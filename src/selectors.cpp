@@ -291,7 +291,7 @@ double SelectorPredictive::getRealBandwidth(double predicted) const{
 }
 
 double SelectorPredictive::getPrimaryPrediction(const KnobsValues& values){
-    auto observation = _observedValues.find(getRealValues(_configuration, values));
+    auto observation = _observedValues.find(_configuration.getRealValues(values));
 
     // Get real bandwidth from maximum
     switch(_p.contractType){
@@ -332,7 +332,7 @@ double SelectorPredictive::getPrimaryPrediction(const KnobsValues& values){
 }
 
 double SelectorPredictive::getSecondaryPrediction(const KnobsValues& values){
-    auto observation = _observedValues.find(getRealValues(_configuration, values));
+    auto observation = _observedValues.find(_configuration.getRealValues(values));
 
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:
@@ -463,9 +463,6 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
     KnobsValues bestValues(KNOB_VALUE_REAL);
     KnobsValues bestSuboptimalValues = _configuration.getRealValues();
 
-    double primaryPrediction = 0;
-    double secondaryPrediction = 0;
-
 #ifdef DEBUG_SELECTORS
     double bestPrimaryPrediction = 0;
     double suboptimalSecondary = 0;
@@ -500,8 +497,8 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
     const vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
     for(size_t i = 0; i < combinations.size(); i++){
         const KnobsValues& currentValues = combinations.at(i);
-        primaryPrediction = getPrimaryPrediction(currentValues);
-        secondaryPrediction = getSecondaryPrediction(currentValues);
+        double primaryPrediction = getPrimaryPrediction(currentValues);
+        double secondaryPrediction = getSecondaryPrediction(currentValues);
 
         updateMaxPerformanceConfiguration(currentValues, primaryPrediction, secondaryPrediction);
 #if STORE_PREDICTIONS
@@ -547,18 +544,7 @@ void SelectorPredictive::refine(){
 }
 
 void SelectorPredictive::updatePredictions(const KnobsValues& next){
-    KnobsValues real(KNOB_VALUE_REAL);
-
-    if(next.areRelative()){
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-            double realv;
-            _configuration.getKnob((KnobType)i)->getRealFromRelative(next[(KnobType)i], realv);
-            real[(KnobType)i] = realv;
-        }
-    }else{
-        real = next;
-    }
-
+    const KnobsValues real = _configuration.getRealValues(next);
     _primaryPrediction = getPrimaryPrediction(real);
     _secondaryPrediction = getSecondaryPrediction(real);
 }
@@ -590,11 +576,11 @@ bool SelectorPredictive::isMaxPerformanceConfiguration() const{
 }
 
 bool SelectorLearner::isAccurate(){
-    double maxBandwidth = 0.0; double predictedMaxBandwidth = 0.0;
-    double power = 0.0; double predictedPower = 0.0;
+    double predictedMaxBandwidth = 0.0;
+    double predictedPower = 0.0;
 
-    maxBandwidth = _samples->average().getMaximumBandwidth();
-    power = _samples->average().watts;
+    double maxBandwidth = _samples->average().getMaximumBandwidth();
+    double power = _samples->average().watts;
 
     switch(_p.contractType){
         case CONTRACT_PERF_UTILIZATION:{
@@ -617,9 +603,8 @@ bool SelectorLearner::isAccurate(){
         }break;
     }
 
-    double performanceError = 100.0, powerError = 100.0;
-    performanceError = std::abs((maxBandwidth - predictedMaxBandwidth) / maxBandwidth*100.0);
-    powerError = std::abs((power - predictedPower) / power*100.0);
+    double performanceError = std::abs((maxBandwidth - predictedMaxBandwidth) / maxBandwidth*100.0);
+    double powerError = std::abs((power - predictedPower) / power*100.0);
 
     // In maximum performance contracts we do not predict power consumption.
     if(_p.contractType == CONTRACT_PERF_MAX){

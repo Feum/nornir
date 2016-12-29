@@ -31,11 +31,12 @@
 #include "external/orlog/src/orlog.hpp"
 #include "external/orlog/src/external/cppnanomsg/nn.hpp"
 #include "external/orlog/src/external/nanomsg/src/pair.h"
+#include "external/mammut/mammut/mammut.hpp"
 
 #define EXTERNAL_CHANNEL_NAME "ipc:///tmp/nornir.ipc"
 
 namespace nornir{
-class ExternalApplication{
+class ExternalApplication: public mammut::utils::NonCopyable{
 private:
     nn::socket _channel;
     int _chid;
@@ -45,7 +46,7 @@ public:
      * Creates a client for interaction with a local server.
      * @param parameters The file containing the Nornir parameters.
      */
-    ExternalApplication(const std::string& parametersFile);
+    explicit ExternalApplication(const std::string& parametersFile);
 
     /**
      * Creates a client for interaction with a remote server.

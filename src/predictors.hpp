@@ -100,7 +100,6 @@ public:
  */
 class RegressionDataServiceTime: public RegressionData{
 private:
-    uint _phyCores;
     mammut::cpufreq::Frequency _minFrequency;
     double _invScalFactorFreq;
     double _invScalFactorFreqAndCores;
@@ -332,14 +331,9 @@ public:
         }
     }
 
-    double predict(const KnobsValues& configuration){
-        double realValue = 0.0;
-        if(configuration.areRelative()){
-            _configuration.getKnob(KNOB_TYPE_MAPPING)->getRealFromRelative(configuration[KNOB_TYPE_MAPPING], realValue);
-        }else{
-            realValue = configuration[KNOB_TYPE_MAPPING];
-        }
-        return _predictors[(MappingType) realValue]->predict(configuration);
+    double predict(const KnobsValues& values){
+        const KnobsValues real = _configuration.getRealValues(values);
+        return _predictors[(MappingType) real[KNOB_TYPE_MAPPING]]->predict(values);
     }
 };
 

@@ -828,7 +828,7 @@ public:
      * @param communicator The communicator used to instantiate the other
      *        modules. If NULL, the modules will be created as local modules.
      */
-    Parameters(mammut::Communicator* const communicator = NULL);
+    explicit Parameters(mammut::Communicator* const communicator = NULL);
 
     /**
      * Creates the adaptivity parameters.

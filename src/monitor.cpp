@@ -57,11 +57,13 @@ ExternalApplication::ExternalApplication(const std::string& parametersFile):
         throw std::runtime_error("Impossible to connect to external Nornir channel.");
     }
     pid_t pid = getpid();
-    assert(mainChannel.send(&pid, sizeof(pid), 0) == sizeof(pid));
+    int ret = mainChannel.send(&pid, sizeof(pid), 0);
+    assert(ret == sizeof(pid));
     // Wait ack. This is needed because we have to be sure that the pid channel
     // has been created before trying to connect.
     char ack;
-    assert(mainChannel.recv(&ack, sizeof(ack), 0) == sizeof(ack));
+    ret = mainChannel.recv(&ack, sizeof(ack), 0);
+    assert(ret == sizeof(ack));
     mainChannel.shutdown(mainChid);
 
     /** Send content length. **/
@@ -76,7 +78,8 @@ ExternalApplication::ExternalApplication(const std::string& parametersFile):
         length += lines.at(i).length();
     }
     length += 1;
-    assert(_channel.send(&length, sizeof(length), 0) == sizeof(length));
+    ret = _channel.send(&length, sizeof(length), 0);
+    assert(ret == sizeof(length));
 
     /** Send content. **/
     string fileContent;
@@ -86,11 +89,13 @@ ExternalApplication::ExternalApplication(const std::string& parametersFile):
     }
     fileContent.push_back('\0');
     const char* fileContentC = fileContent.c_str();
-    assert(_channel.send(fileContentC, length, 0) == (int) length);
+    ret = _channel.send(fileContentC, length, 0);
+    assert(ret == (int) length);
 
     /** Receive validation result. **/
     ParametersValidation pv;
-    assert(_channel.recv(&pv, sizeof(pv), 0) == sizeof(pv));
+    ret = _channel.recv(&pv, sizeof(pv), 0);
+    assert(ret == sizeof(pv));
     if(pv != VALIDATION_OK){
         throw runtime_error("Invalid adaptivity parameters: " + std::to_string(pv));
     }

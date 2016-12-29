@@ -341,7 +341,7 @@ private:
     T _standardDeviation;
     T _coefficientVariation;
 public:
-    MovingAverageSimple(size_t span):_span(span), _nextIndex(0),
+    explicit MovingAverageSimple(size_t span):_span(span), _nextIndex(0),
                                      _storedValues(0){
         _windowImpl.resize(_span);
         zero(_lastSample);
@@ -450,7 +450,7 @@ private:
     T _standardDeviation;
     T _coefficientVariation;
 public:
-    MovingAverageExponential(double alpha):_alpha(alpha),_storedValues(0){
+    explicit MovingAverageExponential(double alpha):_alpha(alpha),_storedValues(0){
         if(_alpha < 0 || _alpha > 1.0){
             throw std::runtime_error("Alpha must be between 0 and 1 "
                                      "(included)");

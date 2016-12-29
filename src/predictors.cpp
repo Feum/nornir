@@ -639,17 +639,11 @@ void PredictorUsl::prepareForPredictions(){
     }
 }
 
-double PredictorUsl::predict(const KnobsValues& configuration){
+double PredictorUsl::predict(const KnobsValues& knobsValues){
+    const KnobsValues real = _configuration.getRealValues(knobsValues);
     double result = 0;
-    double numCores = 0;
-    double frequency = 0;
-    if(configuration.areReal()){
-        numCores = configuration[KNOB_TYPE_VIRTUAL_CORES];
-        frequency = configuration[KNOB_TYPE_FREQUENCY];
-    }else{
-        _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealFromRelative(configuration[KNOB_TYPE_VIRTUAL_CORES], numCores);
-        _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealFromRelative(configuration[KNOB_TYPE_FREQUENCY], frequency);
-    }
+    double numCores = real[KNOB_TYPE_VIRTUAL_CORES];
+    double frequency = real[KNOB_TYPE_FREQUENCY];
     double exp;
     for(size_t i = 0; i < _coefficients.size(); i++){
         exp = i;

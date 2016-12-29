@@ -744,8 +744,6 @@ Parameters::~Parameters(){
 }
 
 ParametersValidation Parameters::validate(){
-    ParametersValidation r = VALIDATION_OK;
-
     setDefaultPost();
 
     _knobEnabled[KNOB_TYPE_FREQUENCY] = knobFrequencyEnabled;
@@ -754,7 +752,7 @@ ParametersValidation Parameters::validate(){
     _knobEnabled[KNOB_TYPE_HYPERTHREADING] = knobHyperthreadingEnabled;
 
     /** Validate frequency knob. **/
-    r = validateKnobFrequencies();
+    ParametersValidation r = validateKnobFrequencies();
     if(r != VALIDATION_OK){return r;}
 
     /** Validate triggers. **/

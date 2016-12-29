@@ -63,7 +63,7 @@ private:
 
     void stopReconfigurationStatsTotal(ticks start);
 public:
-    Configuration(const Parameters& p);
+    explicit Configuration(const Parameters& p);
 
     virtual ~Configuration() = 0;
 
@@ -73,7 +73,14 @@ public:
      * @return true if the values of this configuration are equal to those
      * passed as parameters, false otherwise.
      */
-    bool equal(KnobsValues values) const;
+    bool equal(const KnobsValues& values) const;
+
+    /**
+     * Given some knobs values, returns the corresponding real values.
+     * @param values The knobs values.
+     * @return The corresponding real values.
+     */
+    KnobsValues getRealValues(const KnobsValues& values) const;
 
     /**
      * Returns true if the knobs values need to be changed, false otherwise.
@@ -142,12 +149,16 @@ public:
         return _reconfigurationStats;
     }
 
-    virtual uint getNumServiceNodes() const{return 0;}
+    virtual uint getNumServiceNodes() const = 0;
 };
 
 class ConfigurationExternal: public Configuration{
 public:
-    ConfigurationExternal(const Parameters& p);
+    explicit ConfigurationExternal(const Parameters& p);
+
+    inline uint getNumServiceNodes() const{
+        return 0;
+    }
 };
 
 class ConfigurationFarm: public Configuration{
@@ -166,8 +177,6 @@ public:
         return _numServiceNodes;
     }
 };
-
-KnobsValues getRealValues(const Configuration& configuration, const KnobsValues& values);
 
 std::vector<AdaptiveNode*> convertWorkers(ff::svector<ff::ff_node*> w);
 

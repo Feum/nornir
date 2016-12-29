@@ -116,7 +116,7 @@ class KnobVirtualCores: public Knob{
 private:
     Parameters _p;
 public:
-    KnobVirtualCores(Parameters p);
+    explicit KnobVirtualCores(Parameters p);
     void changeValueReal(double v);
     void changeMax(double v);
 };
@@ -128,7 +128,7 @@ public:
     KnobVirtualCoresFarm(Parameters p,
                   AdaptiveNode* emitter, AdaptiveNode* collector,
                   ff::ff_gatherer* gt,
-                  const std::vector<AdaptiveNode*> workers,
+                  const std::vector<AdaptiveNode*>& workers,
                   const volatile bool* terminated);
 
     void changeValueReal(double v);
@@ -166,14 +166,14 @@ private:
     AdaptiveNode* _emitter;
     AdaptiveNode* _collector;
     ff::ff_gatherer* _gt;
-    const std::vector<AdaptiveNode*> _allWorkers;
+    const std::vector<AdaptiveNode*>& _allWorkers;
     std::vector<AdaptiveNode*> _activeWorkers;
     const volatile bool* _terminated;
 };
 
 class KnobHyperThreading: public Knob{
 public:
-    KnobHyperThreading(Parameters p);
+    explicit KnobHyperThreading(Parameters p);
     void changeValueReal(double v);
 };
 
@@ -288,7 +288,7 @@ public:
         }
     }
 
-    KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){
+    explicit KnobsValues(KnobValueType type = KNOB_VALUE_UNDEF):_type(type){
         reset();
     }
 

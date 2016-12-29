@@ -38,7 +38,7 @@
 
 namespace nornir{
 
-class Selector{
+class Selector: public mammut::utils::NonCopyable{
 private:
     std::vector<CalibrationStats> _calibrationStats;
     uint _calibrationStartMs;

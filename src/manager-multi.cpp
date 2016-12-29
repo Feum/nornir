@@ -391,7 +391,8 @@ void ManagerMulti::calibrate(Manager* m, bool start){
 }
 
 // We want the elements sorted from highest to lowest quality.
-bool validAllocationComp(std::pair<double, const AllocationIndexes*> i , std::pair<double, const AllocationIndexes*> j){
+bool validAllocationComp(const std::pair<double, const AllocationIndexes*>& i,
+                         const std::pair<double, const AllocationIndexes*>& j){
     return i.first > j.first;
 }
 
@@ -450,28 +451,19 @@ void ManagerMulti::applyNewAllocation(){
     DEBUG("Best allocation found: " << alloc);
     for(auto& it : _managerData){
         Manager* m = getManager(it);
-        const KnobsValues& kv = getKnobs(it, alloc.at(pos));
+        const KnobsValues real = m->_configuration->getRealValues(getKnobs(it, alloc.at(pos)));
         if(!m->running()){++pos; continue;}
-        DEBUG("Allocation: " << m << " " << kv << " " << ((SelectorPredictive*)m->_selector)->getPrimaryPrediction(kv) << " " << ((SelectorPredictive*)m->_selector)->getSecondaryPrediction(kv));
-        size_t numCores;
-        if(kv.areRelative()){
-            double tmp;
-            assert(m->_configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealFromRelative(kv[KNOB_TYPE_VIRTUAL_CORES], tmp));
-            numCores = tmp;
-        }else{
-            numCores = kv[KNOB_TYPE_VIRTUAL_CORES];
-        }
-        numCores += m->_configuration->getNumServiceNodes();
-
+        DEBUG("Allocation: " << m << " " << real << " " << ((SelectorPredictive*)m->_selector)->getPrimaryPrediction(kv) << " " << ((SelectorPredictive*)m->_selector)->getSecondaryPrediction(kv));
+        size_t numCores = real[KNOB_TYPE_VIRTUAL_CORES] + m->_configuration->getNumServiceNodes();
         vector<VirtualCoreId> cores;
         cores.reserve(numCores);
         for(size_t i = 0; i < numCores; i++){
             cores.push_back(_allCores.at((i + nextCoreId) % _allCores.size()));
         }
         allowCores(m, cores);
-        //man->_selector->forceConfiguration(kv);
-        m->act(kv, true);
-        ((SelectorPredictive*) m->_selector)->updatePredictions(kv);
+        //man->_selector->forceConfiguration(real);
+        m->act(real, true);
+        ((SelectorPredictive*) m->_selector)->updatePredictions(real);
         ++pos;
         nextCoreId += numCores;
     }
@@ -505,27 +497,15 @@ bool ManagerMulti::isValidAllocation(const AllocationIndexes& indexes) const{
     bool validAllocation = true;
     for(const auto& it : _managerData){
         Manager* currentManager = getManager(it);
-        size_t numCores = 0;
-        Frequency currentFreq;
         allocationPosition = indexes.at(pos);
-        const KnobsValues& kv = getKnobs(it, allocationPosition);
-        if(kv.areRelative()){
-            double tmp;
-            assert(currentManager->_configuration->getKnob(KNOB_TYPE_FREQUENCY)->getRealFromRelative(kv[KNOB_TYPE_FREQUENCY], tmp));
-            currentFreq = tmp;
-            assert(currentManager->_configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealFromRelative(kv[KNOB_TYPE_VIRTUAL_CORES], tmp));
-            numCores = tmp;
-        }else{
-            currentFreq = kv[KNOB_TYPE_FREQUENCY];
-            numCores = kv[KNOB_TYPE_VIRTUAL_CORES];
-        }
-        numCores += currentManager->_configuration->getNumServiceNodes();
+        const KnobsValues real = currentManager->_configuration->getRealValues(getKnobs(it, allocationPosition));
+        size_t numCores = real[KNOB_TYPE_VIRTUAL_CORES] + currentManager->_configuration->getNumServiceNodes();
+        Frequency currentFreq = real[KNOB_TYPE_FREQUENCY];
         // Only keep combinations on the same frequency.
         if(previousFreq && currentFreq != previousFreq){
             validAllocation = false;
             break;
         }
-
         previousFreq = currentFreq;
         totalCores += numCores;
         ++pos;
@@ -574,10 +554,6 @@ void ManagerMulti::run(){
                     if(m->_selector->isCalibrating()){
                         calibrate(m);
                     }
-                    //TODO Removed, not sure why inserted it in first place
-                    //else{
-                    //    allowCores(m, m->getUsedCores());
-                    //}
                     ++it;
                 }
             }

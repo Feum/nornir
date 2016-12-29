@@ -97,7 +97,7 @@ typedef enum{
 class Manager: public Thread{
     friend class ManagerMulti;
 public:
-    Manager(Parameters adaptivityParameters);
+    explicit Manager(Parameters adaptivityParameters);
 
     virtual ~Manager();
     /**

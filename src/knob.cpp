@@ -191,7 +191,7 @@ std::ostream& operator<< (std::ostream& out, const std::vector<Domain*>& v){
 KnobVirtualCoresFarm::KnobVirtualCoresFarm(Parameters p,
                              AdaptiveNode* emitter, AdaptiveNode* collector,
                              ff::ff_gatherer* gt,
-                             const std::vector<AdaptiveNode*> workers,
+                             const std::vector<AdaptiveNode*>& workers,
                              const volatile bool* terminated):
             KnobVirtualCores(p), _emitter(emitter), _collector(collector),
             _gt(gt), _allWorkers(workers), _terminated(terminated){
@@ -510,7 +510,7 @@ void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){
 
     if(_collector){
         _collector->move((VirtualCore*) vcOrder[nextIndex]);
-        nextIndex = (nextIndex + 1) % vcOrder.size();
+        //nextIndex = (nextIndex + 1) % vcOrder.size();
     }
 }
 
@@ -529,9 +529,8 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
 
     std::vector<mammut::cpufreq::Domain*> scalableDomains;
     scalableDomains = _frequencyHandler->getDomains();
-    Domain* currentDomain;
     for(size_t i = 0; i < scalableDomains.size(); i++){
-        currentDomain = scalableDomains.at(i);
+        Domain* currentDomain = scalableDomains.at(i);
         if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
             throw runtime_error("AdaptivityManagerFarm: Impossible "
                                 "to set the specified governor.");
@@ -546,9 +545,8 @@ void KnobFrequency::changeValueReal(double v){
     DEBUG("[Frequency] Changing real value to: " << v);
     std::vector<mammut::cpufreq::Domain*> scalableDomains;
     scalableDomains = _frequencyHandler->getDomains(_knobMapping.getActiveVirtualCores());
-    Domain* currentDomain;
     for(size_t i = 0; i < scalableDomains.size(); i++){
-        currentDomain = scalableDomains.at(i);
+        Domain* currentDomain = scalableDomains.at(i);
         if(!currentDomain->setFrequencyUserspace((uint)v)){
             throw runtime_error("AdaptivityManagerFarm: Impossible "
                                 "to set the specified frequency.");
