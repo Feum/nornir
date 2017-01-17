@@ -79,12 +79,18 @@
                         <hr>
                         <span class="skills">Self adaptive, power-aware runtime support.</span>
                         <hr>
-                        <p class="lead">Nornir is a C++ runtime support,
-                        providing the possibility to create power aware parallel applications. It allows
-                        to specify requirements on the maximum power consumption of the application
-                        or on its minimum performance level. The runtime tries to provide such
-                        guarantees even in presence of workload fluctuations or phase changes,
-                        by adapting the application throughout its execution.
+                        <p class="lead">Nornir is a runtime support,
+                        providing the possibility to specify requirements in terms of performance
+                        and/or power consumption on parallel applications. These requirements will be
+                        enforced by selecting an appropriate amount of resources to allocate to the 
+                        application (e.g. number of cores, clock frequency, threads' mapping, etc...).
+                        The application will be
+                        monitored throughout its entire execution in order to provide such
+                        guarantees even in presence of workload fluctuations or phase changes.
+                        Nornir is written as a C++ customizable framework, allowing the user to specify
+                        its custom decision policies.
+                        You can find more details on the <a href="description.html">Description</a>
+                        section.
                         </p>
                     </div>
                 </div>

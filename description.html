@@ -1,36 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
+	<head>
+	    <meta charset="utf-8">
+	    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+	    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="Nornir Website">
+        <meta name="author" content="Daniele De Sensi">
+	
+	    <title>Nornir</title>
+	    
+	    <!-- Bootstrap Core CSS - Uses Bootswatch Flatly Theme: http://bootswatch.com/flatly/ -->
+	    <link href="css/bootstrap.min.css" rel="stylesheet">
+	    
+	
+	    <!-- Custom CSS -->
+	    <link href="css/freelancer.css" rel="stylesheet">
+	    <link href="css/barstyles.css" rel="stylesheet">
+	    
+	    <script src="js/prettify.js"></script>
+	    <link href="css/prettifydesert.css" rel="stylesheet">
+	    
+	    <!-- Custom Fonts -->
+	    <link href="font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+	    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet" type="text/css">
+	    <link href="https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic" rel="stylesheet" type="text/css">
+	
+	    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+	    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+	    <!--[if lt IE 9]>
+	        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+	        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+	    <![endif]-->
+	    
+	    <style>
+			*[id]:before { 
+				display: block; 
+				content: " "; 
+				margin-top: -120px; 
+				height: 120px; 
+				visibility: hidden; 
+			}
+			
+			ul#manualcontent > li{
+ 				font-size:18px;
+			}
+			ol#manualcontent > li{
+ 				font-size:18px;
+			}
+	    </style>
 
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Nornir Website">
-    <meta name="author" content="Daniele De Sensi">
-
-    <title>Nornir</title>
-    
-    <!-- Bootstrap Core CSS - Uses Bootswatch Flatly Theme: http://bootswatch.com/flatly/ -->
-    <link href="css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Custom CSS -->
-    <link href="css/freelancer.css" rel="stylesheet">
-
-    <!-- Custom Fonts -->
-    <link href="font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css">
-    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet" type="text/css">
-    <link href="https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic" rel="stylesheet" type="text/css">
-
-    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
-    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
-    <!--[if lt IE 9]>
-        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
-        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
-    <![endif]-->
-
-</head>
-
-<body id="page-top" class="index">
+	</head>
+	<body>
 
     <!-- Navigation -->
     <nav class="navbar navbar-default navbar-fixed-top">
@@ -67,95 +87,363 @@
         </div>
         <!-- /.container-fluid -->
     </nav>
-  
-    <!-- Header -->
-    <header>
-        <div class="container" style="padding-bottom: 100px;">
-            <div class="row">
-                <div class="col-lg-12">
-                    <div class="intro-text">
-                        <p class="lead">
-				Description coming soon.
+
+
+	<!-- Begin Body -->
+	<div class="container" style="margin-bottom: 200px">
+		<div class="row" style="position:relative; top:60px">
+  			<div class="col-md-3" id="leftCol">
+	      			<ul class="nav nav-stacked navbar" id="sidebar">
+	  				<li><a href="#intro">Introduction</a></li>
+					<li><a href="#targetapplications">Target Applications</a></li>
+						<ul>
+							<li style="text-transform: capitalize;"><a href="#applicationsff">FastFlow Applications</a></li>
+		                	<li style="text-transform: capitalize;"><a href="#applicationsins">Instrumented Applications</a></li>
+		                	<li style="text-transform: capitalize;"><a href="#applicationsext">External Applications</a></li>
+		                	<li style="text-transform: capitalize;"><a href="#programmingenvironment">Nornir Programming Environment</a></li>
+		                </ul>
+					<li><a href="#parameters">Parameters</a></li>
+					<li><a href="#customization">Customization</a></li>
+					<li><a href="#references">References</a></li>
+      			</div>  
+      			<div class="col-md-9" style="position:relative; top:30px">
+      				<!-------------------->
+      				<!-- Introduction   -->
+      				<!-------------------->
+              			<h2 id="intro">Introduction</h2>
+              			<p>
+                        Nornir is a runtime support,
+                        providing the possibility to specify requirements in terms of performance
+                        and/or power consumption on parallel applications. These requirements will be
+                        enforced by selecting an appropriate amount of resources to allocate to the 
+                        application (e.g. number of cores, clock frequency, threads' mapping, etc...).
+                        The application will be
+                        monitored throughout its entire execution in order to provide such
+                        guarantees even in presence of workload fluctuations or phase changes.
+                        Nornir is written as a C++ customizable framework, allowing the user to specify
+                        its custom decision policies.
+                		</p>
+				<!--------------------------------->
+				<!-- Target applications section -->
+				<!--------------------------------->
+				<hr class="col-md-12">
+              			<h2 id="topology">Target Applications</h2>
+		              	<p>
+				<p>Before moving forward, we need to clarify which kind of applications can be controlled by
+                using Nornir. At the moment, Nornir assumes that the most intensive part of the computations is
+                homogeneously split between a certain number of threads. For example, if your application is running
+                24 threads, let's say 20 of them are performing the intensive part of the computation and they are
+                executing the same code (on the same data or on different data elements, that doesn't matter).
+                This model of execution is pretty common in many computational models like <i>map reduce</i>,
+                <i>task parallel</i> computations, <i>data parallel</i> computations, <i>data stream processing</i>,
+                <i>thread pools</i> and others. For example, if you take as reference the <a href="http://parsec.cs.princeton.edu/"  target="_blank">
+                Parsec</a> benchmark, you may find that all the applications except one follow this model. Actually,
+                Nornir also works on unstructured applications, as far as the underlying runtime system (e.g. Intel TBB,
+                OpenMP, FastFlow or others) keeps the computation well balanced and distributed between the threads.</p>
+                </br>
+                <p>From a technical standpoint, Nornir can provide different types of guarantees according
+                to the programming framework used to write the application. Currently, we 
+                target the following types of applications:
+            	<ol id="manualcontent">
+            		<li>Already existing applications, written by using the 
+                        <a href="http://calvados.di.unipi.it/"  target="_blank">FastFlow</a> framework. This is described in 
+                        <a href="#applicationsff">FastFlow Applications</a> section.</li>
+            		<li>Already existing applications, written by using any formalism/framework and instrumented with
+                    our internal instrumentation tool. This is described in 
+                        <a href="#applicationsins">Instrumented Applications</a> section.</li>
+            		<li>Already existing applications, written by using any formalism/framework. This is described in 
+                        <a href="#applicationsext">External Applications</a> section.</li>
+            	</ol>
+                <p>
+                For applications in point 1. we will have access to many information about internal application structure,
+                synchronization mechanisms used and other additional information. Accordingly, this is the scenario that in 
+                principle would provide you better guarantees and tradeoffs in terms of power consumption and performance.
+                </br></br>
+                For applications in points 1. and 2. we are able to retrieve information about the true performance of the 
+                application. For example, in the case of a video processing application, we would be able to retrieve information
+                about the number of frames processed per second. Accordingly, it would be possible for the user to express
+                explicit performance requirements as minimum number of frames per second that he would like to be processed
+                by its application. Choosing solution 1. could require to rewrite the application (if not already written with
+                FastFlow). On the other hand, choosing solution 2. just require to add few instrumentation calls to the already
+                existing application code.
+                </br></br>
+                For applications in point 3. there is no additional programming effort required to the user. However, in this case
+                we do not have access to the real performance of the application (for example in terms of frames processed per second).
+                For this reason, we will approximate the performance by using hardware counters like the number of assembler instructions
+                executed per time unit, floating operatins per second, etc... . Accordingly, the user cannot specify anymore his
+                requirement in terms of real application performance (e.g. frames per second).
+                </br></br>
+                To summarize, going from point 3. to point 1. we increase the programming effort required to the application programmer
+                while at the same time increasing the quality of the solutions we find as well as the detail in user requests.
+                </br></br>
+                In addition to this, if you still didn't start to code your application, Nornir provides its own parallel programming 
+                environment (based on an extension of FastFlow), allowing you to express structured and non structured parallelism.
+                This programming environment is described in section <a href="#programmingenvironment">Nornir Programming Environment</a>           
+              			
+				</p>
+                <!----------------------------------->
+				<!-- FastFlow Applications section -->
+				<!----------------------------------->
+                <h3 id="applicationsff">FastFlow Applications</h3>
+                <p>
+                If you already have an existing FastFlow <i>farm</i> application, you can easily convert it in order to be
+                controlled by the Nornir runtime support. The process is pretty straightforward and involves the following
+                steps:
+            	<ol id="manualcontent">
+                  <li>The classes describing the Emitter, Workers and Collector of the 
+                      farm must extend <code>nornir::AdaptiveNode</code> instead of 
+                      <code>ff::ff_node</code>.
+                      <b>ATTENTION:</b> <code>svc_init</code> and <code>svc_end</code> are now called after 
+                      each rethreading (in FastFlow they were called only once at the application start and end).
+                      Accordingly, if those operations need to be performed only once, you
+                      should ensure that.
+                  <li>If the application wants to be aware of the changes in the number of workers (e.g. to redistribute
+                      internal data), the nodes can implement the <code>notifyRethreading</code> virtual method.
+                </ol>
+               	</p>
+                <p>At this point, the farm can be passed to the Nornir manager, which will take care of the execution,
+                providing the performance and/or power consumption required, as shown in the following code snippet.</p>
+		               	
+				<pre class="prettyprint">
+// Create emitter, worker, and collector and add to the farm 'farm'.
+nornir::Parameters parameters;
+parameters.contractType = CONTRACT_PERF_BANDWIDTH;
+parameters.requiredBandwidth = 40;
+nornir::ManagerFarm<> manager(&farm, parameters); // Create nornir manager.
+manager.start(); // Start farm.
+manager.join(); // Wait for farm end.
+				</pre>
+                <p>
+                In this snippet, we shown how it is possible to manage an already existing farm, by requiring
+                a minimum performance of 40 tasks processed per second. More details on the parameters
+                can be found in the <a href="parameters">Parameters</a> section.
+                A full working <a href="https://github.com/DanieleDeSensi/nornir/blob/master/demo/farm_ffcompat.cpp" target="_blank">example</a> can be found under the <code>./demo</code> folder.      			
+                </p>
+
+				
+				<div class="alert alert-block alert-danger">
+     					<h4 class="alert-heading">Attention!</h4>
+     					An application using Nornir needs to be run
+		                with <code>sudo</code> rights, since Nornir will change
+                        the clock frequency, threads' mapping, etc... . Moreover,
+                        in some cases priviledged rights are needed to read the 
+                        power consumption as well.
+                </div>
+                <!--------------------------------------->
+				<!-- Instrumented Applications section -->
+				<!--------------------------------------->
+                <h3 id="applicationsins">Instrumented Applications</h3>
+                <p>
+               	This part is still experimental. The code is almost ready but it needs
+                to be further tested, cleaned and documented. If you would like to use
+                Nornir by instrumenting your application, please <a href="contact.html">contact me</a>.
+               	</p>
+
+                <!----------------------------------->
+				<!-- External Applications section -->
+				<!----------------------------------->
+                <h3 id="applicationsext">External Applications</h3>
+                <p>
+               	This part is still experimental. The code is almost ready but it needs
+                to be further tested, cleaned and documented. If you would like to use
+                Nornir on an already existing application, please <a href="contact.html">contact me</a>.
+               	</p>
+                <!------------------------------------------->
+				<!-- Nornir Programming Environmnt section -->
+				<!------------------------------------------->
+                <h3 id="programmingenvironment">Nornir Programming Environment</h3>
+                <p>
+                The programming environment is ready to be used but is not yet documented.
+                If you would like to use it, please <a href="contact.html">contact me</a>.
+               	</p>
+      				<!---------------->
+      				<!-- Parameters -->
+      				<!---------------->
+              			<h2 id="parameters">Parameters</h2>
+              			<p>
+                        Different parameters can be provided to Nornir, specifying the type of requirements,
+                        the type of resources on which we would like to operate and other additional parameters
+                        for algorithm tuning. Such parameters can be specified programmatically, by setting
+                        the members of the <code>Parameters</code> class, or by specifying an XML file name
+                        in the constructor of the <code>Parameters</code> class. The most important parameters
+                        that can be specified by the user are:</p>
+                     	<ol id="manualcontent">
+                            <li><b>contractType</b>: Describes the type of guarantees that the user requires. It
+                            can be one of the following:
+                                <ol id="manualcontent">
+                                    <li><b>POWER_BUDGET</b>: A maximum power consumption allowed for the application. The maximum
+                                    power consumption allowed will be specified through the <code>powerBudget</code> parameter.</li>
+                                    <li><b>PERF_BANDWIDTH</b>: A minimum bandwidth required in terms of number of application elements
+                                    processed per second. It can only be specified for 
+                                    applications written with the Nornir Programming Environment, FastFlow Applications and
+                                    Instrumented Applications. The required bandwidth will be specified through the 
+                                    <code>requiredBandwidth</code> parameter.</li>
+                                    <li><b>PERF_COMPLETION_TIME</b>: A maximum completion time required. It can only be specified for 
+                                    applications written with the Nornir Programming Environment, FastFlow Applications and
+                                    Instrumented Applications. The required completion time will be specified through the
+                                    <code>requiredCompletionTime</code> parameter. 
+                                    Moreover, the user needs to specify how many elements will be processed
+                                    by the application in the <code>expectedTasksNumber</code> parameter.</li>
+                                    <li><b>PERF_MAX</b>: The user required the maximum performance possible for his application.</li>
+                                    <li><b>PERF_UTILIZATION</b>: Keep the utilization factor of the application (in a queueing theory
+                                    meaning) in a range specified through the <code>underloadThresholdFarm</code> and
+                                    <code>overloadThresholdFarm</code> parameters.</li>
+                                </ol>
+                            </li>
+                            <li><b>powerBudget</b>: The maximum allowed power consumption.</li>
+                            <li><b>requiredBandwidth</b>: The minimum required bandwidth in terms of application elements processed per second.</li>
+                            <li><b>requiredCompletionTime</b>: The maximum required completion time.</li>
+                            <li><b>expectedTasksNumber</b>: The number of applications elements to be processed by the application.</li>
+                            <li><b>underloadThresholdFarm</b>: The lower bound for the utilization range, between 0 and 100 (default = 80.0).</li>
+                            <li><b>overloadThresholdFarm</b>: The higher bound for the utilization range, between 0 and 100 (default = 90.0).</li>
+                            <li><b>knobCoresEnabled</b>: Allows Nornir to find the best amount of cores allocated to the application (default = true).</li>
+                            <li><b>knobMappingEnabled</b>: Allows Nornir to find the best allocation of threads on cores (default = true).</li>
+                            <li><b>knobFrequencyEnabled</b>: Allows Nornir to find the best clock frequency (default = true).</li>
+                            <li><b>knobHyperthreadingEnabled</b>: Allows Nornir to find the best hypetrhreading level (default = false).</li>
+                        </ol>
+                        <p>
+                        There exist other additional parameters but they are mostly used for performance tuning and
+                        debugging. Accordingly, they will not be documented at the moment.</br>
+                        In the following code snippet, we show an example of XML parameters configuration file, where
+                        the user requires a maximum power consumption of 50 watts:
+<pre class="prettyprint">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;adaptivityParameters&gt;
+    &lt;contractType&gt;POWER_BUDGET&lt;/contractType&gt;
+    &lt;powerBudget&gt;50&lt;/powerBudget&gt;
+&lt;/adaptivityParameters&gt;
+</pre>
+                		</p>
+      				<!------------------->
+      				<!-- Customization -->
+      				<!------------------->
+              			<h2 id="customization">Customization</h2>
+              			<p>
+                        Nornir can be customized by adding to it different decision and prediction
+                        strategies. This can be done by extending some abstract class and defining
+                        the appropriate member functions. All the infrastructure to monitor the system
+                        and to apply the decisions is already provided by Nornir, so you can focus only
+                        on the algoritmic parts of the decision strategy.
+                        </br></br>
+                        This feature is ready to be used but not yet documented. If you would like
+                        to add custom decision and/or prediction policies to Nornir, please 
+                        <a href="contact.html">contact me</a>.
+                		</p>
+      				<!---------------->
+      				<!-- References -->
+      				<!---------------->
+              			<h2 id="references">References</h2>
+              			<p>
+                        Nornir has been used in the last years to prove the efficiency and accuracy
+                        of different algorithms. The reference article is:
+                        <div class="alert alert-success" style="font-size:18px" role="alert">
+                           De Sensi, Daniele and Torquati, Massimo and Danelutto, Marco (2016)</br>
+                           <b>A Reconfiguration Algorithm for Power-Aware Parallel Applications</b></br>
+                           In <i>ACM Transactions on Architecture and Code Optimization</i> , pp. 43:1--43:25, Dec 2016
+                        </div>
                         </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    
-    </header>
+                        <p>On this article you can find some details about how Nornir works under the hood.</p>
+                        </br></br>
+                        <p>Additional information about different parts of Nornir can be found on the following
+                        papers:</p>
+                        <div class="alert alert-success" role="alert">
+                           <ul id="manualcontent">
+                               <li>
+                                 De Sensi, Daniele (2016)</br>
+                                 <b>Predicting Performance and Power Consumption of Parallel Applications</b></br>
+                                 In <i>Proceedings of 24th Euromicro International Conference on Parallel, Distributed, and Network-Based Processing (PDP)</i>, pp. 200 -- 207
+                               </li>
+                               <li>
+                                  De Sensi, Daniele and Danelutto, Marco and Torquati, Massimo (2015) </br>
+                                 <b>Energy driven adaptivity in stream parallel computations</b></br>
+                                 In <i>Proceedings of 23th Euromicro International Conference on Parallel, Distributed, and Network-Based Processing (PDP)</i>, pp. 103 -- 110
+                               </li>
+                           </ul>
+                        </div>
+                		</p>
+		  	</div>
+		</div>
+	</div>
 
-    <!-- Footer -->
-    <footer class="text-center">
-        <div class="footer-above">
-            <div class="container">
-                <div class="row">
-                    <div class="footer-col col-md-12">
-                        <h3>About</h3>
-                        <p>This site has been created by using <a href="http://getbootstrap.com/">Bootstrap</a>
-                           with <a href="http://startbootstrap.com">Freelance</a> theme.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="footer-below">
-            <div class="container">
-                <div class="row">
-                    <div class="col-lg-12">
-                        The contents of this website are &copy;&nbsp;2016 under the terms of the <a href="https://github.com/DanieleDeSensi/nornir/blob/gh-pages/LICENSE">MIT&nbsp;License</a>.
-                    </div>
-                </div>
-            </div>
-        </div>
-    </footer>
+	<!-- Footer -->
+	<footer class="text-center">
+	    <div class="footer-above">
+	        <div class="container">
+	            <div class="row">
+	                <div class="footer-col col-md-12">
+	                    <h3>About</h3>
+	                    <p>This site has been created by using <a href="http://getbootstrap.com/">Bootstrap</a>
+	                        with <a href="http://startbootstrap.com">Freelance</a> theme.
+	                    </p>
+	                </div>
+	            </div>
+	        </div>
+	    </div>
+	    <div class="footer-below">
+	        <div class="container">
+	            <div class="row">
+	                <div class="col-lg-12">
+	                    The contents of this website are &copy;&nbsp;2016 under the terms of the <a href="https://github.com/DanieleDeSensi/nornir/blob/gh-pages/LICENSE">MIT&nbsp;License</a>.
+	                </div>
+	            </div>
+	        </div>
+	    </div>
+	</footer>
+	<!-- Scroll to Top Button (Only visible on small and extra-small screen sizes) -->
+	<div class="scroll-top page-scroll hidden-sm hidden-xs hidden-lg hidden-md">
+	    <a class="btn btn-primary" href="#page-top">
+	    <i class="fa fa-chevron-up"></i>
+	    </a>
+	</div>
 
-    <!-- Scroll to Top Button (Only visible on small and extra-small screen sizes) -->
-    <div class="scroll-top page-scroll hidden-sm hidden-xs hidden-lg hidden-md">
-        <a class="btn btn-primary" href="#page-top">
-            <i class="fa fa-chevron-up"></i>
-        </a>
-    </div>
 
-
-    <!-- jQuery -->
-    <script src="js/jquery.js"></script>
-
-    <!-- Bootstrap Core JavaScript -->
-    <script src="js/bootstrap.min.js"></script>
-
-    <!-- Plugin JavaScript -->
-    <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.3/jquery.easing.min.js"></script>
-    <script src="js/classie.js"></script>
-    <script src="js/cbpAnimatedHeader.js"></script>
-
-    <!-- Contact Form JavaScript -->
-    <script src="js/jqBootstrapValidation.js"></script>
-
-    <!-- Custom Theme JavaScript -->
-    <script src="js/freelancer.js"></script>
-    
-    <script type="text/javascript">
-        var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
-        document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
-    </script>
-    <script type="text/javascript">
-        try {
-            var pageTracker = _gat._getTracker("UA-74455716-2");
-            pageTracker._trackPageview();
-        } catch(err) {}
-    </script>
-    
-    <script type="text/javascript">
-        $( window ).load(function() {   
-            boxes = $('.col-sm-4');
-            maxHeight = Math.max.apply(
-            Math, boxes.map(function() {
-            return $(this).height();
-            }).get());
-            boxes.height(maxHeight);
-            $('.col-sm-12 .panel').height(maxHeight/2-22);//22 = 20 (bottom-margin) + 2 *1 (border)
-        });
-    </script>
-
-</body>
-
+	<!-- script references -->
+	    <!-- jQuery -->
+	    <script src="js/jquery.js"></script>
+	
+	    <!-- Bootstrap Core JavaScript -->
+	    <script src="js/bootstrap.min.js"></script>
+	
+	    <!-- Plugin JavaScript -->
+	    <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.3/jquery.easing.min.js"></script>
+	    <script src="js/classie.js"></script>
+	    <script src="js/cbpAnimatedHeader.js"></script>
+	
+	    <!-- Contact Form JavaScript -->
+	    <script src="js/jqBootstrapValidation.js"></script>
+	
+	    <!-- Custom Theme JavaScript -->
+	    <script src="js/freelancer.js"></script>
+	    <script src="js/barscripts.js"></script>
+	    
+	    <script type="text/javascript">
+	        var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+	        document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+	    </script>
+	    <script type="text/javascript">
+	        try {
+	            var pageTracker = _gat._getTracker("UA-74455716-1");
+	            pageTracker._trackPageview();
+	        } catch(err) {}
+	    </script>
+	    
+	    <script type="text/javascript">
+	        $( window ).load(function() {   
+	            boxes = $('.col-sm-4');
+	            maxHeight = Math.max.apply(
+	            Math, boxes.map(function() {
+	            return $(this).height();
+	            }).get());
+	            boxes.height(maxHeight);
+	            $('.col-sm-12 .panel').height(maxHeight/2-22);//22 = 20 (bottom-margin) + 2 *1 (border)
+	        });
+	        
+	        
+	        ! function ($) {
+	        	$(function () {
+	            		window.prettyPrint && prettyPrint()
+	        	})
+    		}(window.jQuery)
+	    </script>
+	</body>
 </html>
