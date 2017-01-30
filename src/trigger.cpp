@@ -55,11 +55,9 @@ double TriggerQBlocking::getIdleTime() const{
     // We need to convert to microsec since the threshold is specified in
     // microsec.
     double latencyMicroSec = avg.latency / 1000.0;
-
-
-    if(!avg.utilisation){avg.utilisation = 1;} // Should never happen
-
-    return latencyMicroSec / avg.utilisation - latencyMicroSec;
+    double utilisation = avg.utilisation / 100.0; // From [0, 100] to [0, 1]
+    if(!utilisation){utilisation = 1;} // Should never happen
+    return latencyMicroSec / utilisation - latencyMicroSec;
 }
 
 bool TriggerQBlocking::setBlocking(){
