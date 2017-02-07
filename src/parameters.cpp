@@ -39,7 +39,7 @@ using mammut::Communicator;
 using mammut::Mammut;
 using mammut::utils::enumStrings;
 
-#define CONFIGURATION_VERSION "\"1.0.0\""
+#define CONFIGURATION_VERSION "1.0.0"
 #define CONFPATH_LEN_MAX 512
 #define CONFFILE_VERSION "/nornir/version.csv"
 #define CONFFILE_ARCH "/nornir/archdata.xml"
