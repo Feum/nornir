@@ -307,7 +307,7 @@ typedef enum{
     VALIDATION_WRONG_CONTRACT_PARAMETERS,
 
     // Blocking threshold needs to be specified.
-    VALIDATION_NO_BLOCKING_THRESHOLD,
+    VALIDATION_BLOCKING_PARAMETERS,
 
     // Parameters for Mishra predictors not specified.
     VALIDATION_NO_MISHRA_PARAMETERS,
@@ -784,6 +784,16 @@ public:
     // from non blocking to blocking support (and viceversa). If -1.0,
     // the runtime will never switch [default = -1.0].
     double thresholdQBlocking;
+
+    // Safe range size around the threshold. The switch will occur
+    // when idle time (or utilisation) is lesser than
+    // thresholdQBlocking - thresholdQBlocking*thresholdQBlockingBelt or
+    // greater than
+    // thresholdQBlocking + thresholdQBlocking*thresholdQBlockingBelt.
+    // This is used to prevent switching too often when the metric stays
+    // for a while close to the threshold. It must be a value between
+    // 0 and 1 [default = 0.05].
+    double thresholdQBlockingBelt;
 
     // Max number of samples that can be violated (either accuracy or contract
     // violations) [default = 0].

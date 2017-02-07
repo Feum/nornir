@@ -31,10 +31,12 @@ namespace nornir{
 
 TriggerQBlocking::TriggerQBlocking(TriggerConfQBlocking confQBlocking,
                                    double thresholdQBlocking,
+                                   double thresholdQBlockingBelt,
                                    Smoother<MonitoredSample> const* samples,
                                    AdaptiveNode* emitter):
         _confQBlocking(confQBlocking),
         _thresholdQBlocking(thresholdQBlocking),
+        _thresholdQBlockingBelt(thresholdQBlockingBelt),
         _samples(samples),
         _emitter(emitter),
         _blocking(false){
@@ -45,9 +47,9 @@ double TriggerQBlocking::getIdleTime() const{
     MonitoredSample avg = _samples->average();
 
     /**
-     * Latency = Utilization * Interarrival
-     * Idle = Interarrival - Latency
+     * Idle = (Interarrival - Latency)
      *
+     * Latency = Utilization * Interarrival
      * Interarrival = Latency/Utilization
      * Idle = Latency/Utilization - Latency
      **/
@@ -87,10 +89,13 @@ bool TriggerQBlocking::trigger(){
             return setNonBlocking();
         }break;
         case TRIGGER_Q_BLOCKING_AUTO:{
+            double utilisation = _samples->average().utilisation;
             double idleTime = getIdleTime();
-            if(idleTime > _thresholdQBlocking){
+            if(idleTime > _thresholdQBlocking +
+                          _thresholdQBlocking*_thresholdQBlockingBelt){
                 return setBlocking();
-            }else if(idleTime < _thresholdQBlocking){
+            }else if(idleTime < _thresholdQBlocking -
+                                _thresholdQBlocking*_thresholdQBlockingBelt){
                 return setNonBlocking();
             }
         }break;

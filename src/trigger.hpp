@@ -62,6 +62,7 @@ class TriggerQBlocking: public Trigger{
 public:
     TriggerQBlocking(TriggerConfQBlocking confQBlocking,
                      double thresholdQBlocking,
+                     double thresholdQBlockingBelt,
                      Smoother<MonitoredSample> const* samples,
                      AdaptiveNode* emitter);
     bool trigger();
@@ -72,6 +73,7 @@ private:
 
     TriggerConfQBlocking _confQBlocking;
     const double _thresholdQBlocking;
+    const double _thresholdQBlockingBelt;
     Smoother<MonitoredSample> const* _samples;
     AdaptiveNode* _emitter;
     bool _blocking;

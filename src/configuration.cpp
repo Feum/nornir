@@ -274,6 +274,7 @@ ConfigurationFarm::ConfigurationFarm(const Parameters& p,
 
     _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
                                                               p.thresholdQBlocking,
+                                                              p.thresholdQBlockingBelt,
                                                               samples,
                                                               emitter);
 

@@ -39,6 +39,12 @@ using mammut::Communicator;
 using mammut::Mammut;
 using mammut::utils::enumStrings;
 
+#define CONFIGURATION_VERSION "\"1.0.0\""
+#define CONFPATH_LEN_MAX 512
+#define CONFFILE_VERSION "/nornir/version.csv"
+#define CONFFILE_ARCH "/nornir/archdata.xml"
+#define CONFFILE_VOLTAGE "/nornir/voltage.csv"
+
 void XmlTree::init(const std::string& content, const std::string& rootName){
     rapidxml::xml_document<> xmlContent;
     _fileContentChars = new char[content.size() + 1];
@@ -195,6 +201,7 @@ void Parameters::setDefault(){
     regressionAging = 0;
     maxMonitoringOverhead = 1.0;
     thresholdQBlocking = -1;
+    thresholdQBlockingBelt = 0.05;
     tolerableSamples = 0;
     qSize = 1;
     conservativeValue = 0;
@@ -212,6 +219,37 @@ void Parameters::setDefault(){
     dataflow.maxInterpreters = 0;
 
     observer = NULL;
+
+    /** Retrieving global configuration files. **/
+    char* confHome_c = getenv("XDG_CONFIG_DIRS");
+    vector<string> confHomes;
+    if(!confHome_c || strcmp(confHome_c, "") == 0){
+        confHomes.push_back(string("/etc/xdg"));
+    }else{
+        confHomes = split(string(confHome_c), ':');
+    }
+
+    size_t i = 0;
+    bool found = false;
+    while(i < confHomes.size() && !found){
+        string confFileArch = confHomes.at(i) + string(CONFFILE_ARCH);
+        string confFileVoltage = confHomes.at(i) + string(CONFFILE_VOLTAGE);
+        string confFileVersion = confHomes.at(i) + string(CONFFILE_VERSION);
+
+        if(existsFile(confFileArch) &&
+           existsFile(confFileVoltage) &&
+           existsFile(confFileVersion) &&
+           readFirstLineFromFile(confFileVersion).compare(CONFIGURATION_VERSION) == 0){
+            archData.loadXml(confFileArch);
+            loadVoltageTable(archData.voltageTable, confFileVoltage);
+            found = true;
+        }
+        i++;
+    }
+
+    if(!found){
+        throw runtime_error("Impossible to find configuration files. Please run 'sudo make microbench' from the nornir root folder.");
+    }
 }
 
 uint Parameters::getLowOverheadSamplingInterval() const{
@@ -369,8 +407,9 @@ ParametersValidation Parameters::validateKnobFrequencies(){
 
 ParametersValidation Parameters::validateTriggers(){
     if(triggerQBlocking == TRIGGER_Q_BLOCKING_AUTO &&
-       thresholdQBlocking == -1){
-        return VALIDATION_NO_BLOCKING_THRESHOLD;
+       (thresholdQBlocking == -1 ||
+        thresholdQBlockingBelt < 0 || thresholdQBlockingBelt > 1)){
+        return VALIDATION_BLOCKING_PARAMETERS;
     }
     return VALIDATION_OK;
 }
@@ -670,6 +709,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Uint, regressionAging);
     SETVALUE(xt, Double, maxMonitoringOverhead);
     SETVALUE(xt, Double, thresholdQBlocking);
+    SETVALUE(xt, Double, thresholdQBlockingBelt);
     SETVALUE(xt, Uint, tolerableSamples);
     SETVALUE(xt, Ulong, qSize);
     SETVALUE(xt, Double, conservativeValue);
@@ -689,46 +729,9 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Uint, dataflow.maxInterpreters);
 }
 
-#define CONFIGURATION_VERSION "\"1.0.0\""
-#define CONFPATH_LEN_MAX 512
-#define CONFFILE_VERSION "/nornir/version.csv"
-#define CONFFILE_ARCH "/nornir/archdata.xml"
-#define CONFFILE_VOLTAGE "/nornir/voltage.csv"
-
 Parameters::Parameters(Communicator* const communicator):
       mammut(communicator){
     setDefault();
-
-    /** Retrieving archdata.xml configuration file. **/
-    char* confHome_c = getenv("XDG_CONFIG_DIRS");
-    vector<string> confHomes;
-    if(!confHome_c || strcmp(confHome_c, "") == 0){
-        confHomes.push_back(string("/etc/xdg"));
-    }else{
-        confHomes = split(string(confHome_c), ':');
-    }
-
-    size_t i = 0;
-    bool found = false;
-    while(i < confHomes.size() && !found){
-        string confFileArch = confHomes.at(i) + string(CONFFILE_ARCH);
-        string confFileVoltage = confHomes.at(i) + string(CONFFILE_VOLTAGE);
-        string confFileVersion = confHomes.at(i) + string(CONFFILE_VERSION);
-
-        if(existsFile(confFileArch) &&
-           existsFile(confFileVoltage) &&
-           existsFile(confFileVersion) &&
-           readFirstLineFromFile(confFileVersion).compare(CONFIGURATION_VERSION) == 0){
-            archData.loadXml(confFileArch);
-            loadVoltageTable(archData.voltageTable, confFileVoltage);
-            found = true;
-        }
-        i++;
-    }
-
-    if(!found){
-        throw runtime_error("Impossible to find configuration files. Please run 'sudo make microbench' from the nornir root folder.");
-    }
 }
 
 Parameters::Parameters(const string& paramFileName,
