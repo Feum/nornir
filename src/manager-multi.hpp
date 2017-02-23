@@ -74,7 +74,7 @@ typedef struct ManagerMultiConfiguration{
 }ManagerMultiConfiguration;
 
 // Contains data associated to each running manager.
-typedef struct{
+typedef struct ManagerData{
     // Minimum performance requirement percentage [0, 100].
     double minPerfReqPerc;
     // Minimum performance (absolute value).
@@ -161,7 +161,7 @@ private:
      * Updates the list of preferred allocations of a specific manager.
      * @param m The manager for which the list of preferred allocations should be updated.
      **/
-    void updateAllocations(Manager* m);
+    void updateAllocations(Manager* const m);
 
     /**
      * Updates the list of preferred allocations for all the managers.
