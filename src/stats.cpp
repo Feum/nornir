@@ -166,7 +166,7 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
                             ReconfigurationStats reconfigurationStats,
                             uint durationMs,
                             uint64_t totalTasks){
-
+    std::cout << "Totaltasks: " << totalTasks << std::endl;
     CalibrationStats totalCalibration;
     for(size_t i = 0; i < calibrationStats.size(); i++){
         totalCalibration += calibrationStats.at(i);

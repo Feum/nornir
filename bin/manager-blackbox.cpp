@@ -97,6 +97,7 @@ int main(int argc, char * argv[]){
     std::vector<double> pidPerfs;
     std::vector<ScheduledProgram> scheduledPrograms;
     std::string logDir;
+    std::string parametersFile;
     double powerCap;
     double startTime = mammut::utils::getMillisecondsTime();
     try {
@@ -105,6 +106,8 @@ int main(int argc, char * argv[]){
                            "programs to be ran. One parameter between --pid or "
                            "--schedule must be specified.", ' ', "1.0");
         TCLAP::ValueArg<std::string> logArg("l", "logdir", "Directory where the log files will be stored. (default = ./logs)", false, "./logs/", "string", cmd);
+        TCLAP::ValueArg<std::string> parametersArg("r", "parameters", "Nornir parameters file. Can be specified only when only one application needs "
+                                                   "to be controlled.", false, "", "string", cmd);
         TCLAP::ValueArg<double> capArg("c", "cap", "Power cap, expressed in watts. If 0, no power cap will "
                                        "be applied and we will just maximise performance for each submitted "
                                        "application. (default = 0).", false, 0, "double", cmd);
@@ -132,7 +135,7 @@ int main(int argc, char * argv[]){
         /* Validate parameters. */
         if(!pidArg.getValue().size() &&
            !scheduleArg.getValue().compare("")){
-            std::cerr << "[ERROR] One between --run, --pid or --schedule must be specified." << std::endl;
+            std::cerr << "[ERROR] One between --pid or --schedule must be specified." << std::endl;
             return -1;
         }
 
@@ -146,6 +149,7 @@ int main(int argc, char * argv[]){
         powerCap = capArg.getValue();
         pids = pidArg.getValue();
         pidPerfs = perfArg.getValue();
+        parametersFile = parametersArg.getValue();
 
         if(pids.size()){
             std::cerr << "Sorry, --pid is still not supported. This is mainly due to difficulties in attaching to an already running "
@@ -183,6 +187,11 @@ int main(int argc, char * argv[]){
         return -1;
     }
 
+    if(parametersFile.compare("") && scheduledPrograms.size() > 1){
+        std::cerr << "Parameter file can only be specified when you want to control only one application." << std::endl;
+        return -1;
+    }
+
     ManagerMultiConfiguration mmc;
     mmc.powerCap = powerCap;
     ManagerMulti mm(mmc);
@@ -196,7 +205,11 @@ int main(int argc, char * argv[]){
     /* First we add the already running pid. */
     for(size_t i = 0; i < pids.size(); i++){
         Parameters p;
-        initializeParameters(p);
+        if(parametersFile.compare("")){
+            p.load(parametersFile);
+        }else{
+            initializeParameters(p);
+        }
         std::string logPrefix = logDir + "/" + pidToString(pids.at(i));
         p.observer = new Observer(logPrefix + "_stats.csv",
                                   logPrefix + "_calibration.csv",
@@ -251,7 +264,11 @@ int main(int argc, char * argv[]){
             /* Father - Manager. */
             sp.pid = pid;
             Parameters p;
-            initializeParameters(p);
+            if(parametersFile.compare("")){
+                p.load(parametersFile);
+            }else{
+                initializeParameters(p);
+            }
             stringstream out;
             out << sp.start;
             std::string logPrefix = logDir + "/" + out.str() + "_" + mammut::utils::split(sp.program.at(0), '/').back();
@@ -263,6 +280,7 @@ int main(int argc, char * argv[]){
 
             ManagerBlackBox* m = new (mmem) ManagerBlackBox(pid, p);
             *handlerCreated = true;
+            DEBUG("Started scheduled: " << sp.program[0] << " with pid " << pid << " on manager " << m);
 
             if(multiManagerNeeded){
                 mm.addManager(m, sp.minPerfRequired);
@@ -275,7 +293,6 @@ int main(int argc, char * argv[]){
                 m->~ManagerBlackBox(); // Because created with placement new
                 delete p.observer;
             }
-            DEBUG("Started scheduled: " << sp.program[0] << " with pid " << pid << " on manager " << m);
         }else{
             /* Child - Application */
             *started = true;

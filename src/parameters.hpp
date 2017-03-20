@@ -829,6 +829,18 @@ public:
     // Parameters for dataflow applications.
     DataflowParameters dataflow;
 
+    // This is the path of the file used to signal begin/end of a 
+    // (region of interest). This file should be created when the
+    // application enters the ROI and deleted when the application
+    // exits the ROI. It can be used for example on PARSEC applications
+    // in order to control only the region of interest of the application
+    // excluding initialization and cleanup phases. In that case, the
+    // file would be created in the roi_start hook and deleted in the
+    // roi_end hook. If not specified or if empty string, the application 
+    // will be monitored and controlled throughout its entire execution
+    // [default = ""].
+    std::string roiFile;
+
     // The observer object. It will be called every samplingInterval
     // milliseconds to monitor the adaptivity behaviour [default = NULL].
     Observer* observer;
@@ -854,6 +866,13 @@ public:
      * Destroyes these parameters.
      */
     ~Parameters();
+
+    /**
+     * Loads the parameters from a file.
+     * @param paramFileName The name of the XML file containing the adaptivity
+     *        parameters.
+     */
+    void load(const std::string& paramFileName);
 
     /**
      * Validates these parameters.

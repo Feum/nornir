@@ -168,7 +168,7 @@ void Selector::stopCalibration(uint64_t totalTasks){
         _totalCalibrationTime += cs.duration;
         cs.numTasks = totalTasks - _calibrationStartTasks;
         if(_joulesCounter){
-            cs.joules = ((CounterCpus*) _joulesCounter)->getJoulesCoresAll();
+            cs.joules = ((CounterCpus*) _joulesCounter)->getJoules();
         }
         _calibrationStats.push_back(cs);
         _numCalibrationPoints = 0;

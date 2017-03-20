@@ -207,12 +207,14 @@ void Parameters::setDefault(){
     conservativeValue = 0;
     isolateManager = false;
     statsReconfiguration = false;
+    roiFile = "";
 
     mishra.applicationName = "";
     mishra.namesData = "";
     mishra.bandwidthData = "";
     mishra.powerData = "";
     mishra.numSamples = 20;
+
     dataflow.orderedProcessing = false;
     dataflow.orderedOutput = false;
     dataflow.maxGraphs = 1000;
@@ -716,6 +718,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, ArrayUint, disallowedNumCores);
     SETVALUE(xt, Bool, isolateManager);
     SETVALUE(xt, Bool, statsReconfiguration);
+    SETVALUE(xt, String, roiFile);
 
     SETVALUE(xt, String, mishra.applicationName);
     SETVALUE(xt, String, mishra.namesData);
@@ -745,6 +748,13 @@ Parameters::Parameters(const string& paramFileName,
 Parameters::~Parameters(){
     ;
 }
+
+void Parameters::load(const string& paramFileName){
+    setDefault();
+    /** Loading parameters. **/
+    loadXml(paramFileName);
+}
+
 
 ParametersValidation Parameters::validate(){
     setDefaultPost();

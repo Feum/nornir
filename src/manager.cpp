@@ -112,24 +112,12 @@ void Manager::run(){
     }
 
     waitForStart();
-#if 0
-    /** Creates the parallel section begin file. **/
-    char* default_in_roi = (char*) malloc(sizeof(char)*256);
-    default_in_roi[0] = '\0';
-    default_in_roi = strcat(default_in_roi, getenv("HOME"));
-    default_in_roi = strcat(default_in_roi, "/roi_in");
-    setenv(PAR_BEGIN_ENV, default_in_roi, 0);
-    free(default_in_roi);
-    FILE* in_roi = fopen(getenv(PAR_BEGIN_ENV), "w");
-    fclose(in_roi);
-#endif
 
     /** Wait for the disinhibition from global manager. **/
     while(_inhibited){;}
 
-    if(_counter){
-        _counter->reset();
-    }
+    // Reset joules counter
+    getAndResetJoules();
     //TODO RESET BANDWIDTHIN
     _lastStoredSampleMs = getMillisecondsTime();
     if(_p.observer){
@@ -191,9 +179,7 @@ void Manager::run(){
 
     clean();
     ulong duration = getExecutionTime();
-#if 0
-    unlink(getenv(PAR_BEGIN_ENV));
-#endif
+
     if(_p.observer){
         vector<CalibrationStats> cs;
         if(_selector){
@@ -524,8 +510,7 @@ void Manager::act(KnobsValues kv, bool force){
         _samples->reset();
         _variations->reset();
         DEBUG("Resetting sample.");
-        // _lastStoredSampleMs = getMillisecondsTime();
-        // Discarding a sample since it may be between 2 different configurations.
+        // Don't store this sample since it may be inbetween 2 different configurations.
         orlog::ApplicationSample ws;
         askSample();
         getSample(ws);
@@ -542,14 +527,7 @@ void Manager::act(KnobsValues kv, bool force){
 Joules Manager::getAndResetJoules(){
     Joules joules = 0.0;
     if(_counter){
-        switch(_counter->getType()){
-            case COUNTER_CPUS:{
-                joules = ((CounterCpus*) _counter)->getJoulesCoresAll();
-            }break;
-            default:{
-                joules = _counter->getJoules();
-            }break;
-        }
+        joules = _counter->getJoules();
         _counter->reset();
     }
     return joules;
@@ -636,21 +614,21 @@ void ManagerExternal::stretchPause(){
 }
 
 ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters adaptivityParameters):
-            Manager(adaptivityParameters), _process(adaptivityParameters.mammut.getInstanceTask()->getProcessHandler(pid)),
-            _startTime(getMillisecondsTime()), _lastTime(_startTime){
-        Manager::_pid = pid;
-        Manager::_configuration = new ConfigurationExternal(_p);
-        lockKnobs();
-        _configuration->createAllRealCombinations();
-        _selector = createSelector();
-        // For external application we do not care if synchronous of not (we count iterations).
-        _p.synchronousWorkers = false;
-        // Check supported contracts.
-        if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
-           _p.contractType == CONTRACT_PERF_BANDWIDTH ||
-           _p.contractType == CONTRACT_PERF_UTILIZATION){
-            throw std::runtime_error("ManagerBlackBox. Unsupported contract.");
-        }
+        Manager(adaptivityParameters), _process(adaptivityParameters.mammut.getInstanceTask()->getProcessHandler(pid)){
+    Manager::_pid = pid;
+    Manager::_configuration = new ConfigurationExternal(_p);
+    lockKnobs();
+    _configuration->createAllRealCombinations();
+    _selector = createSelector();
+    // For external application we do not care if synchronous of not (we count iterations).
+    _p.synchronousWorkers = false;
+    // Check supported contracts.
+    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
+       _p.contractType == CONTRACT_PERF_BANDWIDTH ||
+       _p.contractType == CONTRACT_PERF_UTILIZATION){
+        throw std::runtime_error("ManagerBlackBox. Unsupported contract.");
+    }
+    _startTime = 0;
 }
 
 ManagerBlackBox::~ManagerBlackBox(){
@@ -669,7 +647,17 @@ pid_t ManagerBlackBox::getPid() const{
 void ManagerBlackBox::waitForStart(){
     // We know for sure that when the Manager is created the process
     // already started.
+    // However if we have been required to monitor only the ROI, we
+    // wait for ROI start by waiting for the roiFile creation.
+    if(_p.roiFile.compare("")){
+        while(!mammut::utils::existsFile(_p.roiFile)){
+            usleep(1000);
+        }
+    }
+    _startTime = getMillisecondsTime();
+    _lastTime = _startTime;
     ((KnobMappingExternal*)_configuration->getKnob(KNOB_TYPE_MAPPING))->setProcessHandler(_process);
+    _process->resetInstructions(); // To remove those executed before entering ROI
 }
 void ManagerBlackBox::askSample(){
     // We do not need to ask for black box.
@@ -681,17 +669,18 @@ static bool isRunning(pid_t pid) {
 }
 
 void ManagerBlackBox::getSample(orlog::ApplicationSample& sample){
-    double now = getMillisecondsTime();
-    double cycles;
-    if(!isRunning(_process->getId())){
+    if(!isRunning(_process->getId()) ||
+       (_p.roiFile.compare("") && !mammut::utils::existsFile(_p.roiFile))){
         _terminated = true;
         return;
     }
-    _process->getAndResetCycles(cycles);
-    sample.bandwidthTotal = cycles / (now - _lastTime);
+    double instructions = 0;
+    _process->getAndResetInstructions(instructions);
+    double now = getMillisecondsTime();
+    sample.bandwidthTotal = instructions / ((now - _lastTime) / 1000.0);
     sample.latency = -1; // Not used.
     sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
-    sample.tasksCount = 0; // We do not know how many iterations have been performed.
+    sample.tasksCount = instructions; // We consider a task to be an instruction.
     _lastTime = now;
 }
 

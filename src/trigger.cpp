@@ -89,7 +89,6 @@ bool TriggerQBlocking::trigger(){
             return setNonBlocking();
         }break;
         case TRIGGER_Q_BLOCKING_AUTO:{
-            double utilisation = _samples->average().utilisation;
             double idleTime = getIdleTime();
             if(idleTime > _thresholdQBlocking +
                           _thresholdQBlocking*_thresholdQBlockingBelt){
