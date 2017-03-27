@@ -288,8 +288,8 @@ int main(int argc, char * argv[]){
                 while(*handlerCreated){;}
             }else{
                 m->start();
-                m->join();
                 waitpid(pid, NULL, 0);
+                m->join();
                 m->~ManagerBlackBox(); // Because created with placement new
                 delete p.observer;
             }
