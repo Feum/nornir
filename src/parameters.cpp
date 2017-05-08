@@ -181,6 +181,7 @@ void Parameters::setDefault(){
     migrateCollector = false;
     smoothingFactor = 0;
     persistenceValue = 0;
+    cooldownPeriod = 200;
     samplingIntervalCalibration = 100;
     samplingIntervalSteady = 1000;
     steadyThreshold = 4;
@@ -690,6 +691,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, fastReconfiguration);
     SETVALUE(xt, Double, smoothingFactor);
     SETVALUE(xt, Double, persistenceValue);
+    SETVALUE(xt, Double, cooldownPeriod);
     SETVALUE(xt, Uint, samplingIntervalCalibration);
     SETVALUE(xt, Uint, samplingIntervalSteady);
     SETVALUE(xt, Uint, steadyThreshold);

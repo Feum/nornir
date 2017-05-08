@@ -295,6 +295,7 @@ int main(int argc, char * argv[]){
             }
         }else{
             /* Child - Application */
+            //ptrace(PTRACE_TRACEME, 0, 0, NULL);
             *started = true;
             // If the handler is not created, we would not catch the counters of
             // the threads/processes created by this process

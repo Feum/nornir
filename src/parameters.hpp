@@ -686,6 +686,11 @@ public:
     // [default = 1 for samples, 5 for variation].
     double persistenceValue;
 
+    // The number of milliseconds required for the system to cooldown
+    // after a reconfiguration. Since this is a transient state, the statistics
+    // collected in the cooldownPeriod will be discarded [default = 200].
+    double cooldownPeriod;
+
     // The length of the sampling interval (in milliseconds) for the data
     // reading during calibration phase. If 0, it will be automatically computed
     // such to have a low performance overhead [default = 100].

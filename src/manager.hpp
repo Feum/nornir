@@ -369,7 +369,6 @@ class ManagerBlackBox: public Manager{
 private:
     mammut::task::ProcessHandler* _process;
     double _startTime;
-    double _lastTime;
     void shrinkPause();
     void stretchPause();
 public:

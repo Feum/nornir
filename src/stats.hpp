@@ -113,7 +113,7 @@ public:
 typedef struct CalibrationStats{
     uint numSteps;
     uint duration;
-    uint numTasks;
+    uint64_t numTasks;
     mammut::energy::Joules joules;
 
     CalibrationStats():numSteps(0), duration(0),numTasks(0),joules(0){

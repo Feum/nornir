@@ -452,13 +452,13 @@ void Manager::observe(){
     askSample();
     getSample(ws);
     updateTasksCount(ws);
+    double now = getMillisecondsTime();
 
     joules = getAndResetJoules();
     if(_p.observer){
         _p.observer->addJoules(joules);
     }
 
-    double now = getMillisecondsTime();
     double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
     _lastStoredSampleMs = now;
 
@@ -511,16 +511,19 @@ void Manager::act(KnobsValues kv, bool force){
         _variations->reset();
         DEBUG("Resetting sample.");
         // Don't store this sample since it may be inbetween 2 different configurations.
+        if(_p.cooldownPeriod){
+            usleep(_p.cooldownPeriod * 1000);
+        }
         orlog::ApplicationSample ws;
         askSample();
         getSample(ws);
         updateTasksCount(ws);
+        _lastStoredSampleMs = getMillisecondsTime();
 
         Joules joules = getAndResetJoules();
         if(_p.observer){
             _p.observer->addJoules(joules);
         }
-        _lastStoredSampleMs = getMillisecondsTime();
     }
 }
 
@@ -620,7 +623,7 @@ ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters adaptivityParameters):
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
-    // For external application we do not care if synchronous of not (we count iterations).
+    // For external application we do not care if synchronous of not (we count instructions).
     _p.synchronousWorkers = false;
     // Check supported contracts.
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
@@ -655,7 +658,6 @@ void ManagerBlackBox::waitForStart(){
         }
     }
     _startTime = getMillisecondsTime();
-    _lastTime = _startTime;
     ((KnobMappingExternal*)_configuration->getKnob(KNOB_TYPE_MAPPING))->setProcessHandler(_process);
     _process->resetInstructions(); // To remove those executed before entering ROI
 }
@@ -669,19 +671,17 @@ static bool isRunning(pid_t pid) {
 }
 
 void ManagerBlackBox::getSample(orlog::ApplicationSample& sample){
+    double instructions = 0;
     if(!isRunning(_process->getId()) ||
        (_p.roiFile.compare("") && !mammut::utils::existsFile(_p.roiFile))){
         _terminated = true;
         return;
     }
-    double instructions = 0;
     _process->getAndResetInstructions(instructions);
-    double now = getMillisecondsTime();
-    sample.bandwidthTotal = instructions / ((now - _lastTime) / 1000.0);
+    sample.bandwidthTotal = instructions / ((getMillisecondsTime() - _lastStoredSampleMs) / 1000.0);
     sample.latency = -1; // Not used.
     sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
     sample.tasksCount = instructions; // We consider a task to be an instruction.
-    _lastTime = now;
 }
 
 void ManagerBlackBox::manageConfigurationChange(){;}
