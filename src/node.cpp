@@ -113,7 +113,7 @@ void AdaptiveNode::move(const vector<const VirtualCore*>& virtualCores){
     }
 }
 
-void AdaptiveNode::getSampleResponse(orlog::ApplicationSample& sample, double avgLatency){
+void AdaptiveNode::getSampleResponse(knarr::ApplicationSample& sample, double avgLatency){
     while(_responseQ.empty()){
         if(*_terminated){
             return;

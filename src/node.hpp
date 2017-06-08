@@ -37,7 +37,7 @@
 
 PUSH_WARNING
 GCC_DISABLE_WARNING(unused-variable)
-#include "external/orlog/src/orlog.hpp"
+#include "external/knarr/src/knarr.hpp"
 POP_WARNING
 
 #undef DEBUG
@@ -108,7 +108,7 @@ private:
     // We push the pointer to a position in the _managementRequests array.
     // In our case is always _managementRequests[i].type == i
     ManagementRequest _managementRequests[MGMT_REQ_NUM];
-    orlog::ApplicationSample _sampleResponse;
+    knarr::ApplicationSample _sampleResponse;
     double _ticksPerNs;
     ticks _startTicks;
     ticks _ticksWork;
@@ -158,7 +158,7 @@ private:
      *               time 'askForSample' has been called.
      * @param avgLatency The average latency.
      */
-    void getSampleResponse(orlog::ApplicationSample& sample, double avgLatency);
+    void getSampleResponse(knarr::ApplicationSample& sample, double avgLatency);
 
     /**
      * Asks the node to reset the current sample.

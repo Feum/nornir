@@ -91,7 +91,7 @@ Observer::Observer(string statsFile,
     _summaryFile << "CalibrationTasksNum" << "\t";
     _summaryFile << "CalibrationTasks%" << "\t";
     _summaryFile << "CalibrationWatts" << "\t";
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         _summaryFile << "Reconfigurations" << knobTypeToString((KnobType) i) << "Average" << "\t";
         _summaryFile << "Reconfigurations" << knobTypeToString((KnobType) i) << "Stddev" << "\t";
     }
@@ -166,7 +166,6 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
                             ReconfigurationStats reconfigurationStats,
                             uint durationMs,
                             uint64_t totalTasks){
-    std::cout << "Totaltasks: " << totalTasks << std::endl;
     CalibrationStats totalCalibration;
     for(size_t i = 0; i < calibrationStats.size(); i++){
         totalCalibration += calibrationStats.at(i);
@@ -185,7 +184,7 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
     _summaryFile << totalCalibration.numTasks << "\t";
     _summaryFile << ((double) totalCalibration.numTasks / totalTasks) * 100.0 << "\t";
     _summaryFile << totalCalibration.joules / (totalCalibration.duration / 1000.0) << "\t";
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         if(reconfigurationStats.storedKnob((KnobType) i)){
             _summaryFile << reconfigurationStats.getAverageKnob((KnobType) i) << "\t";
             _summaryFile << reconfigurationStats.getStdDevKnob((KnobType) i) << "\t";

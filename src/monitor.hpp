@@ -28,25 +28,25 @@
 #ifndef NORNIR_CLIENT_HPP_
 #define NORNIR_CLIENT_HPP_
 
-#include "external/orlog/src/orlog.hpp"
-#include "external/orlog/src/external/cppnanomsg/nn.hpp"
-#include "external/orlog/src/external/nanomsg/src/pair.h"
+#include "external/knarr/src/knarr.hpp"
+#include "external/knarr/src/external/cppnanomsg/nn.hpp"
+#include "external/knarr/src/external/nanomsg/src/pair.h"
 #include "external/mammut/mammut/mammut.hpp"
 
-#define EXTERNAL_CHANNEL_NAME "ipc:///tmp/nornir.ipc"
+#define INSTRUMENTATION_CONNECTION_CHANNEL "ipc:///tmp/nornir.ipc"
 
 namespace nornir{
-class ExternalApplication: public mammut::utils::NonCopyable{
+class Instrumenter: public mammut::utils::NonCopyable{
 private:
     nn::socket _channel;
     int _chid;
-    orlog::Application* _app;
+    knarr::Application* _app;
 public:
     /**
      * Creates a client for interaction with a local server.
      * @param parameters The file containing the Nornir parameters.
      */
-    explicit ExternalApplication(const std::string& parametersFile);
+    explicit Instrumenter(const std::string& parametersFile);
 
     /**
      * Creates a client for interaction with a remote server.
@@ -54,12 +54,12 @@ public:
      * @param serverAddress The address of the remote Nornir server.
      * @param port The port where the remote Nornir server is listening.
      */
-    ExternalApplication(const std::string& parametersFile, const std::string& serverAddress, uint port = 9999);
+    Instrumenter(const std::string& parametersFile, const std::string& serverAddress, uint port = 9999);
 
     /**
      * Destroys the handle.
      */
-    ~ExternalApplication();
+    ~Instrumenter();
 
     /**
      * This function must be called at each loop iteration when the computation

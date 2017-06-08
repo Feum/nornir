@@ -58,7 +58,7 @@ class ApplicationInstance{
 public:
     nn::socket channel;
     int chid;
-    ManagerExternal *manager;
+    ManagerInstrumented *manager;
     Observer* observer;
 
     ApplicationInstance():channel(AF_SP, NN_PAIR), chid(0), manager(NULL), observer(NULL){;}
@@ -67,7 +67,7 @@ public:
 int main(int argc, char * argv[]){
     nn::socket mainChannel(AF_SP, NN_PAIR);
     int mainChid;
-    mainChid = mainChannel.bind(EXTERNAL_CHANNEL_NAME);
+    mainChid = mainChannel.bind(INSTRUMENTATION_CONNECTION_CHANNEL);
     std::list<ApplicationInstance*> instances;
     if(system("mkdir -p /tmp/nornir") == -1){throw std::runtime_error("Impossible to create nornir dir.");}
     if(system("chmod ugo+rwx /tmp/nornir.ipc") == -1){throw std::runtime_error("Impossible to set permission to nornir channel.");}
@@ -106,7 +106,7 @@ int main(int argc, char * argv[]){
         assert(ai->channel.send(&pv, sizeof(pv), 0) == sizeof(pv));
         ai->observer = new Observer();
         p.observer = ai->observer;
-        ai->manager = new ManagerExternal(ai->channel, ai->chid, p);
+        ai->manager = new ManagerInstrumented(ai->channel, ai->chid, p);
         ai->manager->start();
         instances.push_back(ai);
         mm.addManager(ai->manager);

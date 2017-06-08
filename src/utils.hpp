@@ -175,6 +175,12 @@ inline MonitoredSample operator*(const MonitoredSample& lhs,
     return r;
 }
 
+inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
+    MonitoredSample r = lhs;
+    r *= x;
+    return r;
+}
+
 inline MonitoredSample operator/(const MonitoredSample& lhs,
                                  const MonitoredSample& rhs){
     MonitoredSample r = lhs;
@@ -185,12 +191,6 @@ inline MonitoredSample operator/(const MonitoredSample& lhs,
 inline MonitoredSample operator/(const MonitoredSample& lhs, double x){
     MonitoredSample r = lhs;
     r /= x;
-    return r;
-}
-
-inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
-    MonitoredSample r = lhs;
-    r *= x;
     return r;
 }
 
@@ -235,6 +235,24 @@ inline void regularize(MonitoredSample& x){
     if(x.latency < 0){x.latency = 0;}
 }
 
+inline MonitoredSample minimum(const MonitoredSample& a, const MonitoredSample& b){
+    MonitoredSample ms;
+    ms.watts = a.watts<b.watts?a.watts:b.watts;
+    ms.utilisation = a.utilisation<b.utilisation?a.utilisation:b.utilisation;
+    ms.bandwidth = a.bandwidth<b.bandwidth?a.bandwidth:b.bandwidth;
+    ms.latency = a.latency<b.latency?a.latency:b.latency;
+    return ms;
+}
+
+inline MonitoredSample maximum(const MonitoredSample& a, const MonitoredSample& b){
+    MonitoredSample ms;
+    ms.watts = a.watts>b.watts?a.watts:b.watts;
+    ms.utilisation = a.utilisation>b.utilisation?a.utilisation:b.utilisation;
+    ms.bandwidth = a.bandwidth>b.bandwidth?a.bandwidth:b.bandwidth;
+    ms.latency = a.latency>b.latency?a.latency:b.latency;
+    return ms;
+}
+
 inline double squareRoot(const double& x){
     return x?sqrt(x):0;
 }
@@ -247,12 +265,28 @@ inline void regularize(double& x){
     if(x < 0){x = 0;}
 }
 
+inline double minimum(const double& a, const double& b){
+    return a<b?a:b;
+}
+
+inline double maximum(const double& a, const double& b){
+    return a>b?a:b;
+}
+
 /**
  * Represents a smoothing technique.
  * Requirement: There must exists the following functions:
  *   - 'T squareRoot(const T&)' to compute the square root.
  *   - 'void regularize(T&)' to set the values < 0 to zero.
  *   - 'void zero(T&)' to set to zero.
+ *   - 'T minimum(const T& a, const T& b)' returns the minimum between a and b
+ *      On struct (or classes) returns a new struct (or class)
+ *      with the minimum of each field. For example, if a = {2, 3} and b = {3, 1}
+ *      it returns {2, 1}.
+ *   - 'T maximum(const T& a, const T& b)' returns the maximum between a and b
+ *      On struct (or classes) returns a new struct (or class)
+ *      with the maximum of each field. For example, if a = {2, 3} and b = {3, 1}
+ *      it returns {3, 3}.
  */
 template <typename T> class Smoother{
     template<typename V>
@@ -262,6 +296,14 @@ template <typename T> class Smoother{
     template<typename V>
     friend std::ofstream& operator<<(std::ofstream& os,
                                      const Smoother<V>& obj);
+private:
+    T _min, _max;
+protected:
+    /**
+     * Adds a sample to the smoother.
+     * @param value The sample to be added.
+     */
+    virtual void addImpl(const T& value) = 0;
 public:
     virtual ~Smoother(){;}
 
@@ -281,7 +323,23 @@ public:
      * Adds a sample to the smoother.
      * @param value The sample to be added.
      */
-    virtual void add(const T& value) = 0;
+    void add(const T& value){
+        _min = minimum(_min, value);
+        _max = maximum(_max, value);
+        add(value);
+    }
+
+    /**
+     * Returns the minimum values added so far.
+     * @return The minimum values added so far.
+     */
+    T min(){return _min;}
+
+    /**
+     * Returns the maximum values added so far.
+     * @return The maximum values added so far.
+     */
+    T max(){return _max;}
 
     /**
      * Gets the last stored sample.
@@ -365,7 +423,7 @@ public:
         _windowImpl.resize(_span);
     }
 
-    void add(const T& value){
+    void addImpl(const T& value){
         _lastSample = value;
         if(_storedValues == 0){
             ++_storedValues;
@@ -470,7 +528,7 @@ public:
         _alpha = s;
     }
 
-    void add(const T& value){
+    void addImpl(const T& value){
         ++_storedValues;
         _lastSample = value;
         if(_storedValues == 1){

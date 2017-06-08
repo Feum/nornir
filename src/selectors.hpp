@@ -60,6 +60,7 @@ protected:
     KnobsValues _forcedConfiguration;
     bool _calibrationCoordination;
     bool _calibrationAllowed;
+    u_int64_t _totalTasks;
 
     /**
      * Checks if a specific primary value respects the required contract.
@@ -83,9 +84,8 @@ protected:
 
     /**
      * Starts the recording of calibration stats.
-     * @param totalTasks The total number of tasks processed up to now.
      */
-    void startCalibration(uint64_t totalTasks);
+    void startCalibration();
 public:
     Selector(const Parameters& p,
              const Configuration& configuration,
@@ -101,18 +101,24 @@ public:
     void forceConfiguration(KnobsValues& kv);
 
     /**
+     * Updates the total number of tasks.
+     * MUST be called before calling getNextKnobsValues().
+     * @param totalTasks The total processed tasks.
+     */
+    void updateTotalTasks(u_int64_t totalTasks);
+
+    /**
      * Updates the input bandwidth history with the current value.
-     * MUST be called before calling getNextKnobsValues(...).
+     * MUST be called before calling getNextKnobsValues().
      */
     virtual void updateBandwidthIn();
 
     /**
      * Returns the next values to be set for the knobs.
-     * @param totalTasks The total processed tasks.
      *
      * @return The next values to be set for the knobs.
      */
-    virtual KnobsValues getNextKnobsValues(u_int64_t totalTasks) = 0;
+    virtual KnobsValues getNextKnobsValues() = 0;
 
     /**
      * Returns the calibration statistics.
@@ -128,12 +134,10 @@ public:
      */
     bool isCalibrating() const;
 
-
     /**
      * Stops the recording of calibration stats.
-     * @param totalTasks The total number of tasks processed up to now.
      */
-    void stopCalibration(uint64_t totalTasks);
+    void stopCalibration();
 
     /**
      * Returns the total calibration time.
@@ -181,7 +185,7 @@ public:
 
     ~SelectorFixed();
 
-    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues();
 };
 
 class ManagerMulti;
@@ -283,11 +287,10 @@ public:
 
     /**
      * Returns the next values to be set for the knobs.
-     * @param totalTasks The total processed tasks.
      *
      * @return The next values to be set for the knobs.
      */
-    virtual KnobsValues getNextKnobsValues(u_int64_t totalTasks) = 0;
+    virtual KnobsValues getNextKnobsValues() = 0;
 
     /**
      * Given a prediction, returns the real predicted bandwidth, i.e.
@@ -340,7 +343,7 @@ public:
                    const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
-    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues();
     virtual void updateBandwidthIn();
 };
 
@@ -385,7 +388,7 @@ public:
 
     ~SelectorLearner();
 
-    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues();
 
     /**
      * Checks if the application phase changed.
@@ -419,7 +422,7 @@ public:
     ~SelectorFixedExploration();
 
 
-    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues();
 };
 
 /**
@@ -482,7 +485,7 @@ public:
                          const Smoother<MonitoredSample>* samples);
     ~SelectorLiMartinez();
 
-    KnobsValues getNextKnobsValues(u_int64_t totalTasks);
+    KnobsValues getNextKnobsValues();
 };
 
 }

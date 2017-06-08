@@ -105,7 +105,7 @@ protected:
      * Changes the value of this knob.
      * @param v Is the real value that this knob will have.
      */
-    virtual void changeValueReal(double v) = 0;
+    virtual void changeValue(double v) = 0;
 
     double _realValue;
     bool _locked;
@@ -117,7 +117,7 @@ private:
     Parameters _p;
 public:
     explicit KnobVirtualCores(Parameters p);
-    void changeValueReal(double v);
+    void changeValue(double v);
     void changeMax(double v);
 };
 
@@ -131,7 +131,7 @@ public:
                   const std::vector<AdaptiveNode*>& workers,
                   const volatile bool* terminated);
 
-    void changeValueReal(double v);
+    void changeValue(double v);
     std::vector<double> getAllowedValues() const;
     std::vector<AdaptiveNode*> getActiveWorkers() const;
 private:
@@ -174,7 +174,7 @@ private:
 class KnobHyperThreading: public Knob{
 public:
     explicit KnobHyperThreading(Parameters p);
-    void changeValueReal(double v);
+    void changeValue(double v);
 };
 
 typedef enum{
@@ -189,7 +189,7 @@ public:
     KnobMapping(const Parameters& p,
                 const KnobVirtualCores& knobCores,
                 const KnobHyperThreading& knobHyperThreading);
-    void changeValueReal(double v);
+    void changeValue(double v);
 
     virtual void move(const std::vector<mammut::topology::VirtualCore*>& vcOrder) = 0;
 
@@ -249,7 +249,7 @@ public:
 class KnobFrequency: public Knob{
 public:
     KnobFrequency(Parameters p, const KnobMapping& knobMapping);
-    void changeValueReal(double v);
+    void changeValue(double v);
 private:
     void applyUnusedVCStrategySame(const std::vector<mammut::topology::VirtualCore*>& unusedVc, mammut::cpufreq::Frequency v);
     void applyUnusedVCStrategyOff(const std::vector<mammut::topology::VirtualCore*>& unusedVc);
@@ -280,10 +280,10 @@ std::string knobTypeToString(KnobType kv);
 class KnobsValues{
 private:
     KnobValueType _type;
-    double _values[KNOB_TYPE_NUM];
+    double _values[KNOB_NUM];
 public:
     inline void reset(){
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             _values[i] = 0;
         }
     }
@@ -301,7 +301,7 @@ public:
 
     inline KnobsValues(const KnobsValues& other){
         _type = other._type;
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             _values[i] = other._values[i];
         }
     }
@@ -329,7 +329,7 @@ public:
 
 inline std::ostream& operator<<(std::ostream& os, const KnobsValues& obj){
     os << "[";
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         os << obj[(KnobType) i] << ", ";
     }
     os << "]";
@@ -338,7 +338,7 @@ inline std::ostream& operator<<(std::ostream& os, const KnobsValues& obj){
 
 inline bool operator==(const KnobsValues& lhs,
                        const KnobsValues& rhs){
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         if(lhs[(KnobType) i] !=
            rhs[(KnobType) i]){
             return false;
@@ -354,7 +354,7 @@ inline bool operator!=(const KnobsValues& lhs,
 
 inline bool operator<(const KnobsValues& lhs,
                       const KnobsValues& rhs){
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         if(lhs[(KnobType) i] <
            rhs[(KnobType) i]){
             return true;

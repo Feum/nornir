@@ -86,26 +86,26 @@ void ManagerFarm<lb_t, gt_t>::waitForStart(){
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::askSample(){
+knarr::ApplicationSample ManagerFarm<lb_t, gt_t>::getSample(){
     for(size_t i = 0; i < _activeWorkers.size(); i++){
         _activeWorkers.at(i)->askForSample();
     }
-}
-
-template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::getSample(orlog::ApplicationSample& sample){
+    knarr::ApplicationSample sample;
     AdaptiveNode* w;
     uint numActiveWorkers = _activeWorkers.size();
-    sample = orlog::ApplicationSample();
 
     for(size_t i = 0; i < numActiveWorkers; i++){
-        orlog::ApplicationSample tmp;
+        knarr::ApplicationSample tmp;
         w = _activeWorkers.at(i);
         w->getSampleResponse(tmp, _samples->average().latency);
-        sample += tmp;
+        sample.loadPercentage += tmp.loadPercentage;
+        sample.tasksCount += tmp.tasksCount;
+        sample.latency += tmp.latency;
+        sample.bandwidthTotal += tmp.bandwidthTotal;
     }
     sample.loadPercentage /= numActiveWorkers;
     sample.latency /= numActiveWorkers;
+    return sample;
 }
 
 template <typename lb_t, typename gt_t>
@@ -170,10 +170,10 @@ void ManagerFarm<lb_t, gt_t>::initNodesPostRun() {
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::manageConfigurationChange(){
-    const KnobVirtualCoresFarm* knobWorkers = dynamic_cast<const KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES));
+void ManagerFarm<lb_t, gt_t>::postConfigurationManagement(){
+    const KnobVirtualCoresFarm* knobWorkers = dynamic_cast<const KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
     std::vector<AdaptiveNode*> newWorkers = knobWorkers->getActiveWorkers();
-    orlog::ApplicationSample ws;
+    knarr::ApplicationSample ws;
 
     if(_activeWorkers.size() != newWorkers.size()){
         /**
@@ -184,7 +184,7 @@ void ManagerFarm<lb_t, gt_t>::manageConfigurationChange(){
          * terminated.
          */
         DEBUG("Getting spurious..");
-        getSample(ws);
+        ws = getSample();
         updateTasksCount(ws);
         DEBUG("Spurious got.");
     }
@@ -193,7 +193,7 @@ void ManagerFarm<lb_t, gt_t>::manageConfigurationChange(){
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::clean(){
+void ManagerFarm<lb_t, gt_t>::terminationManagement(){
     DEBUG("Terminating...wait freezing.");
     _farm->wait_freezing();
     _farm->wait();
@@ -207,14 +207,14 @@ ulong ManagerFarm<lb_t, gt_t>::getExecutionTime(){
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::shrinkPause(){
-	KnobVirtualCoresFarm* k = ((KnobVirtualCoresFarm*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES));
+	KnobVirtualCoresFarm* k = ((KnobVirtualCoresFarm*) _configuration->getKnob(KNOB_VIRTUAL_CORES));
 	k->prepareToFreeze();
 	k->freeze();
 }
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::stretchPause(){
-	KnobVirtualCoresFarm* k = ((KnobVirtualCoresFarm*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES));
+	KnobVirtualCoresFarm* k = ((KnobVirtualCoresFarm*) _configuration->getKnob(KNOB_VIRTUAL_CORES));
 	size_t v = k->getRealValue();
 	k->prepareToRun(v);
 	k->run(v);
@@ -301,8 +301,8 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
     KnobsValues values = _configuration->getRealValues();
     SimulationKey key;
     SimulationData data;
-    key.numCores = values[KNOB_TYPE_VIRTUAL_CORES];
-    key.frequency = values[KNOB_TYPE_FREQUENCY];
+    key.numCores = values[KNOB_VIRTUAL_CORES];
+    key.frequency = values[KNOB_FREQUENCY];
     if(table.find(key) != table.end()){
         data = table[key];
     }else{
@@ -393,8 +393,8 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
             act(kv);
 
             values = _configuration->getRealValues();
-            key.numCores = values[KNOB_TYPE_VIRTUAL_CORES];
-            key.frequency = values[KNOB_TYPE_FREQUENCY];
+            key.numCores = values[KNOB_VIRTUAL_CORES];
+            key.frequency = values[KNOB_FREQUENCY];
             if(table.find(key) != table.end()){
                 data = table[key];
             }else{
@@ -407,7 +407,7 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
     }
 
     *terminate = true;
-    clean();
+    terminationManagement();
 
     // We do -1 because the last step was the optimal configuration.
     res.numSteps = steps - 1;
@@ -429,8 +429,8 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
                 ++keys;
                 SimulationKey k;
                 KnobsValues v = combinations.at(i);
-                k.numCores = v[KNOB_TYPE_VIRTUAL_CORES];
-                k.frequency = v[KNOB_TYPE_FREQUENCY];
+                k.numCores = v[KNOB_VIRTUAL_CORES];
+                k.frequency = v[KNOB_FREQUENCY];
 
                 primaryPrediction = sel->getPrimaryPrediction(v);
                 secondaryPrediction = sel->getSecondaryPrediction(v);

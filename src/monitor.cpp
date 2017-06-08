@@ -3,13 +3,14 @@
  *
  * Created on: 03/07/2016
  *
- * This file contains the client code for monitoring a local application and sending
- * the monitoring data to an external manager (server).
- * Firs of all, we try to open the EXTERNAL_CHANNEL_NAME channel, whose name
- * is fixed and known by all the clients and by the server. On this channel,
- * the client sends its PID. Then, all the communications between this specific
- * client (i.e. application) and the server will be done on a separate channel
- * (identified by the PID).
+ * This file contains the client code for monitoring a local application
+ * through instrumentation, and to send the monitoring data to a Nornir
+ * manager running in a different process and acting like a server.
+ * First of all, we try to open the INSTRUMENTATION_CONNECTION_CHANNEL channel,
+ * whose name  is fixed and known by all the clients and by the server. On
+ * this channel, the client sends its PID. Then, all the communications between
+ * this specific client (i.e. application) and the server will be done on a
+ * separate channel (identified by the PID).
  *
  * =========================================================================
  *  Copyright (C) 2015-, Daniele De Sensi (d.desensi.software@gmail.com)
@@ -46,15 +47,15 @@ using namespace std;
 using namespace mammut;
 using namespace mammut::utils;
 
-ExternalApplication::ExternalApplication(const std::string& parametersFile):
+Instrumenter::Instrumenter(const std::string& parametersFile):
         _channel(AF_SP, NN_PAIR){
 
     /** Send pid, then switch to the pid channel. */
     nn::socket mainChannel(AF_SP, NN_PAIR);
     int mainChid;
-    mainChid = mainChannel.connect(EXTERNAL_CHANNEL_NAME);
+    mainChid = mainChannel.connect(INSTRUMENTATION_CONNECTION_CHANNEL);
     if(mainChid < 0){
-        throw std::runtime_error("Impossible to connect to external Nornir channel.");
+        throw std::runtime_error("Impossible to connect to Nornir.");
     }
     pid_t pid = getpid();
     int ret = mainChannel.send(&pid, sizeof(pid), 0);
@@ -100,30 +101,30 @@ ExternalApplication::ExternalApplication(const std::string& parametersFile):
         throw runtime_error("Invalid adaptivity parameters: " + std::to_string(pv));
     }
 
-    /** Create orlog app. **/
-    _app = new orlog::Application(_channel, _chid);
+    /** Create knarr app. **/
+    _app = new knarr::Application(_channel, _chid);
 }
 
-ExternalApplication::ExternalApplication(const std::string& parametersFile,
+Instrumenter::Instrumenter(const std::string& parametersFile,
                const std::string& serverAddress,
                uint port):_channel(AF_SP, NN_PAIR), _chid(0), _app(NULL){
     throw std::runtime_error("Not yet implemented.");
 }
 
-ExternalApplication::~ExternalApplication(){
+Instrumenter::~Instrumenter(){
     _channel.shutdown(_chid);
     delete _app;
 }
 
-void ExternalApplication::begin(){
+void Instrumenter::begin(){
     _app->begin();
 }
 
-void ExternalApplication::end(){
+void Instrumenter::end(){
     _app->end();
 }
 
-void ExternalApplication::terminate(){
+void Instrumenter::terminate(){
     _app->terminate();
 }
 

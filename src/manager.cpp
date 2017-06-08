@@ -75,9 +75,9 @@ static Parameters& validate(Parameters& p){
     return p;
 }
 
-Manager::Manager(Parameters adaptivityParameters):
+Manager::Manager(Parameters nornirParameters):
         _terminated(false),
-        _p(validate(adaptivityParameters)),
+        _p(validate(nornirParameters)),
         _cpufreq(_p.mammut.getInstanceCpuFreq()),
         _counter(_p.mammut.getInstanceEnergy()->getCounter()),
         _task(_p.mammut.getInstanceTask()),
@@ -177,13 +177,14 @@ void Manager::run(){
         }
     }
 
-    clean();
+    terminationManagement();
     ulong duration = getExecutionTime();
 
     if(_p.observer){
         vector<CalibrationStats> cs;
         if(_selector){
-            _selector->stopCalibration(_totalTasks);
+            _selector->updateTotalTasks(_totalTasks);
+            _selector->stopCalibration();
             cs = _selector->getCalibrationsStats();
             _p.observer->calibrationStats(cs, duration, _totalTasks);
         }
@@ -224,7 +225,7 @@ void Manager::stretch(CalibrationShrink type){
     switch(type){
         case CALIBRATION_SHRINK_AGGREGATE:{
             if(_pid){
-                std::vector<VirtualCore*> allowedCores = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getAllowedCores();
+                std::vector<VirtualCore*> allowedCores = ((KnobMapping*) _configuration->getKnob(KNOB_MAPPING))->getAllowedCores();
                 _task->getProcessHandler(_pid)->move(allowedCores);
             }
         }break;
@@ -266,7 +267,7 @@ void Manager::waitModelsInterferenceUpdate(){
 
 std::vector<VirtualCoreId> Manager::getUsedCores(){
     while(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){;}
-    vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getActiveVirtualCores();
+    vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_MAPPING))->getActiveVirtualCores();
     vector<VirtualCoreId> vcid;
     for(VirtualCore* v : vc){
         vcid.push_back(v->getVirtualCoreId());
@@ -279,9 +280,13 @@ void Manager::allowCores(std::vector<mammut::topology::VirtualCoreId> ids){
     for(auto id : ids){
         allowedVc.push_back(_topology->getVirtualCore(id));
     }
-    ((KnobVirtualCores*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES))->changeMax(ids.size() - _configuration->getNumServiceNodes());
-    ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->setAllowedCores(allowedVc);
+    ((KnobVirtualCores*) _configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(ids.size() - _configuration->getNumServiceNodes());
+    ((KnobMapping*) _configuration->getKnob(KNOB_MAPPING))->setAllowedCores(allowedVc);
 }
+
+void Manager::postConfigurationManagement(){;}
+
+void Manager::terminationManagement(){;}
 
 void Manager::updateRequiredBandwidth() {
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
@@ -370,16 +375,16 @@ bool Manager::persist() const{
 
 void Manager::lockKnobs() const{
     if(!_p.knobCoresEnabled){
-        _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->lockToMax();
+        _configuration->getKnob(KNOB_VIRTUAL_CORES)->lockToMax();
     }
     if(!_p.knobMappingEnabled){
-        _configuration->getKnob(KNOB_TYPE_MAPPING)->lock(MAPPING_TYPE_LINEAR);
+        _configuration->getKnob(KNOB_MAPPING)->lock(MAPPING_TYPE_LINEAR);
     }
     if(!_p.knobFrequencyEnabled){
-        _configuration->getKnob(KNOB_TYPE_FREQUENCY)->lockToMax();
+        _configuration->getKnob(KNOB_FREQUENCY)->lockToMax();
     }
     if(!_p.knobHyperthreadingEnabled){
-        _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
+        _configuration->getKnob(KNOB_HYPERTHREADING)->lockToMin();
     }
 }
 
@@ -425,14 +430,14 @@ Smoother<MonitoredSample>* Manager::initSamples() const{
     }
 }
 
-void Manager::updateTasksCount(orlog::ApplicationSample& sample){
+void Manager::updateTasksCount(knarr::ApplicationSample& sample){
     double newTasks = sample.tasksCount;
     if(_p.synchronousWorkers){
         // When we have synchronous workers we need to count the iterations,
         // not the real tasks (indeed in this case each worker will receive
         // the same amount of tasks, e.g. in canneal) since they are sent in
         // broadcast.
-        newTasks /= _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
+        newTasks /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
     }
     _totalTasks += newTasks;
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
@@ -446,11 +451,8 @@ void Manager::updateTasksCount(orlog::ApplicationSample& sample){
 
 void Manager::observe(){
     MonitoredSample sample;
-    orlog::ApplicationSample ws;
     Joules joules = 0.0;
-
-    askSample();
-    getSample(ws);
+    knarr::ApplicationSample ws = getSample();
     updateTasksCount(ws);
     double now = getMillisecondsTime();
 
@@ -478,7 +480,7 @@ void Manager::observe(){
         // for the number of workers since we do it for the totalTasks
         // count. When this flag is set we count iterations, not real
         // tasks.
-        sample.bandwidth /= _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
+        sample.bandwidth /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
     }
 
     _samples->add(sample);
@@ -497,14 +499,15 @@ KnobsValues Manager::decide(){
         // some tasks.  By doing this check, we avoid updating bandwidth for
         // the first forced reconfiguration.
         _selector->updateBandwidthIn();
+        _selector->updateTotalTasks(_totalTasks);
     }
-    return _selector->getNextKnobsValues(_totalTasks);
+    return _selector->getNextKnobsValues();
 }
 
 void Manager::act(KnobsValues kv, bool force){
     if(force || !_configuration->equal(kv)){
         _configuration->setValues(kv);
-        manageConfigurationChange();
+        postConfigurationManagement();
 
         /****************** Clean state ******************/
         _samples->reset();
@@ -514,9 +517,7 @@ void Manager::act(KnobsValues kv, bool force){
         if(_p.cooldownPeriod){
             usleep(_p.cooldownPeriod * 1000);
         }
-        orlog::ApplicationSample ws;
-        askSample();
-        getSample(ws);
+        knarr::ApplicationSample ws = getSample();
         updateTasksCount(ws);
         _lastStoredSampleMs = getMillisecondsTime();
 
@@ -538,11 +539,11 @@ Joules Manager::getAndResetJoules(){
 
 void Manager::logObservation(){
     if(_p.observer){
-        const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration->getKnob(KNOB_TYPE_MAPPING));
+        const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration->getKnob(KNOB_MAPPING));
         MonitoredSample ms = _samples->average();
         _p.observer->observe(_lastStoredSampleMs,
-                             _configuration->getRealValue(KNOB_TYPE_VIRTUAL_CORES),
-                             _configuration->getRealValue(KNOB_TYPE_FREQUENCY),
+                             _configuration->getRealValue(KNOB_VIRTUAL_CORES),
+                             _configuration->getRealValue(KNOB_FREQUENCY),
                              kMapping->getActiveVirtualCores(),
                              _samples->getLastSample().bandwidth,
                              ms.bandwidth,
@@ -554,30 +555,32 @@ void Manager::logObservation(){
     }
 }
 
-ManagerExternal::ManagerExternal(const std::string& orlogChannel,
-                                 Parameters adaptivityParameters):
-        Manager(adaptivityParameters), _monitor(orlogChannel){
+ManagerInstrumented::ManagerInstrumented(const std::string& knarrChannel,
+                                 Parameters nornirParameters):
+        Manager(nornirParameters), _monitor(knarrChannel){
     Manager::_configuration = new ConfigurationExternal(_p);
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
-    // For external application we do not care if synchronous of not (we count iterations).   
+    // For instrumented application we do not care if synchronous of not
+    // (we count iterations).
     _p.synchronousWorkers = false;
 }
 
-ManagerExternal::ManagerExternal(nn::socket& orlogSocket,
+ManagerInstrumented::ManagerInstrumented(nn::socket& knarrSocket,
                                  int chid,
-                                 Parameters adaptivityParameters):
-            Manager(adaptivityParameters), _monitor(orlogSocket, chid){
+                                 Parameters nornirParameters):
+            Manager(nornirParameters), _monitor(knarrSocket, chid){
     Manager::_configuration = new ConfigurationExternal(_p);
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
-    // For external application we do not care if synchronous of not (we count iterations).
+    // For instrumented application we do not care if synchronous of not (we
+    // count iterations).
     _p.synchronousWorkers = false;
 }
 
-ManagerExternal::~ManagerExternal(){
+ManagerInstrumented::~ManagerInstrumented(){
     if(Manager::_configuration){
         delete Manager::_configuration;
     }
@@ -586,44 +589,40 @@ ManagerExternal::~ManagerExternal(){
     }
 }
 
-void ManagerExternal::waitForStart(){
+void ManagerInstrumented::waitForStart(){
     Manager::_pid = _monitor.waitStart();
-    ((KnobMappingExternal*)_configuration->getKnob(KNOB_TYPE_MAPPING))->setPid(_pid);
+    ((KnobMappingExternal*)_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
 }
 
-void ManagerExternal::askSample(){
-    return;
-}
-void ManagerExternal::getSample(orlog::ApplicationSample& sample){
+knarr::ApplicationSample ManagerInstrumented::getSample(){
+    knarr::ApplicationSample sample;
     if(!_monitor.getSample(sample)){
         _terminated = true;
     }
+    return sample;
 }
 
-void ManagerExternal::manageConfigurationChange(){;}
-
-void ManagerExternal::clean(){;}
-
-ulong ManagerExternal::getExecutionTime(){
+ulong ManagerInstrumented::getExecutionTime(){
     return _monitor.getExecutionTime();
 }
 
-void ManagerExternal::shrinkPause(){
+void ManagerInstrumented::shrinkPause(){
     kill(_pid, SIGSTOP);
 }
 
-void ManagerExternal::stretchPause(){
+void ManagerInstrumented::stretchPause(){
     kill(_pid, SIGCONT);
 }
 
-ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters adaptivityParameters):
-        Manager(adaptivityParameters), _process(adaptivityParameters.mammut.getInstanceTask()->getProcessHandler(pid)){
+ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters nornirParameters):
+        Manager(nornirParameters), _process(nornirParameters.mammut.getInstanceTask()->getProcessHandler(pid)){
     Manager::_pid = pid;
     Manager::_configuration = new ConfigurationExternal(_p);
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
-    // For external application we do not care if synchronous of not (we count instructions).
+    // For blackbox application we do not care if synchronous of not
+    // (we count instructions).
     _p.synchronousWorkers = false;
     // Check supported contracts.
     if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
@@ -658,35 +657,29 @@ void ManagerBlackBox::waitForStart(){
         }
     }
     _startTime = getMillisecondsTime();
-    ((KnobMappingExternal*)_configuration->getKnob(KNOB_TYPE_MAPPING))->setProcessHandler(_process);
+    ((KnobMappingExternal*)_configuration->getKnob(KNOB_MAPPING))->setProcessHandler(_process);
     _process->resetInstructions(); // To remove those executed before entering ROI
-}
-void ManagerBlackBox::askSample(){
-    // We do not need to ask for black box.
-    ;
 }
 
 static bool isRunning(pid_t pid) {
     return !kill(pid, 0);
 }
 
-void ManagerBlackBox::getSample(orlog::ApplicationSample& sample){
+knarr::ApplicationSample ManagerBlackBox::getSample(){
+    knarr::ApplicationSample sample;
     double instructions = 0;
     if(!isRunning(_process->getId()) ||
        (_p.roiFile.compare("") && !mammut::utils::existsFile(_p.roiFile))){
         _terminated = true;
-        return;
+        return sample;
     }
     _process->getAndResetInstructions(instructions);
     sample.bandwidthTotal = instructions / ((getMillisecondsTime() - _lastStoredSampleMs) / 1000.0);
     sample.latency = -1; // Not used.
     sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
     sample.tasksCount = instructions; // We consider a task to be an instruction.
+    return sample;
 }
-
-void ManagerBlackBox::manageConfigurationChange(){;}
-
-void ManagerBlackBox::clean(){;}
 
 ulong ManagerBlackBox::getExecutionTime(){
     return getMillisecondsTime() - _startTime;

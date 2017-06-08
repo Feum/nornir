@@ -1,7 +1,7 @@
 /*
  * manager-single.cpp
  *
- * Monitors and adapt an external application by using the orlog library.
+ * Monitors and adapt an external application by using the knarr library.
  * Needs the explicit channel name. This is deprecated. Use manager-external.
  *
  * Created on: 21/06/2016
@@ -46,7 +46,7 @@ int main(int argc, char * argv[]) {
     channelName = argv[1];
 
     Parameters p("parameters.xml");
-    ManagerExternal m(channelName, p);
+    ManagerInstrumented m(channelName, p);
     m.start();
     m.join();
 

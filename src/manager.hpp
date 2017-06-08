@@ -44,7 +44,7 @@
 #include "external/mammut/mammut/module.hpp"
 #include "external/mammut/mammut/utils.hpp"
 #include "external/mammut/mammut/mammut.hpp"
-#include "external/orlog/src/orlog.hpp"
+#include "external/knarr/src/knarr.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -97,7 +97,7 @@ typedef enum{
 class Manager: public Thread{
     friend class ManagerMulti;
 public:
-    explicit Manager(Parameters adaptivityParameters);
+    explicit Manager(Parameters nornirParameters);
 
     virtual ~Manager();
     /**
@@ -171,36 +171,31 @@ protected:
     virtual void waitForStart() = 0;
 
     /**
-     * Asks the application for a sample.
-     */
-    virtual void askSample() = 0;
-
-    /**
      * Obtain application sample.
-     * @param sample An application sample. It will be filled by this call.
+     * @return An application sample.
      */
-    virtual void getSample(orlog::ApplicationSample& sample) = 0;
-
-    /**
-     * Manages a configuration change.
-     */
-    virtual void manageConfigurationChange() = 0;
-
-    /**
-     * Cleaning after termination.
-     */
-    virtual void clean() = 0;
+    virtual knarr::ApplicationSample getSample() = 0;
 
     /**
      * Returns the execution time of the application (milliseconds).
      * - For ManagerFarm, it will be the execution time of the farm.
-     * - For ManagerExternal, it will be the execution time between the construction
-     * of the Application object and the call of the 'terminate' function on it
-     * (application side).
+     * - For ManagerInstrumented, it will be the execution time between
+     *   the construction of the 'Instrumentation' object and the call of the
+     *   'terminate' function on it (application side).
      * - For ManagerBlackBox, it will be the execution time from the point where
      *   the manager is created to the end of the application.
      */
     virtual ulong getExecutionTime() = 0;
+
+    /**
+     * Manages a configuration change.
+     */
+    virtual void postConfigurationManagement();
+
+    /**
+     * Cleaning after termination.
+     */
+    virtual void terminationManagement();
 
     /**
      * Updates the required bandwidth.
@@ -254,7 +249,7 @@ protected:
      * Updates the tasks count.
      * @param sample The workers sample to be used for the update.
      */
-    void updateTasksCount(orlog::ApplicationSample& sample);
+    void updateTasksCount(knarr::ApplicationSample& sample);
 
     /**
      * Observes.
@@ -326,42 +321,39 @@ private:
     void allowCores(std::vector<mammut::topology::VirtualCoreId> ids);
 };
 
-class ManagerExternal: public Manager{
+class ManagerInstrumented: public Manager{
 private:
-    orlog::Monitor _monitor;
+    knarr::Monitor _monitor;
     void shrinkPause();
     void stretchPause();
 public:
     /**
-     * Creates an adaptivity manager for an external INSTRUMENTED application.
-     * @param orlogChannel The name of the Orlog channel.
-     * @param adaptivityParameters The parameters to be used for
+     * Creates an adaptivity manager for an instrumented application.
+     * @param knarrChannel The name of the knarr channel.
+     * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerExternal(const std::string& orlogChannel,
-                    Parameters adaptivityParameters);
+    ManagerInstrumented(const std::string& knarrChannel,
+                    Parameters nornirParameters);
 
     /**
-     * Creates an adaptivity manager for an external application.
-     * @param orlogSocket The Orlog socket.
+     * Creates an adaptivity manager for an instrumented application.
+     * @param knarrSocket The knarr socket.
      * @param chid The channel id.
-     * @param adaptivityParameters The parameters to be used for
+     * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerExternal(nn::socket& orlogSocket,
+    ManagerInstrumented(nn::socket& knarrSocket,
                     int chid,
-                    Parameters adaptivityParameters);
+                    Parameters nornirParameters);
 
     /**
      * Destroyes this adaptivity manager.
      */
-    ~ManagerExternal();
+    ~ManagerInstrumented();
 protected:
     void waitForStart();
-    void askSample();
-    void getSample(orlog::ApplicationSample& sample);
-    void manageConfigurationChange();
-    void clean();
+    knarr::ApplicationSample getSample();
     ulong getExecutionTime();
 };
 
@@ -373,12 +365,13 @@ private:
     void stretchPause();
 public:
     /**
-     * Creates an adaptivity manager for an external NON-INSTRUMENTED application.
+     * Creates an adaptivity manager for an external NON-INSTRUMENTED
+     * application (blackbox).
      * @param pid The identifier of an already running process.
-     * @param adaptivityParameters The parameters to be used for
+     * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerBlackBox(pid_t pid, Parameters adaptivityParameters);
+    ManagerBlackBox(pid_t pid, Parameters nornirParameters);
 
     /**
      * Destroyes this adaptivity manager.
@@ -392,10 +385,7 @@ public:
     pid_t getPid() const;
 protected:
     void waitForStart();
-    void askSample();
-    void getSample(orlog::ApplicationSample& sample);
-    void manageConfigurationChange();
-    void clean();
+    knarr::ApplicationSample getSample();
     ulong getExecutionTime();
 };
 
@@ -413,10 +403,10 @@ public:
     /**
      * Creates a farm adaptivity manager.
      * @param farm The farm to be managed.
-     * @param adaptivityParameters The parameters to be used for
+     * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters adaptivityParameters);
+    ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters nornirParameters);
 
     /**
      * Destroyes this adaptivity manager.
@@ -449,12 +439,11 @@ private:
     std::vector<AdaptiveNode*> _activeWorkers;
 
     void waitForStart();
-    void askSample();
-    void getSample(orlog::ApplicationSample& sample);
+    knarr::ApplicationSample getSample();
     void initNodesPreRun();
     void initNodesPostRun();
-    void manageConfigurationChange();
-    void clean();
+    void postConfigurationManagement();
+    void terminationManagement();
     ulong getExecutionTime();
     void shrinkPause();
     void stretchPause();

@@ -454,7 +454,7 @@ void ManagerMulti::applyNewAllocation(){
         const KnobsValues real = m->_configuration->getRealValues(getKnobs(it, alloc.at(pos)));
         if(!m->running()){++pos; continue;}
         DEBUG("Allocation: " << m << " " << real << " " << ((SelectorPredictive*)m->_selector)->getPrimaryPrediction(real) << " " << ((SelectorPredictive*)m->_selector)->getSecondaryPrediction(real));
-        size_t numCores = real[KNOB_TYPE_VIRTUAL_CORES] + m->_configuration->getNumServiceNodes();
+        size_t numCores = real[KNOB_VIRTUAL_CORES] + m->_configuration->getNumServiceNodes();
         vector<VirtualCoreId> cores;
         cores.reserve(numCores);
         for(size_t i = 0; i < numCores; i++){
@@ -499,8 +499,8 @@ bool ManagerMulti::isValidAllocation(const AllocationIndexes& indexes) const{
         Manager* const currentManager = getManager(it);
         allocationPosition = indexes.at(pos);
         const KnobsValues real = currentManager->_configuration->getRealValues(getKnobs(it, allocationPosition));
-        size_t numCores = real[KNOB_TYPE_VIRTUAL_CORES] + currentManager->_configuration->getNumServiceNodes();
-        Frequency currentFreq = real[KNOB_TYPE_FREQUENCY];
+        size_t numCores = real[KNOB_VIRTUAL_CORES] + currentManager->_configuration->getNumServiceNodes();
+        Frequency currentFreq = real[KNOB_FREQUENCY];
         // Only keep combinations on the same frequency.
         if(previousFreq && currentFreq != previousFreq){
             validAllocation = false;

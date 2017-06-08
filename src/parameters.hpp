@@ -74,11 +74,11 @@ class Observer;
 
 // Possible knobs
 typedef enum{
-    KNOB_TYPE_VIRTUAL_CORES = 0, // Number of contexts to be used.
-    KNOB_TYPE_HYPERTHREADING, // Number of contexts to be used on each physical core.
-    KNOB_TYPE_MAPPING, // Mapping of threads on physical cores.
-    KNOB_TYPE_FREQUENCY,
-    KNOB_TYPE_NUM  // <---- This must always be the last value
+    KNOB_VIRTUAL_CORES = 0, // Number of contexts to be used.
+    KNOB_HYPERTHREADING, // Number of contexts to be used on each physical core.
+    KNOB_MAPPING, // Mapping of threads on physical cores.
+    KNOB_FREQUENCY,
+    KNOB_NUM  // <---- This must always be the last value
 }KnobType;
 
 /// Possible contracts requested by the user.
@@ -504,7 +504,7 @@ typedef struct{
  */
 class Parameters{
 private:
-    bool _knobEnabled[KNOB_TYPE_NUM];
+    bool _knobEnabled[KNOB_NUM];
 
     /**
      * Sets default parameters
@@ -735,6 +735,11 @@ public:
     // valid only if contractType is CONTRACT_COMPLETION_TIME
     // [default = unused].
     uint requiredCompletionTime;
+
+    // The maximum latency required for each input element processed by the
+    // application (in milliseconds).
+    // NOT AVAILABLE AT THE MOMENT.
+    double requiredLatency;
 
     // The number of task expected for this computation. It is
     // valid only if contractType is CONTRACT_COMPLETION_TIME

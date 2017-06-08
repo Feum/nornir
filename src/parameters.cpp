@@ -192,6 +192,7 @@ void Parameters::setDefault(){
     overloadThresholdWorker = 90.0;
     requiredBandwidth = 0;
     requiredCompletionTime = 0;
+    requiredLatency = 0;
     expectedTasksNumber = 0;
     synchronousWorkers = false;
     powerBudget = 0;
@@ -466,37 +467,37 @@ ParametersValidation Parameters::validateContract(){
 }
 
 ParametersValidation Parameters::validateSelector(){
-    bool knobsSupportSelector[STRATEGY_SELECTION_NUM][KNOB_TYPE_NUM];
+    bool knobsSupportSelector[STRATEGY_SELECTION_NUM][KNOB_NUM];
     if(strategySelection == STRATEGY_SELECTION_NUM){
         return VALIDATION_NO;
     }
 
     // ANALYTICAL
-    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_TYPE_VIRTUAL_CORES] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_TYPE_FREQUENCY] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_TYPE_MAPPING] = false;
-    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_TYPE_HYPERTHREADING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_MAPPING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_HYPERTHREADING] = false;
 
     // FULLSEARCH
-    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_TYPE_VIRTUAL_CORES] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_TYPE_FREQUENCY] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_TYPE_MAPPING] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_TYPE_HYPERTHREADING] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_MAPPING] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_HYPERTHREADING] = true;
 
     // For learning we do not check since it depends from the predictors choice.
     // (we will check in validatePredictors())
 
     // LIMARTINEZ
-    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_TYPE_VIRTUAL_CORES] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_TYPE_FREQUENCY] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_TYPE_MAPPING] = false;
-    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_TYPE_HYPERTHREADING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_MAPPING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_HYPERTHREADING] = false;
 
     // MISHRA
-    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_TYPE_VIRTUAL_CORES] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_TYPE_FREQUENCY] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_TYPE_MAPPING] = false;
-    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_TYPE_HYPERTHREADING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_MAPPING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_HYPERTHREADING] = false;
 
     if(strategySelection == STRATEGY_SELECTION_MISHRA &&
        (mishra.bandwidthData.compare("") == 0 ||
@@ -509,7 +510,7 @@ ParametersValidation Parameters::validateSelector(){
 
     if(strategySelection != STRATEGY_SELECTION_LEARNING){
         // Check if the knob enabled can be managed by the selector specified.
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             if(_knobEnabled[i] && !knobsSupportSelector[strategySelection][i]){
                 return VALIDATION_UNSUPPORTED_KNOBS;
             }
@@ -518,8 +519,8 @@ ParametersValidation Parameters::validateSelector(){
         /*********************************************/
         /*            Validate predictors.           */
         /*********************************************/
-        bool knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_NUM][KNOB_TYPE_NUM];
-        bool knobsSupportPower[STRATEGY_PREDICTION_POWER_NUM][KNOB_TYPE_NUM];
+        bool knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_NUM][KNOB_NUM];
+        bool knobsSupportPower[STRATEGY_PREDICTION_POWER_NUM][KNOB_NUM];
 
         if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_NUM ||
            strategyPredictionPower == STRATEGY_PREDICTION_POWER_NUM){
@@ -529,42 +530,42 @@ ParametersValidation Parameters::validateSelector(){
         /*          Performance models.           */
         /******************************************/
         // AMDAHL
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_TYPE_VIRTUAL_CORES] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_TYPE_FREQUENCY] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_TYPE_MAPPING] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_TYPE_HYPERTHREADING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_MAPPING] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_HYPERTHREADING] = false;
         // MISHRA
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_TYPE_VIRTUAL_CORES] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_TYPE_FREQUENCY] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_TYPE_MAPPING] = false;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_TYPE_HYPERTHREADING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_MAPPING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_HYPERTHREADING] = false;
         // USL
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_VIRTUAL_CORES] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_FREQUENCY] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_MAPPING] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_TYPE_HYPERTHREADING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_MAPPING] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_HYPERTHREADING] = false;
         // USLP
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_TYPE_VIRTUAL_CORES] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_TYPE_FREQUENCY] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_TYPE_MAPPING] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_TYPE_HYPERTHREADING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_MAPPING] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_HYPERTHREADING] = false;
 
         /******************************************/
         /*              Power models.             */
         /******************************************/
         // LINEAR
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_TYPE_VIRTUAL_CORES] = true;
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_TYPE_FREQUENCY] = true;
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_TYPE_MAPPING] = true;
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_TYPE_HYPERTHREADING] = false;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_FREQUENCY] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_MAPPING] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_HYPERTHREADING] = false;
         // MISHRA
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_TYPE_VIRTUAL_CORES] = true;
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_TYPE_FREQUENCY] = true;
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_TYPE_MAPPING] = false;
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_TYPE_HYPERTHREADING] = false;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_FREQUENCY] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_MAPPING] = false;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_HYPERTHREADING] = false;
 
         // Check if the knob enabled can be managed by the predictors specified.
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             if(_knobEnabled[i] && (!knobsSupportPerformance[strategyPredictionPerformance][i] ||
                                   !knobsSupportPower[strategyPredictionPower][i])){
                 return VALIDATION_UNSUPPORTED_KNOBS;
@@ -670,7 +671,7 @@ template<> char const* enumStrings<StrategyPersistence>::data[] = {
 };
 
 void Parameters::loadXml(const string& paramFileName){
-    XmlTree xt(paramFileName, "adaptivityParameters");
+    XmlTree xt(paramFileName, "nornirParameters");
 
     SETVALUE(xt, Enum, contractType);
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
@@ -703,6 +704,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, migrateCollector);
     SETVALUE(xt, Double, requiredBandwidth);
     SETVALUE(xt, Uint, requiredCompletionTime);
+    SETVALUE(xt, Double, requiredLatency);
     SETVALUE(xt, Ulong, expectedTasksNumber);
     SETVALUE(xt, Bool, synchronousWorkers);
     SETVALUE(xt, Double, powerBudget);
@@ -761,10 +763,10 @@ void Parameters::load(const string& paramFileName){
 ParametersValidation Parameters::validate(){
     setDefaultPost();
 
-    _knobEnabled[KNOB_TYPE_FREQUENCY] = knobFrequencyEnabled;
-    _knobEnabled[KNOB_TYPE_VIRTUAL_CORES] = knobCoresEnabled;
-    _knobEnabled[KNOB_TYPE_MAPPING] = knobMappingEnabled;
-    _knobEnabled[KNOB_TYPE_HYPERTHREADING] = knobHyperthreadingEnabled;
+    _knobEnabled[KNOB_FREQUENCY] = knobFrequencyEnabled;
+    _knobEnabled[KNOB_VIRTUAL_CORES] = knobCoresEnabled;
+    _knobEnabled[KNOB_MAPPING] = knobMappingEnabled;
+    _knobEnabled[KNOB_HYPERTHREADING] = knobHyperthreadingEnabled;
 
     /** Validate frequency knob. **/
     ParametersValidation r = validateKnobFrequencies();

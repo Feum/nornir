@@ -11,8 +11,8 @@ endif
 ifeq ("$(wildcard ./queues/hzdptr.o)","")
 	$(MAKE) -C queues msqueue
 endif
-# Build orlog
-	$(MAKE) -C orlog
+# Build knarr
+	$(MAKE) -C knarr
 
 clean:
 	$(MAKE) -C leo clean

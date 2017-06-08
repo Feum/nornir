@@ -41,7 +41,7 @@ namespace nornir{
 
 class Configuration: public mammut::utils::NonCopyable {
 protected:
-    Knob* _knobs[KNOB_TYPE_NUM];
+    Knob* _knobs[KNOB_NUM];
     Trigger* _triggers[TRIGGER_TYPE_NUM];
 private:
     const Parameters& _p;

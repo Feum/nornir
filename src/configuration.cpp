@@ -45,7 +45,7 @@ Configuration::Configuration(const Parameters& p):
 }
 
 Configuration::~Configuration(){
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         if(_knobs[i]){
             delete _knobs[i];
         }
@@ -61,7 +61,7 @@ Configuration::~Configuration(){
 void Configuration::combinations(std::vector<std::vector<double> > array, size_t i, std::vector<double> accum){
     if(i == array.size()){
         KnobsValues kv(KNOB_VALUE_REAL);
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             kv[(KnobType) i] = accum.at(i);
         }
         _combinations.push_back(kv);
@@ -77,7 +77,7 @@ void Configuration::combinations(std::vector<std::vector<double> > array, size_t
 
 bool Configuration::equal(const KnobsValues& values) const{
     KnobsValues real = getRealValues(values);
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         KnobType kt = static_cast<KnobType>(i);
         if(real[kt] != getRealValue(kt)){
             return false;
@@ -92,7 +92,7 @@ KnobsValues Configuration::getRealValues(const KnobsValues& values) const{
     }else{
         KnobsValues r(KNOB_VALUE_REAL);
         double real;
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             if(_knobs[(KnobType) i]->getRealFromRelative(values[(KnobType) i], real)){
                 r[(KnobType) i] = real;
             }
@@ -109,7 +109,7 @@ void Configuration::createAllRealCombinations(){
     std::vector<std::vector<double>> values;
     std::vector<double> accum;
     _combinations.clear();
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         values.push_back(_knobs[i]->getAllowedValues());
         if(!_knobs[i]->isLocked()){
             _knobsChangeNeeded = true;
@@ -128,7 +128,7 @@ const std::vector<KnobsValues>& Configuration::getAllRealCombinations() const{
 
 void Configuration::setFastReconfiguration(){
     if(_p.fastReconfiguration){
-        dynamic_cast<KnobFrequency*>(_knobs[KNOB_TYPE_FREQUENCY])->setRelativeValue(100.0);
+        dynamic_cast<KnobFrequency*>(_knobs[KNOB_FREQUENCY])->setRelativeValue(100.0);
     }
 }
 
@@ -141,7 +141,7 @@ void Configuration::maxAllKnobs(){
         return;
     }
     DEBUG("Maxing all the knobs.");
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         _knobs[(KnobType) i]->setToMax();
     }
 }
@@ -152,7 +152,7 @@ double Configuration::getRealValue(KnobType t) const{
 
 KnobsValues Configuration::getRealValues() const{
     KnobsValues kv(KNOB_VALUE_REAL);
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         kv[(KnobType) i] = getRealValue((KnobType) i);
     }
     return kv;
@@ -160,7 +160,7 @@ KnobsValues Configuration::getRealValues() const{
 
 bool Configuration::virtualCoresWillChange(const KnobsValues& values) const{
     KnobsValues real = getRealValues(values);
-    return real[KNOB_TYPE_VIRTUAL_CORES] != _knobs[KNOB_TYPE_VIRTUAL_CORES]->getRealValue();
+    return real[KNOB_VIRTUAL_CORES] != _knobs[KNOB_VIRTUAL_CORES]->getRealValue();
 }
 
 ticks Configuration::startReconfigurationStatsKnob() const{
@@ -177,7 +177,7 @@ ticks Configuration::startReconfigurationStatsTotal() const{
 void Configuration::stopReconfigurationStatsKnob(ticks start, KnobType type,
                                                   bool vcChanged){
     if(_p.statsReconfiguration){
-        if(type == KNOB_TYPE_VIRTUAL_CORES && !vcChanged){
+        if(type == KNOB_VIRTUAL_CORES && !vcChanged){
             // We do not add statistics about workers reconfiguration
             // since they did not changed.
             ;
@@ -202,7 +202,7 @@ void Configuration::setValues(const KnobsValues& values){
 
     ticks totalStart = startReconfigurationStatsTotal();
     setFastReconfiguration();
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    for(size_t i = 0; i < KNOB_NUM; i++){
         ticks reconfigurationStart = startReconfigurationStatsKnob();
 
         // Start of the real reconfiguration
@@ -241,13 +241,13 @@ void Configuration::trigger(){
 
 ConfigurationExternal::ConfigurationExternal(const Parameters& p):
         Configuration(p){
-    _knobs[KNOB_TYPE_VIRTUAL_CORES] = new KnobVirtualCores(p);
-    _knobs[KNOB_TYPE_HYPERTHREADING] = new KnobHyperThreading(p);
-    _knobs[KNOB_TYPE_MAPPING] = new KnobMappingExternal(p,
-                                                *dynamic_cast<KnobVirtualCores*>(_knobs[KNOB_TYPE_VIRTUAL_CORES]),
-                                                *dynamic_cast<KnobHyperThreading*>(_knobs[KNOB_TYPE_HYPERTHREADING]));
-    _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p,
-                                                    *dynamic_cast<KnobMappingExternal*>(_knobs[KNOB_TYPE_MAPPING]));
+    _knobs[KNOB_VIRTUAL_CORES] = new KnobVirtualCores(p);
+    _knobs[KNOB_HYPERTHREADING] = new KnobHyperThreading(p);
+    _knobs[KNOB_MAPPING] = new KnobMappingExternal(p,
+                                                *dynamic_cast<KnobVirtualCores*>(_knobs[KNOB_VIRTUAL_CORES]),
+                                                *dynamic_cast<KnobHyperThreading*>(_knobs[KNOB_HYPERTHREADING]));
+    _knobs[KNOB_FREQUENCY] = new KnobFrequency(p,
+                                                    *dynamic_cast<KnobMappingExternal*>(_knobs[KNOB_MAPPING]));
 
     _triggers[TRIGGER_TYPE_Q_BLOCKING] = NULL;
 }
@@ -260,17 +260,17 @@ ConfigurationFarm::ConfigurationFarm(const Parameters& p,
                                      ff::ff_gatherer* gt,
                                      volatile bool* terminated):
         Configuration(p), _numServiceNodes(0){
-    _knobs[KNOB_TYPE_VIRTUAL_CORES] = new KnobVirtualCoresFarm(p,
+    _knobs[KNOB_VIRTUAL_CORES] = new KnobVirtualCoresFarm(p,
                                           emitter, collector, gt, workers,
                                           terminated);
 
-    _knobs[KNOB_TYPE_HYPERTHREADING] = new KnobHyperThreading(p);
-    _knobs[KNOB_TYPE_MAPPING] = new KnobMappingFarm(p,
-                                                *dynamic_cast<KnobVirtualCoresFarm*>(_knobs[KNOB_TYPE_VIRTUAL_CORES]),
-                                                *dynamic_cast<KnobHyperThreading*>(_knobs[KNOB_TYPE_HYPERTHREADING]),
+    _knobs[KNOB_HYPERTHREADING] = new KnobHyperThreading(p);
+    _knobs[KNOB_MAPPING] = new KnobMappingFarm(p,
+                                                *dynamic_cast<KnobVirtualCoresFarm*>(_knobs[KNOB_VIRTUAL_CORES]),
+                                                *dynamic_cast<KnobHyperThreading*>(_knobs[KNOB_HYPERTHREADING]),
                                                 emitter, collector);
-    _knobs[KNOB_TYPE_FREQUENCY] = new KnobFrequency(p,
-                                                    *dynamic_cast<KnobMappingFarm*>(_knobs[KNOB_TYPE_MAPPING]));
+    _knobs[KNOB_FREQUENCY] = new KnobFrequency(p,
+                                                    *dynamic_cast<KnobMappingFarm*>(_knobs[KNOB_MAPPING]));
 
     _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
                                                               p.thresholdQBlocking,

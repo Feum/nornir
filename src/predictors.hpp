@@ -322,7 +322,7 @@ public:
     }
 
     void refine(){
-        _predictors[(MappingType) _configuration.getRealValue(KNOB_TYPE_MAPPING)]->refine();
+        _predictors[(MappingType) _configuration.getRealValue(KNOB_MAPPING)]->refine();
     }
 
     void prepareForPredictions(){
@@ -333,7 +333,7 @@ public:
 
     double predict(const KnobsValues& values){
         const KnobsValues real = _configuration.getRealValues(values);
-        return _predictors[(MappingType) real[KNOB_TYPE_MAPPING]]->predict(values);
+        return _predictors[(MappingType) real[KNOB_MAPPING]]->predict(values);
     }
 };
 

@@ -119,7 +119,7 @@ RegressionData::RegressionData(const Parameters& p,
 }
 
 double RegressionData::getUsedPhysicalCores(double numVirtualCores){
-    if(_configuration.getRealValue(KNOB_TYPE_HYPERTHREADING) != 1){
+    if(_configuration.getRealValue(KNOB_HYPERTHREADING) != 1){
         throw std::runtime_error("getUsedPhysicalCores, ht > 1 not yet implemented.");
     }
     uint realVirtualCores = numVirtualCores + _configuration.getNumServiceNodes();
@@ -130,10 +130,10 @@ void RegressionData::init(){init(_configuration.getRealValues());}
 
 void RegressionDataServiceTime::init(const KnobsValues& values){
     _numPredictors = 0;
-    uint numVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
+    uint numVirtualCores = values[KNOB_VIRTUAL_CORES];
 
     if(_p.knobFrequencyEnabled){
-        double frequency = values[KNOB_TYPE_FREQUENCY];
+        double frequency = values[KNOB_FREQUENCY];
         _invScalFactorFreq = (double)_minFrequency / frequency;
         ++_numPredictors;
 
@@ -174,13 +174,13 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
 void RegressionDataPower::init(const KnobsValues& values){
     assert(values.areReal());
     _numPredictors = 0;
-    Frequency frequency = values[KNOB_TYPE_FREQUENCY];
-    uint numVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
+    Frequency frequency = values[KNOB_FREQUENCY];
+    uint numVirtualCores = values[KNOB_VIRTUAL_CORES];
     double usedPhysicalCores = getUsedPhysicalCores(numVirtualCores);
 
     if(_p.knobFrequencyEnabled){
         uint usedCpus = 0;
-        if(values[KNOB_TYPE_MAPPING] == MAPPING_TYPE_LINEAR){
+        if(values[KNOB_MAPPING] == MAPPING_TYPE_LINEAR){
             usedCpus = std::ceil(usedPhysicalCores / (double) _phyCoresPerCpu);
         }else{
             usedCpus = std::min(usedPhysicalCores, (double) _cpus);
@@ -192,7 +192,7 @@ void RegressionDataPower::init(const KnobsValues& values){
         //TODO: Potrebbe non esserci una frequenza se FREQUENCY_NO. In tal caso non possiamo predirre nulla.
         getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
                 frequency, _phyCoresPerCpu,
-                _cpus, (MappingType) values[KNOB_TYPE_MAPPING],
+                _cpus, (MappingType) values[KNOB_MAPPING],
                 staticPowerProp, dynamicPowerProp);
         //_voltagePerUsedSockets = staticPowerProp;
         //++_numPredictors;
@@ -352,7 +352,7 @@ void PredictorLinearRegression::refine(){
     _preparationNeeded = true;
     if(_type == PREDICTION_POWER){
         // Add service nodes
-        currentValues[KNOB_TYPE_VIRTUAL_CORES] += _configuration.getNumServiceNodes();
+        currentValues[KNOB_VIRTUAL_CORES] += _configuration.getNumServiceNodes();
     }
     obs_it lb = _observations.lower_bound(currentValues);
 
@@ -546,11 +546,11 @@ bool PredictorUsl::readyForPredictions(){
 }
 
 void PredictorUsl::refine(){
-    double numCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
-    double frequency = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
+    double numCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+    double frequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
     double bandwidth = getMaximumBandwidth();
 
-    double maxCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getAllowedValues().size();
+    double maxCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().size();
     if(frequency == _maxFrequency && numCores == maxCores){
         _maxFreqBw = bandwidth;
         return;
@@ -621,29 +621,14 @@ void PredictorUsl::prepareForPredictions(){
         gsl_vector_free(_y);
         gsl_multifit_linear_free(_ws);
         _preparationNeeded = false;
-
-        if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-            // b = _coefficients[0]
-            // a = _coefficients[1]
-            std::cout << "B1Pred(actual): " << _minFreqCoresBw << std::endl;
-            std::cout << "Contention: " << _coefficients[0] - _coefficients[1] << std::endl;
-            std::cout << "Coherency: " << (double) _coefficients[1]/(_coefficients[0] - _coefficients[1]) << std::endl;
-        }else{
-            // bwseq = 1.0 / _coefficients[0]
-            // b = _coefficients[1]
-            // a = _coefficients[2]
-            std::cout << "B1Pred: " << 1.0 / _coefficients[0] << std::endl;
-            std::cout << "Contention: " << (_coefficients[1] - _coefficients[2])/((double) _coefficients[0]) << std::endl;
-            std::cout << "Coherency: " << (double) _coefficients[2]/(_coefficients[1] - _coefficients[2]) << std::endl;
-        }
     }
 }
 
 double PredictorUsl::predict(const KnobsValues& knobsValues){
     const KnobsValues real = _configuration.getRealValues(knobsValues);
     double result = 0;
-    double numCores = real[KNOB_TYPE_VIRTUAL_CORES];
-    double frequency = real[KNOB_TYPE_FREQUENCY];
+    double numCores = real[KNOB_VIRTUAL_CORES];
+    double frequency = real[KNOB_FREQUENCY];
     double exp;
     for(size_t i = 0; i < _coefficients.size(); i++){
         exp = i;
@@ -721,24 +706,24 @@ double PredictorUsl::getTheta(RecordInterferenceArgument n){
         bw = _minFreqN2Bw;
     }
     KnobsValues kv(KNOB_VALUE_REAL);
-    kv[KNOB_TYPE_FREQUENCY] = _minFrequency;
-    kv[KNOB_TYPE_VIRTUAL_CORES] = numCores;
+    kv[KNOB_FREQUENCY] = _minFrequency;
+    kv[KNOB_VIRTUAL_CORES] = numCores;
     return (((getMinFreqCoresBw()*numCores)/predict(kv)) - 1) - (((_minFreqCoresBwNew*numCores)/bw) - 1);
 }
 
 void PredictorUsl::updateInterference(){
-    double numCores = _configuration.getRealValue(KNOB_TYPE_VIRTUAL_CORES);
-    double frequency = _configuration.getRealValue(KNOB_TYPE_FREQUENCY);
+    double numCores = _configuration.getRealValue(KNOB_VIRTUAL_CORES);
+    double frequency = _configuration.getRealValue(KNOB_FREQUENCY);
     double bandwidth = _samples->average().bandwidth;
     // TODO: At the moment I'm assuming that interferences does not change the
     // slope when we fix number of cores and we change the frequency.
     if(frequency != _minFrequency){
         // We compute the 'old' bandwidth at minimum frequency
         KnobsValues kv(KNOB_VALUE_REAL);
-        kv[KNOB_TYPE_FREQUENCY] = _minFrequency;
-        kv[KNOB_TYPE_VIRTUAL_CORES] = numCores;
+        kv[KNOB_FREQUENCY] = _minFrequency;
+        kv[KNOB_VIRTUAL_CORES] = numCores;
         double minFreqPred = predict(kv);
-        kv[KNOB_TYPE_FREQUENCY] = frequency;
+        kv[KNOB_FREQUENCY] = frequency;
         double currentFreqPred = predict(kv);
         double prop = bandwidth / currentFreqPred;
         bandwidth = prop*minFreqPred;
@@ -798,19 +783,19 @@ PredictorAnalytical::PredictorAnalytical(PredictorType type,
 }
 
 double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
-    double usedVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
-    return (double)(values[KNOB_TYPE_FREQUENCY] * usedVirtualCores) /
-           (double)(_configuration.getRealValue(KNOB_TYPE_FREQUENCY) *
-                    _configuration.getRealValue(KNOB_TYPE_VIRTUAL_CORES));
+    double usedVirtualCores = values[KNOB_VIRTUAL_CORES];
+    return (double)(values[KNOB_FREQUENCY] * usedVirtualCores) /
+           (double)(_configuration.getRealValue(KNOB_FREQUENCY) *
+                    _configuration.getRealValue(KNOB_VIRTUAL_CORES));
 }
 
 double PredictorAnalytical::getPowerPrediction(const KnobsValues& values){
     assert(values.areReal());
     double staticPower = 0, dynamicPower = 0;
-    double usedPhysicalCores = values[KNOB_TYPE_VIRTUAL_CORES];
+    double usedPhysicalCores = values[KNOB_VIRTUAL_CORES];
     getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
-                        values[KNOB_TYPE_FREQUENCY], _phyCoresPerCpu,
-                        _cpus, (MappingType) values[KNOB_TYPE_MAPPING],
+                        values[KNOB_FREQUENCY], _phyCoresPerCpu,
+                        _cpus, (MappingType) values[KNOB_MAPPING],
                         staticPower, dynamicPower);
     return dynamicPower;
 }

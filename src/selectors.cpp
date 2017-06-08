@@ -67,7 +67,8 @@ Selector::Selector(const Parameters& p,
         _forced(false),
         _forcedReturned(false),
         _calibrationCoordination(false),
-        _calibrationAllowed(false){
+        _calibrationAllowed(false),
+        _totalTasks(0){
     _joulesCounter = _localMammut.getInstanceEnergy()->getCounter();
     //TODO Fare meglio con mammut
     //TODO Assicurarsi che il numero totale di configurazioni possibili sia maggiore del numero minimo di punti
@@ -143,7 +144,7 @@ bool Selector::isContractViolated() const{
     return !isFeasiblePrimaryValue(primaryValue, false);
 }
 
-void Selector::startCalibration(uint64_t totalTasks){
+void Selector::startCalibration(){
     DEBUG("Starting calibration.");
     _calibrating = true;
     if(_calibrationCoordination){
@@ -152,13 +153,13 @@ void Selector::startCalibration(uint64_t totalTasks){
     }
     _numCalibrationPoints = 0;
     _calibrationStartMs = getMillisecondsTime();
-    _calibrationStartTasks = totalTasks;
+    _calibrationStartTasks = _totalTasks;
     if(_joulesCounter){
         _joulesCounter->reset();
     }
 }
 
-void Selector::stopCalibration(uint64_t totalTasks){
+void Selector::stopCalibration(){
     DEBUG("Stopping calibration.");
     _calibrating = false;
     if(_numCalibrationPoints){
@@ -166,7 +167,7 @@ void Selector::stopCalibration(uint64_t totalTasks){
         cs.numSteps = _numCalibrationPoints;
         cs.duration = (getMillisecondsTime() - _calibrationStartMs);
         _totalCalibrationTime += cs.duration;
-        cs.numTasks = totalTasks - _calibrationStartTasks;
+        cs.numTasks = _totalTasks - _calibrationStartTasks;
         if(_joulesCounter){
             cs.joules = ((CounterCpus*) _joulesCounter)->getJoules();
         }
@@ -213,6 +214,10 @@ void Selector::forceConfiguration(KnobsValues& kv){
     _forcedConfiguration = kv;
 }
 
+void Selector::updateTotalTasks(u_int64_t totalTasks){
+    _totalTasks = totalTasks;
+}
+
 void Selector::updateBandwidthIn(){
     if(_samples->average().utilisation < MAX_RHO){
         if(_bandwidthIn->average() == numeric_limits<double>::max()){
@@ -233,7 +238,7 @@ SelectorFixed::SelectorFixed(const Parameters& p,
 
 SelectorFixed::~SelectorFixed(){;}
 
-KnobsValues SelectorFixed::getNextKnobsValues(u_int64_t totalTasks){
+KnobsValues SelectorFixed::getNextKnobsValues(){
     _previousConfiguration = _configuration.getRealValues();
     return _configuration.getRealValues();
 }
@@ -639,7 +644,7 @@ SelectorAnalytical::SelectorAnalytical(const Parameters& p,
     ;
 }
 
-KnobsValues SelectorAnalytical::getNextKnobsValues(u_int64_t totalTasks){
+KnobsValues SelectorAnalytical::getNextKnobsValues(){
     _previousConfiguration = _configuration.getRealValues();
     if(isContractViolated() || ((_p.contractType == CONTRACT_PERF_BANDWIDTH || _p.contractType == CONTRACT_PERF_COMPLETION_TIME) && 
                                 ((_samples->average().bandwidth - _p.requiredBandwidth)/_p.requiredBandwidth > 0.05 ||
@@ -736,7 +741,7 @@ SelectorLearner::SelectorLearner(const Parameters& p,
     /***************************************/
     vector<bool> knobsFlags;
     vector<KnobsValues> additionalPoints;
-    knobsFlags.resize(KNOB_TYPE_NUM, false);
+    knobsFlags.resize(KNOB_NUM, false);
 
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
        _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
@@ -745,27 +750,27 @@ SelectorLearner::SelectorLearner(const Parameters& p,
         // parallelism degree equal to one.
         if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
             kv.reset();
-            kv[KNOB_TYPE_VIRTUAL_CORES] = 0.0;
-            kv[KNOB_TYPE_FREQUENCY] = 0.0;
+            kv[KNOB_VIRTUAL_CORES] = 0.0;
+            kv[KNOB_FREQUENCY] = 0.0;
             additionalPoints.push_back(kv);
         }
-        kv[KNOB_TYPE_VIRTUAL_CORES] = 100.0;
-        kv[KNOB_TYPE_FREQUENCY] = 100;
+        kv[KNOB_VIRTUAL_CORES] = 100.0;
+        kv[KNOB_FREQUENCY] = 100;
         additionalPoints.push_back(kv);
         kv.reset();
-        kv[KNOB_TYPE_VIRTUAL_CORES] = 100.0;
-        kv[KNOB_TYPE_FREQUENCY] = 0.0;
+        kv[KNOB_VIRTUAL_CORES] = 100.0;
+        kv[KNOB_FREQUENCY] = 0.0;
         additionalPoints.push_back(kv);
 
         // I only need to explore on virtual cores.
-        knobsFlags[KNOB_TYPE_VIRTUAL_CORES] = true;
+        knobsFlags[KNOB_VIRTUAL_CORES] = true;
     }else if((_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
               _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR)){
         // I only need to explore on virtual cores and frequency.
-        knobsFlags[KNOB_TYPE_VIRTUAL_CORES] = true;
-        knobsFlags[KNOB_TYPE_FREQUENCY] = true;
+        knobsFlags[KNOB_VIRTUAL_CORES] = true;
+        knobsFlags[KNOB_FREQUENCY] = true;
     }else{
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             knobsFlags[i] = _p.isKnobEnabled((KnobType) i);
         }
     }
@@ -790,7 +795,7 @@ SelectorLearner::SelectorLearner(const Parameters& p,
         _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
         _p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP ||
         _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_LINEAR)){
-        _explorer = new ExplorerMultiple(knobsFlags, _explorer, KNOB_TYPE_MAPPING, MAPPING_TYPE_NUM);
+        _explorer = new ExplorerMultiple(knobsFlags, _explorer, KNOB_MAPPING, MAPPING_TYPE_NUM);
     }
 }
 
@@ -800,7 +805,7 @@ SelectorLearner::~SelectorLearner(){
     }
 }
 
-KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
+KnobsValues SelectorLearner::getNextKnobsValues(){
     KnobsValues kv;
     if(_updatingInterference){
         // It can only be done for PERF_* contract (so is primary) and on USL predictors.
@@ -838,7 +843,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
      **/
     if(!_firstPointGenerated){
         _firstPointGenerated = true;
-        startCalibration(totalTasks);
+        startCalibration();
     }else{
         if(isCalibrating()){
             refine();
@@ -856,7 +861,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
                 updatePredictions(kv);
                 DEBUG("Finished in " << _numCalibrationPoints <<
                       " steps with configuration " << kv);
-                stopCalibration(totalTasks);
+                stopCalibration();
             }else{
                 kv = _explorer->nextRelativeKnobsValues();
                 updatePredictions(kv);
@@ -874,7 +879,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             // Drop old models.
             clearPredictors();
 
-            startCalibration(totalTasks);
+            startCalibration();
             resetTotalCalibrationTime();
             _accuracyViolations = 0;
             _contractViolations = 0;
@@ -901,7 +906,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(u_int64_t totalTasks){
             updatePredictions(kv);
             refine();
             ++_totalCalPoints;
-            startCalibration(totalTasks);
+            startCalibration();
             _accuracyViolations = 0;
             _contractViolations = 0;
             if(!accurate){
@@ -944,11 +949,11 @@ void SelectorLearner::updateModelsInterference(){
     _updatingInterference = true;
     // We only add 2 points (the third is the current one).
     KnobsValues kv(KNOB_VALUE_RELATIVE);
-    kv[KNOB_TYPE_FREQUENCY] = 0;
+    kv[KNOB_FREQUENCY] = 0;
 
-    kv[KNOB_TYPE_VIRTUAL_CORES] = 0.5;
+    kv[KNOB_VIRTUAL_CORES] = 0.5;
     _interferenceUpdatePoints.push_back(kv);
-    kv[KNOB_TYPE_VIRTUAL_CORES] = 0;
+    kv[KNOB_VIRTUAL_CORES] = 0;
     _interferenceUpdatePoints.push_back(kv);
 }
 
@@ -974,11 +979,11 @@ SelectorFixedExploration::~SelectorFixedExploration(){
     ;
 }
 
-KnobsValues SelectorFixedExploration::getNextKnobsValues(u_int64_t totalTasks){
+KnobsValues SelectorFixedExploration::getNextKnobsValues(){
     _previousConfiguration = _configuration.getRealValues();
     if(_confToExplore.size()){
         if(!isCalibrating()){
-            startCalibration(totalTasks);
+            startCalibration();
         }else{
             refine();
 
@@ -991,7 +996,7 @@ KnobsValues SelectorFixedExploration::getNextKnobsValues(u_int64_t totalTasks){
         if(isCalibrating()){
             refine();
             KnobsValues kv = getBestKnobsValues();
-            stopCalibration(totalTasks);
+            stopCalibration();
             return kv;
         }else{
             return _configuration.getRealValues();
@@ -1067,19 +1072,19 @@ SelectorLiMartinez::SelectorLiMartinez(const Parameters& p,
         _firstPointGenerated(false), _low1(0), _mid1(0), _high1(0),
         _low2(0), _mid2(0), _high2(0), _midId(1),
         _currentWatts(DBL_MAX), _optimalWatts(DBL_MAX),
-        _optimalFrequency(_availableFrequencies.back()), _optimalWorkers(configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getAllowedValues().back()),
+        _optimalFrequency(_availableFrequencies.back()), _optimalWorkers(configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().back()),
         _currentBw(0),_leftBw(0), _rightBw(0), _improved(false), _optimalFound(false){
     Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().back();
     d->removeTurboFrequencies();
     _availableFrequencies = d->getAvailableFrequencies();
-    _allowedCores = configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getAllowedValues();
+    _allowedCores = configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues();
 }
 
 SelectorLiMartinez::~SelectorLiMartinez(){
     ;
 }
 
-KnobsValues SelectorLiMartinez::getNextKnobsValues(u_int64_t totalTasks){
+KnobsValues SelectorLiMartinez::getNextKnobsValues(){
     _previousConfiguration = _configuration.getRealValues();
     KnobsValues kv(KNOB_VALUE_REAL);
 
@@ -1091,11 +1096,11 @@ KnobsValues SelectorLiMartinez::getNextKnobsValues(u_int64_t totalTasks){
         _high2 = maxWorkers;
 
         DEBUG("Max workers: " << maxWorkers << " mid2: " << _mid2);
-        kv[KNOB_TYPE_VIRTUAL_CORES] = _allowedCores[_mid2 - 1];
-        kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies.back();
+        kv[KNOB_VIRTUAL_CORES] = _allowedCores[_mid2 - 1];
+        kv[KNOB_FREQUENCY] = _availableFrequencies.back();
         _midId = 2;
 
-        startCalibration(totalTasks);
+        startCalibration();
 
         DEBUG("Generating first point: " << kv);
         ++_numCalibrationPoints;
@@ -1110,15 +1115,15 @@ KnobsValues SelectorLiMartinez::getNextKnobsValues(u_int64_t totalTasks){
                 _improved = true;
                 DEBUG("Found a new optimal watts: " << _currentWatts << " vs. " << _optimalWatts);
                 _optimalWatts = _currentWatts;
-                _optimalFrequency = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
-                _optimalWorkers = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
+                _optimalFrequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
+                _optimalWorkers = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
                 _optimalFound = true;
                 DEBUG("Optimal: " << _optimalWorkers << ", " << _optimalFrequency);
             }
 
             // We should keep decreasing the frequency
-            Frequency currentFrequency = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
-            kv[KNOB_TYPE_VIRTUAL_CORES] = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
+            Frequency currentFrequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
+            kv[KNOB_VIRTUAL_CORES] = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
 
             Frequency nextFrequency = currentFrequency * (_p.requiredBandwidth / _samples->average().bandwidth);
             nextFrequency = findNearestFrequency(nextFrequency);
@@ -1126,28 +1131,28 @@ KnobsValues SelectorLiMartinez::getNextKnobsValues(u_int64_t totalTasks){
                 --_numCalibrationPoints;
                 goto changeworkers;
             }else{
-                kv[KNOB_TYPE_FREQUENCY] = nextFrequency;
+                kv[KNOB_FREQUENCY] = nextFrequency;
                 DEBUG("Keeping going down on frequencies. We move to: " << kv);
             }
         }else{
 changeworkers:
             ++_numCalibrationPoints;
             // I have to change the number of workers
-            kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies.back();
+            kv[KNOB_FREQUENCY] = _availableFrequencies.back();
 
             if(_optimalWatts == DBL_MAX){
                 // Still I have not found a number of workers that satisfied
                 // the time requirement. I increase workers. (Go right).
-                kv[KNOB_TYPE_VIRTUAL_CORES] = _allowedCores[_mid2 - 1];
+                kv[KNOB_VIRTUAL_CORES] = _allowedCores[_mid2 - 1];
                 goRight();
                 _midId = 2;
                 DEBUG("New interval 1: [" << _low1 << "," << _mid1 << "," << _high1 << "]");
                 DEBUG("New interval 2: [" << _low2 << "," << _mid2 << "," << _high2 << "]");
                 if(_low1 > _high1 || _low2 > _high2){
-                    kv[KNOB_TYPE_VIRTUAL_CORES] = _optimalWorkers;
-                    kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
+                    kv[KNOB_VIRTUAL_CORES] = _optimalWorkers;
+                    kv[KNOB_FREQUENCY] = _optimalFrequency;
                     _optimalKv = kv;
-                    stopCalibration(totalTasks);
+                    stopCalibration();
                     DEBUG("Exploration finished with: " << kv);
                 }
 
@@ -1156,15 +1161,15 @@ changeworkers:
                       "up to now.");
                 // This number of workers is not ok
                 if(_midId == 1){
-                    kv[KNOB_TYPE_VIRTUAL_CORES] = _allowedCores[_mid2 - 1];
+                    kv[KNOB_VIRTUAL_CORES] = _allowedCores[_mid2 - 1];
                     _midId = 2;
                     DEBUG("Trying with the right side. We move to " << kv);
                 }else{
                     // Both explored and both are not ok, finished
-                    kv[KNOB_TYPE_VIRTUAL_CORES] = _optimalWorkers;
-                    kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
+                    kv[KNOB_VIRTUAL_CORES] = _optimalWorkers;
+                    kv[KNOB_FREQUENCY] = _optimalFrequency;
                     _optimalKv = kv;
-                    stopCalibration(totalTasks);
+                    stopCalibration();
                     DEBUG("Both side are worst. Terminated with: " << kv);
                 }
             }else{
@@ -1180,24 +1185,24 @@ changeworkers:
 
                 if(_low1 <= _high1){
                     _midId = 1;
-                    kv[KNOB_TYPE_VIRTUAL_CORES] = _allowedCores[_mid1 - 1];
+                    kv[KNOB_VIRTUAL_CORES] = _allowedCores[_mid1 - 1];
                     DEBUG("We move to " << kv);
                 }else if(_low2 <= _high2){
                     _midId = 2;
-                    kv[KNOB_TYPE_VIRTUAL_CORES] = _allowedCores[_mid2 - 1];
+                    kv[KNOB_VIRTUAL_CORES] = _allowedCores[_mid2 - 1];
                     DEBUG("We move to " << kv);
                 }else{
                     if(_optimalFound){
-                        kv[KNOB_TYPE_VIRTUAL_CORES] = _optimalWorkers;
-                        kv[KNOB_TYPE_FREQUENCY] = _optimalFrequency;
+                        kv[KNOB_VIRTUAL_CORES] = _optimalWorkers;
+                        kv[KNOB_FREQUENCY] = _optimalFrequency;
                     }else{
                         // Suboptimal solution for perf contract is maximum
                         // frequency and last visited cores.
-                        kv[KNOB_TYPE_VIRTUAL_CORES] = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
-                        kv[KNOB_TYPE_FREQUENCY] = _availableFrequencies.back();
+                        kv[KNOB_VIRTUAL_CORES] = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+                        kv[KNOB_FREQUENCY] = _availableFrequencies.back();
                     }
                     _optimalKv = kv;
-                    stopCalibration(totalTasks);
+                    stopCalibration();
                     DEBUG("Exploration finished with: " << kv);
                 }
             }

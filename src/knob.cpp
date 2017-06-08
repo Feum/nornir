@@ -60,16 +60,16 @@ using namespace std;
 
 std::string knobTypeToString(KnobType kv){
     switch(kv){
-        case KNOB_TYPE_VIRTUAL_CORES:{
+        case KNOB_VIRTUAL_CORES:{
             return "Cores";
         }break;
-        case KNOB_TYPE_HYPERTHREADING:{
+        case KNOB_HYPERTHREADING:{
             return "HTLevel";
         }break;
-        case KNOB_TYPE_MAPPING:{
+        case KNOB_MAPPING:{
             return "Mapping";
         }break;
-        case KNOB_TYPE_FREQUENCY:{
+        case KNOB_FREQUENCY:{
             return "Frequency";
         }break;
         default:{
@@ -99,7 +99,7 @@ void Knob::setRelativeValue(double v){
 
 void Knob::setRealValue(double v){
     if(getAllowedValues().size()){
-        changeValueReal(v);
+        changeValue(v);
         _realValue = v;
     }
 }
@@ -153,7 +153,7 @@ KnobVirtualCores::KnobVirtualCores(Parameters p):_p(p){
     changeMax(numVirtualCores);
 }
 
-void KnobVirtualCores::changeValueReal(double v){;}
+void KnobVirtualCores::changeValue(double v){;}
 
 void KnobVirtualCores::changeMax(double v){
     _knobValues.clear();
@@ -212,7 +212,7 @@ KnobVirtualCoresFarm::KnobVirtualCoresFarm(Parameters p,
     DEBUG("Knob workers created.");
 }
 
-void KnobVirtualCoresFarm::changeValueReal(double v){
+void KnobVirtualCoresFarm::changeValue(double v){
     if(v != _realValue){
         DEBUG("[Workers] Changing real value to: " << v);
         prepareToFreeze();
@@ -315,7 +315,7 @@ KnobHyperThreading::KnobHyperThreading(Parameters p){
     }
 }
 
-void KnobHyperThreading::changeValueReal(double v){;}
+void KnobHyperThreading::changeValue(double v){;}
 
 KnobMapping::KnobMapping(const Parameters& p,
                          const KnobVirtualCores& knobCores,
@@ -336,7 +336,7 @@ template<> char const* enumStrings<MappingType>::data[] = {
     "CACHE_OPTIMAL"
 };
 
-void KnobMapping::changeValueReal(double v){
+void KnobMapping::changeValue(double v){
     DEBUG("[Mapping] Changing real value to: " << enumToString<MappingType>((MappingType)v));
 
     // Its length will be equal to _knobCores.getRealValue()
@@ -546,7 +546,7 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
     }
 }
 
-void KnobFrequency::changeValueReal(double v){
+void KnobFrequency::changeValue(double v){
     DEBUG("[Frequency] Changing real value to: " << v);
     std::vector<mammut::cpufreq::Domain*> scalableDomains;
     scalableDomains = _frequencyHandler->getDomains(_knobMapping.getActiveVirtualCores());

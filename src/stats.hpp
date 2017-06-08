@@ -41,13 +41,13 @@ namespace nornir{
 
 class ReconfigurationStats{
 private:
-    std::vector<double> _knobs[KNOB_TYPE_NUM];
+    std::vector<double> _knobs[KNOB_NUM];
     std::vector<double> _total;
-    bool _storedKnob[KNOB_TYPE_NUM];
+    bool _storedKnob[KNOB_NUM];
     bool _storedTotal;
 public:
     ReconfigurationStats(){
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             _storedKnob[i] = false;
         }
         _storedTotal = false;
@@ -62,7 +62,7 @@ public:
     }
 
     inline ReconfigurationStats(const ReconfigurationStats& other){
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             _knobs[i] = other._knobs[i];
             _storedKnob[i] = other._storedKnob[i];
         }

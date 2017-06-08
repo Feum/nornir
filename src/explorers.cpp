@@ -49,7 +49,7 @@ namespace nornir{
 
     KnobsValues ExplorerRandom::nextRelativeKnobsValues() const{
         KnobsValues r(KNOB_VALUE_RELATIVE);
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             if(generate((KnobType) i)){
                 r[(KnobType)i] = rand() % 100;
             }else{
@@ -73,7 +73,7 @@ namespace nornir{
             Explorer(knobs), _explorationStrategy(explorationStrategy),
             _additionalPoints(additionalPoints){
         uint d = 0;
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             if(generate((KnobType) i)){
                 ++d;
             }
@@ -121,7 +121,7 @@ namespace nornir{
         }else{
             gsl_qrng_get(_generator, _normalizedPoint);
             size_t nextCoordinate = 0;
-            for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+            for(size_t i = 0; i < KNOB_NUM; i++){
                 if(generate((KnobType) i)){
                     r[(KnobType)i] = _normalizedPoint[nextCoordinate]*100.0;
                     ++nextCoordinate;

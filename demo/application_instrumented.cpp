@@ -1,5 +1,5 @@
 /*
- * application_external.cpp
+ * application_instrumented.cpp
  *
  * Created on: 05/07/2016
  *
@@ -30,17 +30,28 @@
 #include <unistd.h>
 
 /**
- * Basic example on how to monitor external applications.
+ * Basic example on how to monitor an instrumented iterative application.
+ * Original code was:
+ * --------------------------------
+ * int main(int argc, char** argv){
+ *   size_t i = 0;
+ *   while(i++ < 10){
+ *     sleep(2);
+ *   }
+ *   return 0;
+ * }
+ * --------------------------------
+ * Instrumented code is:
  */
 int main(int argc, char** argv){
-    nornir::ExternalApplication ea("parameters.xml");
+    nornir::Instrumenter instr("parameters.xml");
     size_t i = 0;
     while(i++ < 10){
-        ea.begin();
+        instr.begin();
         sleep(2);
         ea.end();
     }
-    ea.terminate();
+    instr.terminate();
     return 0;
 }
 
