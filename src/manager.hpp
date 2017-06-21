@@ -54,6 +54,7 @@ namespace nornir{
 
 class Parameters;
 class ManagerMulti;
+class Simulator;
 
 //TODO REMOVE USING
 using namespace std;
@@ -96,6 +97,7 @@ typedef enum{
  */
 class Manager: public Thread{
     friend class ManagerMulti;
+    friend class Simulator;
 public:
     explicit Manager(Parameters nornirParameters);
 
@@ -116,9 +118,6 @@ protected:
 
     // The parameters used to take management decisions.
     Parameters _p;
-
-    // The cpufreq module.
-    CpuFreq* _cpufreq;
 
     // The energy counter.
     Counter* _counter;
@@ -160,6 +159,12 @@ protected:
 
     // Pid of the monitored process.
     pid_t _pid;
+
+    // Flag indicating if the execution must be simulated.
+    bool _toSimulate;
+
+    // Samples to be used for simulation.
+    std::list<MonitoredSample> _simulationSamples;
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
@@ -171,10 +176,10 @@ protected:
     virtual void waitForStart() = 0;
 
     /**
-     * Obtain application sample.
-     * @return An application sample.
+     * Returns a monitored sample.
+     * @return A monitored sample sample.
      */
-    virtual knarr::ApplicationSample getSample() = 0;
+    virtual MonitoredSample getSample();
 
     /**
      * Returns the execution time of the application (milliseconds).
@@ -190,7 +195,7 @@ protected:
     /**
      * Manages a configuration change.
      */
-    virtual void postConfigurationManagement();
+    virtual void postConfigurationManagement() = 0;
 
     /**
      * Cleaning after termination.
@@ -207,24 +212,6 @@ protected:
      * @param domain The domain.
      */
     void setDomainToHighestFrequency(const Domain* domain);
-
-    /**
-     * Returns the primary value of a sample according to
-     * the required contract.
-     * @param sample The sample.
-     * @return The primary value of a sample according to
-     * the required contract.
-     */
-    double getPrimaryValue(const MonitoredSample& sample) const;
-
-    /**
-     * Returns the secondary value of a sample according to
-     * the required contract.
-     * @param sample The sample.
-     * @return The secondary value of a sample according to
-     * the required contract.
-     */
-    double getSecondaryValue(const MonitoredSample& sample) const;
 
     /**
      * Returns true if the manager doesn't have still to check for a new
@@ -249,7 +236,7 @@ protected:
      * Updates the tasks count.
      * @param sample The workers sample to be used for the update.
      */
-    void updateTasksCount(knarr::ApplicationSample& sample);
+    void updateTasksCount(MonitoredSample& sample);
 
     /**
      * Observes.
@@ -319,6 +306,17 @@ private:
     std::vector<PhysicalCoreId> getUsedCores();
 
     void allowCores(std::vector<mammut::topology::VirtualCoreId> ids);
+
+    /**
+     * Sets the parameters to be used when simulating nornir. It must be
+     * called soon after the object creation.
+     * @param samplesFileName The name of the file containing the application
+     * samples.
+     * @param mammutSimulationParameters The parameters to be used when
+     * simulating mammut.
+     */
+    void setSimulationParameters(std::string samplesFileName,
+                                 mammut::SimulationParameters mammutSimulationParameters);
 };
 
 class ManagerInstrumented: public Manager{
@@ -353,7 +351,7 @@ public:
     ~ManagerInstrumented();
 protected:
     void waitForStart();
-    knarr::ApplicationSample getSample();
+    MonitoredSample getSample();
     ulong getExecutionTime();
 };
 
@@ -385,7 +383,7 @@ public:
     pid_t getPid() const;
 protected:
     void waitForStart();
-    knarr::ApplicationSample getSample();
+    MonitoredSample getSample();
     ulong getExecutionTime();
 };
 
@@ -439,7 +437,7 @@ private:
     std::vector<AdaptiveNode*> _activeWorkers;
 
     void waitForStart();
-    knarr::ApplicationSample getSample();
+    MonitoredSample getSample();
     void initNodesPreRun();
     void initNodesPostRun();
     void postConfigurationManagement();
@@ -447,6 +445,19 @@ private:
     ulong getExecutionTime();
     void shrinkPause();
     void stretchPause();
+};
+
+class Simulator: public mammut::utils::Thread{
+private:
+    Manager* _m;
+public:
+    Simulator(Manager* m);
+
+    /**
+     * Function executed by this thread.
+     * ATTENTION: The user must not call this one but 'start()'.
+     */
+    void run();
 };
 
 }

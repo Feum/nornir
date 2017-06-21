@@ -17,6 +17,7 @@ cleanall:
 	$(MAKE) -C dataflow cleanall
 #	$(MAKE) -C external cleanall
 lib: $(TARGET)
+	rm -rf libnornir.a
 	ar rc libnornir.a $(TARGET) dataflow/*.o
 	ranlib libnornir.a
 	ar -M < buildlib.ar

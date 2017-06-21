@@ -108,11 +108,11 @@ private:
     // We push the pointer to a position in the _managementRequests array.
     // In our case is always _managementRequests[i].type == i
     ManagementRequest _managementRequests[MGMT_REQ_NUM];
-    knarr::ApplicationSample _sampleResponse;
+    MonitoredSample _sampleResponse;
     double _ticksPerNs;
     ticks _startTicks;
     ticks _ticksWork;
-    ticks _tasksCount;
+    ticks _numTasks;
     NodeType _nodeType;
     ff::ff_thread* _ffThread;
     const Parameters* _p;
@@ -158,7 +158,7 @@ private:
      *               time 'askForSample' has been called.
      * @param avgLatency The average latency.
      */
-    void getSampleResponse(knarr::ApplicationSample& sample, double avgLatency);
+    void getSampleResponse(MonitoredSample& sample, double avgLatency);
 
     /**
      * Asks the node to reset the current sample.

@@ -28,6 +28,7 @@
 #include "parameters.hpp"
 
 #include <cstring>
+#include <limits>
 
 namespace nornir{
 
@@ -127,6 +128,28 @@ void XmlTree::getDouble(const char* valueName, double& value){
     }
 }
 
+void XmlTree::getDoubleOrMin(const char* valueName, double& value){
+    rapidxml::xml_node<> *node = getNode(valueName);
+    if(node){
+        if(std::string(node->value()).compare("MIN") == 0){
+            value = NORNIR_REQUIREMENT_MIN;
+        }else{
+            value = stringToDouble(node->value());
+        }
+    }
+}
+
+void XmlTree::getDoubleOrMax(const char* valueName, double& value){
+    rapidxml::xml_node<> *node = getNode(valueName);
+    if(node){
+        if(std::string(node->value()).compare("MAX") == 0){
+            value = NORNIR_REQUIREMENT_MAX;
+        }else{
+            value = stringToDouble(node->value());
+        }
+    }
+}
+
 void XmlTree::getString(const char* valueName, string& value){
     rapidxml::xml_node<> *node = getNode(valueName);
     if(node){
@@ -161,8 +184,26 @@ void ArchData::loadXml(const string& archFileName){
     SETVALUE(xc, Double, monitoringCost);
 }
 
+Requirements::Requirements(){
+    bandwidth = NORNIR_REQUIREMENT_UNDEF;
+    powerConsumption = NORNIR_REQUIREMENT_UNDEF;
+    minUtilization = NORNIR_REQUIREMENT_UNDEF;
+    maxUtilization = NORNIR_REQUIREMENT_UNDEF;
+    executionTime = NORNIR_REQUIREMENT_UNDEF;
+    expectedTasksNumber = NORNIR_REQUIREMENT_UNDEF;
+    latency = NORNIR_REQUIREMENT_UNDEF;
+}
+
+bool Requirements::anySpecified() const{
+    return bandwidth != NORNIR_REQUIREMENT_UNDEF ||
+           powerConsumption != NORNIR_REQUIREMENT_UNDEF ||
+           minUtilization != NORNIR_REQUIREMENT_UNDEF ||
+           maxUtilization != NORNIR_REQUIREMENT_UNDEF ||
+           executionTime != NORNIR_REQUIREMENT_UNDEF ||
+           latency != NORNIR_REQUIREMENT_UNDEF;
+}
+
 void Parameters::setDefault(){
-    contractType = CONTRACT_NONE;
     triggerQBlocking = TRIGGER_Q_BLOCKING_NO;
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_SAME;
     strategySelection = STRATEGY_SELECTION_LEARNING;
@@ -186,16 +227,7 @@ void Parameters::setDefault(){
     samplingIntervalSteady = 1000;
     steadyThreshold = 4;
     minTasksPerSample = 0;
-    underloadThresholdFarm = 80.0;
-    overloadThresholdFarm = 90.0;
-    underloadThresholdWorker = 80.0;
-    overloadThresholdWorker = 90.0;
-    requiredBandwidth = 0;
-    requiredCompletionTime = 0;
-    requiredLatency = 0;
-    expectedTasksNumber = 0;
-    synchronousWorkers = false;
-    powerBudget = 0;
+    synchronousWorkers = false;    
     maxCalibrationTime = 0;
     maxCalibrationConfigurations = 0;
     maxPerformancePredictionError = 10.0;
@@ -252,7 +284,8 @@ void Parameters::setDefault(){
     }
 
     if(!found){
-        throw runtime_error("Impossible to find configuration files. Please run 'sudo make microbench' from the nornir root folder.");
+        throw runtime_error("Impossible to find configuration files. Please run "
+                            "'sudo make microbench' from the nornir root folder.");
     }
 }
 
@@ -418,49 +451,66 @@ ParametersValidation Parameters::validateTriggers(){
     return VALIDATION_OK;
 }
 
-ParametersValidation Parameters::validateContract(){
-    switch(contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            if(underloadThresholdFarm > overloadThresholdFarm     ||
-               underloadThresholdWorker > overloadThresholdWorker ||
-               underloadThresholdFarm < 0                         ||
-               overloadThresholdFarm > 100                        ||
-               underloadThresholdWorker < 0                       ||
-               overloadThresholdWorker > 100){
-                return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-            }
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:{
-            if(requiredBandwidth <= 0){
-                return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-            }
-        }break;
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            if(!expectedTasksNumber || !requiredCompletionTime){
-                return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-            }
-        }break;
-        case CONTRACT_PERF_MAX:{
-            ;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            if(powerBudget <= 0 ||
-               strategySelection == STRATEGY_SELECTION_ANALYTICAL ||
-               strategySelection == STRATEGY_SELECTION_LIMARTINEZ){
-                return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-            }
-        }break;
-        default:{
-            ;
-        }break;
+ParametersValidation Parameters::validateRequirements(){
+    if(requirements.minUtilization != NORNIR_REQUIREMENT_UNDEF ||
+       requirements.maxUtilization != NORNIR_REQUIREMENT_UNDEF){
+        if(requirements.minUtilization == NORNIR_REQUIREMENT_UNDEF){
+            requirements.minUtilization = 0.1;
+        }
+        if(requirements.maxUtilization == NORNIR_REQUIREMENT_UNDEF){
+            requirements.maxUtilization = 100;
+        }
+        if(requirements.minUtilization > requirements.maxUtilization     ||
+           requirements.minUtilization < 0                               ||
+           requirements.maxUtilization > 100){
+            return VALIDATION_WRONG_REQUIREMENT;
+        }
     }
-
+    if(requirements.bandwidth != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.bandwidth < 0){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+    if(requirements.latency != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.latency < 0){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+    if(requirements.executionTime != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.expectedTasksNumber == NORNIR_REQUIREMENT_UNDEF){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+    if(requirements.powerConsumption != NORNIR_REQUIREMENT_UNDEF){
+        if(strategySelection == STRATEGY_SELECTION_ANALYTICAL ||
+           strategySelection == STRATEGY_SELECTION_LIMARTINEZ){
+            return VALIDATION_WRONG_REQUIREMENT;
+        }
+    }
     if(maxCalibrationTime == 0 && maxCalibrationConfigurations &&
        (maxPerformancePredictionError <= 0      ||
         maxPerformancePredictionError > 100.0   ||
         maxPowerPredictionError <= 0    ||
         maxPowerPredictionError > 100.0)){
-        return VALIDATION_WRONG_CONTRACT_PARAMETERS;
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+
+    uint maxMinRequirements = 0;
+    if(requirements.bandwidth == NORNIR_REQUIREMENT_MAX){
+        ++maxMinRequirements;
+    }
+    if(requirements.executionTime == NORNIR_REQUIREMENT_MIN){
+        ++maxMinRequirements;
+    }
+    if(requirements.latency == NORNIR_REQUIREMENT_MIN){
+        ++maxMinRequirements;
+    }
+    if(requirements.powerConsumption == NORNIR_REQUIREMENT_MIN){
+        ++maxMinRequirements;
+    }
+
+    // TODO: Remove Utilization requirements (can be obtained through
+    // bandwidth + tolerance/conservative
+    // Only 1 min/max requirement can be specified.
+    if(maxMinRequirements != 1){
+        return VALIDATION_WRONG_REQUIREMENT;
     }
 
     return VALIDATION_OK;
@@ -594,15 +644,6 @@ ParametersValidation Parameters::validateSelector(){
     return VALIDATION_OK;
 }
 
-template<> char const* enumStrings<ContractType>::data[] = {
-    "NONE",
-    "PERF_UTILIZATION",
-    "PERF_BANDWIDTH",
-    "PERF_COMPLETION_TIME",
-    "PERF_MAX",
-    "POWER_BUDGET"
-};
-
 template<> char const* enumStrings<TriggerConfQBlocking>::data[] = {
     "NO",
     "YES",
@@ -673,7 +714,14 @@ template<> char const* enumStrings<StrategyPersistence>::data[] = {
 void Parameters::loadXml(const string& paramFileName){
     XmlTree xt(paramFileName, "nornirParameters");
 
-    SETVALUE(xt, Enum, contractType);
+    SETVALUE(xt, DoubleOrMax, requirements.bandwidth);
+    SETVALUE(xt, DoubleOrMin, requirements.powerConsumption);
+    SETVALUE(xt, Double, requirements.minUtilization);
+    SETVALUE(xt, Double, requirements.maxUtilization);
+    SETVALUE(xt, Double, requirements.expectedTasksNumber);
+    SETVALUE(xt, DoubleOrMin, requirements.executionTime);
+    SETVALUE(xt, DoubleOrMin, requirements.latency);
+
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
     SETVALUE(xt, Enum, strategySelection);
     SETVALUE(xt, Enum, strategyPredictionPerformance);
@@ -697,17 +745,8 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Uint, samplingIntervalSteady);
     SETVALUE(xt, Uint, steadyThreshold);
     SETVALUE(xt, Uint, minTasksPerSample);
-    SETVALUE(xt, Double, underloadThresholdFarm);
-    SETVALUE(xt, Double, overloadThresholdFarm);
-    SETVALUE(xt, Double, underloadThresholdWorker);
-    SETVALUE(xt, Double, overloadThresholdWorker);
     SETVALUE(xt, Bool, migrateCollector);
-    SETVALUE(xt, Double, requiredBandwidth);
-    SETVALUE(xt, Uint, requiredCompletionTime);
-    SETVALUE(xt, Double, requiredLatency);
-    SETVALUE(xt, Ulong, expectedTasksNumber);
     SETVALUE(xt, Bool, synchronousWorkers);
-    SETVALUE(xt, Double, powerBudget);
     SETVALUE(xt, Double, maxCalibrationTime);
     SETVALUE(xt, Uint, maxCalibrationConfigurations);
     SETVALUE(xt, Double, maxPerformancePredictionError);
@@ -780,8 +819,8 @@ ParametersValidation Parameters::validate(){
     r = validateUnusedVc(strategyUnusedVirtualCores);
     if(r != VALIDATION_OK){return r;}
 
-    /** Validate contract parameters. **/
-    r = validateContract();
+    /** Validate requirements. **/
+    r = validateRequirements();
     if(r != VALIDATION_OK){return r;}
 
     /** Validate selectors. **/
@@ -793,6 +832,15 @@ ParametersValidation Parameters::validate(){
 
 bool Parameters::isKnobEnabled(KnobType k) const{
     return _knobEnabled[k];
+}
+
+bool isMinMaxRequirement(double r){
+    return r == NORNIR_REQUIREMENT_MAX || r == NORNIR_REQUIREMENT_MIN;
+}
+
+bool isPrimaryRequirement(double r){
+    return r != NORNIR_REQUIREMENT_UNDEF &&
+           !isMinMaxRequirement(r);
 }
 
 }

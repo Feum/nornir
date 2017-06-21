@@ -58,7 +58,8 @@ Configuration::~Configuration(){
 }
 
 //TODO: Works even if a std::vector is empty? (i.e. a knob has no values)
-void Configuration::combinations(std::vector<std::vector<double> > array, size_t i, std::vector<double> accum){
+void Configuration::combinations(std::vector<std::vector<double> > array,
+                                 size_t i, std::vector<double> accum){
     if(i == array.size()){
         KnobsValues kv(KNOB_VALUE_REAL);
         for(size_t i = 0; i < KNOB_NUM; i++){
@@ -137,9 +138,6 @@ Knob* Configuration::getKnob(KnobType t) const{
 }
 
 void Configuration::maxAllKnobs(){
-    if(_p.contractType == CONTRACT_NONE || !_knobsChangeNeeded){
-        return;
-    }
     DEBUG("Maxing all the knobs.");
     for(size_t i = 0; i < KNOB_NUM; i++){
         _knobs[(KnobType) i]->setToMax();
@@ -214,7 +212,9 @@ void Configuration::setValues(const KnobsValues& values){
             }
         }else if(values.areRelative()){
             if(_knobs[i]->isLocked()){
-                _knobs[i]->setRelativeValue(0); // Only one value possible, any relative value would be ok.
+                // Any relative value would be ok since the knob only has one
+                // possible value.
+                _knobs[i]->setRelativeValue(0);
             }else{
                 _knobs[i]->setRelativeValue(values[(KnobType)i]);
             }
@@ -266,11 +266,11 @@ ConfigurationFarm::ConfigurationFarm(const Parameters& p,
 
     _knobs[KNOB_HYPERTHREADING] = new KnobHyperThreading(p);
     _knobs[KNOB_MAPPING] = new KnobMappingFarm(p,
-                                                *dynamic_cast<KnobVirtualCoresFarm*>(_knobs[KNOB_VIRTUAL_CORES]),
-                                                *dynamic_cast<KnobHyperThreading*>(_knobs[KNOB_HYPERTHREADING]),
-                                                emitter, collector);
+                                               *dynamic_cast<KnobVirtualCoresFarm*>(_knobs[KNOB_VIRTUAL_CORES]),
+                                               *dynamic_cast<KnobHyperThreading*>(_knobs[KNOB_HYPERTHREADING]),
+                                               emitter, collector);
     _knobs[KNOB_FREQUENCY] = new KnobFrequency(p,
-                                                    *dynamic_cast<KnobMappingFarm*>(_knobs[KNOB_MAPPING]));
+                                               *dynamic_cast<KnobMappingFarm*>(_knobs[KNOB_MAPPING]));
 
     _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
                                                               p.thresholdQBlocking,

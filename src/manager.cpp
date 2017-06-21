@@ -78,10 +78,9 @@ static Parameters& validate(Parameters& p){
 Manager::Manager(Parameters nornirParameters):
         _terminated(false),
         _p(validate(nornirParameters)),
-        _cpufreq(_p.mammut.getInstanceCpuFreq()),
-        _counter(_p.mammut.getInstanceEnergy()->getCounter()),
-        _task(_p.mammut.getInstanceTask()),
-        _topology(_p.mammut.getInstanceTopology()),
+        _counter(NULL),
+        _task(NULL),
+        _topology(NULL),
         _samples(initSamples()),
         _variations(new MovingAverageExponential<double>(0.5)),
         _totalTasks(0),
@@ -91,9 +90,10 @@ Manager::Manager(Parameters nornirParameters):
         _inhibited(false),
         _configuration(NULL),
         _selector(NULL),
-        _pid(0)
+        _pid(0),
+        _toSimulate(false)
 {
-    _cpufreq->removeTurboFrequencies();
+    ;
 }
 
 Manager::~Manager(){
@@ -101,14 +101,16 @@ Manager::~Manager(){
 }
 
 void Manager::run(){
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        _remainingTasks = _p.expectedTasksNumber;
-        _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
-    }else if(_p.contractType == CONTRACT_PERF_MAX){
-        // In this way all the configurations will be suboptimal and
-        // we will select the less suboptimal one, i.e. the closest
-        // to the requirement, i.e. the most performing one.
-        _p.requiredBandwidth = std::numeric_limits<double>::max();
+    if(!_toSimulate){
+        _p.mammut.getInstanceCpuFreq()->removeTurboFrequencies();
+        _counter = _p.mammut.getInstanceEnergy()->getCounter();
+        _task = _p.mammut.getInstanceTask();
+        _topology = _p.mammut.getInstanceTopology();
+    }
+
+    if(isPrimaryRequirement(_p.requirements.executionTime)){
+        _remainingTasks = _p.requirements.expectedTasksNumber;
+        _deadline = getMillisecondsTime()/1000.0 + _p.requirements.executionTime;
     }
 
     waitForStart();
@@ -128,8 +130,10 @@ void Manager::run(){
     KnobsValues kv = decide();
     act(kv);
 
-    ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
-    thisThread->move(MANAGER_VIRTUAL_CORE);
+    if(!_toSimulate){
+        ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
+        thisThread->move(NORNIR_MANAGER_VIRTUAL_CORE);
+    }
 
     double microsecsSleep = 0;
     double startSample = getMillisecondsTime();
@@ -167,7 +171,6 @@ void Manager::run(){
                 DEBUG("Asking selector.");
                 KnobsValues kv = decide();
                 act(kv);
-                _configuration->trigger();
                 startSample = getMillisecondsTime();
             }
         }else{
@@ -284,17 +287,30 @@ void Manager::allowCores(std::vector<mammut::topology::VirtualCoreId> ids){
     ((KnobMapping*) _configuration->getKnob(KNOB_MAPPING))->setAllowedCores(allowedVc);
 }
 
+void Manager::setSimulationParameters(std::string samplesFileName,
+                                      mammut::SimulationParameters mammutSimulationParameters){
+    _toSimulate = true;
+    std::ifstream file(samplesFileName);
+    MonitoredSample sample;
+
+    while(file >> sample){
+        _simulationSamples.push_back(sample);
+    }
+
+    _p.mammut.setSimulationParameters(mammutSimulationParameters);
+}
+
 void Manager::postConfigurationManagement(){;}
 
 void Manager::terminationManagement(){;}
 
 void Manager::updateRequiredBandwidth() {
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+    if(isPrimaryRequirement(_p.requirements.executionTime)){
         double now = getMillisecondsTime();
         if(now / 1000.0 >= _deadline){
-            _p.requiredBandwidth = numeric_limits<double>::max();
+            _p.requirements.bandwidth = numeric_limits<double>::max();
         }else{
-            _p.requiredBandwidth = _remainingTasks / ((_deadline * 1000.0 - now) / 1000.0);
+            _p.requirements.bandwidth = _remainingTasks / ((_deadline * 1000.0 - now) / 1000.0);
         }
     }
 }
@@ -311,45 +327,6 @@ void Manager::setDomainToHighestFrequency(const Domain* domain){
     }
 }
 
-double Manager::getPrimaryValue(const MonitoredSample& sample) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_MAX:{
-            return sample.bandwidth;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            return sample.watts;
-        }break;
-        default:{
-            return 0;
-        }break;
-    }
-}
-
-double Manager::getSecondaryValue(const MonitoredSample& sample) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            return sample.watts;
-        }break;
-        case CONTRACT_PERF_MAX:{
-            // In this case we just ignore the power consumption.
-            // By putting it to 0, we force the algorithm to select
-            // the most performing configuration.
-            return 0;
-        }
-        case CONTRACT_POWER_BUDGET:{
-            return sample.bandwidth;
-        }break;
-        default:{
-            return 0;
-        }break;
-    }
-}
-
 bool Manager::persist() const{
     bool r = false;
     switch(_p.strategyPersistence){
@@ -358,38 +335,34 @@ bool Manager::persist() const{
         }break;
         case STRATEGY_PERSISTENCE_VARIATION:{
             const MonitoredSample& variation = _samples->coefficientVariation();
-            double primaryVariation =  getPrimaryValue(variation);
-            double secondaryVariation =  getSecondaryValue(variation);
             r = _samples->size() < 1 ||
-                primaryVariation > _p.persistenceValue ||
-                secondaryVariation > _p.persistenceValue;
-#if 0
-            double primaryVariation = _variations->coefficientVariation();
-            std::cout << "Variation size: " << _variations->size() << " PrimaryVariation: " << primaryVariation << std::endl;
-            r = _variations->size() < 2 || primaryVariation > _p.persistenceValue;
-#endif
+                variation.bandwidth > _p.persistenceValue ||
+                variation.latency > _p.persistenceValue ||
+                variation.watts > _p.persistenceValue;
         }break;
     }
     return r;
 }
 
 void Manager::lockKnobs() const{
-    if(!_p.knobCoresEnabled){
-        _configuration->getKnob(KNOB_VIRTUAL_CORES)->lockToMax();
-    }
-    if(!_p.knobMappingEnabled){
-        _configuration->getKnob(KNOB_MAPPING)->lock(MAPPING_TYPE_LINEAR);
-    }
-    if(!_p.knobFrequencyEnabled){
-        _configuration->getKnob(KNOB_FREQUENCY)->lockToMax();
-    }
-    if(!_p.knobHyperthreadingEnabled){
-        _configuration->getKnob(KNOB_HYPERTHREADING)->lockToMin();
+    if(!_toSimulate){
+        if(!_p.knobCoresEnabled){
+            _configuration->getKnob(KNOB_VIRTUAL_CORES)->lockToMax();
+        }
+        if(!_p.knobMappingEnabled){
+            _configuration->getKnob(KNOB_MAPPING)->lock(MAPPING_TYPE_LINEAR);
+        }
+        if(!_p.knobFrequencyEnabled){
+            _configuration->getKnob(KNOB_FREQUENCY)->lockToMax();
+        }
+        if(!_p.knobHyperthreadingEnabled){
+            _configuration->getKnob(KNOB_HYPERTHREADING)->lockToMin();
+        }
     }
 }
 
 Selector* Manager::createSelector() const{
-    if(_p.contractType == CONTRACT_NONE){
+    if(!_p.requirements.anySpecified()){
         return new SelectorFixed(_p, *_configuration, _samples);
     }else{
         switch(_p.strategySelection){
@@ -430,19 +403,11 @@ Smoother<MonitoredSample>* Manager::initSamples() const{
     }
 }
 
-void Manager::updateTasksCount(knarr::ApplicationSample& sample){
-    double newTasks = sample.tasksCount;
-    if(_p.synchronousWorkers){
-        // When we have synchronous workers we need to count the iterations,
-        // not the real tasks (indeed in this case each worker will receive
-        // the same amount of tasks, e.g. in canneal) since they are sent in
-        // broadcast.
-        newTasks /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
-    }
-    _totalTasks += newTasks;
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        if(_remainingTasks > newTasks){
-            _remainingTasks -= newTasks;
+void Manager::updateTasksCount(MonitoredSample &sample){
+    _totalTasks += sample.numTasks;
+    if(isPrimaryRequirement(_p.requirements.executionTime)){
+        if(_remainingTasks > sample.numTasks){
+            _remainingTasks -= sample.numTasks;
         }else{
             _remainingTasks = 0;
         }
@@ -450,41 +415,47 @@ void Manager::updateTasksCount(knarr::ApplicationSample& sample){
 }
 
 void Manager::observe(){
-    MonitoredSample sample;
     Joules joules = 0.0;
-    knarr::ApplicationSample ws = getSample();
-    updateTasksCount(ws);
-    double now = getMillisecondsTime();
+    MonitoredSample sample;
+    if(_toSimulate){
+        if(_simulationSamples.empty()){
+            _terminated = true;
+            return;
+        }else{
+            sample = _simulationSamples.front();
+            _simulationSamples.pop_front();
+        }
+    }else{
+        sample = getSample();
+        double now = getMillisecondsTime();
+        joules = getAndResetJoules();
+        if(_p.observer){
+            _p.observer->addJoules(joules);
+        }
 
-    joules = getAndResetJoules();
-    if(_p.observer){
-        _p.observer->addJoules(joules);
+        double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
+        _lastStoredSampleMs = now;
+
+        // Add watts to the sample
+        sample.watts = joules / durationSecs;
+
+        if(_p.synchronousWorkers){
+            // When we have synchronous workers we need to divide
+            // for the number of workers since we do it for the totalTasks
+            // count. When this flag is set we count iterations, not real
+            // tasks.
+            sample.bandwidth /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+            // When we have synchronous workers we need to count the iterations,
+            // not the real tasks (indeed in this case each worker will receive
+            // the same amount of tasks, e.g. in canneal) since they are sent in
+            // broadcast.
+            sample.numTasks /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+        }
     }
 
-    double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
-    _lastStoredSampleMs = now;
-
-    sample.watts = joules / durationSecs;
-    // ATTENTION: Bandwidth is not the number of task since the
-    //            last observation but the number of expected
-    //            tasks that will be processed in 1 second.
-    //            For this reason, if we sum all the bandwidths in
-    //            the result observation file, we may have an higher
-    //            number than the number of tasks.
-    sample.bandwidth = ws.bandwidthTotal;
-    sample.utilisation = ws.loadPercentage;
-    sample.latency = ws.latency;
-
-    if(_p.synchronousWorkers){
-        // When we have synchronous workers we need to divide
-        // for the number of workers since we do it for the totalTasks
-        // count. When this flag is set we count iterations, not real
-        // tasks.
-        sample.bandwidth /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
-    }
-
+    updateTasksCount(sample);
     _samples->add(sample);
-    _variations->add(getPrimaryValue(_samples->coefficientVariation()));
+    _variations->add(_samples->coefficientVariation().bandwidth);
 
     DEBUGB(samplesFile << *_samples << "\n");
 }
@@ -513,26 +484,32 @@ void Manager::act(KnobsValues kv, bool force){
         _samples->reset();
         _variations->reset();
         DEBUG("Resetting sample.");
-        // Don't store this sample since it may be inbetween 2 different configurations.
+        // Don't store this sample since it may be inbetween 2
+        // different configurations.
         if(_p.cooldownPeriod){
             usleep(_p.cooldownPeriod * 1000);
         }
-        knarr::ApplicationSample ws = getSample();
-        updateTasksCount(ws);
-        _lastStoredSampleMs = getMillisecondsTime();
 
-        Joules joules = getAndResetJoules();
-        if(_p.observer){
-            _p.observer->addJoules(joules);
+        if(!_toSimulate){
+            MonitoredSample sample = getSample();
+            updateTasksCount(sample);
+            _lastStoredSampleMs = getMillisecondsTime();
+            Joules joules = getAndResetJoules();
+            if(_p.observer){
+                _p.observer->addJoules(joules);
+            }
         }
+        _configuration->trigger();
     }
 }
 
 Joules Manager::getAndResetJoules(){
     Joules joules = 0.0;
-    if(_counter){
-        joules = _counter->getJoules();
-        _counter->reset();
+    if(!_toSimulate){
+        if(_counter){
+            joules = _counter->getJoules();
+            _counter->reset();
+        }
     }
     return joules;
 }
@@ -549,7 +526,7 @@ void Manager::logObservation(){
                              ms.bandwidth,
                              _samples->coefficientVariation().bandwidth,
                              ms.latency,
-                             ms.utilisation,
+                             ms.loadPercentage,
                              _samples->getLastSample().watts,
                              ms.watts);
     }
@@ -594,8 +571,8 @@ void ManagerInstrumented::waitForStart(){
     ((KnobMappingExternal*)_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
 }
 
-knarr::ApplicationSample ManagerInstrumented::getSample(){
-    knarr::ApplicationSample sample;
+MonitoredSample ManagerInstrumented::getSample(){
+    MonitoredSample sample;
     if(!_monitor.getSample(sample)){
         _terminated = true;
     }
@@ -624,11 +601,12 @@ ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters nornirParameters):
     // For blackbox application we do not care if synchronous of not
     // (we count instructions).
     _p.synchronousWorkers = false;
-    // Check supported contracts.
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME ||
-       _p.contractType == CONTRACT_PERF_BANDWIDTH ||
-       _p.contractType == CONTRACT_PERF_UTILIZATION){
-        throw std::runtime_error("ManagerBlackBox. Unsupported contract.");
+    // Check supported requirements.
+    if(isPrimaryRequirement(_p.requirements.bandwidth) ||
+       _p.requirements.maxUtilization != NORNIR_REQUIREMENT_UNDEF ||
+       isPrimaryRequirement(_p.requirements.executionTime) ||
+       _p.requirements.latency != NORNIR_REQUIREMENT_UNDEF){
+        throw std::runtime_error("ManagerBlackBox. Unsupported requirement.");
     }
     _startTime = 0;
 }
@@ -665,8 +643,8 @@ static bool isRunning(pid_t pid) {
     return !kill(pid, 0);
 }
 
-knarr::ApplicationSample ManagerBlackBox::getSample(){
-    knarr::ApplicationSample sample;
+MonitoredSample ManagerBlackBox::getSample(){
+    MonitoredSample sample;
     double instructions = 0;
     if(!isRunning(_process->getId()) ||
        (_p.roiFile.compare("") && !mammut::utils::existsFile(_p.roiFile))){
@@ -674,10 +652,10 @@ knarr::ApplicationSample ManagerBlackBox::getSample(){
         return sample;
     }
     _process->getAndResetInstructions(instructions);
-    sample.bandwidthTotal = instructions / ((getMillisecondsTime() - _lastStoredSampleMs) / 1000.0);
+    sample.bandwidth = instructions / ((getMillisecondsTime() - _lastStoredSampleMs) / 1000.0);
     sample.latency = -1; // Not used.
     sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
-    sample.tasksCount = instructions; // We consider a task to be an instruction.
+    sample.numTasks = instructions; // We consider a task to be an instruction.
     return sample;
 }
 

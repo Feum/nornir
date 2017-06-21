@@ -63,11 +63,37 @@ protected:
     u_int64_t _totalTasks;
 
     /**
-     * Checks if a specific primary value respects the required contract.
+     * Checks the bandwidth respects the required contract.
      * @param value The value to be checked.
      * @param conservative If true applies the conservativeValue.
      */
-    bool isFeasiblePrimaryValue(double value, bool conservative) const;
+    bool isFeasibleBandwidth(double value, bool conservative) const;
+
+    /**
+     * Checks the latency respects the required contract.
+     * @param value The value to be checked.
+     * @param conservative If true applies the conservativeValue.
+     */
+    bool isFeasibleLatency(double value, bool conservative) const;
+
+    /**
+     * Checks if the power consumption respects the required contract.
+     * @param value The value to be checked.
+     * @param conservative If true applies the conservativeValue.
+     */
+    bool isFeasiblePower(double value, bool conservative) const;
+
+    /**
+     * Initializes the best value.
+     * @return The best value seed.
+     */
+    double initBestValue() const;
+
+    /**
+     * Initializes the suboptimal value.
+     * @return The suboptimal value seed.
+     */
+    double initBestSuboptimalValue() const;
 
     /**
      * Checks if the current configuration is the most performing one.
@@ -197,32 +223,30 @@ class ManagerMulti;
 class SelectorPredictive: public Selector{
     friend class ManagerMulti;
 private:
-    std::unique_ptr<Predictor> _primaryPredictor;
-    std::unique_ptr<Predictor> _secondaryPredictor;
+    std::unique_ptr<Predictor> _bandwidthPredictor;
+    std::unique_ptr<Predictor> _powerPredictor;
     bool _feasible;
     KnobsValues _maxPerformanceConfiguration;
     double _maxPerformance;
     // Association between REAL values and observed data.
     std::map<KnobsValues, MonitoredSample> _observedValues;
-    std::map<KnobsValues, double> _primaryPredictions;
-    std::map<KnobsValues, double> _secondaryPredictions;
+    std::map<KnobsValues, double> _performancePredictions;
+    std::map<KnobsValues, double> _powerPredictions;
 
     /**
-     * Checks if x is a best suboptimal monitored value than y.
-     * @param x The first monitored value.
-     * @param y The second monitored value.
-     * @return True if x is a best suboptimal monitored value than y,
-     *         false otherwise.
+     * Checks if a performance/power value is better than the best found
+     * up to now. If so, the new best value is stored.
+     * @param bandwidth The bandwidth value.
+     * @param latency The latency value.
+     * @param power The power consumption value.
+     * @param best The best found up to now.
+     * @return true if it was a better value (best is modified).
      */
-    bool isBestSuboptimalValue(double x, double y) const;
-
-    /**
-     * Returns true if x is a best secondary value than y, false otherwise.
-     */
-    bool isBestSecondaryValue(double x, double y) const;
+    bool isBest(double bandwidth, double latency,
+                double power, double& best);
 protected:
-    double _primaryPrediction;
-    double _secondaryPrediction;
+    double _bandwidthPrediction;
+    double _powerPrediction;
 
     /**
      * Updates the most performing configuration considering the predictions
@@ -231,7 +255,7 @@ protected:
      * @param primaryValue The primary predicted value.
      * @param secondaryValue The secondary predicted value.
      */
-    void updateMaxPerformanceConfiguration(KnobsValues values, double primaryValue, double secondaryValue);
+    void updateMaxPerformanceConfiguration(KnobsValues values, double performance);
 
     /**
      * Computes the best relative knobs values for the farm.
@@ -306,14 +330,14 @@ public:
      * @param values The knobs values.
      * @return The primary prediction for a given configuration.
      */
-    double getPrimaryPrediction(const KnobsValues& values);
+    double getBandwidthPrediction(const KnobsValues& values);
 
     /**
      * Return the secondary prediction for a given configuration.
      * @param values The knobs values.
      * @return The secondary prediction for a given configuration.
      */
-    double getSecondaryPrediction(const KnobsValues& values);
+    double getPowerPrediction(const KnobsValues& values);
 
     /**
      * Returns a map with all the primary predictions.
@@ -327,9 +351,9 @@ public:
      */
     const std::map<KnobsValues, double>& getSecondaryPredictions() const;
 
-    Predictor* getPrimaryPredictor() const{return _primaryPredictor.get();}
+    Predictor* getPrimaryPredictor() const{return _bandwidthPredictor.get();}
 
-    Predictor* getSecondaryPredictor() const{return _secondaryPredictor.get();}
+    Predictor* getSecondaryPredictor() const{return _powerPredictor.get();}
 };
 
 /**

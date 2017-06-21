@@ -117,7 +117,7 @@ void Knob::lock(double v){
 
 void Knob::lockToMax(){
     if(_knobValues.size()){
-        lock(*_knobValues.end());
+        lock(_knobValues.back());
     }else{
         _locked = true;
     }
@@ -125,7 +125,7 @@ void Knob::lockToMax(){
 
 void Knob::lockToMin(){
     if(_knobValues.size()){
-        lock(*_knobValues.begin());
+        lock(_knobValues.front());
     }else{
         _locked = true;
     }
@@ -410,18 +410,17 @@ vector<VirtualCore*> KnobMapping::computeVcOrderLinear(){
     size_t virtualPerPhysical = _knobHyperThreading.getRealValue();
 
     vector<Cpu*> cpus = _topologyHandler->getCpus();
-    for(size_t i = 0; i < cpus.size(); i++){
-        vector<PhysicalCore*> phyCores = cpus.at(i)->getPhysicalCores();
-        for(size_t j = 0; j < phyCores.size(); j++){
-            vector<VirtualCore*> virtCores = phyCores.at(j)->getVirtualCores();
-            for(size_t k = 0; k < virtCores.size(); k++){
-                if(k >= virtualPerPhysical){break;}
-                if(vcOrder.size() == getNumVirtualCores()){
-                    return vcOrder;
-                }
-                if((!_p.isolateManager || virtCores.at(k)->getVirtualCoreId() != MANAGER_VIRTUAL_CORE) &&
+    for(size_t k = 0; k < virtualPerPhysical; k++){
+        for(size_t i = 0; i < cpus.size(); i++){
+            vector<PhysicalCore*> phyCores = cpus.at(i)->getPhysicalCores();
+            for(size_t j = 0; j < phyCores.size(); j++){
+                vector<VirtualCore*> virtCores = phyCores.at(j)->getVirtualCores();
+                if((!_p.isolateManager || virtCores.at(k)->getVirtualCoreId() != NORNIR_MANAGER_VIRTUAL_CORE) &&
                     isAllowed(virtCores.at(k))){
                     vcOrder.push_back(virtCores.at(k));
+                    if(vcOrder.size() == getNumVirtualCores()){
+                        return vcOrder;
+                    }
                 }
             }
         }
@@ -434,6 +433,7 @@ vector<VirtualCore*> KnobMapping::computeVcOrderInterleaved(){
     * Generates a vector of virtual cores to be used for interleaved
     * mapping.
     */
+#if 0
     vector<VirtualCore*> vcOrder;
     size_t virtualPerPhysical = _knobHyperThreading.getRealValue();
 
@@ -460,6 +460,27 @@ vector<VirtualCore*> KnobMapping::computeVcOrderInterleaved(){
             if(nextVirtualId >= virtualPerPhysical){return vcOrder;}
         }
     }
+#endif
+    vector<VirtualCore*> vcOrder;
+    size_t virtualPerPhysical = _knobHyperThreading.getRealValue();
+    vector<Cpu*> cpus = _topologyHandler->getCpus();
+    size_t physicalPerCpu = cpus[0]->getPhysicalCores().size();
+    for(size_t k = 0; k < virtualPerPhysical; k++){
+        for(size_t j = 0; j < physicalPerCpu; j++){
+            for(size_t i = 0; i < cpus.size(); i++){
+                vector<PhysicalCore*> phyCores = cpus.at(i)->getPhysicalCores();
+                vector<VirtualCore*> virtCores = phyCores.at(j)->getVirtualCores();
+                if((!_p.isolateManager || virtCores.at(k)->getVirtualCoreId() != NORNIR_MANAGER_VIRTUAL_CORE) &&
+                    isAllowed(virtCores.at(k))){
+                    vcOrder.push_back(virtCores.at(k));
+                    if(vcOrder.size() == getNumVirtualCores()){
+                        return vcOrder;
+                    }
+                }
+            }
+        }
+    }
+    return vcOrder;
 }
 
 KnobMappingExternal::KnobMappingExternal(const Parameters& p,
@@ -524,8 +545,7 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
         _p(p),
         _knobMapping(knobMapping),
         _frequencyHandler(_p.mammut.getInstanceCpuFreq()),
-        _topologyHandler(_p.mammut.getInstanceTopology()),
-        _cpufreqHandle(_p.mammut.getInstanceCpuFreq()){
+        _topologyHandler(_p.mammut.getInstanceTopology()){
 
     _frequencyHandler->removeTurboFrequencies();
     std::vector<mammut::cpufreq::Frequency> availableFrequencies;
@@ -564,7 +584,7 @@ void KnobFrequency::changeValue(double v){
 }
 
 void KnobFrequency::applyUnusedVCStrategySame(const vector<VirtualCore*>& unusedVc, Frequency v){
-    vector<Domain*> unusedDomains = _cpufreqHandle->getDomainsComplete(unusedVc);
+    vector<Domain*> unusedDomains = _frequencyHandler->getDomainsComplete(unusedVc);
     DEBUG("[Frequency] " << unusedDomains.size() << " unused domains.");
     for(size_t i = 0; i < unusedDomains.size(); i++){
         Domain* domain = unusedDomains.at(i);
@@ -587,7 +607,7 @@ void KnobFrequency::applyUnusedVCStrategyOff(const vector<VirtualCore*>& unusedV
 }
 
 void KnobFrequency::applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& unusedVc){
-    vector<Domain*> unusedDomains = _cpufreqHandle->getDomainsComplete(unusedVc);
+    vector<Domain*> unusedDomains = _frequencyHandler->getDomainsComplete(unusedVc);
     for(size_t i = 0; i < unusedDomains.size(); i++){
         Domain* domain = unusedDomains.at(i);
         if(!domain->setGovernor(GOVERNOR_USERSPACE) ||

@@ -84,64 +84,55 @@ Selector::Selector(const Parameters& p,
 }
 
 
-bool Selector::isFeasiblePrimaryValue(double value, bool conservative) const{
+bool Selector::isFeasibleBandwidth(double value, bool conservative) const{
     double conservativeOffset = 0;
 
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            if(conservative && _p.conservativeValue){
-                conservativeOffset = (_p.overloadThresholdFarm - _p.underloadThresholdFarm) *
-                                     (_p.conservativeValue / 100.0) / 2.0;
-            }
-            return value > _p.underloadThresholdFarm + conservativeOffset &&
-                   value < _p.overloadThresholdFarm - conservativeOffset;
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            if(conservative && _p.conservativeValue){
-                conservativeOffset = _p.requiredBandwidth * (_p.conservativeValue / 100.0);
-            }
-            return value > _p.requiredBandwidth + conservativeOffset;
-        }break;
-        case CONTRACT_PERF_MAX:{
-            return false; // No values are feasible since the bound is +infinity
+    if(isPrimaryRequirement(_p.requirements.bandwidth)){
+        if(conservative && _p.conservativeValue){
+            conservativeOffset = _p.requirements.bandwidth * (_p.conservativeValue / 100.0);
         }
-        case CONTRACT_POWER_BUDGET:{
-            if(conservative && _p.conservativeValue){
-                conservativeOffset = _p.powerBudget * (_p.conservativeValue / 100.0);
-            }
-
-            return value < _p.powerBudget - conservativeOffset;
-        }break;
-        default:{
+       if(value < _p.requirements.bandwidth + conservativeOffset){
             return false;
-        }break;
+       }
     }
-    return false;
+
+    if(isPrimaryRequirement(_p.requirements.minUtilization)){
+        // Convert bandwidth to utilization.
+        value = _bandwidthIn->average() / value * 100.0;
+        if(conservative && _p.conservativeValue){
+            conservativeOffset = (_p.requirements.maxUtilization - _p.requirements.minUtilization) *
+                                 (_p.conservativeValue / 100.0) / 2.0;
+        }
+        if(value < _p.requirements.minUtilization + conservativeOffset ||
+           value > _p.requirements.maxUtilization - conservativeOffset){
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Selector::isFeasibleLatency(double value, bool conservative) const{
+    return true;
+}
+
+bool Selector::isFeasiblePower(double value, bool conservative) const{
+    double conservativeOffset = 0;
+    if(isPrimaryRequirement(_p.requirements.powerConsumption)){
+        if(conservative && _p.conservativeValue){
+            conservativeOffset = _p.requirements.powerConsumption *
+                                 (_p.conservativeValue / 100.0);
+        }
+        return value < _p.requirements.powerConsumption - conservativeOffset;
+    }
+    return true;
 }
 
 bool Selector::isContractViolated() const{
     if(_ignoreViolations){return false;}
-    double primaryValue = 0.0;
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            primaryValue = _samples->average().utilisation;
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            primaryValue = _samples->average().bandwidth;
-        }break;
-        case CONTRACT_PERF_MAX:{
-            return !isMaxPerformanceConfiguration();
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            primaryValue = _samples->average().watts;
-        }break;
-        default:{
-            return 0;
-        }break;
-    }
-    return !isFeasiblePrimaryValue(primaryValue, false);
+    MonitoredSample avg = _samples->average();
+    return !isFeasibleBandwidth(avg.bandwidth, false) ||
+           !isFeasibleLatency(avg.latency, false)     ||
+           !isFeasiblePower(avg.watts, false);
 }
 
 void Selector::startCalibration(){
@@ -219,7 +210,7 @@ void Selector::updateTotalTasks(u_int64_t totalTasks){
 }
 
 void Selector::updateBandwidthIn(){
-    if(_samples->average().utilisation < MAX_RHO){
+    if(_samples->average().loadPercentage < MAX_RHO){
         if(_bandwidthIn->average() == numeric_limits<double>::max()){
             _bandwidthIn->reset();
         }
@@ -227,6 +218,34 @@ void Selector::updateBandwidthIn(){
     }else if(!_bandwidthIn->size()){
         _bandwidthIn->add(numeric_limits<double>::max());
     }
+}
+
+double Selector::initBestValue() const{
+    if(_p.requirements.bandwidth == NORNIR_REQUIREMENT_MAX){
+        return NORNIR_REQUIREMENT_MIN;
+    }else{
+        return NORNIR_REQUIREMENT_MAX;
+    }
+}
+
+double Selector::initBestSuboptimalValue() const{
+    if(isPrimaryRequirement(_p.requirements.bandwidth)){
+        return NORNIR_REQUIREMENT_MIN;
+    }
+
+    if(isPrimaryRequirement(_p.requirements.latency)){
+        return NORNIR_REQUIREMENT_MAX;
+    }
+
+    if(isPrimaryRequirement(_p.requirements.maxUtilization)){
+        return NORNIR_REQUIREMENT_MAX;
+    }
+
+    if(isPrimaryRequirement(_p.requirements.powerConsumption)){
+        return NORNIR_REQUIREMENT_MAX;
+    }
+
+    throw std::runtime_error("Wrong contract specification.");
 }
 
 SelectorFixed::SelectorFixed(const Parameters& p,
@@ -250,35 +269,21 @@ SelectorPredictive::SelectorPredictive(const Parameters& p,
                    std::unique_ptr<Predictor> powerPredictor):
                        Selector(p, configuration, samples),
                        _feasible(true),
-                       _primaryPrediction(NOT_VALID),
-                       _secondaryPrediction(NOT_VALID){
+                       _bandwidthPrediction(NOT_VALID),
+                       _powerPrediction(NOT_VALID){
     /****************************************/
     /*              Predictors              */
     /****************************************/
-    switch(p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_MAX:{
-            _primaryPredictor = std::move(bandwidthPredictor);
-            _secondaryPredictor = std::move(powerPredictor);
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            _primaryPredictor = std::move(powerPredictor);
-            _secondaryPredictor = std::move(bandwidthPredictor);
-        }break;
-        default:{
-            throw std::runtime_error("Unknown contract.");
-        }break;
-    }
+    _bandwidthPredictor = std::move(bandwidthPredictor);
+    _powerPredictor = std::move(powerPredictor);
     _maxPerformance = -1;
 #if STORE_PREDICTIONS
     // Just to let the multi manager work even if this manager terminates
     // before making some predictions.
     const vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
     for(size_t i = 0; i < combinations.size(); i++){
-        _primaryPredictions[combinations.at(i)] = -1;
-        _secondaryPredictions[combinations.at(i)] = -1;
+        _performancePredictions[combinations.at(i)] = -1;
+        _powerPredictions[combinations.at(i)] = -1;
     }
 #endif
 }
@@ -295,86 +300,31 @@ double SelectorPredictive::getRealBandwidth(double predicted) const{
     }
 }
 
-double SelectorPredictive::getPrimaryPrediction(const KnobsValues& values){
+double SelectorPredictive::getBandwidthPrediction(const KnobsValues& values){
     auto observation = _observedValues.find(_configuration.getRealValues(values));
-
-    // Get real bandwidth from maximum
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            double maxBandwidth = 0.0;
-            if(observation != _observedValues.end()){
-                maxBandwidth = observation->second.getMaximumBandwidth();
-            }else{
-                _primaryPredictor->prepareForPredictions();
-                maxBandwidth = _primaryPredictor->predict(values);
-            }
-            return _bandwidthIn->average() / maxBandwidth * 100.0;
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_MAX:{
-            double maxBandwidth = 0.0;
-            if(observation != _observedValues.end()){
-                maxBandwidth = observation->second.getMaximumBandwidth();
-            }else{
-                _primaryPredictor->prepareForPredictions();
-                maxBandwidth = _primaryPredictor->predict(values);
-            }
-            return getRealBandwidth(maxBandwidth);
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            if(observation != _observedValues.end()){
-                return observation->second.watts;
-            }else{
-                _primaryPredictor->prepareForPredictions();
-                return _primaryPredictor->predict(values);
-            }
-        }break;
-        default:{
-            throw std::runtime_error("Unknown contract.");
-        }break;
+    double maxBandwidth = 0.0;
+    if(observation != _observedValues.end()){
+        maxBandwidth = observation->second.getMaximumBandwidth();
+    }else{
+        _bandwidthPredictor->prepareForPredictions();
+        maxBandwidth = _bandwidthPredictor->predict(values);
     }
+    return getRealBandwidth(maxBandwidth);
 }
 
-double SelectorPredictive::getSecondaryPrediction(const KnobsValues& values){
+double SelectorPredictive::getPowerPrediction(const KnobsValues& values){
     auto observation = _observedValues.find(_configuration.getRealValues(values));
-
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            if(observation != _observedValues.end()){
-                return observation->second.watts;
-            }else{
-                _secondaryPredictor->prepareForPredictions();
-                return _secondaryPredictor->predict(values);
-            }
-        }break;
-        case CONTRACT_PERF_MAX:{
-            // Here we can return anything. We are trying to reach a performance bound
-            // of +infinity, thus all the solutions will be suboptimal. Since they ae
-            // all suboptimal, we will not look at all a power consumption.
-            return 0;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            double maxBandwidth = 0;
-            if(observation != _observedValues.end()){
-                maxBandwidth = observation->second.getMaximumBandwidth();
-            }else{
-                _secondaryPredictor->prepareForPredictions();
-                maxBandwidth = _secondaryPredictor->predict(values);
-            }
-            return getRealBandwidth(maxBandwidth);
-        }break;
-        default:{
-            throw std::runtime_error("Unknown contract.");
-        }break;
+    if(observation != _observedValues.end()){
+        return observation->second.watts;
+    }else{
+        _powerPredictor->prepareForPredictions();
+        return _powerPredictor->predict(values);
     }
 }
 
 const std::map<KnobsValues, double>& SelectorPredictive::getPrimaryPredictions() const{
 #if STORE_PREDICTIONS
-    return _primaryPredictions;
+    return _performancePredictions;
 #else
     throw std::runtime_error("Please define STORE_PREDICTIONS macro to 1.");
 #endif
@@ -382,82 +332,44 @@ const std::map<KnobsValues, double>& SelectorPredictive::getPrimaryPredictions()
 
 const std::map<KnobsValues, double>& SelectorPredictive::getSecondaryPredictions() const{
 #if STORE_PREDICTIONS
-    return _secondaryPredictions;
+    return _powerPredictions;
 #else
     throw std::runtime_error("Please define STORE_PREDICTIONS macro to 1.");
 #endif
 }
 
-bool SelectorPredictive::isBestSuboptimalValue(double x, double y) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            // Concerning utilization factors, if both are suboptimal,
-            // we prefer the closest to the lower bound (preferring the one
-            // lower than lower bound).
-            double distanceX, distanceY;
-            distanceX = _p.underloadThresholdFarm - x;
-            distanceY = _p.underloadThresholdFarm - y;
-            if(distanceX > 0 && distanceY < 0){
-                return true;
-            }else if(distanceX < 0 && distanceY > 0){
-                return false;
-            }else{
-                return abs(distanceX) < abs(distanceY);
-            }
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_MAX:{
-            // Concerning bandwidths, if both are suboptimal,
-            // we prefer the higher one.
-            return x > y;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            // Concerning power budgets, if both are suboptimal,
-            // we prefer the lowest one.
-            return x < y;
-        }break;
-        default:{
-            ;
-        }break;
+bool SelectorPredictive::isBest(double bandwidth, double latency,
+                                double power, double& best){
+    // Bandwidth maximization
+    if(_p.requirements.bandwidth == NORNIR_REQUIREMENT_MAX){
+        if(bandwidth > best){
+            best = bandwidth;
+            return true;
+        }
     }
+
+    // Latency minimization
+    if(_p.requirements.latency == NORNIR_REQUIREMENT_MIN){
+        throw std::runtime_error("Latency minimization not yet supported.");
+        if(latency < best){
+            best = latency;
+            return true;
+        }
+    }
+
+    // Power minimization
+    if(_p.requirements.powerConsumption == NORNIR_REQUIREMENT_MIN){
+        if(power < best){
+            best = power;
+            return true;
+        }
+    }
+
     return false;
 }
 
-bool SelectorPredictive::isBestSecondaryValue(double x, double y) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_MAX:{
-            return x < y;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            return x > y;
-        }break;
-        default:{
-            ;
-        }break;
-    }
-    return false;
-}
-
-void SelectorPredictive::updateMaxPerformanceConfiguration(KnobsValues values, double primaryValue, double secondaryValue){
-    double performance = 0.0;
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_MAX:{
-            performance = primaryValue;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            performance = secondaryValue;
-        }break;
-        default:{
-            throw std::runtime_error("Unkown contract type.");
-        }break;
-    }
+void SelectorPredictive::updateMaxPerformanceConfiguration(KnobsValues values,
+                                                           double performance){
     if(performance > _maxPerformance){
         _maxPerformance = performance;
         _maxPerformanceConfiguration = values;
@@ -465,84 +377,72 @@ void SelectorPredictive::updateMaxPerformanceConfiguration(KnobsValues values, d
 }
 
 KnobsValues SelectorPredictive::getBestKnobsValues(){
-    KnobsValues bestValues(KNOB_VALUE_REAL);
-    KnobsValues bestSuboptimalValues = _configuration.getRealValues();
-
-#ifdef DEBUG_SELECTORS
-    double bestPrimaryPrediction = 0;
-    double suboptimalSecondary = 0;
-#endif
-    double bestSecondaryPrediction = 0;
-    double bestSuboptimalValue = 0;
-
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            bestSuboptimalValue = _bandwidthIn->average() / _samples->average().bandwidth * 100.0;
-            bestSecondaryPrediction = numeric_limits<double>::max();
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_MAX:{
-            bestSuboptimalValue = _samples->average().bandwidth;
-            // We have to minimize the power.
-            bestSecondaryPrediction = numeric_limits<double>::max();
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            bestSuboptimalValue = _samples->average().watts;
-            // We have to maximize the bandwidth.
-            bestSecondaryPrediction = numeric_limits<double>::min();
-        }break;
-        default:{
-            throw std::runtime_error("Unkown contract type.");
-        }break;
-    }
-
+    KnobsValues bestKnobs(KNOB_VALUE_REAL);
+    KnobsValues bestSuboptimalKnobs = _configuration.getRealValues();
+    double bestValue = initBestValue();
+    double bestSuboptimalValue = initBestSuboptimalValue();
     _feasible = false;
 
-    const vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
-    for(size_t i = 0; i < combinations.size(); i++){
-        const KnobsValues& currentValues = combinations.at(i);
-        double primaryPrediction = getPrimaryPrediction(currentValues);
-        double secondaryPrediction = getSecondaryPrediction(currentValues);
+#ifdef DEBUG_SELECTORS
+    double bestBandwidthPrediction = 0;
+    double bestLatencyPrediction = 0;
+    double bestPowerPrediction = 0;
 
-        updateMaxPerformanceConfiguration(currentValues, primaryPrediction, secondaryPrediction);
-#if STORE_PREDICTIONS
-        _primaryPredictions[currentValues] = primaryPrediction;
-        _secondaryPredictions[currentValues] = secondaryPrediction;
+    double bestSuboptimalBandwidthPrediction = 0;
+    double bestSuboptimalLatencyPrediction = 0;
+    double bestSuboptimalPowerPrediction = 0;
 #endif
 
-        //std::cout << currentValues << " " << primaryPrediction << " " << secondaryPrediction << std::endl;
-        if(isFeasiblePrimaryValue(primaryPrediction, true)){
-            if(isBestSecondaryValue(secondaryPrediction, bestSecondaryPrediction)){
-                bestValues = currentValues;
-                _feasible = true;
-                DEBUGB(bestPrimaryPrediction = primaryPrediction);
-                bestSecondaryPrediction = secondaryPrediction;
+    const vector<KnobsValues>& combinations = _configuration.getAllRealCombinations();
+    for(const KnobsValues& currentValues : combinations){
+        double bandwidthPrediction = getBandwidthPrediction(currentValues);
+        double powerPrediction = getPowerPrediction(currentValues);
+        assert(bandwidthPrediction > 0);
+        assert(powerPrediction > 0);
+
+        updateMaxPerformanceConfiguration(currentValues, bandwidthPrediction);
+#if STORE_PREDICTIONS
+        _performancePredictions[currentValues] = bandwidthPrediction;
+        _powerPredictions[currentValues] = powerPrediction;
+#endif
+        //std::cout << currentValues << " " << performancePrediction << " " << powerPrediction << std::endl;
+        if(isFeasibleBandwidth(bandwidthPrediction, true) &&
+           isFeasibleLatency(0, true) &&
+           isFeasiblePower(powerPrediction, true)){
+            _feasible = true;
+            if(isBest(bandwidthPrediction, 0, powerPrediction, bestValue)){
+#ifdef DEBUG_SELECTORS
+                bestBandwidthPrediction = bandwidthPrediction;
+                bestPowerPrediction = powerPrediction;
+#endif
+                bestKnobs = currentValues;
+            }else if(isBest(bandwidthPrediction, 0, powerPrediction,
+                            bestSuboptimalValue)){
+#ifdef DEBUG_SELECTORS
+                bestSuboptimalBandwidthPrediction = bandwidthPrediction;
+                bestSuboptimalPowerPrediction = powerPrediction;
+#endif
+                bestSuboptimalKnobs = currentValues;
             }
-        }else if(!_feasible &&
-                 isBestSuboptimalValue(primaryPrediction, bestSuboptimalValue)){
-            bestSuboptimalValue = primaryPrediction;
-            bestSuboptimalValues = currentValues;
-            DEBUGB(suboptimalSecondary = secondaryPrediction);
         }
     }
 
     if(_feasible){
-        DEBUG("Best solution found: " << bestValues);
-        DEBUG("Primary prediction: " << bestPrimaryPrediction);
-        DEBUG("Secondary prediction: " << bestSecondaryPrediction);
-        return bestValues;
+        DEBUG("Best solution found: " << bestKnobs);
+        DEBUG("Bandwidth prediction: " << bestBandwidthPrediction);
+        DEBUG("Power prediction: " << bestPowerPrediction);
+        return bestKnobs;
     }else{
-        DEBUG("Suboptimal solution found: " << bestSuboptimalValues);
-        DEBUG("Primary prediction: " << bestSuboptimalValue);
-        DEBUG("Secondary prediction: " << suboptimalSecondary);
-        return bestSuboptimalValues;
+        DEBUG("Suboptimal solution found: " << bestSuboptimalKnobs);
+        DEBUG("Bandwidth prediction: " << bestSuboptimalBandwidthPrediction);
+        DEBUG("Power prediction: " << bestSuboptimalPowerPrediction);
+        return bestSuboptimalKnobs;
     }
 }
 
 void SelectorPredictive::refine(){
-    _primaryPredictor->refine();
-    _secondaryPredictor->refine();
+    _bandwidthPredictor->refine();
+    _powerPredictor->refine();
     if(_p.strategySelection == STRATEGY_SELECTION_LEARNING){
         _observedValues[_configuration.getRealValues()] = _samples->average();
     }
@@ -550,71 +450,52 @@ void SelectorPredictive::refine(){
 
 void SelectorPredictive::updatePredictions(const KnobsValues& next){
     const KnobsValues real = _configuration.getRealValues(next);
-    _primaryPrediction = getPrimaryPrediction(real);
-    _secondaryPrediction = getSecondaryPrediction(real);
+    _bandwidthPrediction = getBandwidthPrediction(real);
+    _powerPrediction = getPowerPrediction(real);
 }
 
 bool SelectorPredictive::predictorsReady() const{
-    return _primaryPredictor->readyForPredictions() &&
-           _secondaryPredictor->readyForPredictions();
+    return _bandwidthPredictor->readyForPredictions() &&
+           _powerPredictor->readyForPredictions();
 }
 
 bool SelectorPredictive::predictionsDone() const{
-    return _primaryPrediction != NOT_VALID &&
-           _secondaryPrediction != NOT_VALID;
+    return _bandwidthPrediction != NOT_VALID &&
+           _powerPrediction != NOT_VALID;
 }
 
 void SelectorPredictive::clearPredictors(){
-    _primaryPredictor->clear();
-    _secondaryPredictor->clear();
-    _primaryPrediction = NOT_VALID;
-    _secondaryPrediction = NOT_VALID;
+    _bandwidthPredictor->clear();
+    _powerPredictor->clear();
+    _bandwidthPrediction = NOT_VALID;
+    _powerPrediction = NOT_VALID;
     _observedValues.clear();
 }
 
 bool SelectorPredictive::isMaxPerformanceConfiguration() const{
     if(_maxPerformanceConfiguration.areUndefined()){return false;}
     if(!_maxPerformanceConfiguration.areReal()){
-        throw std::runtime_error("[FATAL ERROR] _maxPerformanceConfiguration must be of type REAL.");
+        throw std::runtime_error("[FATAL ERROR] _maxPerformanceConfiguration "
+                                 "must be of type REAL.");
     }
     return _configuration.getRealValues() != _maxPerformanceConfiguration;
 }
 
 bool SelectorLearner::isAccurate(){
-    double predictedMaxBandwidth = 0.0;
-    double predictedPower = 0.0;
+    double predictedMaxBandwidth = _bandwidthPrediction;
+    double predictedPower = _powerPrediction;
 
     double maxBandwidth = _samples->average().getMaximumBandwidth();
     double power = _samples->average().watts;
 
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            // primaryPrediction is rho, we need to convert to max bandwidth.
-            predictedMaxBandwidth = _bandwidthIn->average() / (_primaryPrediction / 100.0);
-            predictedPower = _secondaryPrediction;
-        }break;
-        case CONTRACT_PERF_COMPLETION_TIME:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_MAX:{
-            predictedMaxBandwidth = _primaryPrediction;
-            predictedPower = _secondaryPrediction;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            predictedMaxBandwidth = _secondaryPrediction;
-            predictedPower = _primaryPrediction;
-        }break;
-        default:{
-            ;
-        }break;
+    if(_p.requirements.minUtilization != NORNIR_REQUIREMENT_UNDEF){
+        predictedMaxBandwidth = _bandwidthIn->average() /
+                                (_bandwidthPrediction / 100.0);
     }
 
-    double performanceError = std::abs((maxBandwidth - predictedMaxBandwidth) / maxBandwidth*100.0);
+    double performanceError = std::abs((maxBandwidth - predictedMaxBandwidth) /
+                                        maxBandwidth*100.0);
     double powerError = std::abs((power - predictedPower) / power*100.0);
-
-    // In maximum performance contracts we do not predict power consumption.
-    if(_p.contractType == CONTRACT_PERF_MAX){
-        powerError = 0;
-    }
 
     DEBUG("Perf error: " << performanceError);
     DEBUG("Power error: " << powerError);
@@ -646,9 +527,9 @@ SelectorAnalytical::SelectorAnalytical(const Parameters& p,
 
 KnobsValues SelectorAnalytical::getNextKnobsValues(){
     _previousConfiguration = _configuration.getRealValues();
-    if(isContractViolated() || ((_p.contractType == CONTRACT_PERF_BANDWIDTH || _p.contractType == CONTRACT_PERF_COMPLETION_TIME) && 
-                                ((_samples->average().bandwidth - _p.requiredBandwidth)/_p.requiredBandwidth > 0.05 ||
-                                 (_samples->average().bandwidth < _p.requiredBandwidth)))){
+    if(isContractViolated() || (isPrimaryRequirement(_p.requirements.bandwidth) &&
+                                ((_samples->average().bandwidth - _p.requirements.bandwidth)/_p.requirements.bandwidth > 0.05 ||
+                                 (_samples->average().bandwidth < _p.requirements.bandwidth)))){
         if(_violations > _p.tolerableSamples){
             _violations = 0;
             KnobsValues kv = getBestKnobsValues();
@@ -668,7 +549,7 @@ KnobsValues SelectorAnalytical::getNextKnobsValues(){
 
 void SelectorAnalytical::updateBandwidthIn(){
     // For this selector we do not consider input bandwidth for contract different from the utilization one.
-    if(_p.contractType == CONTRACT_PERF_UTILIZATION){
+    if(_p.requirements.minUtilization != NORNIR_REQUIREMENT_UNDEF){
         Selector::updateBandwidthIn();
     }else{
         ;
@@ -936,10 +817,8 @@ bool SelectorLearner::phaseChanged() const{
 }
 
 void SelectorLearner::updateModelsInterference(){
-    if((_p.contractType != CONTRACT_PERF_BANDWIDTH &&
-       _p.contractType != CONTRACT_PERF_COMPLETION_TIME &&
-       _p.contractType != CONTRACT_PERF_MAX &&
-       _p.contractType != CONTRACT_PERF_UTILIZATION) ||
+    if((isPrimaryRequirement(_p.requirements.powerConsumption) ||
+        isPrimaryRequirement(_p.requirements.latency)) ||
        (_p.strategyPredictionPerformance != STRATEGY_PREDICTION_PERFORMANCE_USL &&
         _p.strategyPredictionPerformance != STRATEGY_PREDICTION_PERFORMANCE_USLP)){
         throw std::runtime_error("updateModelForInterference is only supported for "
@@ -1125,7 +1004,7 @@ KnobsValues SelectorLiMartinez::getNextKnobsValues(){
             Frequency currentFrequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
             kv[KNOB_VIRTUAL_CORES] = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
 
-            Frequency nextFrequency = currentFrequency * (_p.requiredBandwidth / _samples->average().bandwidth);
+            Frequency nextFrequency = currentFrequency * (_p.requirements.bandwidth / _samples->average().bandwidth);
             nextFrequency = findNearestFrequency(nextFrequency);
             if(nextFrequency == currentFrequency){
                 --_numCalibrationPoints;

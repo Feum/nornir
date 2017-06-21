@@ -62,13 +62,18 @@
 #include "external/rapidXml/rapidxml.hpp"
 
 #include <cmath>
+#include <limits>
 #include <fstream>
 #include "external/mammut/mammut/utils.hpp"
 #include "external/mammut/mammut/mammut.hpp"
 
+#define NORNIR_REQUIREMENT_UNDEF 0
+#define NORNIR_REQUIREMENT_MIN std::numeric_limits<double>::min()
+#define NORNIR_REQUIREMENT_MAX std::numeric_limits<double>::max()
+
 namespace nornir{
 
-#define MANAGER_VIRTUAL_CORE (VirtualCoreId) 0
+#define NORNIR_MANAGER_VIRTUAL_CORE (VirtualCoreId) 0
 
 class Observer;
 
@@ -80,33 +85,6 @@ typedef enum{
     KNOB_FREQUENCY,
     KNOB_NUM  // <---- This must always be the last value
 }KnobType;
-
-/// Possible contracts requested by the user.
-typedef enum{
-    // No contract required.
-    CONTRACT_NONE = 0,
-
-    // A specific utilization (expressed by two bounds [X, Y]) is requested.
-    // Under this constraint, the configuration with minimum power consumption
-    // is chosen.
-    CONTRACT_PERF_UTILIZATION,
-
-    // A specific minimum bandwidth is requested. Under this constraint, the
-    // configuration with minimum power consumption is chosen.
-    CONTRACT_PERF_BANDWIDTH,
-
-    // A specific maximum completion time is requested. Under this constraint,
-    // the configuration with minimum energy consumption is chosen.
-    CONTRACT_PERF_COMPLETION_TIME,
-
-    // The maximum bandwidth is requested. No considerations about power consumption
-    // will be done.
-    CONTRACT_PERF_MAX,
-
-    // A specific maximum cores power is requested. Under this constraint, the
-    // configuration with best performance is chosen.
-    CONTRACT_POWER_BUDGET
-}ContractType;
 
 /// Communication queues blocking/nonblocking.
 typedef enum{
@@ -255,6 +233,9 @@ typedef enum{
     // Generic error
     VALIDATION_NO,
 
+    // Wrong requirement or combination of requirements.
+    VALIDATION_WRONG_REQUIREMENT,
+
     // Some of the knobs enabled by the user is not supported
     // by the selection algorithm he chosen.
     VALIDATION_UNSUPPORTED_KNOBS,
@@ -302,9 +283,6 @@ typedef enum{
     // Strategy for unused virtual cores requires lowering the frequency but
     // frequency scaling not available.
     VALIDATION_UNUSED_VC_NO_FREQUENCIES,
-
-    // Specified parameters are not valid for the specified contract.
-    VALIDATION_WRONG_CONTRACT_PARAMETERS,
 
     // Blocking threshold needs to be specified.
     VALIDATION_BLOCKING_PARAMETERS,
@@ -389,6 +367,28 @@ public:
 
     /**
      * If an element named 'valueName' is present, its value is
+     * copied into 'value' and interpreted as a double. If the value
+     * of the element was the string "MIN", the minimum possible
+     * double is copied into 'value'.
+     * @param valueName The name of the XML element.
+     * @param value The value that will contain the element
+     *              valueName (if present).
+     */
+    void getDoubleOrMin(const char* valueName, double& value);
+
+    /**
+     * If an element named 'valueName' is present, its value is
+     * copied into 'value' and interpreted as a double. If the value
+     * of the element was the string "MAX", the maximum possible
+     * double is copied into 'value'.
+     * @param valueName The name of the XML element.
+     * @param value The value that will contain the element
+     *              valueName (if present).
+     */
+    void getDoubleOrMax(const char* valueName, double& value);
+
+    /**
+     * If an element named 'valueName' is present, its value is
      * copied into 'value' and interpreted as a string.
      * @param valueName The name of the XML element.
      * @param value The value that will contain the element
@@ -441,6 +441,60 @@ typedef struct ArchData{
 
     void loadXml(const std::string& archFileName);
 }ArchData;
+
+
+
+/*!
+ * \class Requirements
+ * \brief This class contains the requirements specified by the user.
+ *
+ * This class contains the requirements specified by the user.
+ */
+typedef struct Requirements{
+    // The bandwidth required for the application (expressed as tasks/sec).
+    // It must be greater or equal than 0.
+    // [default = unused].
+    double bandwidth;
+
+    // The maximum cores power to be used.
+    // It must be greater or equal than 0.
+    // [default = unused].
+    double powerConsumption;
+
+    // The underload threshold for the entire farm.
+    // It must be in [0, 100].
+    // [default = unused].
+    double minUtilization;
+
+    // The overload threshold for the entire farm.
+    // It must be in [0, 100].
+    // [default = unused].
+    double maxUtilization;
+
+    // The required completion time for the application (in seconds).
+    // It must be greater or equal than 0. When used, 'expectedTasksNumber'
+    // must be specified.
+    // [default = unused].
+    double executionTime;
+
+    // The maximum latency required for each input element processed by the
+    // application (in milliseconds).
+    // It must be greater or equal than 0.
+    // NOT AVAILABLE AT THE MOMENT.
+    double latency;
+
+    // The number of task expected for this computation.
+    // [default = unused].
+    double expectedTasksNumber;
+
+    Requirements();
+
+    /**
+     * Checks if any requirement has been specified.
+     * @return true if some requirement have been specified.
+     */
+    bool anySpecified() const;
+}Requirements;
 
 typedef struct{
     /**
@@ -588,7 +642,7 @@ private:
      * Validates the required contract.
      * @return The result of the validation.
      */
-    ParametersValidation validateContract();
+    ParametersValidation validateRequirements();
 
     /**                                                                                                                                                
      * Validates the selector.
@@ -610,9 +664,8 @@ public:
     // Architecture's specific data.
     ArchData archData;
 
-    // The contract type that must be respected by the application
-    // [default = CONTRACT_NONE].
-    ContractType contractType;
+    // Requirements specified by the user.
+    Requirements requirements;
 
     // The Q blocking knob [default = KNOB_Q_BLOCKING_NO].
     TriggerConfQBlocking triggerQBlocking;
@@ -706,55 +759,15 @@ public:
     // [default = 4].
     uint32_t steadyThreshold;
 
-    /// The minimum number of tasks in a worker sample. If 0, no minimum.
-    /// [default = 0].
+    // The minimum number of tasks in a worker sample. If 0, no minimum.
+    // [default = 0].
     uint minTasksPerSample;
 
-    // The underload threshold for the entire farm. It is valid only if
-    // contractType is CONTRACT_UTILIZATION [default = 80.0].
-    double underloadThresholdFarm;
-
-    // The overload threshold for the entire farm. It is valid only if
-    // contractType is CONTRACT_UTILIZATION [default = 90.0].
-    double overloadThresholdFarm;
-
-    // The underload threshold for a single worker. It is valid only if
-    // contractType is CONTRACT_UTILIZATION [default = 80.0].
-    double underloadThresholdWorker;
-
-    // The overload threshold for a single worker. It is valid only if
-    // contractType is CONTRACT_UTILIZATION [default = 90.0].
-    double overloadThresholdWorker;
-
-    // The bandwidth required for the application (expressed as tasks/sec).
-    // It is valid only if contractType is CONTRACT_BANDWIDTH
-    // [default = unused].
-    double requiredBandwidth;
-
-    // The required completion time for the application (in seconds). It is
-    // valid only if contractType is CONTRACT_COMPLETION_TIME
-    // [default = unused].
-    uint requiredCompletionTime;
-
-    // The maximum latency required for each input element processed by the
-    // application (in milliseconds).
-    // NOT AVAILABLE AT THE MOMENT.
-    double requiredLatency;
-
-    // The number of task expected for this computation. It is
-    // valid only if contractType is CONTRACT_COMPLETION_TIME
-    // [default = unused].
-    ulong expectedTasksNumber;
-
-    /// If true, this is an application when the workers works synchronously,
-    /// i.e. the emitter works as a barrier between two successive iterations
-    /// of the workers. In this case, the emitter always broadcasts tasks
-    /// to all the workers [default = false].
+    // If true, this is an application when the workers works synchronously,
+    // i.e. the emitter works as a barrier between two successive iterations
+    // of the workers. In this case, the emitter always broadcasts tasks
+    // to all the workers [default = false].
     bool synchronousWorkers;
-
-    // The maximum cores power to be used. It is
-    // valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
-    double powerBudget;
 
     // Maximum calibration time (milliseconds). 0 is no limit.
     // We will keep calibrating until the error is higher than the
@@ -898,6 +911,20 @@ public:
      */
     bool isKnobEnabled(KnobType k) const;
 };
+
+/**
+ * Checks if a requirement is a min/max one.
+ * @param r The requirement.
+ * @return true if the requirement is a min/max one.
+ */
+bool isMinMaxRequirement(double r);
+
+/**
+ * Checks if a requirement is a primary one.
+ * @param r The requirement.
+ * @return true if the requirement is a primary one.
+ */
+bool isPrimaryRequirement(double r);
 
 }
 

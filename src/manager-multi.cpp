@@ -241,13 +241,13 @@ static inline double getMaxPerformance(const std::map<KnobsValues, double>& prim
 void ManagerMulti::updateAllocations(Manager* const m){
     const std::map<KnobsValues, double>& primaryValues = ((SelectorPredictive*) m->_selector)->getPrimaryPredictions();
     const std::map<KnobsValues, double>& secondaryValues = ((SelectorPredictive*) m->_selector)->getSecondaryPredictions();
-    double primaryBound = m->_p.requiredBandwidth;
+    double primaryBound = m->_p.requirements.bandwidth;
     ManagerData& md = _managerData[m];
     double referencePerformance;
-    if(m->_p.contractType == CONTRACT_PERF_MAX){
+    if(isMinMaxRequirement(m->_p.requirements.bandwidth)){
         referencePerformance = getMaxPerformance(primaryValues);
     }else{
-        referencePerformance = m->_p.requiredBandwidth;
+        referencePerformance = m->_p.requirements.bandwidth;
     }
     md.minPerf = (md.minPerfReqPerc/100.0) * referencePerformance;
 
@@ -474,7 +474,7 @@ void ManagerMulti::checkManagerSupported(Manager* m){
     // It is meaningless to control power for individual applications if
     // other applications are running on the system and want to be
     // controlled as well.
-    assert(m->_p.contractType != CONTRACT_POWER_BUDGET);
+    assert(!isPrimaryRequirement(m->_p.requirements.powerConsumption));
 
     assert(m->_p.strategySelection == STRATEGY_SELECTION_LEARNING);
     assert(m->_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_AMDAHL ||
@@ -527,7 +527,7 @@ void ManagerMulti::run(){
         if(_qIn.pop((void**) &sm)){
             ManagerData md;
             Manager* m = sm->manager;
-            DEBUG("Manager (" << m << ") arrived with contract " << m->_p.contractType);
+            DEBUG("Manager (" << m << ") arrived.");
             md.minPerfReqPerc = sm->minPerf;
             md.allocatedCores = std::vector<VirtualCoreId>();
             md.allocations = std::vector<Allocation>();

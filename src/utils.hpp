@@ -34,7 +34,9 @@
 #define NORNIR_UTILS_HPP_
 
 #include "external/mammut/mammut/mammut.hpp"
+#include "external/knarr/src/knarr.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -42,6 +44,7 @@
 #include <vector>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <numeric>
 
 #define MSECS_IN_SECS 1000.0 // Milliseconds in 1 second
@@ -75,17 +78,17 @@ inline double stddev(const std::vector<double>& v){
     return stddev(v, average(v));
 }
 
-typedef struct MonitoredSample{
+typedef struct MonitoredSample: public knarr::ApplicationSample{
     mammut::energy::Joules watts; ///< Consumed watts.
-    double utilisation; ///< Utilisation [0, 100].
-    double bandwidth; ///< Bandwidth of the entire farm (real).
-    double latency; ///< Average latency of a worker (nanoseconds).
 
-    MonitoredSample():watts(0), utilisation(0), bandwidth(0), latency(0){;}
+    MonitoredSample():knarr::ApplicationSample(), watts(0){;}
+
+    MonitoredSample(MonitoredSample const& sample):
+        knarr::ApplicationSample(sample), watts(sample.watts){;}
 
     double getMaximumBandwidth(){
-        if(utilisation < MAX_RHO){
-            return bandwidth / (utilisation / 100.0);
+        if(loadPercentage < MAX_RHO){
+            return bandwidth / (loadPercentage / 100.0);
         }else{
             return bandwidth;
         }
@@ -94,10 +97,8 @@ typedef struct MonitoredSample{
     void swap(MonitoredSample& x){
         using std::swap;
 
+        knarr::ApplicationSample::swap(x);
         swap(watts, x.watts);
-        swap(utilisation, x.utilisation);
-        swap(bandwidth, x.bandwidth);
-        swap(latency, x.latency);
     }
 
     MonitoredSample& operator=(MonitoredSample rhs){
@@ -106,50 +107,38 @@ typedef struct MonitoredSample{
     }
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
+        knarr::ApplicationSample::operator+=(rhs);
         watts += rhs.watts;
-        utilisation += rhs.utilisation;
-        bandwidth += rhs.bandwidth;
-        latency += rhs.latency;
         return *this;
     }
 
     MonitoredSample& operator-=(const MonitoredSample& rhs){
+        knarr::ApplicationSample::operator-=(rhs);
         watts -= rhs.watts;
-        utilisation -= rhs.utilisation;
-        bandwidth -= rhs.bandwidth;
-        latency -= rhs.latency;
         return *this;
     }
 
     MonitoredSample& operator*=(const MonitoredSample& rhs){
+        knarr::ApplicationSample::operator*=(rhs);
         watts *= rhs.watts;
-        utilisation *= rhs.utilisation;
-        bandwidth *= rhs.bandwidth;
-        latency *= rhs.latency;
         return *this;
     }
 
     MonitoredSample& operator/=(const MonitoredSample& rhs){
+        knarr::ApplicationSample::operator/=(rhs);
         watts /= rhs.watts;
-        utilisation /= rhs.utilisation;
-        bandwidth /= rhs.bandwidth;
-        latency /= rhs.latency;
         return *this;
     }
 
     MonitoredSample operator/=(double x){
+        knarr::ApplicationSample::operator/=(x);
         watts /= x;
-        utilisation /= x;
-        bandwidth /= x;
-        latency /= x;
         return *this;
     }
 
     MonitoredSample operator*=(double x){
+        knarr::ApplicationSample::operator*=(x);
         watts *= x;
-        utilisation *= x;
-        bandwidth *= x;
-        latency *= x;
         return *this;
     }
 }MonitoredSample;
@@ -194,62 +183,86 @@ inline MonitoredSample operator/(const MonitoredSample& lhs, double x){
     return r;
 }
 
-inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
+inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& sample){
     os << "[";
-    os << "Watts: " << obj.watts << " ";
-    os << "BandwidthMax: " << obj.utilisation << " ";
-    os << "Bandwidth: " << obj.bandwidth << " ";
-    os << "Latency: " << obj.latency << " ";
+    os << "Watts: " << sample.watts << " ";
+    os << "Knarr Sample: " << static_cast<const knarr::ApplicationSample&>(sample) << " ";
     os << "]";
     return os;
 }
 
-inline std::ofstream& operator<<(std::ofstream& os, const MonitoredSample& obj){
-    os << obj.watts << "\t";
-    os << obj.utilisation << "\t";
-    os << obj.bandwidth << "\t";
-    os << obj.latency << "\t";
-    return os;
+inline std::istream& operator>>(std::istream& is, MonitoredSample& sample){
+    is.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+    is.ignore(std::numeric_limits<std::streamsize>::max(), ':');
+    is >> sample.watts;
+    is.ignore(std::numeric_limits<std::streamsize>::max(), ':');
+    knarr::operator >> (is, sample);
+    is.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+    return is;
 }
 
 inline MonitoredSample squareRoot(const MonitoredSample& x){
     MonitoredSample r;
-    r.watts = x.watts?sqrt(x.watts):0;
-    r.utilisation = x.utilisation?sqrt(x.utilisation):0;
-    r.bandwidth = x.bandwidth?sqrt(x.bandwidth):0;
-    r.latency = x.latency?sqrt(x.latency):0;
+    r.loadPercentage = sqrt(x.loadPercentage);
+    r.bandwidth = sqrt(x.bandwidth);
+    r.latency = sqrt(x.latency);
+    r.numTasks = sqrt(x.numTasks);
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        r.customFields[i] = sqrt(x.customFields[i]);
+    }
+    r.watts = sqrt(x.watts);
     return r;
 }
 
 inline void zero(MonitoredSample& x){
-    x.watts = 0;
-    x.utilisation = 0;
+    x.loadPercentage = 0;
     x.bandwidth = 0;
     x.latency = 0;
+    x.numTasks = 0;
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        x.customFields[i] = 0;
+    }
+    x.watts = 0;
 }
 
 inline void regularize(MonitoredSample& x){
-    if(x.watts < 0){x.watts = 0;}
-    if(x.utilisation < 0){x.utilisation = 0;}
+    if(x.loadPercentage < 0){x.loadPercentage = 0;}
     if(x.bandwidth < 0){x.bandwidth = 0;}
     if(x.latency < 0){x.latency = 0;}
+    if(x.numTasks < 0){x.numTasks = 0;}
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        if(x.customFields[i] < 0){
+            x.customFields[i] = 0;
+        }
+    }
+    if(x.watts < 0){x.watts = 0;}
 }
 
-inline MonitoredSample minimum(const MonitoredSample& a, const MonitoredSample& b){
+inline MonitoredSample minimum(const MonitoredSample& a,
+                               const MonitoredSample& b){
     MonitoredSample ms;
-    ms.watts = a.watts<b.watts?a.watts:b.watts;
-    ms.utilisation = a.utilisation<b.utilisation?a.utilisation:b.utilisation;
-    ms.bandwidth = a.bandwidth<b.bandwidth?a.bandwidth:b.bandwidth;
-    ms.latency = a.latency<b.latency?a.latency:b.latency;
+    ms.loadPercentage = std::min(a.loadPercentage, b.loadPercentage);
+    ms.bandwidth = std::min(a.bandwidth, b.bandwidth);
+    ms.latency = std::min(a.latency, b.latency);
+    ms.numTasks = std::min(a.numTasks, b.numTasks);
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        ms.customFields[i] = std::min(a.customFields[i], b.customFields[i]);
+    }
+    ms.watts = std::min(a.watts, b.watts);
     return ms;
 }
 
-inline MonitoredSample maximum(const MonitoredSample& a, const MonitoredSample& b){
+inline MonitoredSample maximum(const MonitoredSample& a,
+                               const MonitoredSample& b){
     MonitoredSample ms;
-    ms.watts = a.watts>b.watts?a.watts:b.watts;
-    ms.utilisation = a.utilisation>b.utilisation?a.utilisation:b.utilisation;
-    ms.bandwidth = a.bandwidth>b.bandwidth?a.bandwidth:b.bandwidth;
-    ms.latency = a.latency>b.latency?a.latency:b.latency;
+    ms.loadPercentage = std::max(a.loadPercentage, b.loadPercentage);
+    ms.bandwidth = std::max(a.bandwidth, b.bandwidth);
+    ms.latency = std::max(a.latency, b.latency);
+    ms.numTasks = std::max(a.numTasks, b.numTasks);
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        ms.customFields[i] = std::max(a.customFields[i], b.customFields[i]);
+    }
+    ms.watts = std::max(a.watts, b.watts);
     return ms;
 }
 
@@ -508,7 +521,8 @@ private:
     T _standardDeviation;
     T _coefficientVariation;
 public:
-    explicit MovingAverageExponential(double alpha):_alpha(alpha),_storedValues(0){
+    explicit MovingAverageExponential(double alpha):_alpha(alpha),
+                                                     _storedValues(0){
         if(_alpha < 0 || _alpha > 1.0){
             throw std::runtime_error("Alpha must be between 0 and 1 "
                                      "(included)");

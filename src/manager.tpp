@@ -86,22 +86,22 @@ void ManagerFarm<lb_t, gt_t>::waitForStart(){
 }
 
 template <typename lb_t, typename gt_t>
-knarr::ApplicationSample ManagerFarm<lb_t, gt_t>::getSample(){
+MonitoredSample ManagerFarm<lb_t, gt_t>::getSample(){
     for(size_t i = 0; i < _activeWorkers.size(); i++){
         _activeWorkers.at(i)->askForSample();
     }
-    knarr::ApplicationSample sample;
+    MonitoredSample sample;
     AdaptiveNode* w;
     uint numActiveWorkers = _activeWorkers.size();
 
     for(size_t i = 0; i < numActiveWorkers; i++){
-        knarr::ApplicationSample tmp;
+        MonitoredSample tmp;
         w = _activeWorkers.at(i);
         w->getSampleResponse(tmp, _samples->average().latency);
         sample.loadPercentage += tmp.loadPercentage;
-        sample.tasksCount += tmp.tasksCount;
+        sample.numTasks += tmp.numTasks;
         sample.latency += tmp.latency;
-        sample.bandwidthTotal += tmp.bandwidthTotal;
+        sample.bandwidth += tmp.bandwidth;
     }
     sample.loadPercentage /= numActiveWorkers;
     sample.latency /= numActiveWorkers;
@@ -109,7 +109,8 @@ knarr::ApplicationSample ManagerFarm<lb_t, gt_t>::getSample(){
 }
 
 template <typename lb_t, typename gt_t>
-ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters parameters):
+ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm,
+                                     Parameters parameters):
         Manager(parameters),
         _farm(farm),
         _emitter(dynamic_cast<AdaptiveNode*>(_farm->getEmitter())),
@@ -173,7 +174,7 @@ template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::postConfigurationManagement(){
     const KnobVirtualCoresFarm* knobWorkers = dynamic_cast<const KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
     std::vector<AdaptiveNode*> newWorkers = knobWorkers->getActiveWorkers();
-    knarr::ApplicationSample ws;
+    MonitoredSample sample;
 
     if(_activeWorkers.size() != newWorkers.size()){
         /**
@@ -184,8 +185,8 @@ void ManagerFarm<lb_t, gt_t>::postConfigurationManagement(){
          * terminated.
          */
         DEBUG("Getting spurious..");
-        ws = getSample();
-        updateTasksCount(ws);
+        sample = getSample();
+        updateTasksCount(sample);
         DEBUG("Spurious got.");
     }
 
@@ -250,7 +251,9 @@ typedef struct{
 }SimulationData;
 
 template <typename lb_t, typename gt_t>
-SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& configurationData, volatile bool* terminate, size_t maxIterations){                
+SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& configurationData, volatile bool* terminate, size_t maxIterations){
+    // Deprecated since we do not have anymore primary/secondary values.
+#if 0
     vector<string>& lines = configurationData;
     map<SimulationKey, SimulationData, SimulationKeyCompare> table;
     KnobsValues lastConfigurationValues = _configuration->getRealValues();
@@ -275,9 +278,9 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
     }
 
 
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        _remainingTasks = _p.expectedTasksNumber;
-        _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
+    if(_p.requirements.executionTime != NORNIR_REQUIREMENT_UNDEF){
+        _remainingTasks = _p.requirements.expectedTasksNumber;
+        _deadline = getMillisecondsTime()/1000.0 + _p.requirements.executionTime;
     }
 
     waitForStart();
@@ -312,7 +315,7 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
     MonitoredSample sample;
     sample.watts = data.wattsCores;
     sample.bandwidth = 1.0 / data.completionTime;
-    sample.utilisation = 100.0; //TODO Not yet implemented.
+    sample.loadPercentage = 100.0; //TODO Not yet implemented.
     sample.latency = 0; //TODO Not yet implemented.
     size_t steps = 1;
 
@@ -368,7 +371,7 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
         MonitoredSample sample;
         sample.watts = data.wattsCores;
         sample.bandwidth = 1.0 / data.completionTime;
-        sample.utilisation = 100.0; //TODO Not yet implemented.
+        sample.loadPercentage = 100.0; //TODO Not yet implemented.
         sample.latency = 0; //TODO Not yet implemented.
 
         if(_p.synchronousWorkers){
@@ -475,6 +478,8 @@ SimulationResult ManagerFarm<lb_t, gt_t>::simulate(std::vector<std::string>& con
         }break;
     }
     return res;
+#endif
+    return SimulationResult();
 }
 
 }

@@ -11,7 +11,7 @@ export LDLIBS                =  -lnornir -pthread -lrt -lm -lmlpack -llapack -lb
 export INCS                  = -I$(realpath ./src/external/fastflow) -I$(realpath ./src/external/tclap-1.2.1/include) -I/usr/include/libxml2
 export LDFLAGS               = -L$(realpath .)/src -L$(realpath .)/src/external/knarr/src
 
-.PHONY: all demo clean cleanall install uninstall microbench bin
+.PHONY: all demo clean cleanall install uninstall microbench bin test
 
 all:
 	python submodules_init.py
@@ -25,17 +25,30 @@ clean:
 	$(MAKE) -C examples clean
 	$(MAKE) -C microbench clean
 	$(MAKE) -C bin clean
+	$(MAKE) -C test clean
 demo:
 	$(MAKE) -C demo 
 	$(MAKE) -C examples
 bin:
 	$(MAKE) -C bin
+# Compiles and runs all the tests.
+test:
+# Go to mammut folder
+#	cd src/external/mammut && $(MAKE) test 
+# Come back here
+#	cd ../../../ 
+	cd test && ./installdep.sh 
+	cd ..
+	$(MAKE) -C test
+	cd test && ./runtests.sh
+	cd ..
 cleanall:
 	$(MAKE) -C src cleanall
 	$(MAKE) -C demo cleanall
 	$(MAKE) -C examples cleanall
 	$(MAKE) -C microbench cleanall
 	$(MAKE) -C bin cleanall
+	$(MAKE) -C test cleanall
 install:
 	$(MAKE) -C src install
 uninstall:

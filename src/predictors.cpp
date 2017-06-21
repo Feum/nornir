@@ -284,7 +284,7 @@ Predictor::~Predictor(){
 }
 
 double Predictor::getMaximumBandwidth() const{
-    if(_samples->average().utilisation >= MAX_RHO){
+    if(_samples->average().loadPercentage >= MAX_RHO){
         return _samples->average().bandwidth;
     }else{
         return _samples->average().getMaximumBandwidth();

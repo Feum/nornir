@@ -260,7 +260,6 @@ private:
     const KnobMapping& _knobMapping;
     mammut::cpufreq::CpuFreq* _frequencyHandler;
     mammut::topology::Topology* _topologyHandler;
-    mammut::cpufreq::CpuFreq* _cpufreqHandle;
 };
 
 

@@ -113,7 +113,7 @@ void AdaptiveNode::move(const vector<const VirtualCore*>& virtualCores){
     }
 }
 
-void AdaptiveNode::getSampleResponse(knarr::ApplicationSample& sample, double avgLatency){
+void AdaptiveNode::getSampleResponse(MonitoredSample &sample, double avgLatency){
     while(_responseQ.empty()){
         if(*_terminated){
             return;
@@ -210,7 +210,7 @@ void AdaptiveNode::prepareToRun(){
 void AdaptiveNode::reset(){
     tickstot = 0;
     taskcnt = 0;
-    _tasksCount = 0;
+    _numTasks = 0;
     _ticksWork = 0;
     _startTicks = getticks();
 }
@@ -222,18 +222,18 @@ void AdaptiveNode::storeSample(){
     ticks totalTicks = getticks() - _startTicks; // Including idle periods
 
     _ticksWork = tickstot;
-    _tasksCount = taskcnt;
+    _numTasks = taskcnt;
 
     _sampleResponse.loadPercentage = ((double) (_ticksWork) / (double) totalTicks)
                                      * 100.0;
-    _sampleResponse.tasksCount = _tasksCount;
-    if(_tasksCount){
-        _sampleResponse.latency = ((double)_ticksWork / (double)_tasksCount) /
+    _sampleResponse.numTasks = _numTasks;
+    if(_numTasks){
+        _sampleResponse.latency = ((double)_ticksWork / (double)_numTasks) /
                                   _ticksPerNs;
     }else{
         _sampleResponse.latency = 0.0;
     }
-    _sampleResponse.bandwidthTotal = (double) _tasksCount / ticksToSeconds(totalTicks, _ticksPerNs);
+    _sampleResponse.bandwidth = (double) _numTasks / ticksToSeconds(totalTicks, _ticksPerNs);
 
     reset();
 
@@ -336,7 +336,7 @@ AdaptiveNode::AdaptiveNode():
         _tasksManager(NULL),
         _thread(NULL),
         _ticksWork(0),
-        _tasksCount(0),
+        _numTasks(0),
         // Some messages are without an answer (e.g. SWITCH_BLOCKING or
         // RESET_SAMPLE). For this reason, we could enqueue more request before
         // the node reads any of them. For example, we could enqueue a

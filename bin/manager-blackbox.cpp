@@ -77,7 +77,7 @@ std::ostream& operator <<(std::ostream& os, const ScheduledProgram& instance){
 }
 
 void initializeParameters(Parameters& p){
-    p.contractType = CONTRACT_PERF_MAX;
+    p.requirements.bandwidth = NORNIR_REQUIREMENT_MAX;
     p.samplingIntervalCalibration = 100;
     p.samplingIntervalSteady = 1000;
     p.strategySelection = STRATEGY_SELECTION_LEARNING;
