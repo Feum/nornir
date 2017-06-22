@@ -54,7 +54,6 @@ namespace nornir{
 
 class Parameters;
 class ManagerMulti;
-class Simulator;
 
 //TODO REMOVE USING
 using namespace std;
@@ -97,7 +96,6 @@ typedef enum{
  */
 class Manager: public Thread{
     friend class ManagerMulti;
-    friend class Simulator;
 public:
     explicit Manager(Parameters nornirParameters);
 
@@ -112,6 +110,16 @@ public:
      * Forces the manager to terminate.
      **/
     void terminate();
+
+
+    /**
+     * Sets the parameters to be used when simulating nornir. It must be
+     * called soon after the object creation.
+     * @param samplesFileName The name of the file containing the application
+     * samples.
+     * ATTENTION: Only used for testing purposes.
+     */
+    void setSimulationParameters(std::string samplesFileName);
 protected:
     // Flag for checking farm termination.
     volatile bool _terminated;
@@ -179,7 +187,7 @@ protected:
      * Returns a monitored sample.
      * @return A monitored sample sample.
      */
-    virtual MonitoredSample getSample();
+    virtual MonitoredSample getSample() = 0;
 
     /**
      * Returns the execution time of the application (milliseconds).
@@ -195,7 +203,7 @@ protected:
     /**
      * Manages a configuration change.
      */
-    virtual void postConfigurationManagement() = 0;
+    virtual void postConfigurationManagement();
 
     /**
      * Cleaning after termination.
@@ -306,17 +314,6 @@ private:
     std::vector<PhysicalCoreId> getUsedCores();
 
     void allowCores(std::vector<mammut::topology::VirtualCoreId> ids);
-
-    /**
-     * Sets the parameters to be used when simulating nornir. It must be
-     * called soon after the object creation.
-     * @param samplesFileName The name of the file containing the application
-     * samples.
-     * @param mammutSimulationParameters The parameters to be used when
-     * simulating mammut.
-     */
-    void setSimulationParameters(std::string samplesFileName,
-                                 mammut::SimulationParameters mammutSimulationParameters);
 };
 
 class ManagerInstrumented: public Manager{
@@ -445,19 +442,6 @@ private:
     ulong getExecutionTime();
     void shrinkPause();
     void stretchPause();
-};
-
-class Simulator: public mammut::utils::Thread{
-private:
-    Manager* _m;
-public:
-    Simulator(Manager* m);
-
-    /**
-     * Function executed by this thread.
-     * ATTENTION: The user must not call this one but 'start()'.
-     */
-    void run();
 };
 
 }
