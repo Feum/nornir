@@ -128,7 +128,7 @@ public:
     KnobVirtualCoresFarm(Parameters p,
                   AdaptiveNode* emitter, AdaptiveNode* collector,
                   ff::ff_gatherer* gt,
-                  const std::vector<AdaptiveNode*>& workers,
+                  const std::vector<AdaptiveNode*> workers,
                   const volatile bool* terminated);
 
     void changeValue(double v);

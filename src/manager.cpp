@@ -93,11 +93,11 @@ Manager::Manager(Parameters nornirParameters):
         _pid(0),
         _toSimulate(false)
 {
-    ;
+    DEBUGB(samplesFile.open("samples.csv"));
 }
 
 Manager::~Manager(){
-    ;
+    DEBUGB(samplesFile.close());
 }
 
 void Manager::run(){
@@ -287,8 +287,7 @@ void Manager::allowCores(std::vector<mammut::topology::VirtualCoreId> ids){
     ((KnobMapping*) _configuration->getKnob(KNOB_MAPPING))->setAllowedCores(allowedVc);
 }
 
-void Manager::setSimulationParameters(std::string samplesFileName,
-                                      mammut::SimulationParameters mammutSimulationParameters){
+void Manager::setSimulationParameters(std::string samplesFileName){
     _toSimulate = true;
     std::ifstream file(samplesFileName);
     MonitoredSample sample;
@@ -296,8 +295,6 @@ void Manager::setSimulationParameters(std::string samplesFileName,
     while(file >> sample){
         _simulationSamples.push_back(sample);
     }
-
-    _p.mammut.setSimulationParameters(mammutSimulationParameters);
 }
 
 void Manager::postConfigurationManagement(){;}
@@ -457,7 +454,7 @@ void Manager::observe(){
     _samples->add(sample);
     _variations->add(_samples->coefficientVariation().bandwidth);
 
-    DEBUGB(samplesFile << *_samples << "\n");
+    DEBUGB(samplesFile << sample << "\n");
 }
 
 KnobsValues Manager::decide(){

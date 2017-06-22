@@ -124,7 +124,6 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm,
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
-    DEBUGB(samplesFile.open("samples.csv"));
 }
 
 template <typename lb_t, typename gt_t>
@@ -137,7 +136,6 @@ ManagerFarm<lb_t, gt_t>::~ManagerFarm(){
     if(Manager::_configuration){
         delete Manager::_configuration;
     }
-    DEBUGB(samplesFile.close());
 }
 
 template <typename lb_t, typename gt_t>
