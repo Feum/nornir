@@ -151,6 +151,7 @@ KnobVirtualCores::KnobVirtualCores(Parameters p):_p(p){
         numVirtualCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
     }
     changeMax(numVirtualCores);
+    _realValue = numVirtualCores;
 }
 
 void KnobVirtualCores::changeValue(double v){;}
@@ -313,6 +314,7 @@ KnobHyperThreading::KnobHyperThreading(Parameters p){
     for(size_t i = 0; i < maxHtLevel; i++){
         _knobValues.push_back(i + 1);
     }
+    _realValue = 1;
 }
 
 void KnobHyperThreading::changeValue(double v){;}
@@ -333,7 +335,7 @@ KnobMapping::KnobMapping(const Parameters& p,
 template<> char const* enumStrings<MappingType>::data[] = {
     "LINEAR",
     "INTERLEAVED",
-    "CACHE_OPTIMAL"
+    "NUM"
 };
 
 void KnobMapping::changeValue(double v){
@@ -433,34 +435,6 @@ vector<VirtualCore*> KnobMapping::computeVcOrderInterleaved(){
     * Generates a vector of virtual cores to be used for interleaved
     * mapping.
     */
-#if 0
-    vector<VirtualCore*> vcOrder;
-    size_t virtualPerPhysical = _knobHyperThreading.getRealValue();
-
-    vector<Cpu*> cpus = _topologyHandler->getCpus();
-    size_t nextPhysicalId = 0;
-    size_t nextVirtualId = 0;
-    while(true){
-        for(size_t i = 0; i < cpus.size(); i++){
-            vector<PhysicalCore*> phyCores = cpus.at(i)->getPhysicalCores();
-            PhysicalCore* p = phyCores.at(nextPhysicalId);
-            vector<VirtualCore*> virtCores = p->getVirtualCores();
-            VirtualCore* v = virtCores.at(nextVirtualId);
-            if((!_p.isolateManager || v->getVirtualCoreId() != MANAGER_VIRTUAL_CORE) &&
-                isAllowed(v)){
-                vcOrder.push_back(v);
-                if(vcOrder.size() == getNumVirtualCores()){return vcOrder;}
-            }
-        }
-        if(nextPhysicalId + 1 < cpus.at(0)->getPhysicalCores().size()){
-            nextPhysicalId += 1;
-        }else{
-            nextPhysicalId = 0;
-            nextVirtualId += 1;
-            if(nextVirtualId >= virtualPerPhysical){return vcOrder;}
-        }
-    }
-#endif
     vector<VirtualCore*> vcOrder;
     size_t virtualPerPhysical = _knobHyperThreading.getRealValue();
     vector<Cpu*> cpus = _topologyHandler->getCpus();

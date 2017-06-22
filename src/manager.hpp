@@ -316,6 +316,9 @@ private:
     void allowCores(std::vector<mammut::topology::VirtualCoreId> ids);
 };
 
+/**
+ * Manager for instrumented applications.
+ **/
 class ManagerInstrumented: public Manager{
 private:
     knarr::Monitor _monitor;
@@ -352,6 +355,10 @@ protected:
     ulong getExecutionTime();
 };
 
+/**
+ * Manager for non-instrumented applications,
+ * monitored thorugh hardware counters.
+ **/
 class ManagerBlackBox: public Manager{
 private:
     mammut::task::ProcessHandler* _process;
@@ -384,7 +391,30 @@ protected:
     ulong getExecutionTime();
 };
 
-
+/**
+ * Dummy manager for testing purposes.
+ **/
+class ManagerTest: public Manager{
+private:
+    void shrinkPause(){;}
+    void stretchPause(){;}
+public:
+    explicit ManagerTest(Parameters nornirParameters):Manager(nornirParameters){
+        //TODO: Avoid this initialization phase which is common to all the managers.
+        Manager::_configuration = new ConfigurationExternal(_p);
+        lockKnobs();
+        _configuration->createAllRealCombinations();
+        _selector = createSelector();
+        // For instrumented application we do not care if synchronous of not
+        // (we count iterations).
+        _p.synchronousWorkers = false;
+    }
+    ~ManagerTest(){;}
+protected:
+    void waitForStart(){;}
+    MonitoredSample getSample(){return MonitoredSample();}
+    ulong getExecutionTime(){return 0;}
+};
 
 /*!
  * \class ManagerFarm

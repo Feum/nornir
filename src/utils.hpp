@@ -339,7 +339,7 @@ public:
     void add(const T& value){
         _min = minimum(_min, value);
         _max = maximum(_max, value);
-        add(value);
+        addImpl(value);
     }
 
     /**

@@ -2,6 +2,7 @@
 <nornirParameters>
 <strategyPredictionPerformance>USL</strategyPredictionPerformance>
 <strategySelection>LEARNING</strategySelection>
+<knobMappingEnabled>false</knobMappingEnabled>
 <requirements>
 	<bandwidth>MAX</bandwidth>
 	<powerConsumption>30</powerConsumption>

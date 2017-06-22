@@ -1,6 +1,7 @@
 /**
  *  Different tests on parameters.
  **/
+#include "parametersLoader.hpp"
 #include <algorithm>
 #include <limits.h>
 #include <stdlib.h>
@@ -9,18 +10,6 @@
 #include "gtest/gtest.h"
 
 using namespace nornir;
-
-Parameters getParametersRepara(){
-    //p.strategyUnusedVirtualCores // For knobFrequency
-    //p.isolateManager //For knobMapping
-    //p.knobHyperthreadingEnabled // For knobCores
-    //p.disallowedNumCores // For knobCores
-    Parameters p;
-    mammut::SimulationParameters simulationParameters;
-    simulationParameters.sysfsRootPrefix = "../src/external/mammut/test/archs/repara";
-    p.mammut.setSimulationParameters(simulationParameters);
-    return p;
-}
 
 TEST(ParametersTest, SimpleTest) {
     Parameters p = getParametersRepara();

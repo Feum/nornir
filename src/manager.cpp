@@ -342,19 +342,17 @@ bool Manager::persist() const{
 }
 
 void Manager::lockKnobs() const{
-    if(!_toSimulate){
-        if(!_p.knobCoresEnabled){
-            _configuration->getKnob(KNOB_VIRTUAL_CORES)->lockToMax();
-        }
-        if(!_p.knobMappingEnabled){
-            _configuration->getKnob(KNOB_MAPPING)->lock(MAPPING_TYPE_LINEAR);
-        }
-        if(!_p.knobFrequencyEnabled){
-            _configuration->getKnob(KNOB_FREQUENCY)->lockToMax();
-        }
-        if(!_p.knobHyperthreadingEnabled){
-            _configuration->getKnob(KNOB_HYPERTHREADING)->lockToMin();
-        }
+    if(!_p.knobCoresEnabled){
+        _configuration->getKnob(KNOB_VIRTUAL_CORES)->lockToMax();
+    }
+    if(!_p.knobMappingEnabled){
+        _configuration->getKnob(KNOB_MAPPING)->lock(MAPPING_TYPE_LINEAR);
+    }
+    if(!_p.knobFrequencyEnabled){
+        _configuration->getKnob(KNOB_FREQUENCY)->lockToMax();
+    }
+    if(!_p.knobHyperthreadingEnabled){
+        _configuration->getKnob(KNOB_HYPERTHREADING)->lockToMin();
     }
 }
 

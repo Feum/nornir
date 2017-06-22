@@ -1,6 +1,7 @@
 /**
  *  Different tests on knobs.
  **/
+#include "parametersLoader.hpp"
 #include <algorithm>
 #include <limits.h>
 #include <stdlib.h>
@@ -9,18 +10,6 @@
 #include "gtest/gtest.h"
 
 using namespace nornir;
-
-Parameters getParametersRepara(){
-    //p.strategyUnusedVirtualCores // For knobFrequency
-    //p.isolateManager //For knobMapping
-    //p.knobHyperthreadingEnabled // For knobCores
-    //p.disallowedNumCores // For knobCores
-    Parameters p;
-    mammut::SimulationParameters simulationParameters;
-    simulationParameters.sysfsRootPrefix = "../src/external/mammut/test/archs/repara";
-    p.mammut.setSimulationParameters(simulationParameters);
-    return p;
-}
 
 TEST(KnobsTest, KnobsVirtualCores) {
     Parameters p = getParametersRepara();
@@ -140,7 +129,6 @@ TEST(KnobsTest, KnobsMapping){
     Parameters p = getParametersRepara();
     p.knobHyperthreadingEnabled = true;
     KnobVirtualCores knobCores(p);
-    //TODO: Valori di default per _realValue: o tutt o nessuno
     knobCores.setToMax();
     KnobHyperThreading knobHT(p);
     knobHT.setToMax();
@@ -229,27 +217,27 @@ TEST(KnobsTest, KnobsFrequency) {
 
     // Check values.
     std::vector<double> values = knob.getAllowedValues();
-    EXPECT_EQ(values.size(), 13);
+    EXPECT_EQ(values.size(), (size_t) 13);
     for(size_t i = 0; i < values.size(); i++){
         EXPECT_EQ(values[i], 1200000 + (i*100000));
     }
 
     // Check max/min
     knob.setRelativeValue(100);
-    EXPECT_EQ(knob.getRealValue(), 2400000);
+    EXPECT_EQ(knob.getRealValue(), (Frequency) 2400000);
     knob.setRelativeValue(0);
-    EXPECT_EQ(knob.getRealValue(), 1200000);
+    EXPECT_EQ(knob.getRealValue(), (Frequency) 1200000);
 
     // Lock
     knob.lockToMax();
     EXPECT_TRUE(knob.isLocked());
-    EXPECT_EQ(knob.getRealValue(), 2400000);
+    EXPECT_EQ(knob.getRealValue(), (Frequency) 2400000);
     // After lock we lost the values. So to
     // try lockToMin we need to build a new knob.
     KnobFrequency knob2(p, knobMapping);
     knob2.lockToMin();
     EXPECT_TRUE(knob2.isLocked());
-    EXPECT_EQ(knob2.getRealValue(), 1200000);
+    EXPECT_EQ(knob2.getRealValue(), (Frequency) 1200000);
 }
 
 // Global test with strategy for unused virtual cores = NONE

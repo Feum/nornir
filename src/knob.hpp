@@ -177,6 +177,7 @@ public:
     void changeValue(double v);
 };
 
+// ATTENTION: Update enumString in knob.cpp
 typedef enum{
     MAPPING_TYPE_LINEAR = 0,
     MAPPING_TYPE_INTERLEAVED, // One per CPU, round robin
