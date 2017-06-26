@@ -513,6 +513,7 @@ void Manager::logObservation(){
     if(_p.observer){
         const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration->getKnob(KNOB_MAPPING));
         MonitoredSample ms = _samples->average();
+        // TODO: observer -> logger
         _p.observer->observe(_lastStoredSampleMs,
                              _configuration->getRealValue(KNOB_VIRTUAL_CORES),
                              _configuration->getRealValue(KNOB_FREQUENCY),

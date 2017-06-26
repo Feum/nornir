@@ -38,6 +38,7 @@
 namespace nornir{
 
 Configuration::Configuration(const Parameters& p):
+    _numServiceNodes(0),
     _p(p), _combinationsCreated(false),
     _knobsChangeNeeded(false){
     memset(_knobs, 0, sizeof(_knobs));
@@ -259,7 +260,7 @@ ConfigurationFarm::ConfigurationFarm(const Parameters& p,
                                      AdaptiveNode* collector,
                                      ff::ff_gatherer* gt,
                                      volatile bool* terminated):
-        Configuration(p), _numServiceNodes(0){
+        Configuration(p){
     _knobs[KNOB_VIRTUAL_CORES] = new KnobVirtualCoresFarm(p,
                                           emitter, collector, gt, workers,
                                           terminated);

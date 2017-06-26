@@ -39,10 +39,14 @@
 
 namespace nornir{
 
+class ManagerTest;
+
 class Configuration: public mammut::utils::NonCopyable {
+    friend class ManagerTest;
 protected:
     Knob* _knobs[KNOB_NUM];
     Trigger* _triggers[TRIGGER_TYPE_NUM];
+    uint _numServiceNodes;
 private:
     const Parameters& _p;
     bool _combinationsCreated;
@@ -149,21 +153,15 @@ public:
         return _reconfigurationStats;
     }
 
-    virtual uint getNumServiceNodes() const = 0;
+    inline uint getNumServiceNodes() const{return _numServiceNodes;}
 };
 
 class ConfigurationExternal: public Configuration{
 public:
     explicit ConfigurationExternal(const Parameters& p);
-
-    inline uint getNumServiceNodes() const{
-        return 0;
-    }
 };
 
 class ConfigurationFarm: public Configuration{
-private:
-    uint _numServiceNodes;
 public:
     ConfigurationFarm(const Parameters& p,
                       Smoother<MonitoredSample> const* samples,
@@ -172,10 +170,6 @@ public:
                       AdaptiveNode* collector,
                       ff::ff_gatherer* gt,
                       volatile bool* terminated);
-
-    inline uint getNumServiceNodes() const{
-        return _numServiceNodes;
-    }
 };
 
 std::vector<AdaptiveNode*> convertWorkers(ff::svector<ff::ff_node*> w);

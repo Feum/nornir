@@ -66,17 +66,6 @@ using namespace mammut::utils;
 
 struct MonitoredSample;
 
-typedef struct{
-    size_t numSteps;
-    double bandwidthAccuracy;
-    double powerAccuracy;
-    double currentBandwidth;
-    double currentPower;
-    KnobsValues foundConfiguration;
-    std::vector<double> performanceErrors;
-    std::vector<double> powerErrors;
-}SimulationResult;
-
 // How to react to the calibration of other applications
 // in order to do not interfere too much with them.
 typedef enum{
@@ -399,9 +388,11 @@ private:
     void shrinkPause(){;}
     void stretchPause(){;}
 public:
-    explicit ManagerTest(Parameters nornirParameters):Manager(nornirParameters){
+    explicit ManagerTest(Parameters nornirParameters,
+                         uint numServiceNodes = 0):Manager(nornirParameters){
         //TODO: Avoid this initialization phase which is common to all the managers.
         Manager::_configuration = new ConfigurationExternal(_p);
+        _configuration->_numServiceNodes = numServiceNodes;
         lockKnobs();
         _configuration->createAllRealCombinations();
         _selector = createSelector();
@@ -437,19 +428,6 @@ public:
      * Destroyes this adaptivity manager.
      */
     ~ManagerFarm();
-
-
-    /**
-     * Simulates the execution.
-     * ATTENTION: This is only meant to be used by developers.
-     * @param configurationData The lines contained in configurationData file.
-     * @param maxIterations The maximum number of iterations to be performed
-     *        during calibration phase. If 0, there is no bound on the maximum
-     *        number of iterations.
-     */
-    SimulationResult simulate(std::vector<std::string>& configurationData,
-                              volatile bool* terminate,
-                              size_t maxIterations = 0);
 private:
     // The managed farm.
     ff_farm<lb_t, gt_t>* _farm;
