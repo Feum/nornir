@@ -133,8 +133,6 @@ void executeWithFaskel(){
         for(uint i=2; i<numStages; i++)
             pipe = new nornir::dataflow::Pipeline(pipe,stages[i]);
         Parameters p("parameters.xml");
-        Observer o;
-        p.observer = &o;
         p.dataflow.orderedProcessing = true;
         nornir::dataflow::Interpreter m(&p, pipe, input, &output);
         if(strcmp(streamFile, "")){

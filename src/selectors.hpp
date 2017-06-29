@@ -234,7 +234,21 @@ private:
     std::map<KnobsValues, double> _powerPredictions;
 
     /**
-     * Checks if a performance/power value is better than the best found
+     * Checks if the specified value to maximize/minimize
+     * is better than the best found
+     * up to now. If so, the new best value is stored.
+     * @param bandwidth The bandwidth value.
+     * @param latency The latency value.
+     * @param power The power consumption value.
+     * @param best The best found up to now.
+     * @return true if it was a better value (best is modified).
+     */
+    bool isBestMinMax(double bandwidth, double latency,
+                      double power, double& best);
+
+    /**
+     * Checks if the specified value to control
+     * is better than the best found
      * up to now. If so, the new best value is stored.
      * @param bandwidth The bandwidth value.
      * @param latency The latency value.

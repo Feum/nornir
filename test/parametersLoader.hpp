@@ -12,13 +12,14 @@ inline std::vector<std::string> getTestingArchitectures(){
     return {"repara"};
 }
 
-inline nornir::Parameters getParametersRepara(std::string fileName = ""){
+inline nornir::Parameters getParameters(const std::string& archName,
+                                        const std::string& fileName = ""){
     //p.strategyUnusedVirtualCores // For knobFrequency
     //p.isolateManager //For knobMapping
     //p.knobHyperthreadingEnabled // For knobCores
     //p.disallowedNumCores // For knobCores
     char resolved_path[PATH_MAX]; 
-    if(realpath("./repara/config/", resolved_path) == NULL){
+    if(realpath(("./" + archName + "/config/").c_str(), resolved_path) == NULL){
         throw std::runtime_error("realpath not working.");
     }
     // We set this env variable to load the nornir config for this architecture
@@ -30,7 +31,7 @@ inline nornir::Parameters getParametersRepara(std::string fileName = ""){
         p = new nornir::Parameters(fileName);
     }
     mammut::SimulationParameters simulationParameters;
-    simulationParameters.sysfsRootPrefix = "../src/external/mammut/test/archs/repara";
+    simulationParameters.sysfsRootPrefix = "../src/external/mammut/test/archs/" + archName;
     p->mammut.setSimulationParameters(simulationParameters);
     return *p;
 }

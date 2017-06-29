@@ -621,8 +621,6 @@ int main(int argc, char** argv){
 
     /* Create interpreter. */
     nornir::Parameters par("parameters.xml");
-    nornir::Observer obs;
-    par.observer = &obs;
 #ifdef FIXED_STREAM
     par.expectedTasksNumber = atoi(argv[1])*graph.getNumMdfi();
     std::cout << "Expected tasks number: " << par.expectedTasksNumber << std::endl;

@@ -13,7 +13,8 @@ ifeq ("$(wildcard ./queues/hzdptr.o)","")
 endif
 # Build knarr
 	$(MAKE) -C knarr
-
+# Build graphite client
+	$(MAKE) -C graphite-c-client all
 clean:
 	$(MAKE) -C leo clean
 cleanall:

@@ -93,10 +93,28 @@ Manager::Manager(Parameters nornirParameters):
         _pid(0),
         _toSimulate(false)
 {
+    for(LoggerType lt : _p.loggersTypes){
+        switch(lt){
+        case LOGGER_FILE:{
+            _p.loggers.push_back(new LoggerFile());
+        }break;
+        case LOGGER_GRAPHITE:{
+            // TODO passare comeparametro url e porta
+            _p.loggers.push_back(new LoggerGraphite("178.62.14.35", 443));
+        }break;
+        default:{
+            throw std::runtime_error("Unknown logger type.");
+        }
+        }
+    }
     DEBUGB(samplesFile.open("samples.csv"));
 }
 
 Manager::~Manager(){
+    for(auto logger : _p.loggers){
+        delete logger;
+    }
+    _p.loggers.clear();
     DEBUGB(samplesFile.close());
 }
 
@@ -122,9 +140,6 @@ void Manager::run(){
     getAndResetJoules();
     //TODO RESET BANDWIDTHIN
     _lastStoredSampleMs = getMillisecondsTime();
-    if(_p.observer){
-        _p.observer->_startMonitoringMs = _lastStoredSampleMs;
-    }
 
     /* Force the first calibration point. **/
     KnobsValues kv = decide();
@@ -183,16 +198,8 @@ void Manager::run(){
     terminationManagement();
     ulong duration = getExecutionTime();
 
-    if(_p.observer){
-        vector<CalibrationStats> cs;
-        if(_selector){
-            _selector->updateTotalTasks(_totalTasks);
-            _selector->stopCalibration();
-            cs = _selector->getCalibrationsStats();
-            _p.observer->calibrationStats(cs, duration, _totalTasks);
-        }
-        ReconfigurationStats rs = _configuration->getReconfigurationStats();
-        _p.observer->summaryStats(cs, rs, duration, _totalTasks);
+    for(auto logger : _p.loggers){
+        logger->logSummary(*_configuration, _selector, duration, _totalTasks);
     }
 }
 
@@ -414,18 +421,20 @@ void Manager::observe(){
     MonitoredSample sample;
     if(_toSimulate){
         if(_simulationSamples.empty()){
-            _terminated = true;
             return;
         }else{
             sample = _simulationSamples.front();
             _simulationSamples.pop_front();
+            if(_simulationSamples.empty()){
+                _terminated = true;
+            }
         }
     }else{
         sample = getSample();
         double now = getMillisecondsTime();
         joules = getAndResetJoules();
-        if(_p.observer){
-            _p.observer->addJoules(joules);
+        for(auto logger : _p.loggers){
+            logger->addJoules(joules);
         }
 
         double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
@@ -490,8 +499,8 @@ void Manager::act(KnobsValues kv, bool force){
             updateTasksCount(sample);
             _lastStoredSampleMs = getMillisecondsTime();
             Joules joules = getAndResetJoules();
-            if(_p.observer){
-                _p.observer->addJoules(joules);
+            for(auto logger : _p.loggers){
+                logger->addJoules(joules);
             }
         }
         _configuration->trigger();
@@ -510,21 +519,8 @@ Joules Manager::getAndResetJoules(){
 }
 
 void Manager::logObservation(){
-    if(_p.observer){
-        const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration->getKnob(KNOB_MAPPING));
-        MonitoredSample ms = _samples->average();
-        // TODO: observer -> logger
-        _p.observer->observe(_lastStoredSampleMs,
-                             _configuration->getRealValue(KNOB_VIRTUAL_CORES),
-                             _configuration->getRealValue(KNOB_FREQUENCY),
-                             kMapping->getActiveVirtualCores(),
-                             _samples->getLastSample().bandwidth,
-                             ms.bandwidth,
-                             _samples->coefficientVariation().bandwidth,
-                             ms.latency,
-                             ms.loadPercentage,
-                             _samples->getLastSample().watts,
-                             ms.watts);
+    for(auto logger : _p.loggers){
+        logger->log(*_configuration, *_samples);
     }
 }
 

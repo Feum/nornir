@@ -168,6 +168,20 @@ void XmlTree::getArrayUint(const char* valueName, std::vector<uint>& value){
     }
 }
 
+template<typename T>
+void XmlTree::getArrayEnums(const char* valueName, std::vector<T>& values){
+    rapidxml::xml_node<> *node = getNode(valueName);
+    values.clear();
+    if(node){
+        vector<string> strValues = mammut::utils::split(node->value(), ':');
+        for(size_t i = 0; i < strValues.size(); i++){
+            T value;
+            stringstream line(strValues.at(i));
+            line >> enumFromStringInternal(value);
+            values.push_back(value);
+        }
+    }
+}
 
 template<typename T>
 void XmlTree::getEnum(const char* valueName, T& value){
@@ -253,8 +267,6 @@ void Parameters::setDefault(){
     dataflow.orderedOutput = false;
     dataflow.maxGraphs = 1000;
     dataflow.maxInterpreters = 0;
-
-    observer = NULL;
 
     /** Retrieving global configuration files. **/
     char* confHome_c = getenv("XDG_CONFIG_DIRS");
@@ -478,7 +490,7 @@ ParametersValidation Parameters::validateRequirements(){
        requirements.expectedTasksNumber == NORNIR_REQUIREMENT_UNDEF){
         return VALIDATION_WRONG_REQUIREMENT;
     }
-    if(requirements.powerConsumption != NORNIR_REQUIREMENT_UNDEF){
+    if(isPrimaryRequirement(requirements.powerConsumption)){
         if(strategySelection == STRATEGY_SELECTION_ANALYTICAL ||
            strategySelection == STRATEGY_SELECTION_LIMARTINEZ){
             return VALIDATION_WRONG_REQUIREMENT;
@@ -644,6 +656,11 @@ ParametersValidation Parameters::validateSelector(){
     return VALIDATION_OK;
 }
 
+template<> char const* enumStrings<LoggerType>::data[] = {
+    "FILE",
+    "GRAPHITE"
+};
+
 template<> char const* enumStrings<TriggerConfQBlocking>::data[] = {
     "NO",
     "YES",
@@ -762,6 +779,8 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, isolateManager);
     SETVALUE(xt, Bool, statsReconfiguration);
     SETVALUE(xt, String, roiFile);
+    SETVALUE(xt, ArrayEnums, loggersTypes);
+    //xt.getArrayEnums<LoggerType>("loggersTypes", loggersTypes);
 
     SETVALUE(xt, String, mishra.applicationName);
     SETVALUE(xt, String, mishra.namesData);

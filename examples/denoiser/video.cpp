@@ -172,9 +172,7 @@ int main(int argc, char *argv[]) {
     Drain  drain(outvideo);
     ofarm.setCollectorF((ff_node*) &drain);
     
-    nornir::Observer obs;
     nornir::Parameters ap("parameters.xml");
-    ap.observer = &obs;
     if(numframes){
         ap.expectedTasksNumber = numframes*numfiles;
     }

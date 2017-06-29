@@ -4,5 +4,6 @@ ADDLIB external/knarr/src/libknarr.a
 ADDMOD external/leo/leo.o
 ADDMOD external/queues/hzdptr.o
 ADDMOD external/queues/xxhash.o
+ADDMOD external/graphite-c-client/graphite-client.o
 SAVE
 END

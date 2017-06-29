@@ -121,8 +121,6 @@ int main(int argc, char** argv){
         MandelOutputStream out;
         nornir::dataflow::Farm* f = createStandardFarm<ArrayWrapper<float>, float, iterateTask>();
         nornir::Parameters p("parameters.xml");
-        nornir::Observer o;
-        p.observer = &o;
         Interpreter m(&p, f, &inp, &out);
         m.start();
         m.wait();

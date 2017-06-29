@@ -2534,11 +2534,8 @@ int main(int argc, char* argv[])
 					
 					if (FW) FW->set_input_data(OutFilename);
 					
-                                        nornir::Observer obs;
 				    nornir::Parameters ap("parameters.xml");
-				    ap.observer = &obs;
-                                    ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
-                                    std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
+                    ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
 				    nornir::ManagerFarm<> amf(&farm, ap);
                     amf.start();
                     amf.join();
@@ -2594,9 +2591,9 @@ int main(int argc, char* argv[])
 				
 				if (FW) FW->set_input_data(OutFilename);
 
-				nornir::Observer obs;
+				nornir::Logger obs;
 				nornir::Parameters ap("parameters.xml");
-				ap.observer = &obs;
+				ap.logger = &obs;
                                 ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
                                 std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
 

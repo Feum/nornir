@@ -211,10 +211,10 @@ int main(int argc, char * argv[]){
             initializeParameters(p);
         }
         std::string logPrefix = logDir + "/" + pidToString(pids.at(i));
-        p.observer = new Observer(logPrefix + "_stats.csv",
+        p.loggers.push_back(new LoggerFile(logPrefix + "_stats.csv",
                                   logPrefix + "_calibration.csv",
                                   logPrefix + "_summary.csv",
-                                  mammut::utils::getMillisecondsTime() - startTime);
+                                  mammut::utils::getMillisecondsTime() - startTime));
         ManagerBlackBox* m = new ManagerBlackBox(pids.at(i), p);
         if(multiManagerNeeded){
             mm.addManager(m, pidPerfs.at(i));
@@ -225,7 +225,8 @@ int main(int argc, char * argv[]){
             DEBUG("Started PID: " << pids.at(i));
             m->join();
             delete m;
-            delete p.observer;
+            delete p.loggers.back();
+            p.loggers.pop_back();
         }
     }
 
@@ -272,10 +273,10 @@ int main(int argc, char * argv[]){
             stringstream out;
             out << sp.start;
             std::string logPrefix = logDir + "/" + out.str() + "_" + mammut::utils::split(sp.program.at(0), '/').back();
-            p.observer = new Observer(logPrefix + "_stats.csv",
+            p.loggers.push_back(new Logger(logPrefix + "_stats.csv",
                                       logPrefix + "_calibration.csv",
                                       logPrefix + "_summary.csv",
-                                      mammut::utils::getMillisecondsTime() - startTime);
+                                      mammut::utils::getMillisecondsTime() - startTime));
             while(!*started){;}
 
             ManagerBlackBox* m = new (mmem) ManagerBlackBox(pid, p);
@@ -291,7 +292,8 @@ int main(int argc, char * argv[]){
                 waitpid(pid, NULL, 0);
                 m->join();
                 m->~ManagerBlackBox(); // Because created with placement new
-                delete p.observer;
+                delete p.loggers.back();
+                p.loggers.pop_back();
             }
         }else{
             /* Child - Application */

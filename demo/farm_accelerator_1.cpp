@@ -77,8 +77,6 @@ int main(int argc, char * argv[]) {
     maxTasks = streamlen;
 
     nornir::Parameters p("parameters.xml");
-    nornir::Observer o;
-    p.observer = &o;
     nornir::FarmAccelerator<int> farm(&p);
     for(size_t i = 0; i < (size_t) nworkers; i++){
         farm.addWorker(new Worker);

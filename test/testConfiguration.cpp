@@ -12,7 +12,7 @@
 using namespace nornir;
 
 TEST(ConfigurationTest, SimpleTest) {
-    Parameters p = getParametersRepara();
+    Parameters p = getParameters("repara");
     p.strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_OFF;
     p.knobHyperthreadingEnabled = true;
     ConfigurationExternal configuration(p);

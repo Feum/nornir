@@ -75,7 +75,12 @@ namespace nornir{
 
 #define NORNIR_MANAGER_VIRTUAL_CORE (VirtualCoreId) 0
 
-class Observer;
+class Logger;
+
+typedef enum{
+    LOGGER_FILE = 0, // Log on file
+    LOGGER_GRAPHITE // Log on graphite
+}LoggerType;
 
 // Possible knobs
 typedef enum{
@@ -408,6 +413,16 @@ public:
 
     /**
      * If an element named 'valueName' is present, its value is
+     * copied into 'value' and interpreted as an array of enums
+     * (separated by ':').
+     * @param valueName The name of the XML element.
+     * @param value The value that will contain the element
+     *              valueName (if present).
+     */
+    template<typename T> void getArrayEnums(const char* valueName, std::vector<T>& value);
+
+    /**
+     * If an element named 'valueName' is present, its value is
      * copied into 'value' and interpreted as an enumeration.
      * @param T The type of the enumeration.
      * @param valueName The name of the XML element.
@@ -441,8 +456,6 @@ typedef struct ArchData{
 
     void loadXml(const std::string& archFileName);
 }ArchData;
-
-
 
 /*!
  * \class Requirements
@@ -557,7 +570,16 @@ typedef struct{
  * This class contains parameters for adaptivity choices.
  */
 class Parameters{
-private:
+    friend class Manager;
+private:    
+    // The type of loggers to be activated.
+    // It MUST be private because only the manager
+    // needs to access it. The loggers created by
+    // the manager will be deleted by the manager.
+    // If the user needs a new logger it must add it directly
+    // to the loggers vector, not to the loggersType.
+    std::vector<LoggerType> loggersTypes;
+
     bool _knobEnabled[KNOB_NUM];
 
     /**
@@ -864,9 +886,9 @@ public:
     // [default = ""].
     std::string roiFile;
 
-    // The observer object. It will be called every samplingInterval
-    // milliseconds to monitor the adaptivity behaviour [default = NULL].
-    Observer* observer;
+    // The loggers objects. They will be called every samplingInterval
+    // milliseconds to monitor the application [default = NULL].
+    std::vector<Logger*> loggers;
 
     /**
      * Creates the adaptivity parameters.

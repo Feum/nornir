@@ -97,8 +97,6 @@ int main(int argc, char * argv[]) {
     maxTasks = streamlen;
 
     nornir::Parameters p("parameters.xml");
-    nornir::Observer o;
-    p.observer = &o;
     nornir::FarmAccelerator<double, int, int, double> farm(&p);
     farm.addScheduler(new Scheduler);
     for(size_t i = 0; i < (size_t) nworkers; i++){

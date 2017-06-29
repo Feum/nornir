@@ -59,7 +59,6 @@ public:
     nn::socket channel;
     int chid;
     ManagerInstrumented *manager;
-    Observer* observer;
 
     ApplicationInstance():channel(AF_SP, NN_PAIR), chid(0), manager(NULL), observer(NULL){;}
 };
@@ -104,8 +103,6 @@ int main(int argc, char * argv[]){
         ParametersValidation pv = p.validate();
         DEBUG("Sending validation result.");
         assert(ai->channel.send(&pv, sizeof(pv), 0) == sizeof(pv));
-        ai->observer = new Observer();
-        p.observer = ai->observer;
         ai->manager = new ManagerInstrumented(ai->channel, ai->chid, p);
         ai->manager->start();
         instances.push_back(ai);
@@ -122,7 +119,6 @@ int main(int argc, char * argv[]){
                     (*it)->channel.shutdown((*it)->chid);
                     ApplicationInstance* ai = (*it);
                     instances.erase(it);
-                    delete ((*it)->observer);
                     delete ai;
                 }
             }

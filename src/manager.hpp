@@ -389,10 +389,11 @@ private:
     void stretchPause(){;}
 public:
     explicit ManagerTest(Parameters nornirParameters,
-                         uint numServiceNodes = 0):Manager(nornirParameters){
+                         uint numWorkers, uint numServiceNodes):Manager(nornirParameters){
         //TODO: Avoid this initialization phase which is common to all the managers.
         Manager::_configuration = new ConfigurationExternal(_p);
         _configuration->_numServiceNodes = numServiceNodes;
+        ((KnobVirtualCores*) _configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(numWorkers);
         lockKnobs();
         _configuration->createAllRealCombinations();
         _selector = createSelector();

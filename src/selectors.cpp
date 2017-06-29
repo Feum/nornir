@@ -91,9 +91,9 @@ bool Selector::isFeasibleBandwidth(double value, bool conservative) const{
         if(conservative && _p.conservativeValue){
             conservativeOffset = _p.requirements.bandwidth * (_p.conservativeValue / 100.0);
         }
-       if(value < _p.requirements.bandwidth + conservativeOffset){
+        if(value < _p.requirements.bandwidth + conservativeOffset){
             return false;
-       }
+        }
     }
 
     if(isPrimaryRequirement(_p.requirements.minUtilization)){
@@ -338,7 +338,7 @@ const std::map<KnobsValues, double>& SelectorPredictive::getSecondaryPredictions
 #endif
 }
 
-bool SelectorPredictive::isBest(double bandwidth, double latency,
+bool SelectorPredictive::isBestMinMax(double bandwidth, double latency,
                                 double power, double& best){
     // Bandwidth maximization
     if(_p.requirements.bandwidth == NORNIR_REQUIREMENT_MAX){
@@ -367,6 +367,37 @@ bool SelectorPredictive::isBest(double bandwidth, double latency,
 
     return false;
 }
+
+bool SelectorPredictive::isBest(double bandwidth, double latency,
+                                double power, double& best){
+    // Bandwidth requirement
+    if(isPrimaryRequirement(_p.requirements.bandwidth)){
+        if(bandwidth > best){
+            best = bandwidth;
+            return true;
+        }
+    }
+
+    // Latency requirement
+    if(isPrimaryRequirement(_p.requirements.latency)){
+        throw std::runtime_error("Latency control not yet supported.");
+        if(latency < best){
+            best = latency;
+            return true;
+        }
+    }
+
+    // Power requirement
+    if(isPrimaryRequirement(_p.requirements.powerConsumption)){
+        if(power < best){
+            best = power;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 
 void SelectorPredictive::updateMaxPerformanceConfiguration(KnobsValues values,
                                                            double performance){
@@ -410,20 +441,20 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
            isFeasibleLatency(0, true) &&
            isFeasiblePower(powerPrediction, true)){
             _feasible = true;
-            if(isBest(bandwidthPrediction, 0, powerPrediction, bestValue)){
+            if(isBestMinMax(bandwidthPrediction, 0, powerPrediction, bestValue)){
 #ifdef DEBUG_SELECTORS
                 bestBandwidthPrediction = bandwidthPrediction;
                 bestPowerPrediction = powerPrediction;
 #endif
                 bestKnobs = currentValues;
-            }else if(isBest(bandwidthPrediction, 0, powerPrediction,
-                            bestSuboptimalValue)){
-#ifdef DEBUG_SELECTORS
-                bestSuboptimalBandwidthPrediction = bandwidthPrediction;
-                bestSuboptimalPowerPrediction = powerPrediction;
-#endif
-                bestSuboptimalKnobs = currentValues;
             }
+        }else if(isBest(bandwidthPrediction, 0, powerPrediction,
+                        bestSuboptimalValue)){
+#ifdef DEBUG_SELECTORS
+            bestSuboptimalBandwidthPrediction = bandwidthPrediction;
+            bestSuboptimalPowerPrediction = powerPrediction;
+#endif
+            bestSuboptimalKnobs = currentValues;
         }
     }
 

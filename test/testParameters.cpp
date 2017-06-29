@@ -12,7 +12,7 @@
 using namespace nornir;
 
 TEST(ParametersTest, SimpleTest) {
-    Parameters p = getParametersRepara();
+    Parameters p = getParameters("repara");
     // Set a min just to let things work.
     p.requirements.powerConsumption = NORNIR_REQUIREMENT_MIN;
 
