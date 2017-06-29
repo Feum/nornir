@@ -443,6 +443,8 @@ private:
     std::vector<AdaptiveNode*> _activeWorkers;
 
     void waitForStart();
+    void askForSample();
+    MonitoredSample getSampleResponse();
     MonitoredSample getSample();
     void initNodesPreRun();
     void initNodesPostRun();

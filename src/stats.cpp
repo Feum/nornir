@@ -212,7 +212,7 @@ LoggerGraphite::~LoggerGraphite(){
 
 void LoggerGraphite::log(const Configuration& configuration,
                        const Smoother<MonitoredSample>& samples){
-    unsigned int timestamp = getAbsoluteTimestamp();
+    unsigned int timestamp = time(NULL);
 
 
     /*************************************************/

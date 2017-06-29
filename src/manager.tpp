@@ -86,17 +86,19 @@ void ManagerFarm<lb_t, gt_t>::waitForStart(){
 }
 
 template <typename lb_t, typename gt_t>
-MonitoredSample ManagerFarm<lb_t, gt_t>::getSample(){
+void ManagerFarm<lb_t, gt_t>::askForSample(){
     for(size_t i = 0; i < _activeWorkers.size(); i++){
         _activeWorkers.at(i)->askForSample();
     }
-    MonitoredSample sample;
-    AdaptiveNode* w;
-    uint numActiveWorkers = _activeWorkers.size();
+}
 
+template <typename lb_t, typename gt_t>
+MonitoredSample ManagerFarm<lb_t, gt_t>::getSampleResponse(){
+    MonitoredSample sample;    
+    uint numActiveWorkers = _activeWorkers.size();
     for(size_t i = 0; i < numActiveWorkers; i++){
         MonitoredSample tmp;
-        w = _activeWorkers.at(i);
+        AdaptiveNode* w = _activeWorkers.at(i);
         w->getSampleResponse(tmp, _samples->average().latency);
         sample.loadPercentage += tmp.loadPercentage;
         sample.numTasks += tmp.numTasks;
@@ -106,6 +108,12 @@ MonitoredSample ManagerFarm<lb_t, gt_t>::getSample(){
     sample.loadPercentage /= numActiveWorkers;
     sample.latency /= numActiveWorkers;
     return sample;
+}
+
+template <typename lb_t, typename gt_t>
+MonitoredSample ManagerFarm<lb_t, gt_t>::getSample(){
+    askForSample();
+    return getSampleResponse();
 }
 
 template <typename lb_t, typename gt_t>
@@ -183,7 +191,7 @@ void ManagerFarm<lb_t, gt_t>::postConfigurationManagement(){
          * terminated.
          */
         DEBUG("Getting spurious..");
-        sample = getSample();
+        sample = getSampleResponse();
         updateTasksCount(sample);
         DEBUG("Spurious got.");
     }

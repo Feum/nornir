@@ -100,7 +100,7 @@ Manager::Manager(Parameters nornirParameters):
         }break;
         case LOGGER_GRAPHITE:{
             // TODO passare comeparametro url e porta
-            _p.loggers.push_back(new LoggerGraphite("178.62.14.35", 443));
+            _p.loggers.push_back(new LoggerGraphite("178.62.14.35", 2003));
         }break;
         default:{
             throw std::runtime_error("Unknown logger type.");
