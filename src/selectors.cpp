@@ -95,10 +95,17 @@ bool Selector::isFeasibleBandwidth(double value, bool conservative) const{
             return false;
         }
     }
+    return true;
+}
+
+bool Selector::isFeasibleLatency(double value, bool conservative) const{
+    return true;
+}
+
+bool Selector::isFeasibleUtilization(double value, bool conservative) const{
+    double conservativeOffset = 0;
 
     if(isPrimaryRequirement(_p.requirements.minUtilization)){
-        // Convert bandwidth to utilization.
-        value = _bandwidthIn->average() / value * 100.0;
         if(conservative && _p.conservativeValue){
             conservativeOffset = (_p.requirements.maxUtilization - _p.requirements.minUtilization) *
                                  (_p.conservativeValue / 100.0) / 2.0;
@@ -111,9 +118,6 @@ bool Selector::isFeasibleBandwidth(double value, bool conservative) const{
     return true;
 }
 
-bool Selector::isFeasibleLatency(double value, bool conservative) const{
-    return true;
-}
 
 bool Selector::isFeasiblePower(double value, bool conservative) const{
     double conservativeOffset = 0;
@@ -132,6 +136,7 @@ bool Selector::isContractViolated() const{
     MonitoredSample avg = _samples->average();
     return !isFeasibleBandwidth(avg.bandwidth, false) ||
            !isFeasibleLatency(avg.latency, false)     ||
+           !isFeasibleUtilization(avg.loadPercentage, false) ||
            !isFeasiblePower(avg.watts, false);
 }
 
@@ -309,7 +314,11 @@ double SelectorPredictive::getBandwidthPrediction(const KnobsValues& values){
         _bandwidthPredictor->prepareForPredictions();
         maxBandwidth = _bandwidthPredictor->predict(values);
     }
-    return getRealBandwidth(maxBandwidth);
+    if(isPrimaryRequirement(_p.requirements.minUtilization)){
+        return maxBandwidth;
+    }else{
+        return getRealBandwidth(maxBandwidth);
+    }
 }
 
 double SelectorPredictive::getPowerPrediction(const KnobsValues& values){
@@ -338,7 +347,7 @@ const std::map<KnobsValues, double>& SelectorPredictive::getSecondaryPredictions
 #endif
 }
 
-bool SelectorPredictive::isBestMinMax(double bandwidth, double latency,
+bool SelectorPredictive::isBestMinMax(double bandwidth, double latency, double utilization,
                                 double power, double& best){
     // Bandwidth maximization
     if(_p.requirements.bandwidth == NORNIR_REQUIREMENT_MAX){
@@ -357,6 +366,14 @@ bool SelectorPredictive::isBestMinMax(double bandwidth, double latency,
         }
     }
 
+    // Utilization maximization
+    if(_p.requirements.maxUtilization == NORNIR_REQUIREMENT_MAX){
+        if(utilization > best){
+            best = utilization;
+            return true;
+        }
+    }
+
     // Power minimization
     if(_p.requirements.powerConsumption == NORNIR_REQUIREMENT_MIN){
         if(power < best){
@@ -368,8 +385,8 @@ bool SelectorPredictive::isBestMinMax(double bandwidth, double latency,
     return false;
 }
 
-bool SelectorPredictive::isBest(double bandwidth, double latency,
-                                double power, double& best){
+bool SelectorPredictive::isBestSuboptimal(double bandwidth, double latency, double utilization,
+                                          double power, double& best){
     // Bandwidth requirement
     if(isPrimaryRequirement(_p.requirements.bandwidth)){
         if(bandwidth > best){
@@ -383,6 +400,21 @@ bool SelectorPredictive::isBest(double bandwidth, double latency,
         throw std::runtime_error("Latency control not yet supported.");
         if(latency < best){
             best = latency;
+            return true;
+        }
+    }
+
+    // Utilization requirement
+    if(isPrimaryRequirement(_p.requirements.maxUtilization)){
+        // The best is the closest to minUtilization
+        double distanceNew = _p.requirements.minUtilization - utilization;
+        double distanceBest = _p.requirements.minUtilization - best;
+        if(distanceNew > 0 && distanceBest < 0){
+            best = utilization;
+            return true;
+        }else if(!(distanceNew < 0 && distanceBest > 0) &&
+                 abs(distanceNew) < abs(distanceBest)){
+            best = utilization;
             return true;
         }
     }
@@ -428,28 +460,35 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
     for(const KnobsValues& currentValues : combinations){
         double bandwidthPrediction = getBandwidthPrediction(currentValues);
         double powerPrediction = getPowerPrediction(currentValues);
-        assert(bandwidthPrediction > 0);
+        double utilizationPrediction = _bandwidthIn->average() /
+                                       bandwidthPrediction * 100.0;
+        assert(bandwidthPrediction >= 0);
         assert(powerPrediction > 0);
+        assert(utilizationPrediction >= 0);
 
         updateMaxPerformanceConfiguration(currentValues, bandwidthPrediction);
 #if STORE_PREDICTIONS
         _performancePredictions[currentValues] = bandwidthPrediction;
         _powerPredictions[currentValues] = powerPrediction;
 #endif
+
         //std::cout << currentValues << " " << performancePrediction << " " << powerPrediction << std::endl;
         if(isFeasibleBandwidth(bandwidthPrediction, true) &&
            isFeasibleLatency(0, true) &&
+           isFeasibleUtilization(utilizationPrediction, true) &&
            isFeasiblePower(powerPrediction, true)){
             _feasible = true;
-            if(isBestMinMax(bandwidthPrediction, 0, powerPrediction, bestValue)){
+            if(isBestMinMax(bandwidthPrediction, 0, utilizationPrediction,
+                            powerPrediction, bestValue)){
 #ifdef DEBUG_SELECTORS
                 bestBandwidthPrediction = bandwidthPrediction;
                 bestPowerPrediction = powerPrediction;
 #endif
                 bestKnobs = currentValues;
             }
-        }else if(isBest(bandwidthPrediction, 0, powerPrediction,
-                        bestSuboptimalValue)){
+        }else if(isBestSuboptimal(bandwidthPrediction, 0, utilizationPrediction,
+                                  powerPrediction, bestSuboptimalValue)){
+
 #ifdef DEBUG_SELECTORS
             bestSuboptimalBandwidthPrediction = bandwidthPrediction;
             bestSuboptimalPowerPrediction = powerPrediction;
@@ -579,8 +618,9 @@ KnobsValues SelectorAnalytical::getNextKnobsValues(){
 }
 
 void SelectorAnalytical::updateBandwidthIn(){
-    // For this selector we do not consider input bandwidth for contract different from the utilization one.
-    if(_p.requirements.minUtilization != NORNIR_REQUIREMENT_UNDEF){
+    // For this selector we do not consider input bandwidth for contracts
+    // different from the utilization one.
+    if(isPrimaryRequirement(_p.requirements.minUtilization)){
         Selector::updateBandwidthIn();
     }else{
         ;

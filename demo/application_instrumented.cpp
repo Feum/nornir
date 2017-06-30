@@ -49,7 +49,7 @@ int main(int argc, char** argv){
     while(i++ < 10){
         instr.begin();
         sleep(2);
-        ea.end();
+        instr.end();
     }
     instr.terminate();
     return 0;

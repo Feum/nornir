@@ -49,7 +49,7 @@
 
 #define MSECS_IN_SECS 1000.0 // Milliseconds in 1 second
 #define NSECS_IN_SECS 1000000000.0 // Nanoseconds in 1 second
-#define MAX_RHO 95
+#define MAX_RHO 96
 
 namespace nornir{
 

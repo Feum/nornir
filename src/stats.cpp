@@ -219,11 +219,11 @@ void LoggerGraphite::log(const Configuration& configuration,
     /*               Resources info                  */
     /*************************************************/
     for(auto vc : dynamic_cast<const KnobMapping*>(configuration.getKnob(KNOB_MAPPING))->getActiveVirtualCores()){
-        graphite_send_plain((std::string("nornir.resources.cores") + utils::intToString(vc->getVirtualCoreId())).c_str(), 1, timestamp);
+        graphite_send_plain((std::string("nornir.resources.cores.") + utils::intToString(vc->getVirtualCoreId())).c_str(), 1, timestamp);
     }
     // Set all other cores to zero.
     for(auto vc : dynamic_cast<const KnobMapping*>(configuration.getKnob(KNOB_MAPPING))->getUnusedVirtualCores()){
-        graphite_send_plain((std::string("nornir.resources.cores") + utils::intToString(vc->getVirtualCoreId())).c_str(), 0, timestamp);
+        graphite_send_plain((std::string("nornir.resources.cores.") + utils::intToString(vc->getVirtualCoreId())).c_str(), 0, timestamp);
     }
     graphite_send_plain("nornir.resources.cores.num", configuration.getRealValue(KNOB_VIRTUAL_CORES), timestamp);
     graphite_send_plain("nornir.resources.frequency", configuration.getRealValue(KNOB_FREQUENCY), timestamp);

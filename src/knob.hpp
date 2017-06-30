@@ -118,6 +118,12 @@ private:
 public:
     explicit KnobVirtualCores(Parameters p);
     void changeValue(double v);
+    /**
+     * Changes the maximum allowed value for this knob.
+     * If it is lower than the current value, the current value is changed as
+     * well.
+     * @param v The new maximum allowed value.
+     */
     void changeMax(double v);
 };
 

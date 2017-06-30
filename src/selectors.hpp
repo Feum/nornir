@@ -63,14 +63,14 @@ protected:
     u_int64_t _totalTasks;
 
     /**
-     * Checks the bandwidth respects the required contract.
+     * Checks if the bandwidth respects the required contract.
      * @param value The value to be checked.
      * @param conservative If true applies the conservativeValue.
      */
     bool isFeasibleBandwidth(double value, bool conservative) const;
 
     /**
-     * Checks the latency respects the required contract.
+     * Checks if the latency respects the required contract.
      * @param value The value to be checked.
      * @param conservative If true applies the conservativeValue.
      */
@@ -82,6 +82,13 @@ protected:
      * @param conservative If true applies the conservativeValue.
      */
     bool isFeasiblePower(double value, bool conservative) const;
+
+    /**
+     * Checks if the utilization respects the required contract.
+     * @param value The value to be checked.
+     * @param conservative If true applies the conservativeValue.
+     */
+    bool isFeasibleUtilization(double value, bool conservative) const;
 
     /**
      * Initializes the best value.
@@ -239,25 +246,27 @@ private:
      * up to now. If so, the new best value is stored.
      * @param bandwidth The bandwidth value.
      * @param latency The latency value.
+     * @param utilization The utilization value.
      * @param power The power consumption value.
      * @param best The best found up to now.
      * @return true if it was a better value (best is modified).
      */
-    bool isBestMinMax(double bandwidth, double latency,
+    bool isBestMinMax(double bandwidth, double latency, double utilization,
                       double power, double& best);
 
     /**
      * Checks if the specified value to control
-     * is better than the best found
+     * is better than the best suboptimal value found
      * up to now. If so, the new best value is stored.
      * @param bandwidth The bandwidth value.
      * @param latency The latency value.
+     * @param utilization The utilization value.
      * @param power The power consumption value.
      * @param best The best found up to now.
      * @return true if it was a better value (best is modified).
      */
-    bool isBest(double bandwidth, double latency,
-                double power, double& best);
+    bool isBestSuboptimal(double bandwidth, double latency, double utilization,
+                          double power, double& best);
 protected:
     double _bandwidthPrediction;
     double _powerPrediction;

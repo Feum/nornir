@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <nornirParameters>
-<strategyPredictionPerformance>USL</strategyPredictionPerformance>
-<strategySelection>LEARNING</strategySelection>
+<strategySelection>ANALYTICAL</strategySelection>
 <knobCoresEnabled>true</knobCoresEnabled>
 <knobFrequencyEnabled>true</knobFrequencyEnabled>
 <knobMappingEnabled>false</knobMappingEnabled>
 <knobHyperthreadingEnabled>false</knobHyperthreadingEnabled>
 <loggersTypes>FILE</loggersTypes>
+<disallowedNumCores>3:6:7:8:9:11:12:13:14:15:16:17:18:19:21:22</disallowedNumCores>
+<dataflow>
+	<maxInterpreters>20</maxInterpreters>
+	<maxGraphs>1000</maxGraphs>
+</dataflow>
 <requirements>
-	<bandwidth>25</bandwidth>
+	<minUtilization>80</minUtilization>
+	<maxUtilization>90</maxUtilization>
 	<powerConsumption>MIN</powerConsumption>
 </requirements>
 </nornirParameters>

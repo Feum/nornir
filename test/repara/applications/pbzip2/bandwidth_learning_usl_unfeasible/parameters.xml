@@ -11,4 +11,4 @@
 	<bandwidth>999999</bandwidth>
 	<powerConsumption>MIN</powerConsumption>
 </requirements>
-</adaptivityParameters>
+</nornirParameters>

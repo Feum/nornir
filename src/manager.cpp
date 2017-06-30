@@ -119,8 +119,8 @@ Manager::~Manager(){
 }
 
 void Manager::run(){
+    _p.mammut.getInstanceCpuFreq()->removeTurboFrequencies();
     if(!_toSimulate){
-        _p.mammut.getInstanceCpuFreq()->removeTurboFrequencies();
         _counter = _p.mammut.getInstanceEnergy()->getCounter();
         _task = _p.mammut.getInstanceTask();
         _topology = _p.mammut.getInstanceTopology();

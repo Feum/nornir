@@ -419,7 +419,8 @@ public:
      * @param value The value that will contain the element
      *              valueName (if present).
      */
-    template<typename T> void getArrayEnums(const char* valueName, std::vector<T>& value);
+    template<typename T> void getArrayEnums(const char* valueName,
+                                            std::vector<T>& value);
 
     /**
      * If an element named 'valueName' is present, its value is

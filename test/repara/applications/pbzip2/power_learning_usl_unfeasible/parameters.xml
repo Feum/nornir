@@ -4,11 +4,11 @@
 <strategySelection>LEARNING</strategySelection>
 <knobCoresEnabled>true</knobCoresEnabled>
 <knobFrequencyEnabled>true</knobFrequencyEnabled>
-<knobMappingEnabled>true</knobMappingEnabled>
+<knobMappingEnabled>false</knobMappingEnabled>
 <knobHyperthreadingEnabled>false</knobHyperthreadingEnabled>
 <loggersTypes>FILE</loggersTypes>
 <requirements>
 	<bandwidth>MAX</bandwidth>
-	<powerConsumption>60</powerConsumption>
+	<powerConsumption>1</powerConsumption>
 </requirements>
 </nornirParameters>

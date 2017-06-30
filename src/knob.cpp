@@ -163,6 +163,9 @@ void KnobVirtualCores::changeMax(double v){
             _knobValues.push_back(i + 1);
         }
     }
+    if(_realValue > v){
+        _realValue = v;
+    }
 }
 
 #ifdef DEBUG_KNOB
