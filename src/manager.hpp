@@ -393,7 +393,7 @@ public:
         //TODO: Avoid this initialization phase which is common to all the managers.
         Manager::_configuration = new ConfigurationExternal(_p);
         _configuration->_numServiceNodes = numServiceNodes;
-        ((KnobVirtualCores*) _configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(numWorkers);
+        dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(numWorkers);
         lockKnobs();
         _configuration->createAllRealCombinations();
         _selector = createSelector();

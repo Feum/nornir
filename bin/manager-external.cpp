@@ -75,7 +75,8 @@ int main(int argc, char * argv[]){
     mm.start();
     while(true){
         pid_t pid;
-        assert(mainChannel.recv(&pid, sizeof(pid), 0) == sizeof(pid));
+        size_t r = mainChannel.recv(&pid, sizeof(pid), 0);
+        assert(r == sizeof(pid));
 
         DEBUG("Received a request from process " << pid);
         ApplicationInstance* ai = new ApplicationInstance;
@@ -83,14 +84,17 @@ int main(int argc, char * argv[]){
         DEBUG("Created app channel.");
 
         DEBUG("Sending ack.");
-        char ack;
-        assert(mainChannel.send(&ack, sizeof(ack), 0) == sizeof(ack));
+        char ack = 0;
+        r = mainChannel.send(&ack, sizeof(ack), 0);
+        assert(r == sizeof(ack));
 
         size_t length = 0;
-        assert(ai->channel.recv(&length, sizeof(length), 0) == sizeof(length));
+        r = ai->channel.recv(&length, sizeof(length), 0);
+        assert(r == sizeof(length));
         char* parameters = new char[length];
         DEBUG("Receiving parameters.");
-        assert(ai->channel.recv(parameters, length*sizeof(char), 0) == (int) (sizeof(char)*length));
+        r = ai->channel.recv(parameters, length*sizeof(char), 0);
+        assert(r == (int) (sizeof(char)*length));
         std::string parametersString(parameters);
         std::ofstream out("parameters.xml");
         out << parametersString;
@@ -102,7 +106,8 @@ int main(int argc, char * argv[]){
         Parameters p("parameters.xml");
         ParametersValidation pv = p.validate();
         DEBUG("Sending validation result.");
-        assert(ai->channel.send(&pv, sizeof(pv), 0) == sizeof(pv));
+        r = ai->channel.send(&pv, sizeof(pv), 0);
+        assert(r == sizeof(pv));
         ai->manager = new ManagerInstrumented(ai->channel, ai->chid, p);
         ai->manager->start();
         instances.push_back(ai);

@@ -239,8 +239,8 @@ static inline double getMaxPerformance(const std::map<KnobsValues, double>& prim
 }
 
 void ManagerMulti::updateAllocations(Manager* const m){
-    const std::map<KnobsValues, double>& primaryValues = ((SelectorPredictive*) m->_selector)->getPrimaryPredictions();
-    const std::map<KnobsValues, double>& secondaryValues = ((SelectorPredictive*) m->_selector)->getSecondaryPredictions();
+    const std::map<KnobsValues, double>& primaryValues = dynamic_cast<SelectorPredictive*>(m->_selector)->getPrimaryPredictions();
+    const std::map<KnobsValues, double>& secondaryValues = dynamic_cast<SelectorPredictive*>(m->_selector)->getSecondaryPredictions();
     double primaryBound = m->_p.requirements.bandwidth;
     ManagerData& md = _managerData[m];
     double referencePerformance;
@@ -249,7 +249,7 @@ void ManagerMulti::updateAllocations(Manager* const m){
     }else{
         referencePerformance = m->_p.requirements.bandwidth;
     }
-    md.minPerf = (md.minPerfReqPerc/100.0) * referencePerformance;
+    md.minPerf = (md.minPerfReqPerc / 100.0) * referencePerformance;
 
     std::multimap<double, KnobsValues> unfeasible, sortedSecondary;
     for(auto it : primaryValues){
@@ -399,11 +399,9 @@ bool validAllocationComp(const std::pair<double const, const AllocationIndexes*>
 void ManagerMulti::getValidAllocations(ValidAllocations& validAllocations) const{
     validAllocations.clear();
     validAllocations.reserve(_allocationsCombinations.size());
-    const AllocationIndexes* indexes = NULL;
-    double quality = -1;
     for(size_t i = 0; i < _allocationsCombinations.size(); i++){
-        indexes = &(_allocationsCombinations.at(i));
-        quality = -1;
+        const AllocationIndexes* indexes = &(_allocationsCombinations.at(i));
+        double quality = -1;
         if(isValidAllocation(*indexes)){
             quality = getQuality(*indexes);
         }
@@ -453,7 +451,7 @@ void ManagerMulti::applyNewAllocation(){
         Manager* const m = getManager(it);
         const KnobsValues real = m->_configuration->getRealValues(getKnobs(it, alloc.at(pos)));
         if(!m->running()){++pos; continue;}
-        DEBUG("Allocation: " << m << " " << real << " " << ((SelectorPredictive*)m->_selector)->getPrimaryPrediction(real) << " " << ((SelectorPredictive*)m->_selector)->getSecondaryPrediction(real));
+        DEBUG("Allocation: " << m << " " << real << " " << dynamic_cast<SelectorPredictive*>(m->_selector)->getPrimaryPrediction(real) << " " << dynamic_cast<SelectorPredictive*>(m->_selector)->getSecondaryPrediction(real));
         size_t numCores = real[KNOB_VIRTUAL_CORES] + m->_configuration->getNumServiceNodes();
         vector<VirtualCoreId> cores;
         cores.reserve(numCores);
@@ -463,7 +461,7 @@ void ManagerMulti::applyNewAllocation(){
         allowCores(m, cores);
         //man->_selector->forceConfiguration(real);
         m->act(real, true);
-        ((SelectorPredictive*) m->_selector)->updatePredictions(real);
+        dynamic_cast<SelectorPredictive*>(m->_selector)->updatePredictions(real);
         ++pos;
         nextCoreId += numCores;
     }
@@ -492,12 +490,12 @@ bool ManagerMulti::isValidAllocation(const AllocationIndexes& indexes) const{
     if(indexes.empty()){
         throw std::runtime_error("FATAL ERROR: No indexes.");
     }
-    size_t pos = 0, totalCores = 0, allocationPosition = 0;
+    size_t pos = 0, totalCores = 0;
     Frequency previousFreq = 0;
     bool validAllocation = true;
     for(const auto& it : _managerData){
         Manager* const currentManager = getManager(it);
-        allocationPosition = indexes.at(pos);
+        size_t allocationPosition = indexes.at(pos);
         const KnobsValues real = currentManager->_configuration->getRealValues(getKnobs(it, allocationPosition));
         size_t numCores = real[KNOB_VIRTUAL_CORES] + currentManager->_configuration->getNumServiceNodes();
         Frequency currentFreq = real[KNOB_FREQUENCY];
@@ -521,13 +519,13 @@ void ManagerMulti::run(){
     mammut::energy::Counter* joulesCounter = _m.getInstanceEnergy()->getCounter();
     double lastSampleTime = mammut::utils::getMillisecondsTime();
     double lastJoules = joulesCounter->getJoules();
-    double currentSampleTime, currentJoules, currentWatts;
     while(true){
         SubmittedManager* sm;
         if(_qIn.pop((void**) &sm)){
             ManagerData md;
             Manager* m = sm->manager;
             DEBUG("Manager (" << m << ") arrived.");
+            md.minPerf = 0;
             md.minPerfReqPerc = sm->minPerf;
             md.allocatedCores = std::vector<VirtualCoreId>();
             md.allocations = std::vector<Allocation>();
@@ -558,6 +556,7 @@ void ManagerMulti::run(){
                 }
             }
         }
+        double currentSampleTime, currentJoules, currentWatts;
         currentJoules = joulesCounter->getJoules();
         currentSampleTime = mammut::utils::getMillisecondsTime();
         currentWatts = (currentJoules - lastJoules)/((currentSampleTime - lastSampleTime)/1000.0);

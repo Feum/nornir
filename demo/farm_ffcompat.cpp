@@ -55,7 +55,7 @@ using namespace ff;
  */
 class Emitter: public nornir::AdaptiveNode {
 public:
-    Emitter(int max_task):ntask(max_task) {};
+    explicit Emitter(int max_task):ntask(max_task){;}
 
     void * svc(void *) {
         usleep(MICROSECSSLEEP);
@@ -63,8 +63,10 @@ public:
         --ntask;
         if (ntask<0){
             std::cout << "Emitter finished" << std::endl;
+            //cppcheck-suppress memleak
             TERMINATE_APPLICATION;
         }
+        //cppcheck-suppress memleak
         return task;
     }
 private:

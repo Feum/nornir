@@ -52,8 +52,10 @@ public:
         --maxTasks;
         if (maxTasks < 0){
             std::cout << "Scheduler finished" << std::endl;
+            //cppcheck-suppress memleak
             return NULL;
         }
+        //cppcheck-suppress memleak
         return task;
     }
 };

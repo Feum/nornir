@@ -1,5 +1,8 @@
 *.o
 *.a
+*.gcov
+*.gcda
+*.gcno
 proc.out
 /src/external/mammut/*
 /src/external/knarr/*

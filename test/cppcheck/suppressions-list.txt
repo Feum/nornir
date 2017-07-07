@@ -1,0 +1,5 @@
+// External libraries
+*:src/external/*
+
+// False positives in manager.tpp and ewc.tpp (doesn't suppress if files are specified, don't know why).
+uninitMemberVar

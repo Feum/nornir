@@ -6,12 +6,12 @@ export CC                    = gcc
 export CXX                   = g++ 
 export OPTIMIZE_FLAGS        = -finline-functions -O3 #-DPOOL
 export DEBUG_FLAGS           = #-DDEBUG_PREDICTORS -DDEBUG_SELECTORS #-DDEBUG_DF_STREAM -DDEBUG_NODE -DDEBUG_KNOB -DDEBUG_MANAGER
-export CXXFLAGS              = -Wall -pedantic --std=c++11 $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
-export LDLIBS                =  -lnornir -pthread -lrt -lm -lmlpack -llapack -lblas -lgsl -lgslcblas -larmadillo -lknarr -lanl
+export CXXFLAGS              = $(COVERAGE_FLAGS) -Wall -pedantic --std=c++11 $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
+export LDLIBS                = $(COVERAGE_LIBS) -lnornir -pthread -lrt -lm -lmlpack -llapack -lblas -lgsl -lgslcblas -larmadillo -lknarr -lanl
 export INCS                  = -I$(realpath ./src/external/fastflow) -I$(realpath ./src/external/tclap-1.2.1/include) -I/usr/include/libxml2
 export LDFLAGS               = -L$(realpath .)/src -L$(realpath .)/src/external/knarr/src
 
-.PHONY: all demo clean cleanall install uninstall microbench bin test
+.PHONY: all demo clean cleanall install uninstall microbench bin test gcov develcheck
 
 all:
 	python submodules_init.py
@@ -31,17 +31,21 @@ demo:
 	$(MAKE) -C examples
 bin:
 	$(MAKE) -C bin
+cppcheck:
+	cppcheck --xml --xml-version=2 --enable=warning,performance,information,style --inline-suppr --error-exitcode=1 --force  . --suppressions-list=./test/cppcheck/suppressions-list.txt -isrc/external -itest -iexamples 2> cppcheck-report.xml || (cat cppcheck-report.xml; exit 2) 
 # Compiles and runs all the tests.
 test:
-# Go to mammut folder
-#	cd src/external/mammut && $(MAKE) test 
-# Come back here
-#	cd ../../../ 
+	make cleanall
+	make "COVERAGE_FLAGS=-fprofile-arcs -ftest-coverage"
 	cd test && ./installdep.sh 
 	cd ..
-	$(MAKE) -C test
-	cd test && ./runtests.sh
+	$(MAKE) "COVERAGE_LIBS=-lgcov" -C test && cd test && ./runtests.sh
 	cd ..
+gcov:
+	./test/gcov/gcov.sh
+# Performs all the checks
+develcheck:
+	$(MAKE) cppcheck && $(MAKE) test && $(MAKE) gcov
 cleanall:
 	$(MAKE) -C src cleanall
 	$(MAKE) -C demo cleanall

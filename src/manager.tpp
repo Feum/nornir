@@ -214,14 +214,14 @@ ulong ManagerFarm<lb_t, gt_t>::getExecutionTime(){
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::shrinkPause(){
-	KnobVirtualCoresFarm* k = ((KnobVirtualCoresFarm*) _configuration->getKnob(KNOB_VIRTUAL_CORES));
+    KnobVirtualCoresFarm* k = dynamic_cast<KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
 	k->prepareToFreeze();
 	k->freeze();
 }
 
 template <typename lb_t, typename gt_t>
 void ManagerFarm<lb_t, gt_t>::stretchPause(){
-	KnobVirtualCoresFarm* k = ((KnobVirtualCoresFarm*) _configuration->getKnob(KNOB_VIRTUAL_CORES));
+    KnobVirtualCoresFarm* k = dynamic_cast<KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
 	size_t v = k->getRealValue();
 	k->prepareToRun(v);
 	k->run(v);

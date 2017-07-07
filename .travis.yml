@@ -1,0 +1,26 @@
+language: cpp
+compiler: 
+  - gcc
+#  - clang
+sudo: required
+dist: trusty
+      
+install:
+  # CppCheck
+  - sudo apt-get install -qq cppcheck
+
+script:
+  # Runs compilation, cppcheck, tests and coverage collection
+  - make develcheck
+
+after_success:
+    # codecov.io
+    - bash <(curl -s https://codecov.io/bash) -X gcov -f 'test/gcov/*.gcov'
+
+notifications:
+  email:
+    recipients:
+      - d.desensi.software@gmail.com
+    on_success: never # default: change
+    on_failure: always # default: always
+  

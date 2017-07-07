@@ -85,11 +85,11 @@ Selector::Selector(const Parameters& p,
 
 
 bool Selector::isFeasibleBandwidth(double value, bool conservative) const{
-    double conservativeOffset = 0;
-
     if(isPrimaryRequirement(_p.requirements.bandwidth)){
+        double conservativeOffset = 0;
         if(conservative && _p.conservativeValue){
-            conservativeOffset = _p.requirements.bandwidth * (_p.conservativeValue / 100.0);
+            conservativeOffset = _p.requirements.bandwidth *
+                                        (_p.conservativeValue / 100.0);
         }
         if(value < _p.requirements.bandwidth + conservativeOffset){
             return false;
@@ -103,9 +103,8 @@ bool Selector::isFeasibleLatency(double value, bool conservative) const{
 }
 
 bool Selector::isFeasibleUtilization(double value, bool conservative) const{
-    double conservativeOffset = 0;
-
     if(isPrimaryRequirement(_p.requirements.minUtilization)){
+        double conservativeOffset = 0;
         if(conservative && _p.conservativeValue){
             conservativeOffset = (_p.requirements.maxUtilization - _p.requirements.minUtilization) *
                                  (_p.conservativeValue / 100.0) / 2.0;
@@ -120,8 +119,8 @@ bool Selector::isFeasibleUtilization(double value, bool conservative) const{
 
 
 bool Selector::isFeasiblePower(double value, bool conservative) const{
-    double conservativeOffset = 0;
     if(isPrimaryRequirement(_p.requirements.powerConsumption)){
+        double conservativeOffset = 0;
         if(conservative && _p.conservativeValue){
             conservativeOffset = _p.requirements.powerConsumption *
                                  (_p.conservativeValue / 100.0);
@@ -273,14 +272,14 @@ SelectorPredictive::SelectorPredictive(const Parameters& p,
                    std::unique_ptr<Predictor> bandwidthPredictor,
                    std::unique_ptr<Predictor> powerPredictor):
                        Selector(p, configuration, samples),
+                       _bandwidthPredictor(std::move(bandwidthPredictor)),
+                       _powerPredictor(std::move(powerPredictor)),
                        _feasible(true),
                        _bandwidthPrediction(NOT_VALID),
                        _powerPrediction(NOT_VALID){
     /****************************************/
     /*              Predictors              */
     /****************************************/
-    _bandwidthPredictor = std::move(bandwidthPredictor);
-    _powerPredictor = std::move(powerPredictor);
     _maxPerformance = -1;
 #if STORE_PREDICTIONS
     // Just to let the multi manager work even if this manager terminates
@@ -360,10 +359,12 @@ bool SelectorPredictive::isBestMinMax(double bandwidth, double latency, double u
     // Latency minimization
     if(_p.requirements.latency == NORNIR_REQUIREMENT_MIN){
         throw std::runtime_error("Latency minimization not yet supported.");
+        /*
         if(latency < best){
             best = latency;
             return true;
         }
+        */
     }
 
     // Utilization maximization
@@ -385,8 +386,9 @@ bool SelectorPredictive::isBestMinMax(double bandwidth, double latency, double u
     return false;
 }
 
-bool SelectorPredictive::isBestSuboptimal(double bandwidth, double latency, double utilization,
-                                          double power, double& best){
+bool SelectorPredictive::isBestSuboptimal(double bandwidth, double latency,
+                                          double utilization, double power,
+                                          double& best){
     // Bandwidth requirement
     if(isPrimaryRequirement(_p.requirements.bandwidth)){
         if(bandwidth > best){
@@ -398,10 +400,12 @@ bool SelectorPredictive::isBestSuboptimal(double bandwidth, double latency, doub
     // Latency requirement
     if(isPrimaryRequirement(_p.requirements.latency)){
         throw std::runtime_error("Latency control not yet supported.");
+        /*
         if(latency < best){
             best = latency;
             return true;
         }
+        */
     }
 
     // Utilization requirement
@@ -448,11 +452,11 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
 
 #ifdef DEBUG_SELECTORS
     double bestBandwidthPrediction = 0;
-    double bestLatencyPrediction = 0;
+    //double bestLatencyPrediction = 0;
     double bestPowerPrediction = 0;
 
     double bestSuboptimalBandwidthPrediction = 0;
-    double bestSuboptimalLatencyPrediction = 0;
+    //double bestSuboptimalLatencyPrediction = 0;
     double bestSuboptimalPowerPrediction = 0;
 #endif
 
@@ -472,7 +476,10 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
         _powerPredictions[currentValues] = powerPrediction;
 #endif
 
-        //std::cout << currentValues << " " << performancePrediction << " " << powerPrediction << std::endl;
+        DEBUG("Prediction: " << currentValues << " "
+                             << bandwidthPrediction << " "
+                             << powerPrediction);
+
         if(isFeasibleBandwidth(bandwidthPrediction, true) &&
            isFeasibleLatency(0, true) &&
            isFeasibleUtilization(utilizationPrediction, true) &&
@@ -488,7 +495,11 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
             }
         }else if(isBestSuboptimal(bandwidthPrediction, 0, utilizationPrediction,
                                   powerPrediction, bestSuboptimalValue)){
-
+            // TODO In realta' per controllare se e' un sottoottimale
+            // migliore bisognerebbe prendere la configurazione che soddisfa
+            // il maggior numero di constraints fra quelli specificati.
+            // Solo in un secondo momento, se non ne soddisfa nessuno, si va
+            // a cercare quello piu' 'vicino'
 #ifdef DEBUG_SELECTORS
             bestSuboptimalBandwidthPrediction = bandwidthPrediction;
             bestSuboptimalPowerPrediction = powerPrediction;
@@ -762,7 +773,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(){
     if(_updatingInterference){
         // It can only be done for PERF_* contract (so is primary) and on USL predictors.
         // (Check already done when the flag is set).
-        PredictorUsl* pred = ((PredictorUsl*) getPrimaryPredictor());
+        PredictorUsl* pred = dynamic_cast<PredictorUsl*>(getPrimaryPredictor());
         pred->updateInterference();
         if(!_interferenceUpdatePoints.empty()){
             kv = _interferenceUpdatePoints.back();

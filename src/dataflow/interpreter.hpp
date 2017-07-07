@@ -29,7 +29,6 @@
 #define NORNIR_DF_INTERPRETER_HPP_
 
 #include "../interface.hpp"
-#include "interpreter.hpp"
 #include "tokens.hpp"
 #include "stream.hpp"
 #include "mdfi.hpp"
@@ -73,7 +72,7 @@ private:
     size_t _qId;
     size_t _processedTasks;
 public:
-    WorkerMdf(QUEUE& q);
+    explicit WorkerMdf(QUEUE& q);
 
     /**
      * Computes a macro data flow instruction.
@@ -88,7 +87,7 @@ public:
 /**
  * This is the interpreter of the macro data flow instructions.
  */
-class Interpreter{
+class Interpreter: mammut::utils::NonCopyable{
 private:
     QUEUE _q;
     nornir::Scheduler<Mdfi>* _s;

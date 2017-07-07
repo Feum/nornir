@@ -68,7 +68,6 @@ Instrumenter::Instrumenter(const std::string& parametersFile):
     mainChannel.shutdown(mainChid);
 
     /** Send content length. **/
-    std::string s;
     std::stringstream out;
     out << pid;
     _chid = _channel.connect((string("ipc:///tmp/nornir/") + out.str() + string(".ipc")).c_str());

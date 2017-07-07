@@ -249,7 +249,7 @@ public:
      * Creates a global manager.
      * @param configuration Configuration parameters for the global manager.
      **/
-    ManagerMulti(ManagerMultiConfiguration configuration = ManagerMultiConfiguration());
+    explicit ManagerMulti(ManagerMultiConfiguration configuration = ManagerMultiConfiguration());
 
     /**
      * Destroys the global manager.

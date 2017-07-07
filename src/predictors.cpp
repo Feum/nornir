@@ -76,7 +76,6 @@ static void getPowerProportions(VoltageTable table, uint physicalCores,
                                 uint numDomains, MappingType mt,
                                 double& staticPower, double& dynamicPower){
     int numCores = physicalCores;
-    double voltage = 0;
     staticPower = 0;
     dynamicPower = 0;
     uint currentCores = 0;
@@ -98,7 +97,7 @@ static void getPowerProportions(VoltageTable table, uint physicalCores,
                 throw std::runtime_error("getPowerProportions: mapping type not supported.");
             }
         }
-        voltage = getVoltage(table, currentCores, frequency);
+        double voltage = getVoltage(table, currentCores, frequency);
 
         staticPower += voltage;
         dynamicPower += currentCores*frequency*voltage*voltage;
@@ -164,8 +163,8 @@ uint RegressionDataServiceTime::getNumPredictors() const{
 }
 
 void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) const{
-    size_t rowId = 0;
     if(_p.knobFrequencyEnabled){
+        size_t rowId = 0;
         matrix(rowId++, columnId) = _invScalFactorFreq;
         matrix(rowId++, columnId) = _invScalFactorFreqAndCores;
     }
@@ -319,7 +318,7 @@ PredictorLinearRegression::~PredictorLinearRegression(){
 void PredictorLinearRegression::clear(){
     for(obs_it iterator = _observations.begin();
                iterator != _observations.end();
-               iterator++){
+               ++iterator){
         delete iterator->second.data;
     }
     _observations.clear();
@@ -404,7 +403,7 @@ void PredictorLinearRegression::prepareForPredictions(){
         size_t i = 0;
         for(obs_it iterator = _observations.begin();
                    iterator != _observations.end();
-                   iterator++){
+                   ++iterator){
             const Observation& obs = iterator->second;
 
             if(!_p.regressionAging || contains(_agingVector, iterator->first)){
@@ -497,7 +496,7 @@ double PredictorLinearRegression::predict(const KnobsValues& values){
 double PredictorLinearRegression::getInactivePowerParameter() const{
     if(_type == PREDICTION_POWER){
         size_t pos;
-        if(!((RegressionDataPower*)_predictionInput)->getInactivePowerPosition(pos)){
+        if(!dynamic_cast<RegressionDataPower*>(_predictionInput)->getInactivePowerPosition(pos)){
             throw std::runtime_error("Impossible to get inactive power parameter.");
         }
         return _lr.Parameters().at(pos);
@@ -629,9 +628,8 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
     double result = 0;
     double numCores = real[KNOB_VIRTUAL_CORES];
     double frequency = real[KNOB_FREQUENCY];
-    double exp;
     for(size_t i = 0; i < _coefficients.size(); i++){
-        exp = i;
+        double exp = i;
         if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
             // I do not have the constant factor b0*(x^0)
             exp += 1;

@@ -166,12 +166,18 @@ protected:
     unsigned int getRelativeTimestamp();
     unsigned int getAbsoluteTimestamp();
 public:
-    Logger(unsigned int timeOffset = 0);
+    explicit Logger(unsigned int timeOffset = 0);
     virtual ~Logger(){;}
-    virtual void log(const Configuration& configuration, const Smoother<MonitoredSample>& samples) = 0;
-    virtual void logSummary(const Configuration& configuration, Selector* selector, ulong duration, double totalTasks) = 0;
+    virtual void log(const Configuration& configuration,
+                     const Smoother<MonitoredSample>& samples) = 0;
+    virtual void logSummary(const Configuration& configuration,
+                            Selector* selector,
+                            ulong duration, double totalTasks) = 0;
 };
 
+/**
+ * A logger to store data on C++ streams (e.g. ofstream, etc...).
+ */
 class LoggerStream: public Logger{
 protected:
     std::ostream* _statsStream;
@@ -185,10 +191,15 @@ public:
                  std::ostream* summaryStream,
                  unsigned int timeOffset = 0);
 
-    void log(const Configuration& configuration, const Smoother<MonitoredSample>& samples);
-    void logSummary(const Configuration& configuration, Selector* selector, ulong durationMs, double totalTasks);
+    void log(const Configuration& configuration,
+             const Smoother<MonitoredSample>& samples);
+    void logSummary(const Configuration& configuration,
+                    Selector* selector, ulong durationMs, double totalTasks);
 };
 
+/**
+ * This logger logs data on files.
+ */
 class LoggerFile: public LoggerStream{
 public:
     LoggerFile(std::string statsFile = "stats.csv",
@@ -210,6 +221,42 @@ public:
     }
 };
 
+/**
+ * This logger can be used to send data to a Graphite (https://graphiteapp.org/)
+ * monitoring system (and maybe to show monitored data through a Grafana
+ * (https://grafana.com/) front end. To install Graphite and Grafana, you
+ * can use an already configured virtual machine, like the one present
+ * at (https://github.com/pellepelster/graphite-grafana-vagrant-box).
+ *
+ * By default, graphite will store data at 60 seconds granularity.
+ * If your sampling interval is shorter than 60 seconds, graphite will
+ * average the data received by Nornir.
+ * All the metrics exported by Nornir are prefixed by "nornir." string.
+ *
+ * To increase the graphite granularity, please refer to the graphite
+ * documentation. However, in most cases it should be sufficient to execute
+ * the following steps:
+ *  1. Modify the retention by adding an appropriate rule to the
+ *     /etc/carbon/storage-schemas.conf (path may be different).
+ *     For example, to store one sample for each second and to keep stored
+ *     only the samples received during the last day the rule is the following:.
+ *
+ *         [default_nornir]
+ *         pattern = nornir.*
+ *         retentions = 1s:1d
+ * 2. Change the scale of the data already stored by Nornir in graphite. You
+ *    should execute the following command for all the .wsp files present
+ *    in /var/lib/graphite/whisper/nornir folder (path may be different):
+ *         $ whisper-resize.py filename.wsp
+ *    If you do not need the old data, you can simply remove them by doing:
+ *         $ rm -r /var/lib/graphite/whisper/nornir/
+ * 3. Change graphite's web app caching, by modifying the value of the
+ *    DEFAULT_CACHE_DURATION variable from 60 (default) to 1 (if you want a
+ *    1 second granularity) in [graphite/settings.py] file (specific path
+ *    depends on your installation).
+ * After 60 seconds circa the modification should be loaded automatically by
+ * graphite and your data can now be displayed at an higher resolution.
+ */
 class LoggerGraphite: public Logger{
 public:
     LoggerGraphite(const std::string& host, unsigned int port);

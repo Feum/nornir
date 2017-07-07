@@ -48,7 +48,7 @@ public:
      * Constructor of the wrapper.
      * \param d Size of the array.
      */
-    inline ArrayWrapper(uint d):a(new T[d]), dim(d){;}
+    explicit inline ArrayWrapper(uint d):a(new T[d]), dim(d){;}
 
     ArrayWrapper(const ArrayWrapper& aw):a(new T[aw.dim]), dim(aw.dim){
         for(uint i = 0; i < dim; i++){
@@ -175,7 +175,7 @@ protected:
     virtual std::vector<void*> loadObjects() = 0;
 
 public:
-    InputStreamRate(const std::string& fileName);
+    explicit InputStreamRate(const std::string& fileName);
 
     ~InputStreamRate();
 

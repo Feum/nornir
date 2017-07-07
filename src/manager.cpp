@@ -150,15 +150,11 @@ void Manager::run(){
         thisThread->move(NORNIR_MANAGER_VIRTUAL_CORE);
     }
 
-    double microsecsSleep = 0;
     double startSample = getMillisecondsTime();
-    double overheadMs = 0;
-
-    uint samplingInterval;
-    uint steadySamples = 0;
+    uint samplingInterval, steadySamples = 0;
 
     while(!_terminated){
-        overheadMs = getMillisecondsTime() - startSample;
+        double overheadMs = getMillisecondsTime() - startSample;
         if(_selector->isCalibrating()){
             samplingInterval = _p.samplingIntervalCalibration;
             steadySamples = 0;
@@ -168,7 +164,7 @@ void Manager::run(){
         }else{
             samplingInterval = _p.samplingIntervalSteady;
         }
-        microsecsSleep = ((double)samplingInterval - overheadMs)*
+        double microsecsSleep = ((double)samplingInterval - overheadMs)*
                           (double)MAMMUT_MICROSECS_IN_MILLISEC;
         if(microsecsSleep < 0){
             microsecsSleep = 0;
@@ -235,7 +231,7 @@ void Manager::stretch(CalibrationShrink type){
     switch(type){
         case CALIBRATION_SHRINK_AGGREGATE:{
             if(_pid){
-                std::vector<VirtualCore*> allowedCores = ((KnobMapping*) _configuration->getKnob(KNOB_MAPPING))->getAllowedCores();
+                std::vector<VirtualCore*> allowedCores = dynamic_cast<KnobMapping*>(_configuration->getKnob(KNOB_MAPPING))->getAllowedCores();
                 _task->getProcessHandler(_pid)->move(allowedCores);
             }
         }break;
@@ -256,7 +252,7 @@ void Manager::updateModelsInterference(){
     // Temporarely disinhibit.
     _samples->reset();
     disinhibit();
-    ((SelectorLearner*) _selector)->updateModelsInterference();
+    dynamic_cast<SelectorLearner*>(_selector)->updateModelsInterference();
 }
 
 void Manager::waitModelsInterferenceUpdate(){
@@ -264,7 +260,7 @@ void Manager::waitModelsInterferenceUpdate(){
         throw std::runtime_error("waitModelsInterferenceUpdate can only be "
                         "used on LEARNING selectors.");
     }
-    while(!((SelectorLearner*) _selector)->areModelsUpdated() && !_terminated){
+    while(!dynamic_cast<SelectorLearner*>(_selector)->areModelsUpdated() && !_terminated){
         // If in the meanwhile the selector is waiting for calibration,
         // allow him to calibrate.
         if(_selector->isCalibrating()){
@@ -277,7 +273,7 @@ void Manager::waitModelsInterferenceUpdate(){
 
 std::vector<VirtualCoreId> Manager::getUsedCores(){
     while(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){;}
-    vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_MAPPING))->getActiveVirtualCores();
+    vector<VirtualCore*> vc = dynamic_cast<KnobMapping*>(_configuration->getKnob(KNOB_MAPPING))->getActiveVirtualCores();
     vector<VirtualCoreId> vcid;
     for(VirtualCore* v : vc){
         vcid.push_back(v->getVirtualCoreId());
@@ -290,8 +286,8 @@ void Manager::allowCores(std::vector<mammut::topology::VirtualCoreId> ids){
     for(auto id : ids){
         allowedVc.push_back(_topology->getVirtualCore(id));
     }
-    ((KnobVirtualCores*) _configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(ids.size() - _configuration->getNumServiceNodes());
-    ((KnobMapping*) _configuration->getKnob(KNOB_MAPPING))->setAllowedCores(allowedVc);
+    dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(ids.size() - _configuration->getNumServiceNodes());
+    dynamic_cast<KnobMapping*>(_configuration->getKnob(KNOB_MAPPING))->setAllowedCores(allowedVc);
 }
 
 void Manager::setSimulationParameters(std::string samplesFileName){
@@ -560,7 +556,7 @@ ManagerInstrumented::~ManagerInstrumented(){
 
 void ManagerInstrumented::waitForStart(){
     Manager::_pid = _monitor.waitStart();
-    ((KnobMappingExternal*)_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
+    dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
 }
 
 MonitoredSample ManagerInstrumented::getSample(){
@@ -627,7 +623,7 @@ void ManagerBlackBox::waitForStart(){
         }
     }
     _startTime = getMillisecondsTime();
-    ((KnobMappingExternal*)_configuration->getKnob(KNOB_MAPPING))->setProcessHandler(_process);
+    dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setProcessHandler(_process);
     _process->resetInstructions(); // To remove those executed before entering ROI
 }
 

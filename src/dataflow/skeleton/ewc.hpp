@@ -43,7 +43,7 @@ private:
 protected:
     size_t _numPartitions;
 public:
-    Scatterer(size_t numPartitions):_numPartitions(numPartitions){;}
+    explicit Scatterer(size_t numPartitions):_numPartitions(numPartitions){;}
 
     virtual std::vector<void*> compute(void* in) = 0;
 
@@ -62,7 +62,7 @@ private:
 protected:
     size_t _numPartitions;
 public:
-    Gatherer(size_t numPartitions):_numPartitions(numPartitions){;}
+    explicit Gatherer(size_t numPartitions):_numPartitions(numPartitions){;}
 
     virtual void* compute(std::vector<void*> in) = 0;
 
@@ -82,7 +82,7 @@ public:
  */
 template <typename T> class ReduceScatterer: public Scatterer{
 private:
-    bool autoDelete;
+    bool _autoDelete;
 public:
     /**
      * Constructor of the emitter of the reduce.
@@ -119,7 +119,7 @@ public:
      * Constructor of the collector of the reduce.
      * \param numPartitions The number of partitions.
      */
-    ReduceGatherer(size_t numPartitions);
+    explicit ReduceGatherer(size_t numPartitions);
 
     void* compute(std::vector<void*> in);
 };
@@ -131,7 +131,7 @@ public:
  */
 template <typename T> class MapScatterer: public Scatterer{
 private:
-    bool autoDelete;
+    bool _autoDelete;
 public:
     /**
      * Constructor of the emitter of the map.
@@ -165,7 +165,7 @@ public:
  */
 template <typename V> class MapGatherer: public Gatherer{
 public:
-    MapGatherer(size_t numPartitions);
+    explicit MapGatherer(size_t numPartitions);
 
     void* compute(std::vector<void*> in);
 };

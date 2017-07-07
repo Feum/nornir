@@ -200,7 +200,7 @@ std::ostream& operator<< (std::ostream& out, const std::vector<Domain*>& v){
 KnobVirtualCoresFarm::KnobVirtualCoresFarm(Parameters p,
                              AdaptiveNode* emitter, AdaptiveNode* collector,
                              ff::ff_gatherer* gt,
-                             const std::vector<AdaptiveNode*> workers,
+                             const std::vector<AdaptiveNode *>& workers,
                              const volatile bool* terminated):
             KnobVirtualCores(p), _emitter(emitter), _collector(collector),
             _gt(gt), _allWorkers(workers), _terminated(terminated){

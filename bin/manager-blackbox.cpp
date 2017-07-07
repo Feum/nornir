@@ -317,8 +317,18 @@ int main(int argc, char * argv[]){
             if(execve(arguments[0], arguments, environ) == -1){
                 std::cerr << "Impossible to run the specified executable. Terminating the manager." << std::endl;
                 ((ManagerBlackBox*) mmem)->terminate();
+                // Useless since is never executed, inserted only to avoid cppcheck errors.
+                for(size_t i = 0; i < sp.program.size(); i++){
+                    delete[] arguments[i];
+                }
+                delete[] arguments;
                 return -1;
             }
+            // Useless since is never executed, inserted only to avoid cppcheck errors.
+            for(size_t i = 0; i < sp.program.size(); i++){
+                delete[] arguments[i];
+            }
+            delete[] arguments;
             return -1; // execve never returns (except in the error case above).
         }
     }

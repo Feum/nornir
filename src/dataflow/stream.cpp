@@ -80,11 +80,11 @@ InputStreamRate::InputStreamRate(const std::string& fileName):
         _nextObject(0), _nextBurst(0), _excess(0), _lastStoredRateTs(0){
     _clockThread = new ClockThread(_lastSec, _terminated);
     FILE* f = NULL;
-    char line[512];
     f = fopen(fileName.c_str(), "r");
     float rate = 0;
     float duration = 0;
     if(f){
+        char line[512];
         while(fgets(line, 512, f) != NULL){
             sscanf(line, "%f %f", &rate, &duration);
             Rates r;
