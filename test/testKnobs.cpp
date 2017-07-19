@@ -12,7 +12,7 @@
 using namespace nornir;
 
 TEST(KnobsTest, KnobsVirtualCores) {
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     p.knobHyperthreadingEnabled = false;
     KnobVirtualCores knob(p);
 
@@ -52,7 +52,7 @@ TEST(KnobsTest, KnobsVirtualCores) {
 
 // Test trying to disallow some number of cores (used in Nornir dataflow runtime).
 TEST(KnobsTest, KnobsVirtualCores2) {
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     for(size_t i = 0; i < 48; i++){
         if(i % 3 == 0){
             p.disallowedNumCores.push_back(i);
@@ -76,7 +76,7 @@ TEST(KnobsTest, KnobsVirtualCores2) {
 
 // Test trying to enable/disable hyperthreading
 TEST(KnobsTest, KnobsVirtualCores3) {
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     p.knobHyperthreadingEnabled = true;
     KnobVirtualCores knob(p);
     // Check values.
@@ -97,7 +97,7 @@ TEST(KnobsTest, KnobsVirtualCores3) {
 }
 
 TEST(KnobsTest, KnobsHyperThreading){
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     KnobHyperThreading knob(p);
 
     // Check values.
@@ -126,7 +126,7 @@ TEST(KnobsTest, KnobsHyperThreading){
 }
 
 TEST(KnobsTest, KnobsMapping){
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     p.knobHyperthreadingEnabled = true;
     KnobVirtualCores knobCores(p);
     knobCores.setToMax();
@@ -208,7 +208,7 @@ TEST(KnobsTest, KnobsMapping){
 }
 
 TEST(KnobsTest, KnobsFrequency) {
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     p.knobHyperthreadingEnabled = false;
     KnobVirtualCores knobCores(p);
     KnobHyperThreading knobHT(p);
@@ -242,7 +242,7 @@ TEST(KnobsTest, KnobsFrequency) {
 
 // Global test with strategy for unused virtual cores = NONE
 TEST(KnobsTest, GlobalUnusedNone){
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     p.knobHyperthreadingEnabled = true;
     p.strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_NONE;
     KnobVirtualCores knobCores(p);
@@ -295,7 +295,7 @@ TEST(KnobsTest, GlobalUnusedNone){
 
 // Global test with strategy for unused virtual cores = LOWEST_FREQUENCY
 TEST(KnobsTest, GlobalUnusedLowest){
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     p.knobHyperthreadingEnabled = true;
     p.strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_LOWEST_FREQUENCY;
     KnobVirtualCores knobCores(p);
@@ -348,7 +348,7 @@ TEST(KnobsTest, GlobalUnusedLowest){
 
 // Global test with strategy for unused virtual cores = OFF
 TEST(KnobsTest, GlobalUnusedOff){
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     p.knobHyperthreadingEnabled = true;
     p.strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_OFF;
     KnobVirtualCores knobCores(p);
@@ -402,7 +402,7 @@ TEST(KnobsTest, GlobalUnusedOff){
 
 // Global test with strategy for unused virtual cores = SAME
 TEST(KnobsTest, GlobalUnusedSame){
-    Parameters p = getParameters("repara");
+    Parameters  p = getParameters("repara");
     p.knobHyperthreadingEnabled = true;
     p.strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_SAME;
     KnobVirtualCores knobCores(p);

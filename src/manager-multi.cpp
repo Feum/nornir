@@ -542,7 +542,7 @@ void ManagerMulti::run(){
                     it = _managerData.erase(it);
                     inhibitAll();
                     updateModels();
-                    if(_managerData.size()){
+                    if(!_managerData.empty()){
                         applyNewAllocation();
                         disinhibitAll();
                     }

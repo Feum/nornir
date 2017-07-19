@@ -502,17 +502,17 @@ void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){
     vector<AdaptiveNode*> workers = ((KnobVirtualCoresFarm*) &_knobCores)->getActiveWorkers();
     size_t nextIndex = 0;
     if(_emitter){
-        _emitter->move((VirtualCore*) vcOrder[nextIndex]);
+        _emitter->move(vcOrder[nextIndex]);
         nextIndex = (nextIndex + 1) % vcOrder.size();
     }
 
     for(size_t i = 0; i < workers.size(); i++){
-        workers[i]->move((VirtualCore*) vcOrder[nextIndex]);
+        workers[i]->move(vcOrder[nextIndex]);
         nextIndex = (nextIndex + 1) % vcOrder.size();
     }
 
     if(_collector){
-        _collector->move((VirtualCore*) vcOrder[nextIndex]);
+        _collector->move(vcOrder[nextIndex]);
         //nextIndex = (nextIndex + 1) % vcOrder.size();
     }
 }
@@ -534,7 +534,7 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
     for(size_t i = 0; i < scalableDomains.size(); i++){
         Domain* currentDomain = scalableDomains.at(i);
         if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
-            throw runtime_error("AdaptivityManagerFarm: Impossible "
+            throw runtime_error("KnobFrequency: Impossible "
                                 "to set the specified governor.");
         }
     }
@@ -550,7 +550,7 @@ void KnobFrequency::changeValue(double v){
     for(size_t i = 0; i < scalableDomains.size(); i++){
         Domain* currentDomain = scalableDomains.at(i);
         if(!currentDomain->setFrequencyUserspace((uint)v)){
-            throw runtime_error("AdaptivityManagerFarm: Impossible "
+            throw runtime_error("KnobFrequency: Impossible "
                                 "to set the specified frequency.");
         }
     }
@@ -567,7 +567,7 @@ void KnobFrequency::applyUnusedVCStrategySame(const vector<VirtualCore*>& unused
         Domain* domain = unusedDomains.at(i);
         DEBUG("[Frequency] Setting unused domain " << domain->getId() << " to: " << v);
         if(!domain->setFrequencyUserspace((uint)v)){
-            throw runtime_error("AdaptivityManagerFarm: Impossible "
+            throw runtime_error("KnobFrequency: Impossible "
                                 "to set the specified frequency.");
         }    
     }
@@ -589,7 +589,7 @@ void KnobFrequency::applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& 
         Domain* domain = unusedDomains.at(i);
         if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
            !domain->setLowestFrequencyUserspace()){
-            throw runtime_error("AdaptivityManagerFarm: Impossible to "
+            throw runtime_error("KnobFrequency: Impossible to "
                                 "set lowest frequency for unused "
                                 "virtual cores.");
         }

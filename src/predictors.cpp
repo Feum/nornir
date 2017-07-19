@@ -106,8 +106,8 @@ static void getPowerProportions(VoltageTable table, uint physicalCores,
     }
 }
 
-RegressionData::RegressionData(const Parameters& p,
-                               const Configuration& configuration,
+RegressionData::RegressionData(const Parameters &p,
+                               const Configuration &configuration,
                                const Smoother<MonitoredSample>* samples):
         _p(p), _configuration(configuration), _samples(samples){
     _topology = _p.mammut.getInstanceTopology();
@@ -144,8 +144,8 @@ void RegressionDataServiceTime::init(const KnobsValues& values){
     }
 }
 
-RegressionDataServiceTime::RegressionDataServiceTime(const Parameters& p,
-                                                     const Configuration& configuration,
+RegressionDataServiceTime::RegressionDataServiceTime(const Parameters &p,
+                                                     const Configuration &configuration,
                                                      const Smoother<MonitoredSample>* samples):
         RegressionData(p, configuration, samples),
         _invScalFactorFreq(0),
@@ -226,8 +226,8 @@ void RegressionDataPower::init(const KnobsValues& values){
     }
 }
 
-RegressionDataPower::RegressionDataPower(const Parameters& p,
-                                         const Configuration& configuration,
+RegressionDataPower::RegressionDataPower(const Parameters &p,
+                                         const Configuration &configuration,
                                          const Smoother<MonitoredSample>* samples):
         RegressionData(p, configuration, samples), _dynamicPowerModel(0),
         _voltagePerUsedSockets(0), _voltagePerUnusedSockets(0),
@@ -270,8 +270,8 @@ bool RegressionDataPower::getInactivePowerPosition(size_t& pos) const{
 }
 
 Predictor::Predictor(PredictorType type,
-                     const Parameters& p,
-                     const Configuration& configuration,
+                     const Parameters &p,
+                     const Configuration &configuration,
                      const Smoother<MonitoredSample>* samples):
         _type(type), _p(p), _configuration(configuration),
         _samples(samples), _modelError(0){
@@ -507,8 +507,8 @@ double PredictorLinearRegression::getInactivePowerParameter() const{
 
 /**************** PredictorUSL ****************/
 PredictorUsl::PredictorUsl(PredictorType type,
-             const Parameters& p,
-             const Configuration& configuration,
+             const Parameters &p,
+             const Configuration &configuration,
              const Smoother<MonitoredSample>* samples):
                     Predictor(type, p, configuration, samples),
                     _maxPolDegree(POLYNOMIAL_DEGREE_USL),
@@ -770,8 +770,8 @@ double PredictorUsl::getLambda(RecordInterferenceArgument n) const{
 /**************** PredictorSimple ****************/
 
 PredictorAnalytical::PredictorAnalytical(PredictorType type,
-                                 const Parameters& p,
-                                 const Configuration& configuration,
+                                 const Parameters &p,
+                                 const Configuration &configuration,
                                  const Smoother<MonitoredSample>* samples):
             Predictor(type, p, configuration, samples) {
     Topology* t = _p.mammut.getInstanceTopology();
@@ -828,9 +828,9 @@ double PredictorAnalytical::predict(const KnobsValues& values){
 }
 
 
-PredictorMishra::PredictorMishra(PredictorType type,
-              const Parameters& p,
-              const Configuration& configuration,
+PredictorLeo::PredictorLeo(PredictorType type,
+              const Parameters &p,
+              const Configuration &configuration,
               const Smoother<MonitoredSample>* samples):
                   Predictor(type, p, configuration, samples),
                   _preparationNeeded(true){
@@ -841,42 +841,42 @@ PredictorMishra::PredictorMishra(PredictorType type,
     }
     _values.resize(combinations.size());
     _values.zeros();
-    std::vector<std::string> names = mammut::utils::readFile(p.mishra.namesData);
+    std::vector<std::string> names = mammut::utils::readFile(p.leo.namesData);
     bool appFound = false;
     for(size_t i = 0; i < names.size(); i++){
-        if(names.at(i).compare(p.mishra.applicationName) == 0){
+        if(names.at(i).compare(p.leo.applicationName) == 0){
             _appId = i;
             appFound = true;
         }
     }
     if(!appFound){
-        throw std::runtime_error("Impossible to find application " + p.mishra.applicationName +
-                                 " in " + p.mishra.namesData);
+        throw std::runtime_error("Impossible to find application " + p.leo.applicationName +
+                                 " in " + p.leo.namesData);
     }
 }
 
-PredictorMishra::~PredictorMishra(){
+PredictorLeo::~PredictorLeo(){
     ;
 }
 
-bool PredictorMishra::readyForPredictions(){
+bool PredictorLeo::readyForPredictions(){
     return true;
 }
 
-void PredictorMishra::clear(){
+void PredictorLeo::clear(){
     _values.zeros();
     _predictions.zeros();
 }
 
-void PredictorMishra::refine(){
+void PredictorLeo::refine(){
     _preparationNeeded = true;
     auto it = _confIndexes.find(_configuration.getRealValues());
     if(it == _confIndexes.end()){
-        throw std::runtime_error("[Mishra] Impossible to find index for configuration.");
+        throw std::runtime_error("[Leo] Impossible to find index for configuration.");
     }
     size_t confId = it->second;
     if(confId >= _values.size()){
-        throw std::runtime_error("[Mishra] Invalid configuration index: " + confId);
+        throw std::runtime_error("[Leo] Invalid configuration index: " + confId);
     }
     switch(_type){
         case PREDICTION_BANDWIDTH:{
@@ -885,7 +885,7 @@ void PredictorMishra::refine(){
             // a utilization < 1, results may be wrong.
 #if 0
             if(_samples->average().utilisation < MAX_RHO){
-                throw std::runtime_error("[Mishra] bandwidth bandwidthMax problem.");
+                throw std::runtime_error("[Leo] bandwidth bandwidthMax problem.");
             }
 #endif
             _values.at(confId) = getMaximumBandwidth();
@@ -894,15 +894,15 @@ void PredictorMishra::refine(){
             _values.at(confId) = getCurrentPower();
         }break;
         default:{
-            throw std::runtime_error("[Mishra] Unknown predictor type.");
+            throw std::runtime_error("[Leo] Unknown predictor type.");
         }
     }
 }
 
-void PredictorMishra::prepareForPredictions(){
+void PredictorLeo::prepareForPredictions(){
     if(_preparationNeeded){
         if(!readyForPredictions()){
-            throw std::runtime_error("[Mishra] prepareForPredictions: Not enough "
+            throw std::runtime_error("[Leo] prepareForPredictions: Not enough "
                                      "points are present");
         }
 
@@ -910,11 +910,11 @@ void PredictorMishra::prepareForPredictions(){
         bool perColumnNormalization;
         switch(_type){
             case PREDICTION_BANDWIDTH:{
-                dataFile = _p.mishra.bandwidthData;
+                dataFile = _p.leo.bandwidthData;
                 perColumnNormalization = true;
             }break;
             case PREDICTION_POWER:{
-                dataFile = _p.mishra.powerData;
+                dataFile = _p.leo.powerData;
                 perColumnNormalization = false;
             }break;
             default:{
@@ -929,21 +929,21 @@ void PredictorMishra::prepareForPredictions(){
     }
 }
 
-double PredictorMishra::predict(const KnobsValues& realValues){
+double PredictorLeo::predict(const KnobsValues& realValues){
     auto it = _confIndexes.find(realValues);
     if(it == _confIndexes.end()){
-        throw std::runtime_error("[Mishra] Impossible to find index for configuration.");
+        throw std::runtime_error("[Leo] Impossible to find index for configuration.");
     }
     size_t confId = it->second;
     if(confId >= _predictions.size()){
-        throw std::runtime_error("[Mishra] Invalid configuration index: " + confId);
+        throw std::runtime_error("[Leo] Invalid configuration index: " + confId);
     }
     return _predictions.at(confId);
 }
 
 PredictorFullSearch::PredictorFullSearch(PredictorType type,
-          const Parameters& p,
-          const Configuration& configuration,
+          const Parameters &p,
+          const Configuration &configuration,
           const Smoother<MonitoredSample>* samples):
       Predictor(type, p, configuration, samples),
       _allConfigurations(_configuration.getAllRealCombinations()){

@@ -243,7 +243,7 @@ void Parameters::setDefault(){
     minTasksPerSample = 0;
     synchronousWorkers = false;    
     maxCalibrationTime = 0;
-    maxCalibrationConfigurations = 0;
+    maxCalibrationSteps = 0;
     maxPerformancePredictionError = 10.0;
     maxPowerPredictionError = 5.0;
     regressionAging = 0;
@@ -257,11 +257,11 @@ void Parameters::setDefault(){
     statsReconfiguration = false;
     roiFile = "";
 
-    mishra.applicationName = "";
-    mishra.namesData = "";
-    mishra.bandwidthData = "";
-    mishra.powerData = "";
-    mishra.numSamples = 20;
+    leo.applicationName = "";
+    leo.namesData = "";
+    leo.bandwidthData = "";
+    leo.powerData = "";
+    leo.numSamples = 20;
 
     dataflow.orderedProcessing = false;
     dataflow.orderedOutput = false;
@@ -496,7 +496,7 @@ ParametersValidation Parameters::validateRequirements(){
             return VALIDATION_WRONG_REQUIREMENT;
         }
     }
-    if(maxCalibrationTime == 0 && maxCalibrationConfigurations &&
+    if(maxCalibrationTime == 0 && maxCalibrationSteps &&
        (maxPerformancePredictionError <= 0      ||
         maxPerformancePredictionError > 100.0   ||
         maxPowerPredictionError <= 0    ||
@@ -555,18 +555,18 @@ ParametersValidation Parameters::validateSelector(){
     knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_MAPPING] = false;
     knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_HYPERTHREADING] = false;
 
-    // MISHRA
-    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_VIRTUAL_CORES] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_FREQUENCY] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_MAPPING] = false;
-    knobsSupportSelector[STRATEGY_SELECTION_MISHRA][KNOB_HYPERTHREADING] = false;
+    // LEO
+    knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_MAPPING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_HYPERTHREADING] = false;
 
-    if(strategySelection == STRATEGY_SELECTION_MISHRA &&
-       (mishra.bandwidthData.compare("") == 0 ||
-        mishra.powerData.compare("") == 0 ||
-        mishra.applicationName.compare("") == 0 ||
-        mishra.namesData.compare("") == 0)){
-        return VALIDATION_NO_MISHRA_PARAMETERS;
+    if(strategySelection == STRATEGY_SELECTION_LEO &&
+       (leo.bandwidthData.compare("") == 0 ||
+        leo.powerData.compare("") == 0 ||
+        leo.applicationName.compare("") == 0 ||
+        leo.namesData.compare("") == 0)){
+        return VALIDATION_NO_LEO_PARAMETERS;
     }
 
 
@@ -596,11 +596,11 @@ ParametersValidation Parameters::validateSelector(){
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_FREQUENCY] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_MAPPING] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_HYPERTHREADING] = false;
-        // MISHRA
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_VIRTUAL_CORES] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_FREQUENCY] = true;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_MAPPING] = false;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_MISHRA][KNOB_HYPERTHREADING] = false;
+        // LEO
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_MAPPING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_HYPERTHREADING] = false;
         // USL
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_VIRTUAL_CORES] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_FREQUENCY] = true;
@@ -620,11 +620,11 @@ ParametersValidation Parameters::validateSelector(){
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_FREQUENCY] = true;
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_MAPPING] = true;
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_HYPERTHREADING] = false;
-        // MISHRA
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_VIRTUAL_CORES] = true;
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_FREQUENCY] = true;
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_MAPPING] = false;
-        knobsSupportPower[STRATEGY_PREDICTION_POWER_MISHRA][KNOB_HYPERTHREADING] = false;
+        // LEO
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_FREQUENCY] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_MAPPING] = false;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_HYPERTHREADING] = false;
 
         // Check if the knob enabled can be managed by the predictors specified.
         for(size_t i = 0; i < KNOB_NUM; i++){
@@ -634,12 +634,12 @@ ParametersValidation Parameters::validateSelector(){
             }
         }
 
-        if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_MISHRA &&
-             (mishra.bandwidthData.compare("") == 0 ||
-              mishra.powerData.compare("") == 0 ||
-              mishra.applicationName.compare("") == 0 ||
-              mishra.namesData.compare("") == 0)){
-                return VALIDATION_NO_MISHRA_PARAMETERS;
+        if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_LEO &&
+             (leo.bandwidthData.compare("") == 0 ||
+              leo.powerData.compare("") == 0 ||
+              leo.applicationName.compare("") == 0 ||
+              leo.namesData.compare("") == 0)){
+                return VALIDATION_NO_LEO_PARAMETERS;
         }
 
         // Currently, USL predictors only works with low discrepancy explorators.
@@ -680,7 +680,7 @@ template<> char const* enumStrings<StrategySelection>::data[] = {
     "ANALYTICAL",
     "FULLSEARCH",
     "LIMARTINEZ",
-    "MISHRA",
+    "LEO",
     "NUM" // <- Must always be the last
 };
 
@@ -688,13 +688,13 @@ template<> char const* enumStrings<StrategyPredictionPerformance>::data[] = {
     "AMDAHL",
     "USL",
     "USLP",
-    "MISHRA",
+    "LEO",
     "NUM" // <- Must always be the last
 };
 
 template<> char const* enumStrings<StrategyPredictionPower>::data[] = {
     "LINEAR",
-    "MISHRA",
+    "LEO",
     "NUM" // <- Must always be the last
 };
 
@@ -765,7 +765,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, migrateCollector);
     SETVALUE(xt, Bool, synchronousWorkers);
     SETVALUE(xt, Double, maxCalibrationTime);
-    SETVALUE(xt, Uint, maxCalibrationConfigurations);
+    SETVALUE(xt, Uint, maxCalibrationSteps);
     SETVALUE(xt, Double, maxPerformancePredictionError);
     SETVALUE(xt, Double, maxPowerPredictionError);
     SETVALUE(xt, Uint, regressionAging);
@@ -782,11 +782,11 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, ArrayEnums, loggersTypes);
     //xt.getArrayEnums<LoggerType>("loggersTypes", loggersTypes);
 
-    SETVALUE(xt, String, mishra.applicationName);
-    SETVALUE(xt, String, mishra.namesData);
-    SETVALUE(xt, String, mishra.bandwidthData);
-    SETVALUE(xt, String, mishra.powerData);
-    SETVALUE(xt, Uint, mishra.numSamples);
+    SETVALUE(xt, String, leo.applicationName);
+    SETVALUE(xt, String, leo.namesData);
+    SETVALUE(xt, String, leo.bandwidthData);
+    SETVALUE(xt, String, leo.powerData);
+    SETVALUE(xt, Uint, leo.numSamples);
 
     SETVALUE(xt, Bool, dataflow.orderedProcessing);
     SETVALUE(xt, Bool, dataflow.orderedOutput);

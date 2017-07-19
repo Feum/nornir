@@ -129,7 +129,7 @@ public:
 
 class KnobVirtualCoresFarm: public KnobVirtualCores{
     template <typename lb_t, typename gt_t>
-    friend class ManagerFarm;
+    friend class ManagerFastFlow;
 public:
     KnobVirtualCoresFarm(Parameters p,
                   AdaptiveNode* emitter, AdaptiveNode* collector,

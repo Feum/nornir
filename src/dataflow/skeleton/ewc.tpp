@@ -126,8 +126,8 @@ void* ReduceGatherer<T, fun>::compute(std::vector<void*> in){
     q = ai->getArray()->get(ai->geti());
     delete ai;
 #else
-    p = (T*) in.at(0);
-    q = (T*) in.at(1);
+    p = static_cast<T*>(in.at(0));
+    q = static_cast<T*>(in.at(1));
 #endif
     T* x = fun(p,q);
     for(int i = 2; i < _numPartitions; i++){
@@ -140,7 +140,7 @@ void* ReduceGatherer<T, fun>::compute(std::vector<void*> in){
         }
         delete ai;
 #else
-        T* a = (T*) in.at(i);
+        T* a = static_cast<T*>(in.at(i));
 #endif
         x = fun(x, a);
     }
@@ -206,7 +206,7 @@ void MapWorker<T, V, fun>::compute(Data* d){
     first=0;
 #endif
     for(int i=first; i<nElem;i++){
-        T* x = (T*) w1->get(i);
+        T* x = static_cast<T*>(w1->get(i));
         V* y = fun(x);
         w1->set(i, y);
     }

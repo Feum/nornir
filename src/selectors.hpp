@@ -478,13 +478,13 @@ public:
  * Energy Under Performance Constraints" - Mishra, Nikita and Zhang, Huazhe
  * and Lafferty, John D. and Hoffmann, Henry
  */
-class SelectorMishra: public SelectorFixedExploration{
+class SelectorLeo: public SelectorFixedExploration{
 public:
-    SelectorMishra(const Parameters& p,
+    SelectorLeo(const Parameters& p,
                    const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
-    ~SelectorMishra();
+    ~SelectorLeo();
 };
 
 /**

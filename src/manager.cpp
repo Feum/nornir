@@ -70,7 +70,7 @@ using namespace mammut::utils;
 static Parameters& validate(Parameters& p){
     ParametersValidation apv = p.validate();
     if(apv != VALIDATION_OK){
-        throw runtime_error("Invalid adaptivity parameters: " + std::to_string(apv));
+        throw runtime_error("Invalid parameters: " + std::to_string(apv));
     }
     return p;
 }
@@ -319,10 +319,8 @@ void Manager::setDomainToHighestFrequency(const Domain* domain){
     if(!domain->setGovernor(GOVERNOR_PERFORMANCE)){
         if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
            !domain->setHighestFrequencyUserspace()){
-            throw runtime_error("AdaptivityManagerFarm: Fatal error while "
-                                "setting highest frequency for sensitive "
-                                "emitter/collector. Try to run it without "
-                                "sensitivity parameters.");
+            throw runtime_error("Manager: Fatal error when trying to set"
+                                "domain to maximum frequency.");
         }
     }
 }
@@ -373,8 +371,8 @@ Selector* Manager::createSelector() const{
             case STRATEGY_SELECTION_LIMARTINEZ:{
                 return new SelectorLiMartinez(_p, *_configuration, _samples);
             }break;
-            case STRATEGY_SELECTION_MISHRA:{
-                return new SelectorMishra(_p, *_configuration, _samples);
+            case STRATEGY_SELECTION_LEO:{
+                return new SelectorLeo(_p, *_configuration, _samples);
             }break;
             case STRATEGY_SELECTION_FULLSEARCH:{
                 return new SelectorFullSearch(_p, *_configuration, _samples);

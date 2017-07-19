@@ -85,7 +85,7 @@ TEST(ManagerTest, GlobalTest) {
             for(string testcase : getTestCases(arch, bench)){ // And for all testcases on that benchmark
                 std::cout << "Running test: " << arch << " - " << bench <<
                              " - " << testcase << std::endl;
-                Parameters p = getParameters(arch, getTestPath(arch, bench, testcase) + "parameters.xml");
+                Parameters  p = getParameters(arch, getTestPath(arch, bench, testcase) + "parameters.xml");
                 // Sampling can be done faster since it is just simulated.
                 p.samplingIntervalCalibration = 1;
                 p.samplingIntervalSteady = 1;

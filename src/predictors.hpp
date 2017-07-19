@@ -454,7 +454,7 @@ public:
  * Energy Under Performance Constraints" - Mishra, Nikita and Zhang, Huazhe
  * and Lafferty, John D. and Hoffmann, Henry
  */
-class PredictorMishra: public Predictor{
+class PredictorLeo: public Predictor{
 private:
     std::map<KnobsValues, size_t> _confIndexes;
     arma::vec _values;
@@ -462,12 +462,12 @@ private:
     bool _preparationNeeded;
     size_t _appId;
 public:
-    PredictorMishra(PredictorType type,
+    PredictorLeo(PredictorType type,
               const Parameters& p,
               const Configuration& configuration,
               const Smoother<MonitoredSample>* samples);
 
-    ~PredictorMishra();
+    ~PredictorLeo();
 
     bool readyForPredictions();
 

@@ -47,7 +47,7 @@
  *         knobMappingEnabled = true
  *
  *         In addition to that, we also developed and compared with:
- *             strategySelection = STRATEGY_SELECTION_MISHRA
+ *             strategySelection = STRATEGY_SELECTION_LEO
  *             strategySelection = STRATEGY_SELECTION_FULLSEARCH
  *             strategySelection = STRATEGY_SELECTION_LIMARTINEZ
  *         and also with
@@ -145,7 +145,7 @@ typedef enum{
     // "A Probabilistic Graphical Model-based Approach for Minimizing
     // Energy Under Performance Constraints" - Mishra, Nikita and Zhang, Huazhe
     // and Lafferty, John D. and Hoffmann, Henry
-    STRATEGY_SELECTION_MISHRA,
+    STRATEGY_SELECTION_LEO,
 
     STRATEGY_SELECTION_NUM // <- Must always be the last.
 }StrategySelection;
@@ -156,7 +156,7 @@ typedef enum{
     STRATEGY_PREDICTION_PERFORMANCE_AMDAHL = 0,
     STRATEGY_PREDICTION_PERFORMANCE_USL,
     STRATEGY_PREDICTION_PERFORMANCE_USLP, // <- More precise than USL but needs one additional calibration point.
-    STRATEGY_PREDICTION_PERFORMANCE_MISHRA,
+    STRATEGY_PREDICTION_PERFORMANCE_LEO,
     STRATEGY_PREDICTION_PERFORMANCE_NUM // <- This must always be the last.
 }StrategyPredictionPerformance;
 
@@ -164,7 +164,7 @@ typedef enum{
 // if the selection strategy is "LEARNING".
 typedef enum{
     STRATEGY_PREDICTION_POWER_LINEAR = 0,
-    STRATEGY_PREDICTION_POWER_MISHRA,
+    STRATEGY_PREDICTION_POWER_LEO,
     STRATEGY_PREDICTION_POWER_NUM // <- This must always be the last.
 }StrategyPredictionPower;
 
@@ -292,8 +292,8 @@ typedef enum{
     // Blocking threshold needs to be specified.
     VALIDATION_BLOCKING_PARAMETERS,
 
-    // Parameters for Mishra predictors not specified.
-    VALIDATION_NO_MISHRA_PARAMETERS,
+    // Parameters for Leo predictors not specified.
+    VALIDATION_NO_LEO_PARAMETERS,
 }ParametersValidation;
 
 /**
@@ -535,7 +535,7 @@ typedef struct{
      * Number of samples to be used [default = 20].
      */
     uint numSamples;
-}MishraParameters;
+}LeoParameters;
 
 typedef struct{
     /**
@@ -565,10 +565,10 @@ typedef struct{
 }DataflowParameters;
 
 /*!
- * \class AdaptivityParameters
- * \brief This class contains parameters for adaptivity choices.
+ * \class Parameters
+ * \brief This class contains nornir parameters.
  *
- * This class contains parameters for adaptivity choices.
+ * This class contains nornir parameters.
  */
 class Parameters{
     friend class Manager;
@@ -736,8 +736,8 @@ public:
     // Flag to enable/disable hyperthreading knob [default = false].
     bool knobHyperthreadingEnabled;
 
-    // Parameters for Mishra predictor.
-    MishraParameters mishra;
+    // Parameters for LEO predictor.
+    LeoParameters leo;
 
     // Flag to enable/disable cores turbo boosting [default = false].
     bool turboBoost;
@@ -803,8 +803,8 @@ public:
     // phase. 0 is no limit. We will keep calibrating until the error is
     // higher than the max*PredictionError AND calibration time is lower
     // than the maxCalibrationTime AND the number of visited configurations
-    // is lower than maxCalibrationConfigurations [default = 0.0].
-    uint maxCalibrationConfigurations;
+    // is lower than maxCalibrationSteps [default = 0.0].
+    uint maxCalibrationSteps;
 
     // Maximum error percentage allowed for performance prediction.
     // [default = 10.0].
@@ -892,15 +892,15 @@ public:
     std::vector<Logger*> loggers;
 
     /**
-     * Creates the adaptivity parameters.
+     * Creates the nornir paramters.
      * @param communicator The communicator used to instantiate the other
      *        modules. If NULL, the modules will be created as local modules.
      */
     explicit Parameters(mammut::Communicator* const communicator = NULL);
 
     /**
-     * Creates the adaptivity parameters.
-     * @param paramFileName The name of the XML file containing the adaptivity
+     * Creates the nornir parameters.
+     * @param paramFileName The name of the XML file containing the nornir
      *        parameters.
      * @param communicator The communicator used to instantiate the other
      *        modules. If NULL, the modules will be created as local modules.
@@ -915,7 +915,7 @@ public:
 
     /**
      * Loads the parameters from a file.
-     * @param paramFileName The name of the XML file containing the adaptivity
+     * @param paramFileName The name of the XML file containing the nornir
      *        parameters.
      */
     void load(const std::string& paramFileName);

@@ -164,7 +164,7 @@ void Selector::stopCalibration(){
         _totalCalibrationTime += cs.duration;
         cs.numTasks = _totalTasks - _calibrationStartTasks;
         if(_joulesCounter){
-            cs.joules = ((CounterCpus*) _joulesCounter)->getJoules();
+            cs.joules = dynamic_cast<CounterCpus*>(_joulesCounter)->getJoules();
         }
         _calibrationStats.push_back(cs);
         _numCalibrationPoints = 0;
@@ -661,8 +661,8 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
                         predictor = new PredictorUsl(type, p, configuration, samples);
                     }
                 }break;
-                case STRATEGY_PREDICTION_PERFORMANCE_MISHRA:{
-                    predictor = new PredictorMishra(type, p, configuration, samples);
+                case STRATEGY_PREDICTION_PERFORMANCE_LEO:{
+                    predictor = new PredictorLeo(type, p, configuration, samples);
                 }break;
                 default:{
                     throw std::runtime_error("Unknown prediction strategy.");
@@ -678,8 +678,8 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
                         predictor = new PredictorLinearRegression(type, p, configuration, samples);
                     }
                 }break;
-                case STRATEGY_PREDICTION_POWER_MISHRA:{
-                    predictor = new PredictorMishra(type, p, configuration, samples);
+                case STRATEGY_PREDICTION_POWER_LEO:{
+                    predictor = new PredictorLeo(type, p, configuration, samples);
                 }break;
                 default:{
                     throw std::runtime_error("Unknown prediction strategy.");
@@ -861,7 +861,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(){
             _forced = false;
             DEBUG("Input bandwidth fluctuations, recomputing best solution.");
         }else if((!_p.maxCalibrationTime || getTotalCalibrationTime() < _p.maxCalibrationTime) &&
-                 (!_p.maxCalibrationConfigurations || _totalCalPoints < _p.maxCalibrationConfigurations) &&
+                 (!_p.maxCalibrationSteps || _totalCalPoints < _p.maxCalibrationSteps) &&
                  ((!accurate && _accuracyViolations > _p.tolerableSamples) ||
                   (isBestSolutionFeasible() && !_forced && contractViolated && _contractViolations > _p.tolerableSamples))){
             /******************* More calibration points. *******************/
@@ -965,17 +965,17 @@ KnobsValues SelectorFixedExploration::getNextKnobsValues(){
     }
 }
 
-SelectorMishra::SelectorMishra(const Parameters& p,
+SelectorLeo::SelectorLeo(const Parameters& p,
                const Configuration& configuration,
                const Smoother<MonitoredSample>* samples):
         SelectorFixedExploration(p, configuration, samples,
-                       std::unique_ptr<Predictor>(new PredictorMishra(PREDICTION_BANDWIDTH, p, configuration, samples)),
-                       std::unique_ptr<Predictor>(new PredictorMishra(PREDICTION_POWER, p, configuration, samples)),
-                       p.mishra.numSamples){
+                       std::unique_ptr<Predictor>(new PredictorLeo(PREDICTION_BANDWIDTH, p, configuration, samples)),
+                       std::unique_ptr<Predictor>(new PredictorLeo(PREDICTION_POWER, p, configuration, samples)),
+                       p.leo.numSamples){
     ;
 }
 
-SelectorMishra::~SelectorMishra(){
+SelectorLeo::~SelectorLeo(){
     ;
 }
 

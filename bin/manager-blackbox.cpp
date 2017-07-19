@@ -316,7 +316,7 @@ int main(int argc, char * argv[]){
             *handlerCreated = false;
             if(execve(arguments[0], arguments, environ) == -1){
                 std::cerr << "Impossible to run the specified executable. Terminating the manager." << std::endl;
-                ((ManagerBlackBox*) mmem)->terminate();
+                static_cast<ManagerBlackBox*>(mmem)->terminate();
                 // Useless since is never executed, inserted only to avoid cppcheck errors.
                 for(size_t i = 0; i < sp.program.size(); i++){
                     delete[] arguments[i];
@@ -343,7 +343,7 @@ int main(int argc, char * argv[]){
 
         for(size_t i = 0; i < pids.size() + scheduledPrograms.size(); i++){
             ManagerBlackBox* m;
-            while((m = (ManagerBlackBox*) mm.getTerminatedManager()) == NULL){
+            while((m = static_cast<ManagerBlackBox*>(mm.getTerminatedManager())) == NULL){
                 sleep(1);
             }
             DEBUG("Manager (" << m << ") terminated.");

@@ -104,7 +104,7 @@ int main(int argc, char * argv[]){
         //TODO: If we will let this work for remote machines too, we will need
         // to also send archfile.xml
         Parameters p("parameters.xml");
-        ParametersValidation pv = p.validate();
+        ConfigurationValidation pv = p.validate();
         DEBUG("Sending validation result.");
         r = ai->channel.send(&pv, sizeof(pv), 0);
         assert(r == sizeof(pv));
@@ -119,11 +119,13 @@ int main(int argc, char * argv[]){
         if(m){
             for(auto it = instances.begin(); it != instances.end(); it++){
                 if((*it)->manager == m){
+                    auto newit = it + 1;
                     DEBUG("Application manager terminated, cleaning.");
                     delete ((*it)->manager);
                     (*it)->channel.shutdown((*it)->chid);
                     ApplicationInstance* ai = (*it);
                     instances.erase(it);
+                    it = newit;
                     delete ai;
                 }
             }

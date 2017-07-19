@@ -96,7 +96,7 @@ typedef struct{
 class AdaptiveNode: public ff::ff_node{
 private:
     template <typename L, typename G>
-    friend class ManagerFarm;
+    friend class ManagerFastFlow;
     friend class KnobVirtualCoresFarm;
     friend class KnobMappingFarm;
     friend class TriggerQBlocking;

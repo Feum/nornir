@@ -155,7 +155,7 @@ class Logger{
     friend class Manager;
 
     template <typename T, typename V>
-    friend class ManagerFarm;
+    friend class ManagerFastFlow;
 private:
     unsigned int _timeOffset;
     unsigned int _startMonitoring;

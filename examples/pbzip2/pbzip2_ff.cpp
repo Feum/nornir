@@ -2536,7 +2536,7 @@ int main(int argc, char* argv[])
 					
 				    nornir::Parameters ap("parameters.xml");
                     ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
-				    nornir::ManagerFarm<> amf(&farm, ap);
+				    nornir::ManagerFastFlow<> amf(&farm, ap);
                     amf.start();
                     amf.join();
 #if 0
@@ -2594,7 +2594,7 @@ int main(int argc, char* argv[])
 				nornir::Parameters ap("parameters.xml");
                 ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
                 std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
-				nornir::ManagerFarm<> amf(&farm, ap);
+				nornir::ManagerFastFlow<> amf(&farm, ap);
 				amf.start();
 				amf.join();
 

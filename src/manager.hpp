@@ -64,7 +64,6 @@ using namespace mammut::task;
 using namespace mammut::topology;
 using namespace mammut::utils;
 
-struct MonitoredSample;
 
 // How to react to the calibration of other applications
 // in order to do not interfere too much with them.
@@ -180,7 +179,7 @@ protected:
 
     /**
      * Returns the execution time of the application (milliseconds).
-     * - For ManagerFarm, it will be the execution time of the farm.
+     * - For ManagerFastflow, it will be the execution time of the pattern.
      * - For ManagerInstrumented, it will be the execution time between
      *   the construction of the 'Instrumentation' object and the call of the
      *   'terminate' function on it (application side).
@@ -321,7 +320,7 @@ public:
      * adaptivity decisions.
      */
     ManagerInstrumented(const std::string& knarrChannel,
-                    Parameters nornirParameters);
+                        Parameters nornirParameters);
 
     /**
      * Creates an adaptivity manager for an instrumented application.
@@ -331,8 +330,8 @@ public:
      * adaptivity decisions.
      */
     ManagerInstrumented(nn::socket& knarrSocket,
-                    int chid,
-                    Parameters nornirParameters);
+                        int chid,
+                        Parameters nornirParameters);
 
     /**
      * Destroyes this adaptivity manager.
@@ -409,13 +408,15 @@ protected:
 };
 
 /*!
- * \class ManagerFarm
- * \brief This class manages the adaptivity in farm based computations.
+ * \class ManagerFastflow
+ * \brief This class manages the adaptivity in applications written
+ * with FastFlow programming framework.
  *
- * This class manages the adaptivity in farm based computations.
+ * This class manages the adaptivity in applications written
+ * with FastFlow programming framework.
  */
 template <typename lb_t = ff::ff_loadbalancer, typename gt_t = ff::ff_gatherer>
-class ManagerFarm: public Manager{
+class ManagerFastFlow: public Manager{
 public:
     /**
      * Creates a farm adaptivity manager.
@@ -423,12 +424,12 @@ public:
      * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters nornirParameters);
+    ManagerFastFlow(ff_farm<lb_t, gt_t>* farm, Parameters nornirParameters);
 
     /**
      * Destroyes this adaptivity manager.
      */
-    ~ManagerFarm();
+    ~ManagerFastFlow();
 private:
     // The managed farm.
     ff_farm<lb_t, gt_t>* _farm;

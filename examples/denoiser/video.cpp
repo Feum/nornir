@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
     if(numframes){
         ap.expectedTasksNumber = numframes*numfiles;
     }
-    nornir::ManagerFarm<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
+    nornir::ManagerFastFlow<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
 
     amf.start();
     amf.join();

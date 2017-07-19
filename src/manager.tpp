@@ -65,7 +65,7 @@ using namespace mammut::topology;
 using namespace mammut::utils;
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::waitForStart(){
+void ManagerFastFlow<lb_t, gt_t>::waitForStart(){
     if(_p.qSize){
         _farm->setFixedSize(true);
         // We need to multiply for the number of workers since FastFlow
@@ -86,14 +86,14 @@ void ManagerFarm<lb_t, gt_t>::waitForStart(){
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::askForSample(){
+void ManagerFastFlow<lb_t, gt_t>::askForSample(){
     for(size_t i = 0; i < _activeWorkers.size(); i++){
         _activeWorkers.at(i)->askForSample();
     }
 }
 
 template <typename lb_t, typename gt_t>
-MonitoredSample ManagerFarm<lb_t, gt_t>::getSampleResponse(){
+MonitoredSample ManagerFastFlow<lb_t, gt_t>::getSampleResponse(){
     MonitoredSample sample;    
     uint numActiveWorkers = _activeWorkers.size();
     for(size_t i = 0; i < numActiveWorkers; i++){
@@ -111,13 +111,13 @@ MonitoredSample ManagerFarm<lb_t, gt_t>::getSampleResponse(){
 }
 
 template <typename lb_t, typename gt_t>
-MonitoredSample ManagerFarm<lb_t, gt_t>::getSample(){
+MonitoredSample ManagerFastFlow<lb_t, gt_t>::getSample(){
     askForSample();
     return getSampleResponse();
 }
 
 template <typename lb_t, typename gt_t>
-ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm,
+ManagerFastFlow<lb_t, gt_t>::ManagerFastFlow(ff_farm<lb_t, gt_t>* farm,
                                      Parameters parameters):
         Manager(parameters),
         _farm(farm),
@@ -135,7 +135,7 @@ ManagerFarm<lb_t, gt_t>::ManagerFarm(ff_farm<lb_t, gt_t>* farm,
 }
 
 template <typename lb_t, typename gt_t>
-ManagerFarm<lb_t, gt_t>::~ManagerFarm(){
+ManagerFastFlow<lb_t, gt_t>::~ManagerFastFlow(){
     delete _samples;
     delete _variations;
     if(_selector){
@@ -147,7 +147,7 @@ ManagerFarm<lb_t, gt_t>::~ManagerFarm(){
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::initNodesPreRun() {
+void ManagerFastFlow<lb_t, gt_t>::initNodesPreRun() {
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
         _activeWorkers.at(i)->initPreRun(&_p, NODE_TYPE_WORKER, &_terminated);
     }
@@ -163,7 +163,7 @@ void ManagerFarm<lb_t, gt_t>::initNodesPreRun() {
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::initNodesPostRun() {
+void ManagerFastFlow<lb_t, gt_t>::initNodesPostRun() {
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
         _activeWorkers.at(i)->initPostRun();
     }
@@ -177,7 +177,7 @@ void ManagerFarm<lb_t, gt_t>::initNodesPostRun() {
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::postConfigurationManagement(){
+void ManagerFastFlow<lb_t, gt_t>::postConfigurationManagement(){
     const KnobVirtualCoresFarm* knobWorkers = dynamic_cast<const KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
     std::vector<AdaptiveNode*> newWorkers = knobWorkers->getActiveWorkers();
     MonitoredSample sample;
@@ -200,7 +200,7 @@ void ManagerFarm<lb_t, gt_t>::postConfigurationManagement(){
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::terminationManagement(){
+void ManagerFastFlow<lb_t, gt_t>::terminationManagement(){
     DEBUG("Terminating...wait freezing.");
     _farm->wait_freezing();
     _farm->wait();
@@ -208,19 +208,19 @@ void ManagerFarm<lb_t, gt_t>::terminationManagement(){
 }
 
 template <typename lb_t, typename gt_t>
-ulong ManagerFarm<lb_t, gt_t>::getExecutionTime(){
+ulong ManagerFastFlow<lb_t, gt_t>::getExecutionTime(){
     return _farm->ffTime();
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::shrinkPause(){
+void ManagerFastFlow<lb_t, gt_t>::shrinkPause(){
     KnobVirtualCoresFarm* k = dynamic_cast<KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
 	k->prepareToFreeze();
 	k->freeze();
 }
 
 template <typename lb_t, typename gt_t>
-void ManagerFarm<lb_t, gt_t>::stretchPause(){
+void ManagerFastFlow<lb_t, gt_t>::stretchPause(){
     KnobVirtualCoresFarm* k = dynamic_cast<KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
 	size_t v = k->getRealValue();
 	k->prepareToRun(v);

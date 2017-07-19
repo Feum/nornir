@@ -307,7 +307,7 @@ private:
     bool _nodesCreated;
     const Parameters* _params;
     bool _paramsCreated;
-    ManagerFarm<>* _manager;
+    ManagerFastFlow<>* _manager;
 
     template <class S, class W>
     void init(size_t numWorkers){
@@ -449,7 +449,7 @@ public:
             (dynamic_cast<SchedulerBase<I>*>(_farm->getEmitter()))->setLb(_farm->getlb());
         }
         preStart();
-        _manager = new ManagerFarm<>(_farm, *_params);
+        _manager = new ManagerFastFlow<>(_farm, *_params);
         _manager->start();
     }
 
