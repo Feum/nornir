@@ -1,5 +1,5 @@
 /*
- * monitor.hpp
+ * instrumenter.hpp
  *
  * Created on: 03/07/2016
  *
@@ -25,8 +25,8 @@
  * =========================================================================
  */
 
-#ifndef NORNIR_CLIENT_HPP_
-#define NORNIR_CLIENT_HPP_
+#ifndef NORNIR_INSTRUMENTER_HPP_
+#define NORNIR_INSTRUMENTER_HPP_
 
 #include "external/knarr/src/knarr.hpp"
 #include "external/knarr/src/external/cppnanomsg/nn.hpp"
@@ -36,50 +36,32 @@
 #define INSTRUMENTATION_CONNECTION_CHANNEL "ipc:///tmp/nornir.ipc"
 
 namespace nornir{
-class Instrumenter: public mammut::utils::NonCopyable{
+
+class InstrumenterHelper: public knarr::Application, mammut::utils::NonCopyable{
+public:
+    InstrumenterHelper(std::pair<nn::socket*, uint> p,
+                       size_t numThreads = 1,
+                       knarr::Aggregator* aggregator = NULL):
+        knarr::Application(*p.first, p.second, numThreads, aggregator){;}
+};
+
+/**
+ * Extends knarr::Application by providing a way to automatically connect
+ * to the nornir manager server.
+ */
+class Instrumenter: public InstrumenterHelper{
 private:
-    nn::socket _channel;
-    int _chid;
-    knarr::Application* _app;
+    std::pair<nn::socket*, uint> getChannel(const std::string& parametersFile) const;
 public:
     /**
      * Creates a client for interaction with a local server.
      * @param parameters The file containing the Nornir parameters.
      */
-    explicit Instrumenter(const std::string& parametersFile);
-
-    /**
-     * Creates a client for interaction with a remote server.
-     * @param parameters The file containing the Nornir parameters.
-     * @param serverAddress The address of the remote Nornir server.
-     * @param port The port where the remote Nornir server is listening.
-     */
-    Instrumenter(const std::string& parametersFile, const std::string& serverAddress, uint port = 9999);
-
-    /**
-     * Destroys the handle.
-     */
-    ~Instrumenter();
-
-    /**
-     * This function must be called at each loop iteration when the computation
-     * part of the loop begins.
-     */
-    void begin();
-
-    /**
-     * This function must be called at each loop iteration when the computation
-     * part of the loop ends.
-     */
-    void end();
-
-    /**
-     * This function must only be called once, when the parallel part
-     * of the application terminates.
-     */
-    void terminate();
+    explicit Instrumenter(const std::string& parametersFile,
+                          size_t numThreads = 1,
+                          knarr::Aggregator* aggregator = NULL);
 };
 
 }
 
-#endif /* NORNIR_CLIENT_HPP_ */
+#endif /* NORNIR_INSTRUMENTER_HPP_ */

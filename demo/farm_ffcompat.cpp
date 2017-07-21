@@ -44,7 +44,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "../src/manager.hpp"
+#include "../src/nornir.hpp"
 
 using namespace ff;
 

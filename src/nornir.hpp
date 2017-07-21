@@ -1,10 +1,7 @@
 /*
- * manager-single.cpp
+ * nornir.hpp
  *
- * Monitors and adapt an external application by using the knarr library.
- * Needs the explicit channel name. This is deprecated. Use manager-external.
- *
- * Created on: 21/06/2016
+ * Created on: 20/07/2017
  *
  * =========================================================================
  *  Copyright (C) 2015-, Daniele De Sensi (d.desensi.software@gmail.com)
@@ -27,29 +24,14 @@
  *
  * =========================================================================
  */
+#ifndef NORNIR_HPP_
+#define NORNIR_HPP_
 
-#include <vector>
-#include <iostream>
-#include <fstream>
-#include "../src/nornir.hpp"
+#include "./dataflow/interpreter.hpp"
+#include "interface.hpp"
+#include "instrumenter.hpp"
+#include "manager.hpp"
+#include "manager-multi.hpp"
+#include "stats.hpp"
 
-using namespace nornir;
-
-int main(int argc, char * argv[]) {
-    char* channelName = NULL;
-    if(argc != 2) {
-        std::cerr << "use: " 
-                  << argv[0] 
-                  << " channelName\n";
-        return -1;
-    }   
-    channelName = argv[1];
-
-    Parameters p("parameters.xml");
-    ManagerInstrumented m(channelName, p);
-    m.start();
-    m.join();
-
-    return 0;
-}
-
+#endif // NORNIR_HPP_

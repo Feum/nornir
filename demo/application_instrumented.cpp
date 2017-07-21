@@ -25,7 +25,7 @@
  * =========================================================================
  */
 
-#include "../src/monitor.hpp"
+#include "../src/nornir.hpp"
 
 #include <unistd.h>
 

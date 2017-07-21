@@ -441,7 +441,7 @@ ParametersValidation Parameters::validateKnobFrequencies(){
     if(fastReconfiguration &&
        (!isHighestFrequencySettable() ||
          strategyUnusedVirtualCores == STRATEGY_UNUSED_VC_NONE)){
-        return VALIDATION_NO_FAST_RECONF;
+        fastReconfiguration = false;
     }
 
     if(mammut.getInstanceCpuFreq()->isBoostingSupported()){
@@ -520,8 +520,8 @@ ParametersValidation Parameters::validateRequirements(){
 
     // TODO: Remove Utilization requirements (can be obtained through
     // bandwidth + tolerance/conservative
-    // Only 1 min/max requirement can be specified.
-    if(maxMinRequirements != 1){
+    // At most 1 min/max requirement can be specified.
+    if(maxMinRequirements > 1){
         return VALIDATION_WRONG_REQUIREMENT;
     }
 

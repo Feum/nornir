@@ -517,6 +517,7 @@ void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){
     }
 }
 
+#define FREQUENCY_NONE std::numeric_limits<Frequency>::max()
 
 KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
         _p(p),
@@ -527,17 +528,26 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
     _frequencyHandler->removeTurboFrequencies();
     std::vector<mammut::cpufreq::Frequency> availableFrequencies;
     availableFrequencies = _frequencyHandler->getDomains().at(0)->getAvailableFrequencies();
-    _realValue = availableFrequencies.front();
-
-    std::vector<mammut::cpufreq::Domain*> scalableDomains;
-    scalableDomains = _frequencyHandler->getDomains();
-    for(size_t i = 0; i < scalableDomains.size(); i++){
-        Domain* currentDomain = scalableDomains.at(i);
-        if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
-            throw runtime_error("KnobFrequency: Impossible "
-                                "to set the specified governor.");
+    if(availableFrequencies.empty()){
+        if(_p.knobFrequencyEnabled){
+            throw std::runtime_error("Frequencies not available. Please set "
+                                     "knobFrequencyEnabled to false.");
+        }else{
+            availableFrequencies.push_back(FREQUENCY_NONE);
+        }
+    }else{
+        std::vector<mammut::cpufreq::Domain*> scalableDomains;
+        scalableDomains = _frequencyHandler->getDomains();
+        for(size_t i = 0; i < scalableDomains.size(); i++){
+            Domain* currentDomain = scalableDomains.at(i);
+            if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
+                throw runtime_error("KnobFrequency: Impossible "
+                                    "to set the specified governor.");
+            }
         }
     }
+    _realValue = availableFrequencies.front();
+
     for(size_t i = 0; i < availableFrequencies.size(); i++){
         _knobValues.push_back(availableFrequencies.at(i));
     }
@@ -545,31 +555,35 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
 
 void KnobFrequency::changeValue(double v){
     DEBUG("[Frequency] Changing real value to: " << v);
-    std::vector<mammut::cpufreq::Domain*> scalableDomains;
-    scalableDomains = _frequencyHandler->getDomains(_knobMapping.getActiveVirtualCores());
-    for(size_t i = 0; i < scalableDomains.size(); i++){
-        Domain* currentDomain = scalableDomains.at(i);
-        if(!currentDomain->setFrequencyUserspace((uint)v)){
-            throw runtime_error("KnobFrequency: Impossible "
-                                "to set the specified frequency.");
+    if(v != FREQUENCY_NONE){
+        std::vector<mammut::cpufreq::Domain*> scalableDomains;
+        scalableDomains = _frequencyHandler->getDomains(_knobMapping.getActiveVirtualCores());
+        for(size_t i = 0; i < scalableDomains.size(); i++){
+            Domain* currentDomain = scalableDomains.at(i);
+            if(!currentDomain->setFrequencyUserspace((uint)v)){
+                throw runtime_error("KnobFrequency: Impossible "
+                                    "to set the specified frequency.");
+            }
         }
+        DEBUG("[Frequency] Frequency changed for domains: " << scalableDomains);
     }
     applyUnusedVCStrategy(v);
-    DEBUG("[Frequency] Frequency changed for domains: " << scalableDomains);
     DEBUG("[Frequency] Active VC: " << _knobMapping.getActiveVirtualCores());
     DEBUG("[Frequency] Unused VC: " << _knobMapping.getUnusedVirtualCores());
 }
 
 void KnobFrequency::applyUnusedVCStrategySame(const vector<VirtualCore*>& unusedVc, Frequency v){
-    vector<Domain*> unusedDomains = _frequencyHandler->getDomainsComplete(unusedVc);
-    DEBUG("[Frequency] " << unusedDomains.size() << " unused domains.");
-    for(size_t i = 0; i < unusedDomains.size(); i++){
-        Domain* domain = unusedDomains.at(i);
-        DEBUG("[Frequency] Setting unused domain " << domain->getId() << " to: " << v);
-        if(!domain->setFrequencyUserspace((uint)v)){
-            throw runtime_error("KnobFrequency: Impossible "
-                                "to set the specified frequency.");
-        }    
+    if(v != FREQUENCY_NONE){
+        vector<Domain*> unusedDomains = _frequencyHandler->getDomainsComplete(unusedVc);
+        DEBUG("[Frequency] " << unusedDomains.size() << " unused domains.");
+        for(size_t i = 0; i < unusedDomains.size(); i++){
+            Domain* domain = unusedDomains.at(i);
+            DEBUG("[Frequency] Setting unused domain " << domain->getId() << " to: " << v);
+            if(!domain->setFrequencyUserspace((uint)v)){
+                throw runtime_error("KnobFrequency: Impossible "
+                                    "to set the specified frequency.");
+            }
+        }
     }
 }
 
@@ -588,7 +602,7 @@ void KnobFrequency::applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& 
     for(size_t i = 0; i < unusedDomains.size(); i++){
         Domain* domain = unusedDomains.at(i);
         if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
-           !domain->setLowestFrequencyUserspace()){
+           (_p.knobFrequencyEnabled && !domain->setLowestFrequencyUserspace())){
             throw runtime_error("KnobFrequency: Impossible to "
                                 "set lowest frequency for unused "
                                 "virtual cores.");

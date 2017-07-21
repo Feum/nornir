@@ -6,7 +6,7 @@
 #include <stdio.h> 
 #include <linux/limits.h>
 #include <time.h>
-#include "../src/manager.hpp"
+#include "../src/nornir.hpp"
 
 inline std::vector<std::string> getTestingArchitectures(){
     return {"repara"};

@@ -46,7 +46,7 @@
 #include "netlist.h"
 #include "rng.h"
 
-#include "../../src/interface.hpp"
+#include "../../src/nornir.hpp"
 
 using namespace std;
 using namespace nornir;

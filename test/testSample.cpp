@@ -5,7 +5,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <time.h>
-#include "../src/manager.hpp"
+#include "../src/nornir.hpp"
 #include "gtest/gtest.h"
 
 

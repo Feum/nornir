@@ -34,7 +34,7 @@
 //    ofarm(Stage1+Stage2)
 
 #include <opencv2/opencv.hpp>
-#include "../../manager.hpp"
+#include "../../src/nornir.hpp"
 
 using namespace ff; 
 using namespace cv;

@@ -46,7 +46,7 @@
 */
 
 #include <iostream>
-#include "../../src/manager.hpp"
+#include "../../src/nornir.hpp"
 #include <ff/spin-lock.hpp>
 
 #include "marX2.h"

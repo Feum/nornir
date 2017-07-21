@@ -27,7 +27,7 @@
 
 #include <iostream>
 #include <stdlib.h>
-#include "../../src/dataflow/interpreter.hpp"
+#include "../../src/nornir.hpp"
 
 using namespace nornir::dataflow;
 

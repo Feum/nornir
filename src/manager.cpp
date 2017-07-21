@@ -93,6 +93,7 @@ Manager::Manager(Parameters nornirParameters):
         _pid(0),
         _toSimulate(false)
 {
+    DEBUG("Initializing manager.");
     for(LoggerType lt : _p.loggersTypes){
         switch(lt){
         case LOGGER_FILE:{
@@ -120,11 +121,13 @@ Manager::~Manager(){
 
 void Manager::run(){
     _p.mammut.getInstanceCpuFreq()->removeTurboFrequencies();
+    DEBUG("Turbo frequencies removed.");
     if(!_toSimulate){
         _counter = _p.mammut.getInstanceEnergy()->getCounter();
         _task = _p.mammut.getInstanceTask();
         _topology = _p.mammut.getInstanceTopology();
     }
+    DEBUG("Mammut handlers created.");
 
     if(isPrimaryRequirement(_p.requirements.executionTime)){
         _remainingTasks = _p.requirements.expectedTasksNumber;
@@ -132,6 +135,7 @@ void Manager::run(){
     }
 
     waitForStart();
+    DEBUG("Application started.");
 
     /** Wait for the disinhibition from global manager. **/
     while(_inhibited){;}
@@ -155,7 +159,7 @@ void Manager::run(){
 
     while(!_terminated){
         double overheadMs = getMillisecondsTime() - startSample;
-        if(_selector->isCalibrating()){
+        if(_selector && _selector->isCalibrating()){
             samplingInterval = _p.samplingIntervalCalibration;
             steadySamples = 0;
         }else if(steadySamples < _p.steadyThreshold){
@@ -521,10 +525,14 @@ void Manager::logObservation(){
 ManagerInstrumented::ManagerInstrumented(const std::string& knarrChannel,
                                  Parameters nornirParameters):
         Manager(nornirParameters), _monitor(knarrChannel){
+    DEBUG("Creating configuration.");
     Manager::_configuration = new ConfigurationExternal(_p);
+    DEBUG("Configuration created.");
     lockKnobs();
+    DEBUG("Knobs locked.");
     _configuration->createAllRealCombinations();
     _selector = createSelector();
+    DEBUG("Selector created.");
     // For instrumented application we do not care if synchronous of not
     // (we count iterations).
     _p.synchronousWorkers = false;

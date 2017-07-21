@@ -8,7 +8,7 @@
 #include <stdio.h> 
 #include <linux/limits.h>
 #include <time.h>
-#include "../src/manager.hpp"
+#include "../src/nornir.hpp"
 #include "gtest/gtest.h"
 
 using namespace nornir;

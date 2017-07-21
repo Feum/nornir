@@ -8,7 +8,7 @@
  * The main file.
  */
 
-#include "../../../src/dataflow/interpreter.hpp"
+#include "../../../src/nornir.hpp"
 #include "ProbeTask.hpp"
 #include "Flow.hpp"
 #include "Stages.hpp"

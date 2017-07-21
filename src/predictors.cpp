@@ -154,7 +154,11 @@ RegressionDataServiceTime::RegressionDataServiceTime(const Parameters &p,
     _phyCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
     Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().at(0);
     d->removeTurboFrequencies();
-    _minFrequency = d->getAvailableFrequencies().at(0);
+    if(!d->getAvailableFrequencies().empty()){
+        _minFrequency = d->getAvailableFrequencies().at(0);
+    }else if(_p.knobFrequencyEnabled){
+        throw std::runtime_error("Please set knobFrequencyEnabled to false.");
+    }
     init(_configuration.getRealValues());
 }
 
@@ -240,7 +244,13 @@ RegressionDataPower::RegressionDataPower(const Parameters &p,
     _strategyUnused = _p.strategyUnusedVirtualCores;
     Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().front();
     d->removeTurboFrequencies();
-    _lowestFrequency = d->getAvailableFrequencies().front();
+
+    if(!d->getAvailableFrequencies().empty()){
+        _lowestFrequency = d->getAvailableFrequencies().front();
+    }else if(_p.knobFrequencyEnabled){
+        throw std::runtime_error("Please set knobFrequencyEnabled to false.");
+    }
+
     init(_configuration.getRealValues());
 }
 

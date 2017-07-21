@@ -29,7 +29,7 @@
 
 #include <iostream>
 #include <stdlib.h>
-#include "../../../src/dataflow/interpreter.hpp"
+#include "../../../src/nornir.hpp"
 
 #define FIXED_STREAM
 
@@ -622,8 +622,8 @@ int main(int argc, char** argv){
     /* Create interpreter. */
     nornir::Parameters par("parameters.xml");
 #ifdef FIXED_STREAM
-    par.expectedTasksNumber = atoi(argv[1])*graph.getNumMdfi();
-    std::cout << "Expected tasks number: " << par.expectedTasksNumber << std::endl;
+    par.requirements.expectedTasksNumber = atoi(argv[1])*graph.getNumMdfi();
+    std::cout << "Expected tasks number: " << par.requirements.expectedTasksNumber << std::endl;
 #endif
     nornir::dataflow::Interpreter inter(&par, &graph, &inp, &out);
     inter.start();

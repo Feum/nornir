@@ -150,7 +150,7 @@
 #define PRIu64 "llu"
 #endif
 
-#include "../../src/interface.hpp"
+#include "../../src/nornir.hpp"
 
 /* ------------------ FastFlow specific ---------------- */
 

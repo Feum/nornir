@@ -42,7 +42,7 @@ using namespace tbb;
 #ifdef ENABLE_FF
 //#define BLOCKING_MODE
 #include <iostream>
-#include "../../../src/dataflow/interpreter.hpp"
+#include "../../../src/nornir.hpp"
 
 using namespace ff;
 using namespace nornir;

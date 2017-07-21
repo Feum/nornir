@@ -34,9 +34,7 @@
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
-#include "../src/manager.hpp"
-#include "../src/manager-multi.hpp"
-#include "../src/monitor.hpp"
+#include "../src/nornir.hpp"
 
 using namespace nornir;
 using namespace nn;
@@ -60,10 +58,32 @@ public:
     int chid;
     ManagerInstrumented *manager;
 
-    ApplicationInstance():channel(AF_SP, NN_PAIR), chid(0), manager(NULL), observer(NULL){;}
+    ApplicationInstance():channel(AF_SP, NN_PAIR), chid(0), manager(NULL){;}
 };
 
+void managerCleanup(Manager* m, std::list<ApplicationInstance*>& instances){
+    if(m){
+        for(auto it = instances.begin(); it != instances.end(); it++){
+            if((*it)->manager == m){
+                auto newit = std::next(it);
+                DEBUG("Application manager terminated, cleaning.");
+                delete ((*it)->manager);
+                (*it)->channel.shutdown((*it)->chid);
+                ApplicationInstance* ai = (*it);
+                instances.erase(it);
+                it = newit;
+                delete ai;
+            }
+        }
+    }
+}
+
 int main(int argc, char * argv[]){
+    // TODO: at the moment we do not support concurrent applications.
+    // In the future the value of this flag should be given by the user
+    // when starts this executable.
+    bool multipleApplications = false;
+
     nn::socket mainChannel(AF_SP, NN_PAIR);
     int mainChid;
     mainChid = mainChannel.bind(INSTRUMENTATION_CONNECTION_CHANNEL);
@@ -72,7 +92,11 @@ int main(int argc, char * argv[]){
     if(system("chmod ugo+rwx /tmp/nornir.ipc") == -1){throw std::runtime_error("Impossible to set permission to nornir channel.");}
     if(system("chmod ugo+rwx /tmp/nornir/") == -1){throw std::runtime_error("Impossible to set permission nornir dir.");}
     ManagerMulti mm;
-    mm.start();
+    if(multipleApplications){
+        mm.start();
+        DEBUG("ManagerMulti started.");
+    }
+
     while(true){
         pid_t pid;
         size_t r = mainChannel.recv(&pid, sizeof(pid), 0);
@@ -80,7 +104,9 @@ int main(int argc, char * argv[]){
 
         DEBUG("Received a request from process " << pid);
         ApplicationInstance* ai = new ApplicationInstance;
-        ai->chid = ai->channel.bind((string("ipc:///tmp/nornir/") + mammut::utils::intToString(pid) + string(".ipc")).c_str());
+        ai->chid = ai->channel.bind((string("ipc:///tmp/nornir/") +
+                                     mammut::utils::intToString(pid) +
+                                     string(".ipc")).c_str());
         DEBUG("Created app channel.");
 
         DEBUG("Sending ack.");
@@ -94,7 +120,7 @@ int main(int argc, char * argv[]){
         char* parameters = new char[length];
         DEBUG("Receiving parameters.");
         r = ai->channel.recv(parameters, length*sizeof(char), 0);
-        assert(r == (int) (sizeof(char)*length));
+        assert(r == (sizeof(char)*length));
         std::string parametersString(parameters);
         std::ofstream out("parameters.xml");
         out << parametersString;
@@ -104,32 +130,32 @@ int main(int argc, char * argv[]){
         //TODO: If we will let this work for remote machines too, we will need
         // to also send archfile.xml
         Parameters p("parameters.xml");
-        ConfigurationValidation pv = p.validate();
+        ParametersValidation pv = p.validate();
         DEBUG("Sending validation result.");
         r = ai->channel.send(&pv, sizeof(pv), 0);
         assert(r == sizeof(pv));
         ai->manager = new ManagerInstrumented(ai->channel, ai->chid, p);
         ai->manager->start();
-        instances.push_back(ai);
-        mm.addManager(ai->manager);
+        DEBUG("Manager started.");
+
+        // Add to the list of running managers and to the multimanager.
+        if(multipleApplications){
+            instances.push_back(ai);
+            mm.addManager(ai->manager);
+        }
 
         /** Try to join and delete already terminated managers. **/
         Manager* m;
-        m = mm.getTerminatedManager();
-        if(m){
-            for(auto it = instances.begin(); it != instances.end(); it++){
-                if((*it)->manager == m){
-                    auto newit = it + 1;
-                    DEBUG("Application manager terminated, cleaning.");
-                    delete ((*it)->manager);
-                    (*it)->channel.shutdown((*it)->chid);
-                    ApplicationInstance* ai = (*it);
-                    instances.erase(it);
-                    it = newit;
-                    delete ai;
-                }
-            }
+        // Corunning applications.
+        if(multipleApplications){
+            m = mm.getTerminatedManager();
+        }else{
+            // Single application.
+            m = ai->manager;
+            DEBUG("Joining manager.");
+            m->join();
         }
+        managerCleanup(m, instances);
     }
     mainChannel.shutdown(mainChid);
     return 0;

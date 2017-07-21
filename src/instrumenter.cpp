@@ -38,8 +38,19 @@
 #include <unistd.h>
 
 #include "parameters.hpp"
-#include "monitor.hpp"
+#include "instrumenter.hpp"
 #include "external/mammut/mammut/mammut.hpp"
+
+#undef DEBUG
+#undef DEBUGB
+
+#ifdef DEBUG_INSTRUMENTER
+#define DEBUG(x) do { std::cerr << "[Instrumenter] " << x << std::endl; } while (0)
+#define DEBUGB(x) do {x} while (0)
+#else
+#define DEBUG(x)
+#define DEBUGB(x)
+#endif
 
 namespace nornir{
 
@@ -47,8 +58,9 @@ using namespace std;
 using namespace mammut;
 using namespace mammut::utils;
 
-Instrumenter::Instrumenter(const std::string& parametersFile):
-        _channel(AF_SP, NN_PAIR){
+std::pair<nn::socket*, uint> Instrumenter::getChannel(const std::string& parametersFile) const{
+    nn::socket* channel = new nn::socket(AF_SP, NN_PAIR);
+    int chid;
 
     /** Send pid, then switch to the pid channel. */
     nn::socket mainChannel(AF_SP, NN_PAIR);
@@ -57,28 +69,35 @@ Instrumenter::Instrumenter(const std::string& parametersFile):
     if(mainChid < 0){
         throw std::runtime_error("Impossible to connect to Nornir.");
     }
+    DEBUG("Connected to main channel.");
     pid_t pid = getpid();
     int ret = mainChannel.send(&pid, sizeof(pid), 0);
     assert(ret == sizeof(pid));
+    DEBUG("PID sent.");
     // Wait ack. This is needed because we have to be sure that the pid channel
     // has been created before trying to connect.
     char ack;
     ret = mainChannel.recv(&ack, sizeof(ack), 0);
     assert(ret == sizeof(ack));
+    DEBUG("Ack received.");
     mainChannel.shutdown(mainChid);
+    DEBUG("Main channel closed.");
 
     /** Send content length. **/
     std::stringstream out;
     out << pid;
-    _chid = _channel.connect((string("ipc:///tmp/nornir/") + out.str() + string(".ipc")).c_str());
-    assert(_chid >= 0);
+    chid = channel->connect((string("ipc:///tmp/nornir/") + out.str() +
+                             string(".ipc")).c_str());
+    DEBUG("Connected to application channel.");
+    assert(chid >= 0);
     vector<string> lines = readFile(parametersFile);
     size_t length = 0;
     for(size_t i = 0; i < lines.size(); i++){
         length += lines.at(i).length();
     }
     length += 1;
-    ret = _channel.send(&length, sizeof(length), 0);
+    ret = channel->send(&length, sizeof(length), 0);
+    DEBUG("Parameters sent.");
     assert(ret == sizeof(length));
 
     /** Send content. **/
@@ -89,42 +108,26 @@ Instrumenter::Instrumenter(const std::string& parametersFile):
     }
     fileContent.push_back('\0');
     const char* fileContentC = fileContent.c_str();
-    ret = _channel.send(fileContentC, length, 0);
+    ret = channel->send(fileContentC, length, 0);
     assert(ret == (int) length);
 
     /** Receive validation result. **/
     ParametersValidation pv;
-    ret = _channel.recv(&pv, sizeof(pv), 0);
+    ret = channel->recv(&pv, sizeof(pv), 0);
     assert(ret == sizeof(pv));
+    DEBUG("Validation results received.");
     if(pv != VALIDATION_OK){
         throw runtime_error("Invalid adaptivity parameters: " + std::to_string(pv));
     }
 
-    /** Create knarr app. **/
-    _app = new knarr::Application(_channel, _chid);
+    return std::pair<nn::socket*, uint>(channel, chid);
 }
 
 Instrumenter::Instrumenter(const std::string& parametersFile,
-               const std::string& serverAddress,
-               uint port):_channel(AF_SP, NN_PAIR), _chid(0), _app(NULL){
-    throw std::runtime_error("Not yet implemented.");
-}
-
-Instrumenter::~Instrumenter(){
-    _channel.shutdown(_chid);
-    delete _app;
-}
-
-void Instrumenter::begin(){
-    _app->begin();
-}
-
-void Instrumenter::end(){
-    _app->end();
-}
-
-void Instrumenter::terminate(){
-    _app->terminate();
+                           size_t numThreads,
+                           knarr::Aggregator *aggregator):
+        InstrumenterHelper(getChannel(parametersFile), numThreads, aggregator){
+    ;
 }
 
 }

@@ -35,9 +35,7 @@
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <stdlib.h>
-#include "../src/manager.hpp"
-#include "../src/manager-multi.hpp"
-#include "../src/external/mammut/mammut/external/papi-5.5.1/src/papi.h"
+#include "../src/nornir.hpp"
 #include <tclap/CmdLine.h>
 
 using namespace nornir;
@@ -273,7 +271,7 @@ int main(int argc, char * argv[]){
             stringstream out;
             out << sp.start;
             std::string logPrefix = logDir + "/" + out.str() + "_" + mammut::utils::split(sp.program.at(0), '/').back();
-            p.loggers.push_back(new Logger(logPrefix + "_stats.csv",
+            p.loggers.push_back(new LoggerFile(logPrefix + "_stats.csv",
                                       logPrefix + "_calibration.csv",
                                       logPrefix + "_summary.csv",
                                       mammut::utils::getMillisecondsTime() - startTime));

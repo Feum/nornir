@@ -33,7 +33,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "../src/interface.hpp"
+#include "../src/nornir.hpp"
 
 using namespace ff;
 
