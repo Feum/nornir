@@ -32,24 +32,24 @@
 extern "C"{
 #endif
 
-struct instrumenterC;
-typedef struct instrumenterC instrumenterC;
+struct NornirInstrumenter;
+typedef struct NornirInstrumenter NornirInstrumenter;
 
-instrumenterC* instrumenterC_create(const char* parametersFile);
+NornirInstrumenter* nornir_instrumenter_create(const char* parametersFile);
 
-instrumenterC* instrumenterC_create_with_threads(const char* parametersFile, size_t numThreads);
+NornirInstrumenter* nornir_instrumenter_create_with_threads(const char* parametersFile, size_t numThreads);
 
-void instrumenterC_destroy(instrumenterC* instrumenter);
+void nornir_instrumenter_destroy(NornirInstrumenter* instrumenter);
 
-void instrumenterC_begin(instrumenterC* instrumenter);
+void nornir_instrumenter_begin(NornirInstrumenter* instrumenter);
 
-void instrumenterC_begin_with_threads(instrumenterC* instrumenter, size_t threadId);
+void nornir_instrumenter_begin_with_threads(NornirInstrumenter* instrumenter, size_t threadId);
 
-void instrumenterC_end(instrumenterC* instrumenter);
+void nornir_instrumenter_end(NornirInstrumenter* instrumenter);
 
-void instrumenterC_end_with_threads(instrumenterC* instrumenter, size_t threadId);
+void nornir_instrumenter_end_with_threads(NornirInstrumenter* instrumenter, size_t threadId);
 
-void instrumenterC_terminate(instrumenterC* instrumenter);
+void nornir_instrumenter_terminate(NornirInstrumenter* instrumenter);
 
 #ifdef __cplusplus
 }

@@ -134,35 +134,35 @@ Instrumenter::Instrumenter(const std::string& parametersFile,
 }
 
 extern "C"{    
-    instrumenterC* instrumenterC_create(const char* parametersFile){
-        return reinterpret_cast<instrumenterC*>(new nornir::Instrumenter(parametersFile));
+    NornirInstrumenter* nornir_instrumenter_create(const char* parametersFile){
+        return reinterpret_cast<NornirInstrumenter*>(new nornir::Instrumenter(parametersFile));
     }
 
-    instrumenterC* instrumenterC_create_with_threads(const char* parametersFile, size_t numThreads){
-        return reinterpret_cast<instrumenterC*>(new nornir::Instrumenter(parametersFile, numThreads));
+    NornirInstrumenter* nornir_instrumenter_create_with_threads(const char* parametersFile, size_t numThreads){
+        return reinterpret_cast<NornirInstrumenter*>(new nornir::Instrumenter(parametersFile, numThreads));
     }
 
-    void instrumenterC_destroy(instrumenterC* instrumenter){
+    void nornir_instrumenter_destroy(NornirInstrumenter* instrumenter){
         delete reinterpret_cast<nornir::Instrumenter*>(instrumenter);
     }
 
-    void instrumenterC_begin(instrumenterC* instrumenter){
+    void nornir_instrumenter_begin(NornirInstrumenter* instrumenter){
         reinterpret_cast<nornir::Instrumenter*>(instrumenter)->begin();
     }
 
-    void instrumenterC_begin_with_threads(instrumenterC* instrumenter, size_t threadId){
+    void nornir_instrumenter_begin_with_threads(NornirInstrumenter* instrumenter, size_t threadId){
         reinterpret_cast<nornir::Instrumenter*>(instrumenter)->begin(threadId);
     }
 
-    void instrumenterC_end(instrumenterC* instrumenter){
+    void nornir_instrumenter_end(NornirInstrumenter* instrumenter){
         reinterpret_cast<nornir::Instrumenter*>(instrumenter)->end();
     }
 
-    void instrumenterC_end_with_threads(instrumenterC* instrumenter, size_t threadId){
+    void nornir_instrumenter_end_with_threads(NornirInstrumenter* instrumenter, size_t threadId){
         reinterpret_cast<nornir::Instrumenter*>(instrumenter)->end(threadId);
     }
 
-    void instrumenterC_terminate(instrumenterC* instrumenter){
+    void nornir_instrumenter_terminate(NornirInstrumenter* instrumenter){
         reinterpret_cast<nornir::Instrumenter*>(instrumenter)->terminate();
     }
 }
