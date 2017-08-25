@@ -265,37 +265,40 @@ manager.join(); // Wait for farm end.
                         the type of resources on which we would like to operate and other additional parameters
                         for algorithm tuning. Such parameters can be specified programmatically, by setting
                         the members of the <code>Parameters</code> class, or by specifying an XML file name
-                        in the constructor of the <code>Parameters</code> class. The most important parameters
+                        in the constructor of the <code>Parameters</code> class. 
+                        The most important parameters that can be specified by the user concern the requirements,
+                        and they are:
+
+                     	<ol id="manualcontent">
+                            <li><b>powerConsumption</b>: The maximum allowed power consumption.</li>
+                            <li><b>bandwidth</b>: The minimum required bandwidth in terms of application elements processed per second.</li>
+                            <li><b>executionTime</b>: The maximum required completion time.</li>
+                            <li><b>expectedTasksNumber</b>: The number of applications elements to be processed by the application.</li>
+                            <li><b>minUtilization</b>: The minimum allowed utilization (in the queueing theory sense), between 0 and 100 (default = 80.0).</li>
+                            <li><b>maxUtilization</b>: The maximum allowed utilization (in the queueing theory sense), between 0 and 100 (default = 90.0).</li>
+							<li><b>latency</b>: The maximum latency per iteration (NOT SUPPORTED AT THE MOMENT).</li>
+                        </ol>
+  						</p>
+  						<p>
+                        If specified programmatically, such parameters must be specified under the
+                        <code>requirements</code> object. If specified through an XML file, they must
+                        be specified under <code>&lt;requirements&gt;</code> XML tag, as shown
+                        in the following example, where the user asks Nornir to find the most performing configuration
+                        with a maximum power consumption of 50 watts:
+<pre class="prettyprint">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;adaptivityParameters&gt;
+	&lt;requirements&gt;
+		&lt;bandwidth&gt;MAX&lt;/bandwidth&gt;
+		&lt;powerConsumption&gt;50&lt;/powerConsumption&gt;
+	&lt;/requirements&gt;
+&lt;/adaptivityParameters&gt;
+</pre>
+  						</p>
+  						<p>
+                        Other important parameters
                         that can be specified by the user are:</p>
                      	<ol id="manualcontent">
-                            <li><b>contractType</b>: Describes the type of guarantees that the user requires. It
-                            can be one of the following:
-                                <ol id="manualcontent">
-                                    <li><b>POWER_BUDGET</b>: A maximum power consumption allowed for the application. The maximum
-                                    power consumption allowed will be specified through the <code>powerBudget</code> parameter.</li>
-                                    <li><b>PERF_BANDWIDTH</b>: A minimum bandwidth required in terms of number of application elements
-                                    processed per second. It can only be specified for 
-                                    applications written with the Nornir Programming Environment, FastFlow Applications and
-                                    Instrumented Applications. The required bandwidth will be specified through the 
-                                    <code>requiredBandwidth</code> parameter.</li>
-                                    <li><b>PERF_COMPLETION_TIME</b>: A maximum completion time required. It can only be specified for 
-                                    applications written with the Nornir Programming Environment, FastFlow Applications and
-                                    Instrumented Applications. The required completion time will be specified through the
-                                    <code>requiredCompletionTime</code> parameter. 
-                                    Moreover, the user needs to specify how many elements will be processed
-                                    by the application in the <code>expectedTasksNumber</code> parameter.</li>
-                                    <li><b>PERF_MAX</b>: The user required the maximum performance possible for his application.</li>
-                                    <li><b>PERF_UTILIZATION</b>: Keep the utilization factor of the application (in a queueing theory
-                                    meaning) in a range specified through the <code>underloadThresholdFarm</code> and
-                                    <code>overloadThresholdFarm</code> parameters.</li>
-                                </ol>
-                            </li>
-                            <li><b>powerBudget</b>: The maximum allowed power consumption.</li>
-                            <li><b>requiredBandwidth</b>: The minimum required bandwidth in terms of application elements processed per second.</li>
-                            <li><b>requiredCompletionTime</b>: The maximum required completion time.</li>
-                            <li><b>expectedTasksNumber</b>: The number of applications elements to be processed by the application.</li>
-                            <li><b>underloadThresholdFarm</b>: The lower bound for the utilization range, between 0 and 100 (default = 80.0).</li>
-                            <li><b>overloadThresholdFarm</b>: The higher bound for the utilization range, between 0 and 100 (default = 90.0).</li>
                             <li><b>knobCoresEnabled</b>: Allows Nornir to find the best amount of cores allocated to the application (default = true).</li>
                             <li><b>knobMappingEnabled</b>: Allows Nornir to find the best allocation of threads on cores (default = true).</li>
                             <li><b>knobFrequencyEnabled</b>: Allows Nornir to find the best clock frequency (default = true).</li>
@@ -304,15 +307,7 @@ manager.join(); // Wait for farm end.
                         <p>
                         There exist other additional parameters but they are mostly used for performance tuning and
                         debugging. Accordingly, they will not be documented at the moment.</br>
-                        In the following code snippet, we show an example of XML parameters configuration file, where
-                        the user requires a maximum power consumption of 50 watts:
-<pre class="prettyprint">
-&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-&lt;adaptivityParameters&gt;
-    &lt;contractType&gt;POWER_BUDGET&lt;/contractType&gt;
-    &lt;powerBudget&gt;50&lt;/powerBudget&gt;
-&lt;/adaptivityParameters&gt;
-</pre>
+
                 		</p>
       				<!------------------->
       				<!-- Customization -->
@@ -348,13 +343,28 @@ manager.join(); // Wait for farm end.
                         papers:</p>
                         <div class="alert alert-success" role="alert">
                            <ul id="manualcontent">
+							   <li>
+                                 De Sensi, Daniele and De Matteis, Tiziano and Danelutto, Marco (2017)</br>
+                                 <b>Nornir: A Customisable Framework for Autonomic and Power-Aware Applications</b></br>
+                                 In <i>Euro-Par 2017 Workshops, Proc. of the Auto-DaSP Workshop </i>
+                               </li> 
+							   <li>
+                                 Aldinucci, Marco and Danelutto, Marco and De Sensi, Daniele and Mencagli, Gabriele and Torquati, Massimo (2017)</br>
+                                 <b>Towards Power-Aware Data Pipelining on Multicores</b></br>
+                                 In <i>Proc. of HLPP2017: Intl. Workshop on High-Level Parallel Programming</i>
+                               </li>                           
+							   <li>
+                                 Danelutto, Marco and De Sensi, Daniele and Torquati, Massimo (2017) </br>
+                                 <b>A Power-Aware, Self-Adaptive Macro Data Flow Framework</b></br>
+                                 In <i>Parallel Processing Letters</i>, pp. 1740004, March 2017 
+                               </li>
                                <li>
                                  De Sensi, Daniele (2016)</br>
                                  <b>Predicting Performance and Power Consumption of Parallel Applications</b></br>
                                  In <i>Proceedings of 24th Euromicro International Conference on Parallel, Distributed, and Network-Based Processing (PDP)</i>, pp. 200 -- 207
                                </li>
                                <li>
-                                  De Sensi, Daniele and Danelutto, Marco and Torquati, Massimo (2015) </br>
+                                 Danelutto, Marco and De Sensi, Daniele and Torquati, Massimo (2015) </br>
                                  <b>Energy driven adaptivity in stream parallel computations</b></br>
                                  In <i>Proceedings of 23th Euromicro International Conference on Parallel, Distributed, and Network-Based Processing (PDP)</i>, pp. 103 -- 110
                                </li>
