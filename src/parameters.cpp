@@ -482,7 +482,18 @@ ParametersValidation Parameters::validateRequirements(){
        requirements.bandwidth < 0){
         return VALIDATION_WRONG_REQUIREMENT;
     }
+    if(requirements.executionTime != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.executionTime != NORNIR_REQUIREMENT_MIN &&
+       requirements.executionTime < 0){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+    if(requirements.powerConsumption != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.powerConsumption != NORNIR_REQUIREMENT_MIN &&
+       requirements.powerConsumption < 0){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
     if(requirements.latency != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.latency != NORNIR_REQUIREMENT_MIN &&
        requirements.latency < 0){
         return VALIDATION_WRONG_REQUIREMENT;
     }
@@ -527,7 +538,6 @@ ParametersValidation Parameters::validateRequirements(){
 
     return VALIDATION_OK;
 }
-
 ParametersValidation Parameters::validateSelector(){
     bool knobsSupportSelector[STRATEGY_SELECTION_NUM][KNOB_NUM];
     if(strategySelection == STRATEGY_SELECTION_NUM){
