@@ -34,7 +34,7 @@
 //    ofarm(Stage1+Stage2)
 
 #include <opencv2/opencv.hpp>
-#include "../../manager.hpp"
+#include "../../src/nornir.hpp"
 
 using namespace ff; 
 using namespace cv;
@@ -172,13 +172,11 @@ int main(int argc, char *argv[]) {
     Drain  drain(outvideo);
     ofarm.setCollectorF((ff_node*) &drain);
     
-    nornir::Observer obs;
     nornir::Parameters ap("parameters.xml");
-    ap.observer = &obs;
     if(numframes){
         ap.expectedTasksNumber = numframes*numfiles;
     }
-    nornir::ManagerFarm<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
+    nornir::ManagerFastFlow<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
 
     amf.start();
     amf.join();

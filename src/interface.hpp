@@ -49,6 +49,8 @@ private:
         _lb = lb;
     }
 public:
+    SchedulerBase():_lb(NULL){;}
+
     /**
      * Sends a task to one of the workers.
      * @param task The task to be sent.
@@ -297,7 +299,7 @@ public:
  * @tparam O The type of the tasks produced by the workers and received by the
  *           gatherer
  */
-template <typename I, typename O> class FarmBase{
+template <typename I, typename O> class FarmBase: public mammut::utils::NonCopyable{
 protected:
     ff::ff_farm<>* _farm;
     std::vector<ff::ff_node*> _workers;
@@ -305,7 +307,7 @@ private:
     bool _nodesCreated;
     const Parameters* _params;
     bool _paramsCreated;
-    ManagerFarm<>* _manager;
+    ManagerFastFlow<>* _manager;
 
     template <class S, class W>
     void init(size_t numWorkers){
@@ -371,7 +373,7 @@ public:
      * The constructor of the farm.
      * @param parameters The configuration parameters.
      */
-    FarmBase(const Parameters* parameters):_farm(NULL),
+    explicit FarmBase(const Parameters* parameters):_farm(NULL),
                                        _params(NULL), _manager(NULL){
         _nodesCreated = false;
         _params = parameters;
@@ -383,7 +385,7 @@ public:
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
      */
-    FarmBase(const std::string& paramFileName):_farm(NULL),
+    explicit FarmBase(const std::string& paramFileName):_farm(NULL),
                                           _params(NULL), _manager(NULL){
         _nodesCreated = false;
         _params = new Parameters(paramFileName);
@@ -413,6 +415,7 @@ public:
      */
     template <class S, class W>
     void start(size_t numWorkers){
+        // TODO Metter un valore di default per i workers (e.g. 0). IN tal caso girarlo con un numero di workers uguali al numero di cores.
         init<S, W>(numWorkers);
         start();
     }
@@ -446,7 +449,7 @@ public:
             (dynamic_cast<SchedulerBase<I>*>(_farm->getEmitter()))->setLb(_farm->getlb());
         }
         preStart();
-        _manager = new ManagerFarm<>(_farm, *_params);
+        _manager = new ManagerFastFlow<>(_farm, *_params);
         _manager->start();
     }
 
@@ -468,9 +471,9 @@ public:
                 delete _farm->getCollector();
             }
         }
-	if(_manager){
-	    delete _manager;
-	}
+        if(_manager){
+            delete _manager;
+        }
     }
 
     /**
@@ -499,14 +502,14 @@ public:
      * The constructor of the farm.
      * @param parameter The configuration parameters.
      */
-    Farm(const Parameters* parameters):FarmBase<I,O>(parameters){;}
+    explicit Farm(const Parameters* parameters):FarmBase<I,O>(parameters){;}
 
     /**
      * The constructor of the farm.
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
      */
-    Farm(const std::string& paramFileName):FarmBase<I,O>(paramFileName){;}
+    explicit Farm(const std::string& paramFileName):FarmBase<I,O>(paramFileName){;}
 
     /**
      * Adds the scheduler to the farm.
@@ -577,7 +580,7 @@ public:
      * The constructor of the farm.
      * @param parameters The configuration parameters.
      */
-    FarmAcceleratorBase(const Parameters* parameters):
+    explicit FarmAcceleratorBase(const Parameters* parameters):
             FarmBase<I,O>::FarmBase(parameters),
             _schedulerDummy(NULL){;}
 
@@ -586,7 +589,7 @@ public:
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
      */
-    FarmAcceleratorBase(const std::string& paramFileName):
+    explicit FarmAcceleratorBase(const std::string& paramFileName):
              FarmBase<I,O>::FarmBase(paramFileName),
              _schedulerDummy(NULL){;}
 
@@ -720,7 +723,7 @@ public:
      * The constructor of the farm.
      * @param parameters The configuration parameters.
      */
-    FarmAccelerator(const Parameters* parameters):
+    explicit FarmAccelerator(const Parameters* parameters):
             FarmAcceleratorBase<S, I, O, G>(parameters),
             _gathererDummy(NULL){;}
 
@@ -729,7 +732,7 @@ public:
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
      */
-    FarmAccelerator(const std::string& paramFileName):
+    explicit FarmAccelerator(const std::string& paramFileName):
             FarmAcceleratorBase<S, I, O, G>(paramFileName),
             _gathererDummy(NULL){;}
 
@@ -807,7 +810,7 @@ public:
      * The constructor of the farm.
      * @param parameters The configuration parameters.
      */
-    FarmAccelerator(const Parameters* parameters):
+    explicit FarmAccelerator(const Parameters* parameters):
             FarmAcceleratorBase<S, I, std::nullptr_t, std::nullptr_t>(parameters){;}
 
     /**
@@ -815,7 +818,7 @@ public:
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
      */
-    FarmAccelerator(const std::string& paramFileName):
+    explicit FarmAccelerator(const std::string& paramFileName):
             FarmAcceleratorBase<S, I, std::nullptr_t, std::nullptr_t>(paramFileName){;}
 };
 
@@ -829,7 +832,7 @@ public:
      * The constructor of the farm.
      * @param parameters The configuration parameters.
      */
-    FarmAccelerator(const Parameters* parameters):
+    explicit FarmAccelerator(const Parameters* parameters):
             FarmAcceleratorBase<S, I, O, std::nullptr_t>(parameters){;}
 
     /**
@@ -837,7 +840,7 @@ public:
      * @param paramFileName The filename of the XML file containing the
      *        configuration parameters.
      */
-    FarmAccelerator(const std::string& paramFileName):
+    explicit FarmAccelerator(const std::string& paramFileName):
             FarmAcceleratorBase<S, I, O, std::nullptr_t>(paramFileName){;}
 
     /**

@@ -27,7 +27,7 @@
 
 #include <iostream>
 #include <stdlib.h>
-#include "../../src/dataflow/interpreter.hpp"
+#include "../../src/nornir.hpp"
 
 using namespace nornir::dataflow;
 
@@ -39,20 +39,20 @@ private:
     size_t _streamSize;
     bool _eos;
 public:
-    inline DemoInputStream(size_t streamSize):
+    explicit inline DemoInputStream(size_t streamSize):
             _currentElem(0), _streamSize(streamSize), _eos(false){
         srand(time(NULL));
     }
 
     inline void* next(){
-        ArrayWrapper<float*>* aw;
         if(_currentElem < _streamSize){
             ++_currentElem;
             size_t size = rand() % MAX_SIZE;
-            aw = new ArrayWrapper<float*>(size);
+            ArrayWrapper<float*>* aw = new ArrayWrapper<float*>(size);
             std::cout << "Generated: [";
             for(size_t i = 0; i < size; i++){
-                float* x = new float((rand() % 100)* 0.1);
+                float* x = new float();
+                *x = (rand() % 100)* 0.1;
                 aw->set(i, x);
                 std::cout << *x << ", ";
             }
@@ -89,6 +89,7 @@ float* fun1(float* x){
 
 int* fun2(float* x){
     *x = floor(*x);
+    //cppcheck-suppress invalidPointerCast
     return (int*) x;
 }
 

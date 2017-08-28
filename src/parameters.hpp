@@ -23,6 +23,36 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  *
  * =========================================================================
+ *
+ * Strategies used/developed for different papers:
+ * - PDP2015:
+ *         strategySelection = STRATEGY_SELECTION_ANALYTICAL
+ *         knobMappingEnabled = false
+ *         (Actually was a simpler selection strategy than the current one).
+ *     - PPL2016:
+ *         strategySelection = STRATEGY_SELECTION_ANALYTICAL
+ *         knobMappingEnabled = false
+ * - PDP2016:
+ *         strategySelection =  STRATEGY_SELECTION_LEARNING
+ *         strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_AMDAHL
+ *         strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
+ *         strategyExploration = (Many of them)
+ *         knobMappingEnabled = false
+ * - TACO2016:
+ *         strategySelection = STRATEGY_SELECTION_LEARNING
+ *         strategyPredictionPerformance = STRATEGY_PREDICTION_PERFORMANCE_USL
+ *         strategyPredictionPower = STRATEGY_PREDICTION_POWER_LINEAR
+ *         strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_LOWEST_FREQUENCY
+ *         strategyExploration = STRATEGY_EXPLORATION_HALTON
+ *         knobMappingEnabled = true
+ *
+ *         In addition to that, we also developed and compared with:
+ *             strategySelection = STRATEGY_SELECTION_LEO
+ *             strategySelection = STRATEGY_SELECTION_FULLSEARCH
+ *             strategySelection = STRATEGY_SELECTION_LIMARTINEZ
+ *         and also with
+ *             knobMappingEnabled = false
+ *
  */
 
 
@@ -32,38 +62,34 @@
 #include "external/rapidXml/rapidxml.hpp"
 
 #include <cmath>
+#include <limits>
 #include <fstream>
-#include "external/Mammut/mammut/utils.hpp"
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/utils.hpp"
+#include "external/mammut/mammut/mammut.hpp"
+
+#define NORNIR_REQUIREMENT_UNDEF 0
+#define NORNIR_REQUIREMENT_MIN std::numeric_limits<double>::min()
+#define NORNIR_REQUIREMENT_MAX std::numeric_limits<double>::max()
 
 namespace nornir{
 
-#define MANAGER_VIRTUAL_CORE (VirtualCoreId) 0
+#define NORNIR_MANAGER_VIRTUAL_CORE (VirtualCoreId) 0
 
-class Observer;
+class Logger;
 
-/// Possible contracts requested by the user.
 typedef enum{
-    // No contract required.
-    CONTRACT_NONE = 0,
+    LOGGER_FILE = 0, // Log on file
+    LOGGER_GRAPHITE // Log on graphite
+}LoggerType;
 
-    // A specific utilization (expressed by two bounds [X, Y]) is requested.
-    // Under this constraint, the configuration with minimum power consumption
-    // is chosen.
-    CONTRACT_PERF_UTILIZATION,
-
-    // A specific minimum bandwidth is requested. Under this constraint, the
-    // configuration with minimum power consumption is chosen.
-    CONTRACT_PERF_BANDWIDTH,
-
-    // A specific maximum completion time is requested. Under this constraint,
-    // the configuration with minimum energy consumption is chosen.
-    CONTRACT_PERF_COMPLETION_TIME,
-
-    // A specific maximum cores power is requested. Under this constraint, the
-    // configuration with best performance is chosen.
-    CONTRACT_POWER_BUDGET
-}ContractType;
+// Possible knobs
+typedef enum{
+    KNOB_VIRTUAL_CORES = 0, // Number of contexts to be used.
+    KNOB_HYPERTHREADING, // Number of contexts to be used on each physical core.
+    KNOB_MAPPING, // Mapping of threads on physical cores.
+    KNOB_FREQUENCY,
+    KNOB_NUM  // <---- This must always be the last value
+}KnobType;
 
 /// Communication queues blocking/nonblocking.
 typedef enum{
@@ -119,25 +145,27 @@ typedef enum{
     // "A Probabilistic Graphical Model-based Approach for Minimizing
     // Energy Under Performance Constraints" - Mishra, Nikita and Zhang, Huazhe
     // and Lafferty, John D. and Hoffmann, Henry
-    STRATEGY_SELECTION_MISHRA
+    STRATEGY_SELECTION_LEO,
+
+    STRATEGY_SELECTION_NUM // <- Must always be the last.
 }StrategySelection;
 
 // Possible prediction strategies for performance. Can only be specified if the
 // selection strategy is "LEARNING".
 typedef enum{
     STRATEGY_PREDICTION_PERFORMANCE_AMDAHL = 0,
-    STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING,
     STRATEGY_PREDICTION_PERFORMANCE_USL,
-    STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING,
-    STRATEGY_PREDICTION_PERFORMANCE_MISHRA
+    STRATEGY_PREDICTION_PERFORMANCE_USLP, // <- More precise than USL but needs one additional calibration point.
+    STRATEGY_PREDICTION_PERFORMANCE_LEO,
+    STRATEGY_PREDICTION_PERFORMANCE_NUM // <- This must always be the last.
 }StrategyPredictionPerformance;
 
 // Possible prediction strategies for power consumption. Can only be specified
 // if the selection strategy is "LEARNING".
 typedef enum{
     STRATEGY_PREDICTION_POWER_LINEAR = 0,
-    STRATEGY_PREDICTION_POWER_LINEAR_MAPPING,
-    STRATEGY_PREDICTION_POWER_MISHRA
+    STRATEGY_PREDICTION_POWER_LEO,
+    STRATEGY_PREDICTION_POWER_NUM // <- This must always be the last.
 }StrategyPredictionPower;
 
 /// Possible ways to select the calibration points. Can only be specified if
@@ -202,15 +230,6 @@ typedef enum{
     STRATEGY_PERSISTENCE_VARIATION
 }StrategyPersistence;
 
-// Strategy to be applied when changing the number of cores.
-typedef enum{
-    // Changes the number of threads.
-    STRATEGY_CORES_RETHREADING = 0,
-
-    // Changes the mapping of the threads.
-    STRATEGY_CORES_REMAPPING
-}StrategyCoresChange;
-
 /// Possible parameters validation results.
 typedef enum{
     // Parameters are ok.
@@ -218,6 +237,17 @@ typedef enum{
 
     // Generic error
     VALIDATION_NO,
+
+    // Wrong requirement or combination of requirements.
+    VALIDATION_WRONG_REQUIREMENT,
+
+    // Some of the knobs enabled by the user is not supported
+    // by the selection algorithm he chosen.
+    VALIDATION_UNSUPPORTED_KNOBS,
+
+    // On this architecture is not possible to manually change
+    // the frequency.
+    VALIDATION_NO_MANUAL_DVFS,
 
     // Frequency can be changed by the operating system and the flag
     // "constant_tsc" is not present on the CPU. Accordingly, since we
@@ -256,14 +286,11 @@ typedef enum{
     // frequency scaling not available.
     VALIDATION_UNUSED_VC_NO_FREQUENCIES,
 
-    // Specified parameters are not valid for the specified contract.
-    VALIDATION_WRONG_CONTRACT_PARAMETERS,
-
     // Blocking threshold needs to be specified.
-    VALIDATION_NO_BLOCKING_THRESHOLD,
+    VALIDATION_BLOCKING_PARAMETERS,
 
-    // Parameters for Mishra predictors not specified.
-    VALIDATION_NO_MISHRA_PARAMETERS,
+    // Parameters for Leo predictors not specified.
+    VALIDATION_NO_LEO_PARAMETERS,
 }ParametersValidation;
 
 /**
@@ -342,6 +369,28 @@ public:
 
     /**
      * If an element named 'valueName' is present, its value is
+     * copied into 'value' and interpreted as a double. If the value
+     * of the element was the string "MIN", the minimum possible
+     * double is copied into 'value'.
+     * @param valueName The name of the XML element.
+     * @param value The value that will contain the element
+     *              valueName (if present).
+     */
+    void getDoubleOrMin(const char* valueName, double& value);
+
+    /**
+     * If an element named 'valueName' is present, its value is
+     * copied into 'value' and interpreted as a double. If the value
+     * of the element was the string "MAX", the maximum possible
+     * double is copied into 'value'.
+     * @param valueName The name of the XML element.
+     * @param value The value that will contain the element
+     *              valueName (if present).
+     */
+    void getDoubleOrMax(const char* valueName, double& value);
+
+    /**
+     * If an element named 'valueName' is present, its value is
      * copied into 'value' and interpreted as a string.
      * @param valueName The name of the XML element.
      * @param value The value that will contain the element
@@ -358,6 +407,17 @@ public:
      *              valueName (if present).
      */
     void getArrayUint(const char* valueName, std::vector<uint>& value);
+
+    /**
+     * If an element named 'valueName' is present, its value is
+     * copied into 'value' and interpreted as an array of enums
+     * (separated by ':').
+     * @param valueName The name of the XML element.
+     * @param value The value that will contain the element
+     *              valueName (if present).
+     */
+    template<typename T> void getArrayEnums(const char* valueName,
+                                            std::vector<T>& value);
 
     /**
      * If an element named 'valueName' is present, its value is
@@ -395,6 +455,58 @@ typedef struct ArchData{
     void loadXml(const std::string& archFileName);
 }ArchData;
 
+/*!
+ * \class Requirements
+ * \brief This class contains the requirements specified by the user.
+ *
+ * This class contains the requirements specified by the user.
+ */
+typedef struct Requirements{
+    // The bandwidth required for the application (expressed as tasks/sec).
+    // It must be greater or equal than 0.
+    // [default = unused].
+    double bandwidth;
+
+    // The maximum cores power to be used.
+    // It must be greater or equal than 0.
+    // [default = unused].
+    double powerConsumption;
+
+    // The underload threshold for the entire farm.
+    // It must be in [0, 100].
+    // [default = unused].
+    double minUtilization;
+
+    // The overload threshold for the entire farm.
+    // It must be in [0, 100].
+    // [default = unused].
+    double maxUtilization;
+
+    // The required completion time for the application (in seconds).
+    // It must be greater or equal than 0. When used, 'expectedTasksNumber'
+    // must be specified.
+    // [default = unused].
+    double executionTime;
+
+    // The maximum latency required for each input element processed by the
+    // application (in milliseconds).
+    // It must be greater or equal than 0.
+    // NOT AVAILABLE AT THE MOMENT.
+    double latency;
+
+    // The number of task expected for this computation.
+    // [default = unused].
+    double expectedTasksNumber;
+
+    Requirements();
+
+    /**
+     * Checks if any requirement has been specified.
+     * @return true if some requirement have been specified.
+     */
+    bool anySpecified() const;
+}Requirements;
+
 typedef struct{
     /**
      * The name of this application (it must matches with one of the names
@@ -420,7 +532,7 @@ typedef struct{
      * Number of samples to be used [default = 20].
      */
     uint numSamples;
-}MishraParameters;
+}LeoParameters;
 
 typedef struct{
     /**
@@ -450,13 +562,24 @@ typedef struct{
 }DataflowParameters;
 
 /*!
- * \class AdaptivityParameters
- * \brief This class contains parameters for adaptivity choices.
+ * \class Parameters
+ * \brief This class contains nornir parameters.
  *
- * This class contains parameters for adaptivity choices.
+ * This class contains nornir parameters.
  */
 class Parameters{
-private:
+    friend class Manager;
+private:    
+    // The type of loggers to be activated.
+    // It MUST be private because only the manager
+    // needs to access it. The loggers created by
+    // the manager will be deleted by the manager.
+    // If the user needs a new logger it must add it directly
+    // to the loggers vector, not to the loggersType.
+    std::vector<LoggerType> loggersTypes;
+
+    bool _knobEnabled[KNOB_NUM];
+
     /**
      * Sets default parameters
      */
@@ -539,19 +662,13 @@ private:
      * Validates the required contract.
      * @return The result of the validation.
      */
-    ParametersValidation validateContract();
+    ParametersValidation validateRequirements();
 
     /**                                                                                                                                                
      * Validates the selector.
      * @return The result of the validation.
      */
     ParametersValidation validateSelector();
-
-    /**
-     * Validates the predictor.
-     * @return The result of the validation.
-     */
-    ParametersValidation validatePredictor();
 
     /**
      * Loads the content of the parameters with the content
@@ -567,9 +684,8 @@ public:
     // Architecture's specific data.
     ArchData archData;
 
-    // The contract type that must be respected by the application
-    // [default = CONTRACT_NONE].
-    ContractType contractType;
+    // Requirements specified by the user.
+    Requirements requirements;
 
     // The Q blocking knob [default = KNOB_Q_BLOCKING_NO].
     TriggerConfQBlocking triggerQBlocking;
@@ -605,9 +721,6 @@ public:
     // Persistence strategy [default = STRATEGY_PERSISTENCE_SAMPLES].
     StrategyPersistence strategyPersistence;
 
-    // Cores change strategy [default = STRATEGY_CORES_RETHREADING].
-    StrategyCoresChange strategyCoresChange;
-
     // Flag to enable/disable cores knobs [default = true].
     bool knobCoresEnabled;
 
@@ -617,8 +730,11 @@ public:
     // Flag to enable/disable frequency knob [default = true].
     bool knobFrequencyEnabled;
 
-    // Parameters for Mishra predictor.
-    MishraParameters mishra;
+    // Flag to enable/disable hyperthreading knob [default = false].
+    bool knobHyperthreadingEnabled;
+
+    // Parameters for LEO predictor.
+    LeoParameters leo;
 
     // Flag to enable/disable cores turbo boosting [default = false].
     bool turboBoost;
@@ -643,6 +759,11 @@ public:
     // [default = 1 for samples, 5 for variation].
     double persistenceValue;
 
+    // The number of milliseconds required for the system to cooldown
+    // after a reconfiguration. Since this is a transient state, the statistics
+    // collected in the cooldownPeriod will be discarded [default = 200].
+    double cooldownPeriod;
+
     // The length of the sampling interval (in milliseconds) for the data
     // reading during calibration phase. If 0, it will be automatically computed
     // such to have a low performance overhead [default = 100].
@@ -658,50 +779,15 @@ public:
     // [default = 4].
     uint32_t steadyThreshold;
 
-    /// The minimum number of tasks in a worker sample. If 0, no minimum.
-    /// [default = 0].
+    // The minimum number of tasks in a worker sample. If 0, no minimum.
+    // [default = 0].
     uint minTasksPerSample;
 
-    // The underload threshold for the entire farm. It is valid only if
-    // contractType is CONTRACT_UTILIZATION [default = 80.0].
-    double underloadThresholdFarm;
-
-    // The overload threshold for the entire farm. It is valid only if
-    // contractType is CONTRACT_UTILIZATION [default = 90.0].
-    double overloadThresholdFarm;
-
-    // The underload threshold for a single worker. It is valid only if
-    // contractType is CONTRACT_UTILIZATION [default = 80.0].
-    double underloadThresholdWorker;
-
-    // The overload threshold for a single worker. It is valid only if
-    // contractType is CONTRACT_UTILIZATION [default = 90.0].
-    double overloadThresholdWorker;
-
-    // The bandwidth required for the application (expressed as tasks/sec).
-    // It is valid only if contractType is CONTRACT_BANDWIDTH
-    // [default = unused].
-    double requiredBandwidth;
-
-    // The required completion time for the application (in seconds). It is
-    // valid only if contractType is CONTRACT_COMPLETION_TIME
-    // [default = unused].
-    uint requiredCompletionTime;
-
-    // The number of task expected for this computation. It is
-    // valid only if contractType is CONTRACT_COMPLETION_TIME
-    // [default = unused].
-    ulong expectedTasksNumber;
-
-    /// If true, this is an application when the workers works synchronously,
-    /// i.e. the emitter works as a barrier between two successive iterations
-    /// of the workers. In this case, the emitter always broadcasts tasks
-    /// to all the workers [default = false].
+    // If true, this is an application when the workers works synchronously,
+    // i.e. the emitter works as a barrier between two successive iterations
+    // of the workers. In this case, the emitter always broadcasts tasks
+    // to all the workers [default = false].
     bool synchronousWorkers;
-
-    // The maximum cores power to be used. It is
-    // valid only if contractType is CONTRACT_POWER_BUDGET [default = unused].
-    double powerBudget;
 
     // Maximum calibration time (milliseconds). 0 is no limit.
     // We will keep calibrating until the error is higher than the
@@ -714,8 +800,8 @@ public:
     // phase. 0 is no limit. We will keep calibrating until the error is
     // higher than the max*PredictionError AND calibration time is lower
     // than the maxCalibrationTime AND the number of visited configurations
-    // is lower than maxCalibrationConfigurations [default = 0.0].
-    uint maxCalibrationConfigurations;
+    // is lower than maxCalibrationSteps [default = 0.0].
+    uint maxCalibrationSteps;
 
     // Maximum error percentage allowed for performance prediction.
     // [default = 10.0].
@@ -742,12 +828,22 @@ public:
     // the runtime will never switch [default = -1.0].
     double thresholdQBlocking;
 
+    // Safe range size around the threshold. The switch will occur
+    // when idle time (or utilisation) is lesser than
+    // thresholdQBlocking - thresholdQBlocking*thresholdQBlockingBelt or
+    // greater than
+    // thresholdQBlocking + thresholdQBlocking*thresholdQBlockingBelt.
+    // This is used to prevent switching too often when the metric stays
+    // for a while close to the threshold. It must be a value between
+    // 0 and 1 [default = 0.05].
+    double thresholdQBlockingBelt;
+
     // Max number of samples that can be violated (either accuracy or contract
     // violations) [default = 0].
     uint tolerableSamples;
 
     // Maximum size for the internal queues of the farm.
-    // If 0, nothing will be modified [default = 1].
+    // 0 corresponds to infinite size [default = 1].
     ulong qSize;
 
     // If different from zero:
@@ -761,7 +857,7 @@ public:
     // A vector containing the number of cores not allowed to be used.
     // E.g. if it contains the number 3, then the runtime will
     // never use  3 cores. It can only be specified when
-    // knobWorkers is different from KNOB_WORKERS_NO [default = empty].
+    // knobCoresEnabled is true [default = empty].
     std::vector<uint> disallowedNumCores;
 
     // If true, the manager will run on a physical core by itself.
@@ -776,20 +872,32 @@ public:
     // Parameters for dataflow applications.
     DataflowParameters dataflow;
 
-    // The observer object. It will be called every samplingInterval
-    // milliseconds to monitor the adaptivity behaviour [default = NULL].
-    Observer* observer;
+    // This is the path of the file used to signal begin/end of a 
+    // (region of interest). This file should be created when the
+    // application enters the ROI and deleted when the application
+    // exits the ROI. It can be used for example on PARSEC applications
+    // in order to control only the region of interest of the application
+    // excluding initialization and cleanup phases. In that case, the
+    // file would be created in the roi_start hook and deleted in the
+    // roi_end hook. If not specified or if empty string, the application 
+    // will be monitored and controlled throughout its entire execution
+    // [default = ""].
+    std::string roiFile;
+
+    // The loggers objects. They will be called every samplingInterval
+    // milliseconds to monitor the application [default = NULL].
+    std::vector<Logger*> loggers;
 
     /**
-     * Creates the adaptivity parameters.
+     * Creates the nornir paramters.
      * @param communicator The communicator used to instantiate the other
      *        modules. If NULL, the modules will be created as local modules.
      */
-    Parameters(mammut::Communicator* const communicator = NULL);
+    explicit Parameters(mammut::Communicator* const communicator = NULL);
 
     /**
-     * Creates the adaptivity parameters.
-     * @param paramFileName The name of the XML file containing the adaptivity
+     * Creates the nornir parameters.
+     * @param paramFileName The name of the XML file containing the nornir
      *        parameters.
      * @param communicator The communicator used to instantiate the other
      *        modules. If NULL, the modules will be created as local modules.
@@ -803,11 +911,40 @@ public:
     ~Parameters();
 
     /**
+     * Loads the parameters from a file.
+     * @param paramFileName The name of the XML file containing the nornir
+     *        parameters.
+     */
+    void load(const std::string& paramFileName);
+
+    /**
      * Validates these parameters.
      * @return The validation result.
      */
     ParametersValidation validate();
+
+    /**
+     * Check if a specific knob is enabled.
+     * ATTENTION: Can only be called after validate().
+     * @param k The knob to check.
+     * @return true if the specified knob is enabled, false otherwise.
+     */
+    bool isKnobEnabled(KnobType k) const;
 };
+
+/**
+ * Checks if a requirement is a min/max one.
+ * @param r The requirement.
+ * @return true if the requirement is a min/max one.
+ */
+bool isMinMaxRequirement(double r);
+
+/**
+ * Checks if a requirement is a primary one.
+ * @param r The requirement.
+ * @return true if the requirement is a primary one.
+ */
+bool isPrimaryRequirement(double r);
 
 }
 

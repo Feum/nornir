@@ -27,7 +27,7 @@
 
 #include <iostream>
 #include <stdlib.h>
-#include "../../src/dataflow/interpreter.hpp"
+#include "../../src/nornir.hpp"
 
 using namespace nornir::dataflow;
 
@@ -39,7 +39,7 @@ private:
     size_t _streamSize;
     bool _eos;
 public:
-    inline DemoInputStream(size_t streamSize):
+    explicit inline DemoInputStream(size_t streamSize):
             _currentElem(0), _streamSize(streamSize), _eos(false){
         srand(time(NULL));
     }
@@ -49,7 +49,8 @@ public:
         if(_currentElem < _streamSize){
             int* x;
             ++_currentElem;
-            x = new int(rand() % 1000);
+            x = new int();
+            *x = rand() % 1000;
             std::cout << "Generated: " << *x << std::endl;
             std::cout << "ExpectedOutput: " << ((*x + 3) * 4) + 1 << std::endl;
             return (void*) x;

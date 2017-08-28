@@ -38,16 +38,15 @@
 
 namespace nornir{
 
-
 class ReconfigurationStats{
 private:
-    std::vector<double> _knobs[KNOB_TYPE_NUM];
+    std::vector<double> _knobs[KNOB_NUM];
     std::vector<double> _total;
-    bool _storedKnob[KNOB_TYPE_NUM];
+    bool _storedKnob[KNOB_NUM];
     bool _storedTotal;
 public:
     ReconfigurationStats(){
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             _storedKnob[i] = false;
         }
         _storedTotal = false;
@@ -62,7 +61,7 @@ public:
     }
 
     inline ReconfigurationStats(const ReconfigurationStats& other){
-        for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+        for(size_t i = 0; i < KNOB_NUM; i++){
             _knobs[i] = other._knobs[i];
             _storedKnob[i] = other._storedKnob[i];
         }
@@ -113,7 +112,7 @@ public:
 typedef struct CalibrationStats{
     uint numSteps;
     uint duration;
-    uint numTasks;
+    uint64_t numTasks;
     mammut::energy::Joules joules;
 
     CalibrationStats():numSteps(0), duration(0),numTasks(0),joules(0){
@@ -143,57 +142,132 @@ typedef struct CalibrationStats{
     }
 }CalibrationStats;
 
+class Configuration;
+class Selector;
+
 /*!
  * This class can be used to obtain statistics about reconfigurations
  * performed by the manager.
  * It can be extended by a user defined class to customize action to take
  * for each observed statistic.
  */
-class Observer{
+class Logger{
     friend class Manager;
 
     template <typename T, typename V>
-    friend class ManagerFarm;
+    friend class ManagerFastFlow;
 private:
-    std::ofstream _statsFile;
-    std::ofstream _calibrationFile;
-    std::ofstream _summaryFile;
-    unsigned int _startMonitoringMs;
-    mammut::energy::Joules _totalJoules;
-    unsigned int _lastTimestamp;
+    unsigned int _timeOffset;
+    unsigned int _startMonitoring;
 
     void addJoules(mammut::energy::Joules j);
-
-    double calibrationDurationToPerc(const CalibrationStats& cs,
-                                     uint durationMs);
+protected:
+    mammut::energy::Joules _totalJoules;
+    unsigned int getRelativeTimestamp();
+    unsigned int getAbsoluteTimestamp();
 public:
-    Observer(std::string statsFile = "stats.csv",
-             std::string calibrationFile = "calibration.csv",
-             std::string summaryFile = "summary.csv");
+    explicit Logger(unsigned int timeOffset = 0);
+    virtual ~Logger(){;}
+    virtual void log(const Configuration& configuration,
+                     const Smoother<MonitoredSample>& samples) = 0;
+    virtual void logSummary(const Configuration& configuration,
+                            Selector* selector,
+                            ulong duration, double totalTasks) = 0;
+};
 
-    virtual ~Observer();
+/**
+ * A logger to store data on C++ streams (e.g. ofstream, etc...).
+ */
+class LoggerStream: public Logger{
+protected:
+    std::ostream* _statsStream;
+    std::ostream* _calibrationStream;
+    std::ostream* _summaryStream;
+    unsigned int _timeOffset;
+public:
 
-    virtual void observe(unsigned int timeStamp,
-                         size_t workers,
-                         mammut::cpufreq::Frequency frequency,
-                         const std::vector<mammut::topology::VirtualCore*>& virtualCores,
-                         double currentBandwidth,
-                         double smoothedBandwidth,
-                         double coeffVarBandwidth,
-                         double smoothedLatency,
-                         double smoothedUtilization,
-                         mammut::energy::Joules currentWatts,
-                         mammut::energy::Joules smoothedWatts);
+    LoggerStream(std::ostream* statsStream,
+                 std::ostream* calibrationStream,
+                 std::ostream* summaryStream,
+                 unsigned int timeOffset = 0);
 
-    virtual void calibrationStats(const std::vector<CalibrationStats>&
-                                  calibrationStats,
-                                  uint durationMs,
-                                  uint64_t totalTasks);
+    void log(const Configuration& configuration,
+             const Smoother<MonitoredSample>& samples);
+    void logSummary(const Configuration& configuration,
+                    Selector* selector, ulong durationMs, double totalTasks);
+};
 
-    virtual void summaryStats(const std::vector<CalibrationStats>& calibrationStats,
-                              ReconfigurationStats reconfigurationStats,
-                              uint durationMs,
-                              uint64_t totalTasks);
+/**
+ * This logger logs data on files.
+ */
+class LoggerFile: public LoggerStream{
+public:
+    LoggerFile(std::string statsFile = "stats.csv",
+               std::string calibrationFile = "calibration.csv",
+               std::string summaryFile = "summary.csv",
+               unsigned int timeOffset = 0):
+        LoggerStream(new std::ofstream(statsFile),
+                     new std::ofstream(calibrationFile),
+                     new std::ofstream(summaryFile),
+                     timeOffset){;}
+
+    ~LoggerFile(){
+        dynamic_cast<std::ofstream*>(_statsStream)->close();
+        dynamic_cast<std::ofstream*>(_calibrationStream)->close();
+        dynamic_cast<std::ofstream*>(_summaryStream)->close();
+        delete _statsStream;
+        delete _calibrationStream;
+        delete _summaryStream;
+    }
+};
+
+/**
+ * This logger can be used to send data to a Graphite (https://graphiteapp.org/)
+ * monitoring system (and maybe to show monitored data through a Grafana
+ * (https://grafana.com/) front end. To install Graphite and Grafana, you
+ * can use an already configured virtual machine, like the one present
+ * at (https://github.com/pellepelster/graphite-grafana-vagrant-box).
+ *
+ * By default, graphite will store data at 60 seconds granularity.
+ * If your sampling interval is shorter than 60 seconds, graphite will
+ * average the data received by Nornir.
+ * All the metrics exported by Nornir are prefixed by "nornir." string.
+ *
+ * To increase the graphite granularity, please refer to the graphite
+ * documentation. However, in most cases it should be sufficient to execute
+ * the following steps:
+ *  1. Modify the retention by adding an appropriate rule to the
+ *     /etc/carbon/storage-schemas.conf (path may be different).
+ *     For example, to store one sample for each second and to keep stored
+ *     only the samples received during the last day the rule is the following:.
+ *
+ *         [default_nornir]
+ *         pattern = nornir.*
+ *         retentions = 1s:1d
+ * 2. Change the scale of the data already stored by Nornir in graphite. You
+ *    should execute the following command for all the .wsp files present
+ *    in /var/lib/graphite/whisper/nornir folder (path may be different):
+ *         $ whisper-resize.py filename.wsp
+ *    If you do not need the old data, you can simply remove them by doing:
+ *         $ rm -r /var/lib/graphite/whisper/nornir/
+ * 3. Change graphite's web app caching, by modifying the value of the
+ *    DEFAULT_CACHE_DURATION variable from 60 (default) to 1 (if you want a
+ *    1 second granularity) in [graphite/settings.py] file (specific path
+ *    depends on your installation).
+ * After 60 seconds circa the modification should be loaded automatically by
+ * graphite and your data can now be displayed at an higher resolution.
+ */
+class LoggerGraphite: public Logger{
+public:
+    LoggerGraphite(const std::string& host, unsigned int port);
+    ~LoggerGraphite();
+
+    void log(const Configuration& configuration,
+             const Smoother<MonitoredSample>& samples);
+
+    // Doesn't log anything.
+    void logSummary(const Configuration& configuration, Selector* selector,
+                    ulong durationMs, double totalTasks){;}
 };
 
 }

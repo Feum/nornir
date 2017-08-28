@@ -12,7 +12,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "../../src/external/orlog/src/orlog.hpp"
+#include "../../src/external/knarr/src/knarr.hpp"
 
 #ifdef ENABLE_PARSEC_HOOKS
 #include <hooks.h>
@@ -377,7 +377,7 @@ int bs_thread(void *tid_ptr) {
     int start = tid * (numOptions / nThreads);
     int end = start + (numOptions / nThreads);
 
-    orlog::Application app("ipc:///tmp/prova");
+    knarr::Application app("ipc:///tmp/prova");
 
     for (j=0; j<NUM_RUNS; j++) {
       app.begin();
@@ -560,9 +560,7 @@ int main (int argc, char **argv)
     bs_thread(&tid);
 #else //ENABLE_TBB
 #ifdef ENABLE_FF
-    nornir::Observer obs;
     nornir::Parameters ap("parameters.xml");
-    ap.observer = &obs;
     ap.expectedTasksNumber = numOptions * NUM_RUNS / CHUNKSIZE;
     nornir::Farm<fftask_t> farm(&ap);
     farm.start<Emitter, Worker>(nThreads);

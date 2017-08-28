@@ -26,7 +26,7 @@
  */
 
 #include "interpreter.hpp"
-#include "../external/Mammut/mammut/mammut.hpp"
+#include "../external/mammut/mammut/mammut.hpp"
 #include <map>
 
 using namespace mammut;
@@ -47,7 +47,7 @@ Mdfg* compile(Computable* c){
      * of the worker.
      **/
     if(tc == typeid(Farm)){
-        Farm* f = (Farm*) c;
+        Farm* f = dynamic_cast<Farm*>(c);
         Mdfg* g = compile(f->getWorker());
         return g;
     /**
@@ -55,7 +55,7 @@ Mdfg* compile(Computable* c){
      * first stage of the pipeline and links it together.
      **/
     }else if(tc == typeid(Pipeline)){
-        Pipeline* p = (Pipeline*) c;
+        Pipeline* p = dynamic_cast<Pipeline*>(c);
         /**Compiles the two stages.**/
         Mdfg* g1 = compile(p->getFirstStage());
         Mdfg* g2 = compile(p->getSecondStage());
@@ -95,7 +95,7 @@ Mdfg* compile(Computable* c){
         return combined;
     /**Map and reduce compiling.**/
     }else if(tc == typeid(EmitterWorkerCollector)){
-        EmitterWorkerCollector* ewc = (EmitterWorkerCollector*) c;
+        EmitterWorkerCollector* ewc = dynamic_cast<EmitterWorkerCollector*>(c);
         int workersNum = ewc->getNWorkers();
         /**Compiles worker.**/
         std::vector<Computable*>& workersC = ewc->getWorkers();
@@ -206,10 +206,9 @@ private:
     std::vector<WorkerMdf*>& _workers;
 
     inline void sendToWorkers(Mdfi* instr){
-        size_t destination;
         ++_tasksInside;
         if(_orderedProc){
-            destination = _scheduling[instr->getId()];
+            size_t destination = _scheduling[instr->getId()];
             ++_mdfiSent[destination];
             sendTo(instr, destination);
         }else{
@@ -289,10 +288,9 @@ public:
     }
 
     ~Scheduler(){
-#ifdef POOL
-        Mdfg* g;
+#ifdef POOL        
         while(_pool->size()!=0){
-            g = _pool->front();
+            Mdfg* g = _pool->front();
             _pool->pop_front();
             delete g;
         }
@@ -363,7 +361,7 @@ public:
             if(_q.pop((void**) &task, 0)){
                 popped++;
                 --_tasksInside;
-                poppedIns = ((Mdfi*) task);
+                poppedIns = static_cast<Mdfi*>(task);
                 size_t numOutTokens = poppedIns->getNumOutTokens();
                 for(uint j = 0; j < numOutTokens; j++){
                     ot = *(poppedIns->getOutToken(j));
@@ -388,9 +386,9 @@ public:
                                 _out->put(ot.getResult());
                                 ++_lastSent;
                             }else{
-                                assert(_result->emplace(std::piecewise_construct,
-                                       std::forward_as_tuple(graphId),
-                                       std::forward_as_tuple(ot.getResult())).second);
+                                _result->emplace(std::piecewise_construct,
+                                                 std::forward_as_tuple(graphId),
+                                                 std::forward_as_tuple(ot.getResult()));
                             }
                         }
                         auto it = _graphs->find(graphId);
@@ -447,10 +445,9 @@ public:
              * PRESERVES THE ORDER OF THE TASKS.
              **/
             if(_out && _orderedOut){
-                void* se;
                 std::map<ulong, void*>::iterator it;
                 while((it = _result->find(_lastSent)) != _result->end()){
-                    se = it->second;
+                    void* se = it->second;
                     _result->erase(it);
                     _out->put(se);
                     ++_lastSent;

@@ -28,9 +28,9 @@
 #include "knob.hpp"
 #include "parameters.hpp"
 
-#include "external/Mammut/mammut/mammut.hpp"
-#include "external/Mammut/mammut/utils.hpp"
-#include "external/Mammut/mammut/cpufreq/cpufreq.hpp"
+#include "external/mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/utils.hpp"
+#include "external/mammut/mammut/cpufreq/cpufreq.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -60,16 +60,16 @@ using namespace std;
 
 std::string knobTypeToString(KnobType kv){
     switch(kv){
-        case KNOB_TYPE_VIRTUAL_CORES:{
+        case KNOB_VIRTUAL_CORES:{
             return "Cores";
         }break;
-        case KNOB_TYPE_HYPERTHREADING:{
+        case KNOB_HYPERTHREADING:{
             return "HTLevel";
         }break;
-        case KNOB_TYPE_MAPPING:{
+        case KNOB_MAPPING:{
             return "Mapping";
         }break;
-        case KNOB_TYPE_FREQUENCY:{
+        case KNOB_FREQUENCY:{
             return "Frequency";
         }break;
         default:{
@@ -99,7 +99,7 @@ void Knob::setRelativeValue(double v){
 
 void Knob::setRealValue(double v){
     if(getAllowedValues().size()){
-        changeValueReal(v);
+        changeValue(v);
         _realValue = v;
     }
 }
@@ -117,7 +117,7 @@ void Knob::lock(double v){
 
 void Knob::lockToMax(){
     if(_knobValues.size()){
-        lock(*_knobValues.end());
+        lock(_knobValues.back());
     }else{
         _locked = true;
     }
@@ -125,7 +125,7 @@ void Knob::lockToMax(){
 
 void Knob::lockToMin(){
     if(_knobValues.size()){
-        lock(*_knobValues.begin());
+        lock(_knobValues.front());
     }else{
         _locked = true;
     }
@@ -143,12 +143,18 @@ std::vector<double> Knob::getAllowedValues() const{
     return _knobValues;
 }
 
-KnobVirtualCores::KnobVirtualCores(Parameters p, uint plus):_p(p), _plus(plus){
-    std::vector<VirtualCore*> virtualCores = _p.mammut.getInstanceTopology()->getVirtualCores();
-    changeMax(virtualCores.size() - _plus);
+KnobVirtualCores::KnobVirtualCores(Parameters p):_p(p){
+    size_t numVirtualCores = 0;
+    if(_p.knobHyperthreadingEnabled){
+        numVirtualCores = _p.mammut.getInstanceTopology()->getVirtualCores().size();
+    }else{
+        numVirtualCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
+    }
+    changeMax(numVirtualCores);
+    _realValue = numVirtualCores;
 }
 
-void KnobVirtualCores::changeValueReal(double v){;}
+void KnobVirtualCores::changeValue(double v){;}
 
 void KnobVirtualCores::changeMax(double v){
     _knobValues.clear();
@@ -156,6 +162,9 @@ void KnobVirtualCores::changeMax(double v){
         if(!utils::contains(_p.disallowedNumCores, (uint) i + 1)){
             _knobValues.push_back(i + 1);
         }
+    }
+    if(_realValue > v){
+        _realValue = v;
     }
 }
 
@@ -191,11 +200,10 @@ std::ostream& operator<< (std::ostream& out, const std::vector<Domain*>& v){
 KnobVirtualCoresFarm::KnobVirtualCoresFarm(Parameters p,
                              AdaptiveNode* emitter, AdaptiveNode* collector,
                              ff::ff_gatherer* gt,
-                             const std::vector<AdaptiveNode*> workers,
+                             const std::vector<AdaptiveNode *>& workers,
                              const volatile bool* terminated):
-                KnobVirtualCores(p, (emitter?1:0) + (collector?1:0)),
-        _emitter(emitter), _collector(collector),
-        _gt(gt), _allWorkers(workers), _terminated(terminated){
+            KnobVirtualCores(p), _emitter(emitter), _collector(collector),
+            _gt(gt), _allWorkers(workers), _terminated(terminated){
     _realValue = _allWorkers.size();
     _knobValues.clear();
     for(size_t i = 0; i < _allWorkers.size(); i++){
@@ -208,7 +216,7 @@ KnobVirtualCoresFarm::KnobVirtualCoresFarm(Parameters p,
     DEBUG("Knob workers created.");
 }
 
-void KnobVirtualCoresFarm::changeValueReal(double v){
+void KnobVirtualCoresFarm::changeValue(double v){
     if(v != _realValue){
         DEBUG("[Workers] Changing real value to: " << v);
         prepareToFreeze();
@@ -309,9 +317,10 @@ KnobHyperThreading::KnobHyperThreading(Parameters p){
     for(size_t i = 0; i < maxHtLevel; i++){
         _knobValues.push_back(i + 1);
     }
+    _realValue = 1;
 }
 
-void KnobHyperThreading::changeValueReal(double v){;}
+void KnobHyperThreading::changeValue(double v){;}
 
 KnobMapping::KnobMapping(const Parameters& p,
                          const KnobVirtualCores& knobCores,
@@ -329,12 +338,13 @@ KnobMapping::KnobMapping(const Parameters& p,
 template<> char const* enumStrings<MappingType>::data[] = {
     "LINEAR",
     "INTERLEAVED",
-    "CACHE_OPTIMAL"
+    "NUM"
 };
 
-void KnobMapping::changeValueReal(double v){
+void KnobMapping::changeValue(double v){
     DEBUG("[Mapping] Changing real value to: " << enumToString<MappingType>((MappingType)v));
 
+    // Its length will be equal to _knobCores.getRealValue()
     vector<VirtualCore*> vcOrder;
     switch((MappingType) v){
         case MAPPING_TYPE_LINEAR:{
@@ -370,6 +380,10 @@ void KnobMapping::setAllowedCores(std::vector<mammut::topology::VirtualCore*> vc
     _allowedVirtualCores = vc;
 }
 
+std::vector<mammut::topology::VirtualCore*> KnobMapping::getAllowedCores() const{
+    return _allowedVirtualCores;
+}
+
 bool KnobMapping::isAllowed(mammut::topology::VirtualCore* v) const{
     if(!_allowedVirtualCores.size()){
         return true;
@@ -401,18 +415,17 @@ vector<VirtualCore*> KnobMapping::computeVcOrderLinear(){
     size_t virtualPerPhysical = _knobHyperThreading.getRealValue();
 
     vector<Cpu*> cpus = _topologyHandler->getCpus();
-    for(size_t i = 0; i < cpus.size(); i++){
-        vector<PhysicalCore*> phyCores = cpus.at(i)->getPhysicalCores();
-        for(size_t j = 0; j < phyCores.size(); j++){
-            vector<VirtualCore*> virtCores = phyCores.at(j)->getVirtualCores();
-            for(size_t k = 0; k < virtCores.size(); k++){
-                if(k >= virtualPerPhysical){break;}
-                if(vcOrder.size() == getNumVirtualCores()){
-                    return vcOrder;
-                }
-                if((!_p.isolateManager || virtCores.at(k)->getVirtualCoreId() != MANAGER_VIRTUAL_CORE) &&
+    for(size_t k = 0; k < virtualPerPhysical; k++){
+        for(size_t i = 0; i < cpus.size(); i++){
+            vector<PhysicalCore*> phyCores = cpus.at(i)->getPhysicalCores();
+            for(size_t j = 0; j < phyCores.size(); j++){
+                vector<VirtualCore*> virtCores = phyCores.at(j)->getVirtualCores();
+                if((!_p.isolateManager || virtCores.at(k)->getVirtualCoreId() != NORNIR_MANAGER_VIRTUAL_CORE) &&
                     isAllowed(virtCores.at(k))){
                     vcOrder.push_back(virtCores.at(k));
+                    if(vcOrder.size() == getNumVirtualCores()){
+                        return vcOrder;
+                    }
                 }
             }
         }
@@ -427,30 +440,24 @@ vector<VirtualCore*> KnobMapping::computeVcOrderInterleaved(){
     */
     vector<VirtualCore*> vcOrder;
     size_t virtualPerPhysical = _knobHyperThreading.getRealValue();
-
     vector<Cpu*> cpus = _topologyHandler->getCpus();
-    size_t nextPhysicalId = 0;
-    size_t nextVirtualId = 0;
-    while(true){
-        for(size_t i = 0; i < cpus.size(); i++){
-            vector<PhysicalCore*> phyCores = cpus.at(i)->getPhysicalCores();
-            PhysicalCore* p = phyCores.at(nextPhysicalId);
-            vector<VirtualCore*> virtCores = p->getVirtualCores();
-            VirtualCore* v = virtCores.at(nextVirtualId);
-            if((!_p.isolateManager || v->getVirtualCoreId() != MANAGER_VIRTUAL_CORE) &&
-                isAllowed(v)){
-                vcOrder.push_back(v);
-                if(vcOrder.size() == getNumVirtualCores()){return vcOrder;}
+    size_t physicalPerCpu = cpus[0]->getPhysicalCores().size();
+    for(size_t k = 0; k < virtualPerPhysical; k++){
+        for(size_t j = 0; j < physicalPerCpu; j++){
+            for(size_t i = 0; i < cpus.size(); i++){
+                vector<PhysicalCore*> phyCores = cpus.at(i)->getPhysicalCores();
+                vector<VirtualCore*> virtCores = phyCores.at(j)->getVirtualCores();
+                if((!_p.isolateManager || virtCores.at(k)->getVirtualCoreId() != NORNIR_MANAGER_VIRTUAL_CORE) &&
+                    isAllowed(virtCores.at(k))){
+                    vcOrder.push_back(virtCores.at(k));
+                    if(vcOrder.size() == getNumVirtualCores()){
+                        return vcOrder;
+                    }
+                }
             }
         }
-        if(nextPhysicalId + 1 < cpus.at(0)->getPhysicalCores().size()){
-            nextPhysicalId += 1;
-        }else{
-            nextPhysicalId = 0;
-            nextVirtualId += 1;
-            if(nextVirtualId >= virtualPerPhysical){return vcOrder;}
-        }
     }
+    return vcOrder;
 }
 
 KnobMappingExternal::KnobMappingExternal(const Parameters& p,
@@ -461,7 +468,11 @@ KnobMappingExternal::KnobMappingExternal(const Parameters& p,
 }
 
 void KnobMappingExternal::setPid(pid_t pid){
-    _processHandler = _p.mammut.getInstanceTask()->getProcessHandler(pid);
+    setProcessHandler(_p.mammut.getInstanceTask()->getProcessHandler(pid));
+}
+
+void KnobMappingExternal::setProcessHandler(task::ProcessHandler* processHandler){
+    _processHandler = processHandler;
 }
 
 void KnobMappingExternal::move(const vector<VirtualCore*>& vcOrder){
@@ -491,76 +502,88 @@ void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){
     vector<AdaptiveNode*> workers = ((KnobVirtualCoresFarm*) &_knobCores)->getActiveWorkers();
     size_t nextIndex = 0;
     if(_emitter){
-        _emitter->move((VirtualCore*) vcOrder[nextIndex]);
+        _emitter->move(vcOrder[nextIndex]);
         nextIndex = (nextIndex + 1) % vcOrder.size();
     }
 
     for(size_t i = 0; i < workers.size(); i++){
-        workers[i]->move((VirtualCore*) vcOrder[nextIndex]);
+        workers[i]->move(vcOrder[nextIndex]);
         nextIndex = (nextIndex + 1) % vcOrder.size();
     }
 
     if(_collector){
-        _collector->move((VirtualCore*) vcOrder[nextIndex]);
-        nextIndex = (nextIndex + 1) % vcOrder.size();
+        _collector->move(vcOrder[nextIndex]);
+        //nextIndex = (nextIndex + 1) % vcOrder.size();
     }
 }
 
+#define FREQUENCY_NONE std::numeric_limits<Frequency>::max()
 
 KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
         _p(p),
         _knobMapping(knobMapping),
         _frequencyHandler(_p.mammut.getInstanceCpuFreq()),
-        _topologyHandler(_p.mammut.getInstanceTopology()),
-        _cpufreqHandle(_p.mammut.getInstanceCpuFreq()){
+        _topologyHandler(_p.mammut.getInstanceTopology()){
 
+    _frequencyHandler->removeTurboFrequencies();
     std::vector<mammut::cpufreq::Frequency> availableFrequencies;
     availableFrequencies = _frequencyHandler->getDomains().at(0)->getAvailableFrequencies();
-    _realValue = availableFrequencies.front();
-
-    std::vector<mammut::cpufreq::Domain*> scalableDomains;
-    scalableDomains = _frequencyHandler->getDomains();
-    Domain* currentDomain;
-    for(size_t i = 0; i < scalableDomains.size(); i++){
-        currentDomain = scalableDomains.at(i);
-        if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
-            throw runtime_error("AdaptivityManagerFarm: Impossible "
-                                "to set the specified governor.");
+    if(availableFrequencies.empty()){
+        if(_p.knobFrequencyEnabled){
+            throw std::runtime_error("Frequencies not available. Please set "
+                                     "knobFrequencyEnabled to false.");
+        }else{
+            availableFrequencies.push_back(FREQUENCY_NONE);
+        }
+    }else{
+        std::vector<mammut::cpufreq::Domain*> scalableDomains;
+        scalableDomains = _frequencyHandler->getDomains();
+        for(size_t i = 0; i < scalableDomains.size(); i++){
+            Domain* currentDomain = scalableDomains.at(i);
+            if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
+                throw runtime_error("KnobFrequency: Impossible "
+                                    "to set the specified governor.");
+            }
         }
     }
+    _realValue = availableFrequencies.front();
+
     for(size_t i = 0; i < availableFrequencies.size(); i++){
         _knobValues.push_back(availableFrequencies.at(i));
     }
 }
 
-void KnobFrequency::changeValueReal(double v){
+void KnobFrequency::changeValue(double v){
     DEBUG("[Frequency] Changing real value to: " << v);
-    std::vector<mammut::cpufreq::Domain*> scalableDomains;
-    scalableDomains = _frequencyHandler->getDomains(_knobMapping.getActiveVirtualCores());
-    Domain* currentDomain;
-    for(size_t i = 0; i < scalableDomains.size(); i++){
-        currentDomain = scalableDomains.at(i);
-        if(!currentDomain->setFrequencyUserspace((uint)v)){
-            throw runtime_error("AdaptivityManagerFarm: Impossible "
-                                "to set the specified frequency.");
+    if(v != FREQUENCY_NONE){
+        std::vector<mammut::cpufreq::Domain*> scalableDomains;
+        scalableDomains = _frequencyHandler->getDomains(_knobMapping.getActiveVirtualCores());
+        for(size_t i = 0; i < scalableDomains.size(); i++){
+            Domain* currentDomain = scalableDomains.at(i);
+            if(!currentDomain->setFrequencyUserspace((uint)v)){
+                throw runtime_error("KnobFrequency: Impossible "
+                                    "to set the specified frequency.");
+            }
         }
+        DEBUG("[Frequency] Frequency changed for domains: " << scalableDomains);
     }
     applyUnusedVCStrategy(v);
-    DEBUG("[Frequency] Frequency changed for domains: " << scalableDomains);
     DEBUG("[Frequency] Active VC: " << _knobMapping.getActiveVirtualCores());
     DEBUG("[Frequency] Unused VC: " << _knobMapping.getUnusedVirtualCores());
 }
 
 void KnobFrequency::applyUnusedVCStrategySame(const vector<VirtualCore*>& unusedVc, Frequency v){
-    vector<Domain*> unusedDomains = _cpufreqHandle->getDomainsComplete(unusedVc);
-    DEBUG("[Frequency] " << unusedDomains.size() << " unused domains.");
-    for(size_t i = 0; i < unusedDomains.size(); i++){
-        Domain* domain = unusedDomains.at(i);
-        DEBUG("[Frequency] Setting unused domain " << domain->getId() << " to: " << v);
-        if(!domain->setFrequencyUserspace((uint)v)){
-            throw runtime_error("AdaptivityManagerFarm: Impossible "
-                                "to set the specified frequency.");
-        }    
+    if(v != FREQUENCY_NONE){
+        vector<Domain*> unusedDomains = _frequencyHandler->getDomainsComplete(unusedVc);
+        DEBUG("[Frequency] " << unusedDomains.size() << " unused domains.");
+        for(size_t i = 0; i < unusedDomains.size(); i++){
+            Domain* domain = unusedDomains.at(i);
+            DEBUG("[Frequency] Setting unused domain " << domain->getId() << " to: " << v);
+            if(!domain->setFrequencyUserspace((uint)v)){
+                throw runtime_error("KnobFrequency: Impossible "
+                                    "to set the specified frequency.");
+            }
+        }
     }
 }
 
@@ -575,12 +598,12 @@ void KnobFrequency::applyUnusedVCStrategyOff(const vector<VirtualCore*>& unusedV
 }
 
 void KnobFrequency::applyUnusedVCStrategyLowestFreq(const vector<VirtualCore*>& unusedVc){
-    vector<Domain*> unusedDomains = _cpufreqHandle->getDomainsComplete(unusedVc);
+    vector<Domain*> unusedDomains = _frequencyHandler->getDomainsComplete(unusedVc);
     for(size_t i = 0; i < unusedDomains.size(); i++){
         Domain* domain = unusedDomains.at(i);
         if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
-           !domain->setLowestFrequencyUserspace()){
-            throw runtime_error("AdaptivityManagerFarm: Impossible to "
+           (_p.knobFrequencyEnabled && !domain->setLowestFrequencyUserspace())){
+            throw runtime_error("KnobFrequency: Impossible to "
                                 "set lowest frequency for unused "
                                 "virtual cores.");
         }

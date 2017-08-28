@@ -30,7 +30,7 @@ namespace dataflow{
 
 template <typename T>
 ReduceScatterer<T>::ReduceScatterer(size_t numPartitions, bool autoDelete):
-    Scatterer(numPartitions), autoDelete(autoDelete){;}
+    Scatterer(numPartitions), _autoDelete(autoDelete){;}
 
 template <typename T>
 std::vector<void*> ReduceScatterer<T>::compute(void* in){
@@ -40,32 +40,31 @@ std::vector<void*> ReduceScatterer<T>::compute(void* in){
     int mod = dim%_numPartitions;
     int size = dim/_numPartitions;
 #ifdef NOCOPY
-    int l,h=0;
-    for(uint i=0; i<chunkNum; i++){
-        l=h;
-        if(mod && i==chunkNum-mod){
-            size+=1;
-            mod=0;
+    int h = 0;
+    for(uint i = 0; i < chunkNum; i++){
+        int l = h;
+        if(mod && i == chunkNum - mod){
+            size += 1;
+            mod = 0;
         }
-        h=l+size;
-        toRet[i]=new ArrayIndexes<T*>(task,l,h);
+        h = l + size;
+        toRet[i] = new ArrayIndexes<T*>(task, l, h);
     }
 #else
-    ArrayWrapper<T*>* toAdd;
     int k=0;
     for(uint i=0; i<_numPartitions; i++){
         if(mod && i==_numPartitions-mod){
             size+=1;
             mod=0;
         }
-        toAdd=new ArrayWrapper<T*>(size);
+        ArrayWrapper<T*>* toAdd=new ArrayWrapper<T*>(size);
         for(int j=0; j<size; j++){
             toAdd->set(j,task->get(k));
             k++;
         }
         r.push_back(toAdd);
     }
-    if(autoDelete) delete task;
+    if(_autoDelete) delete task;
 #endif
     return r;
 }
@@ -120,27 +119,28 @@ void* ReduceGatherer<T, fun>::compute(std::vector<void*> in){
     T *p, *q;
 #ifdef NOCOPY
     ArrayIndexes<T*>* ai;
-    ai = (ArrayIndexes<T*>*) d->getInput((Computable*)0);
+    ai = dynamic_cast<ArrayIndexes<T*>*>(d->getInput(dynamic_cast<Computable*>(0)));
     p = ai->getArray()->get(ai->geti());
     delete ai;
-    ai = (ArrayIndexes<T*>*) d->getInput((Computable*)1);
+    ai = dynamic_cast<ArrayIndexes<T*>*>(d->getInput(dynamic_cast<Computable*>(1)));
     q = ai->getArray()->get(ai->geti());
     delete ai;
 #else
-    p = (T*) in.at(0);
-    q = (T*) in.at(1);
+    p = static_cast<T*>(in.at(0));
+    q = static_cast<T*>(in.at(1));
 #endif
-    T* x=fun(p,q);
-    T* a;
+    T* x = fun(p,q);
     for(int i = 2; i < _numPartitions; i++){
 #ifdef NOCOPY
         ArrayIndexes<T*>* ai;
-        ai=(ArrayIndexes<T*>*)t[i];
-        a=ai->getArray()->get(ai->geti());
-        if(i==chunkNum-1) delete ai->getArray();
+        ai = (ArrayIndexes<T*>*)t[i];
+        T* a = ai->getArray()->get(ai->geti());
+        if(i == chunkNum - 1){
+            delete ai->getArray();
+        }
         delete ai;
 #else
-        a = (T*) in.at(i);
+        T* a = static_cast<T*>(in.at(i));
 #endif
         x = fun(x, a);
     }
@@ -149,7 +149,7 @@ void* ReduceGatherer<T, fun>::compute(std::vector<void*> in){
 
 template <typename T>
 MapScatterer<T>::MapScatterer(size_t numPartitions, bool autoDelete):
-    Scatterer(numPartitions), autoDelete(autoDelete){;}
+    Scatterer(numPartitions), _autoDelete(autoDelete){;}
 
 template <typename T>
 std::vector<void*> MapScatterer<T>::compute(void* in){
@@ -159,9 +159,9 @@ std::vector<void*> MapScatterer<T>::compute(void* in){
     uint mod = dim % _numPartitions;
     uint size = dim / _numPartitions;
 #ifdef NOCOPY
-    int l, h = 0;
+    int h = 0;
     for(uint i = 0; i < numWorkers; i++){
-        l = h;
+        int l = h;
         if(mod && i == numWorkers-mod){
             size += 1;
             mod = 0;
@@ -170,21 +170,22 @@ std::vector<void*> MapScatterer<T>::compute(void* in){
         toRet[i] = new ArrayIndexes<T*>(task,l,h);
     }
 #else
-    int k=0;
-    ArrayWrapper<void*>* toAdd;
-    for(uint i=0; i<_numPartitions; i++){
-        if(mod && i==_numPartitions-mod){
-            size+=1;
-            mod=0;
+    int k = 0;
+    for(uint i = 0; i < _numPartitions; i++){
+        if(mod && i == _numPartitions - mod){
+            size += 1;
+            mod = 0;
         }
-        toAdd=new ArrayWrapper<void*>(size);
-        for(uint j=0; j<size; j++){
+        ArrayWrapper<void*>* toAdd = new ArrayWrapper<void*>(size);
+        for(uint j = 0; j < size; j++){
             toAdd->set(j,task->get(k));
             k++;
         }
         r.push_back(toAdd);
     }
-    if(autoDelete) delete task;
+    if(_autoDelete){
+        delete task;
+    }
 #endif
     return r;
 }
@@ -204,12 +205,10 @@ void MapWorker<T, V, fun>::compute(Data* d){
     nElem=w1->size();
     first=0;
 #endif
-    V* y;
-    T* x;
     for(int i=first; i<nElem;i++){
-        x=(T*)w1->get(i);
-        y=fun(x);
-        w1->set(i,y);
+        T* x = static_cast<T*>(w1->get(i));
+        V* y = fun(x);
+        w1->set(i, y);
     }
     d->setOutput(t);
 }
@@ -222,10 +221,10 @@ void* MapGatherer<V>::compute(std::vector<void*> in){
 #ifdef NOCOPY
     ArrayIndexes<void*>* ai;
     for(uint i=0; i<_numPartitions-1; i++){
-        ai=(ArrayIndexes<void*>*)receiveData((Computable*) i);
+        ai = dynamic_cast<ArrayIndexes<void*>*>(receiveData(dynamic_cast<Computable*>(i)));
         delete ai;
     }
-    ai = (ArrayIndexes<void*>*)receiveData((Computable*) (_numPartitions-1));
+    ai = dynamic_cast<ArrayIndexes<void*>*>(receiveData(dynamic_cast<Computable*>(_numPartitions-1)));
     sendData(ai->getArray());
     delete ai;
 #else

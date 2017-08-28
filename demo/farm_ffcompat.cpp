@@ -44,7 +44,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "../src/manager.hpp"
+#include "../src/nornir.hpp"
 
 using namespace ff;
 
@@ -55,7 +55,7 @@ using namespace ff;
  */
 class Emitter: public nornir::AdaptiveNode {
 public:
-    Emitter(int max_task):ntask(max_task) {};
+    explicit Emitter(int max_task):ntask(max_task){;}
 
     void * svc(void *) {
         usleep(MICROSECSSLEEP);
@@ -63,8 +63,10 @@ public:
         --ntask;
         if (ntask<0){
             std::cout << "Emitter finished" << std::endl;
+            //cppcheck-suppress memleak
             TERMINATE_APPLICATION;
         }
+        //cppcheck-suppress memleak
         return task;
     }
 private:
@@ -146,7 +148,7 @@ int main(int argc, char * argv[]) {
     /*  START - New code needed with respect to the existing code. */
     /***************************************************************/
     nornir::Parameters ap("parameters.xml"); // Load parameters.
-    nornir::ManagerFarm<> amf(&farm, ap); // Create nornir manager.
+    nornir::ManagerFastFlow<> amf(&farm, ap); // Create nornir manager.
     amf.start(); // Start farm.
     amf.join(); // Wait for farm end.
     /***************************************************************/

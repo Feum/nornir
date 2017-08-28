@@ -83,7 +83,7 @@ public:
 template <typename T, typename V, V*(*fun)(T*)> class StandardFarmWorker: public Computable{
 public:
     void compute(Data* d){
-        V* result = fun((T*) d->getInput());
+        V* result = fun(static_cast<T*>(d->getInput()));
         d->setOutput(result);
     }
 };

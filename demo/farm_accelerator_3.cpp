@@ -32,7 +32,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "../src/interface.hpp"
+#include "../src/nornir.hpp"
 
 using namespace ff;
 
@@ -95,9 +95,6 @@ int main(int argc, char * argv[]) {
     maxTasks = streamlen;
 
     nornir::Parameters p("parameters.xml");
-    p.contractType = nornir::CONTRACT_NONE;
-    nornir::Observer o;
-    p.observer = &o;
     nornir::FarmAccelerator<double, int, int> farm(&p);
     farm.addScheduler(new Scheduler);
     for(size_t i = 0; i < (size_t) nworkers; i++){

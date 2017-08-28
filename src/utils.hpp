@@ -33,8 +33,10 @@
 #ifndef NORNIR_UTILS_HPP_
 #define NORNIR_UTILS_HPP_
 
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/mammut.hpp"
+#include "external/knarr/src/knarr.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -42,11 +44,12 @@
 #include <vector>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <numeric>
 
 #define MSECS_IN_SECS 1000.0 // Milliseconds in 1 second
 #define NSECS_IN_SECS 1000000000.0 // Nanoseconds in 1 second
-#define MAX_RHO 5 //96
+#define MAX_RHO 96
 
 namespace nornir{
 
@@ -75,17 +78,17 @@ inline double stddev(const std::vector<double>& v){
     return stddev(v, average(v));
 }
 
-typedef struct MonitoredSample{
+typedef struct MonitoredSample: public knarr::ApplicationSample{
     mammut::energy::Joules watts; ///< Consumed watts.
-    double utilisation; ///< Utilisation [0, 100].
-    double bandwidth; ///< Bandwidth of the entire farm (real).
-    double latency; ///< Average latency of a worker (nanoseconds).
 
-    MonitoredSample():watts(0), utilisation(0), bandwidth(0), latency(0){;}
+    MonitoredSample():knarr::ApplicationSample(), watts(0){;}
+
+    MonitoredSample(MonitoredSample const& sample):
+        knarr::ApplicationSample(sample), watts(sample.watts){;}
 
     double getMaximumBandwidth(){
-        if(utilisation < MAX_RHO){
-            return bandwidth / (utilisation / 100.0);
+        if(loadPercentage < MAX_RHO){
+            return bandwidth / (loadPercentage / 100.0);
         }else{
             return bandwidth;
         }
@@ -94,10 +97,8 @@ typedef struct MonitoredSample{
     void swap(MonitoredSample& x){
         using std::swap;
 
+        knarr::ApplicationSample::swap(x);
         swap(watts, x.watts);
-        swap(utilisation, x.utilisation);
-        swap(bandwidth, x.bandwidth);
-        swap(latency, x.latency);
     }
 
     MonitoredSample& operator=(MonitoredSample rhs){
@@ -106,50 +107,38 @@ typedef struct MonitoredSample{
     }
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
+        knarr::ApplicationSample::operator+=(rhs);
         watts += rhs.watts;
-        utilisation += rhs.utilisation;
-        bandwidth += rhs.bandwidth;
-        latency += rhs.latency;
         return *this;
     }
 
     MonitoredSample& operator-=(const MonitoredSample& rhs){
+        knarr::ApplicationSample::operator-=(rhs);
         watts -= rhs.watts;
-        utilisation -= rhs.utilisation;
-        bandwidth -= rhs.bandwidth;
-        latency -= rhs.latency;
         return *this;
     }
 
     MonitoredSample& operator*=(const MonitoredSample& rhs){
+        knarr::ApplicationSample::operator*=(rhs);
         watts *= rhs.watts;
-        utilisation *= rhs.utilisation;
-        bandwidth *= rhs.bandwidth;
-        latency *= rhs.latency;
         return *this;
     }
 
     MonitoredSample& operator/=(const MonitoredSample& rhs){
+        knarr::ApplicationSample::operator/=(rhs);
         watts /= rhs.watts;
-        utilisation /= rhs.utilisation;
-        bandwidth /= rhs.bandwidth;
-        latency /= rhs.latency;
         return *this;
     }
 
     MonitoredSample operator/=(double x){
+        knarr::ApplicationSample::operator/=(x);
         watts /= x;
-        utilisation /= x;
-        bandwidth /= x;
-        latency /= x;
         return *this;
     }
 
     MonitoredSample operator*=(double x){
+        knarr::ApplicationSample::operator*=(x);
         watts *= x;
-        utilisation *= x;
-        bandwidth *= x;
-        latency *= x;
         return *this;
     }
 }MonitoredSample;
@@ -175,6 +164,12 @@ inline MonitoredSample operator*(const MonitoredSample& lhs,
     return r;
 }
 
+inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
+    MonitoredSample r = lhs;
+    r *= x;
+    return r;
+}
+
 inline MonitoredSample operator/(const MonitoredSample& lhs,
                                  const MonitoredSample& rhs){
     MonitoredSample r = lhs;
@@ -188,52 +183,107 @@ inline MonitoredSample operator/(const MonitoredSample& lhs, double x){
     return r;
 }
 
-inline MonitoredSample operator*(const MonitoredSample& lhs, double x){
-    MonitoredSample r = lhs;
-    r *= x;
-    return r;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& obj){
+inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& sample){
     os << "[";
-    os << "Watts: " << obj.watts << " ";
-    os << "BandwidthMax: " << obj.utilisation << " ";
-    os << "Bandwidth: " << obj.bandwidth << " ";
-    os << "Latency: " << obj.latency << " ";
+    os << "Watts: " << sample.watts << " ";
+    os << "Knarr Sample: " << static_cast<const knarr::ApplicationSample&>(sample) << " ";
     os << "]";
     return os;
 }
 
-inline std::ofstream& operator<<(std::ofstream& os, const MonitoredSample& obj){
-    os << obj.watts << "\t";
-    os << obj.utilisation << "\t";
-    os << obj.bandwidth << "\t";
-    os << obj.latency << "\t";
-    return os;
+inline std::istream& operator>>(std::istream& is, MonitoredSample& sample){
+    is.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+    is.ignore(std::numeric_limits<std::streamsize>::max(), ':');
+    is >> sample.watts;
+    is.ignore(std::numeric_limits<std::streamsize>::max(), ':');
+    knarr::operator >> (is, sample);
+    is.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+    return is;
 }
 
 inline MonitoredSample squareRoot(const MonitoredSample& x){
     MonitoredSample r;
-    r.watts = x.watts?sqrt(x.watts):0;
-    r.utilisation = x.utilisation?sqrt(x.utilisation):0;
-    r.bandwidth = x.bandwidth?sqrt(x.bandwidth):0;
-    r.latency = x.latency?sqrt(x.latency):0;
+    r.loadPercentage = sqrt(x.loadPercentage);
+    r.bandwidth = sqrt(x.bandwidth);
+    r.latency = sqrt(x.latency);
+    r.numTasks = sqrt(x.numTasks);
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        r.customFields[i] = sqrt(x.customFields[i]);
+    }
+    r.watts = sqrt(x.watts);
     return r;
 }
 
+inline void zero(MonitoredSample& x){
+    x.loadPercentage = 0;
+    x.bandwidth = 0;
+    x.latency = 0;
+    x.numTasks = 0;
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        x.customFields[i] = 0;
+    }
+    x.watts = 0;
+}
+
 inline void regularize(MonitoredSample& x){
-    if(x.watts < 0){x.watts = 0;}
-    if(x.utilisation < 0){x.utilisation = 0;}
+    if(x.loadPercentage < 0){x.loadPercentage = 0;}
     if(x.bandwidth < 0){x.bandwidth = 0;}
     if(x.latency < 0){x.latency = 0;}
+    if(x.numTasks < 0){x.numTasks = 0;}
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        if(x.customFields[i] < 0){
+            x.customFields[i] = 0;
+        }
+    }
+    if(x.watts < 0){x.watts = 0;}
+}
+
+inline MonitoredSample minimum(const MonitoredSample& a,
+                               const MonitoredSample& b){
+    MonitoredSample ms;
+    ms.loadPercentage = std::min(a.loadPercentage, b.loadPercentage);
+    ms.bandwidth = std::min(a.bandwidth, b.bandwidth);
+    ms.latency = std::min(a.latency, b.latency);
+    ms.numTasks = std::min(a.numTasks, b.numTasks);
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        ms.customFields[i] = std::min(a.customFields[i], b.customFields[i]);
+    }
+    ms.watts = std::min(a.watts, b.watts);
+    return ms;
+}
+
+inline MonitoredSample maximum(const MonitoredSample& a,
+                               const MonitoredSample& b){
+    MonitoredSample ms;
+    ms.loadPercentage = std::max(a.loadPercentage, b.loadPercentage);
+    ms.bandwidth = std::max(a.bandwidth, b.bandwidth);
+    ms.latency = std::max(a.latency, b.latency);
+    ms.numTasks = std::max(a.numTasks, b.numTasks);
+    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        ms.customFields[i] = std::max(a.customFields[i], b.customFields[i]);
+    }
+    ms.watts = std::max(a.watts, b.watts);
+    return ms;
 }
 
 inline double squareRoot(const double& x){
     return x?sqrt(x):0;
 }
 
+inline void zero(double& x){
+    x = 0;
+}
+
 inline void regularize(double& x){
     if(x < 0){x = 0;}
+}
+
+inline double minimum(const double& a, const double& b){
+    return a<b?a:b;
+}
+
+inline double maximum(const double& a, const double& b){
+    return a>b?a:b;
 }
 
 /**
@@ -241,6 +291,15 @@ inline void regularize(double& x){
  * Requirement: There must exists the following functions:
  *   - 'T squareRoot(const T&)' to compute the square root.
  *   - 'void regularize(T&)' to set the values < 0 to zero.
+ *   - 'void zero(T&)' to set to zero.
+ *   - 'T minimum(const T& a, const T& b)' returns the minimum between a and b
+ *      On struct (or classes) returns a new struct (or class)
+ *      with the minimum of each field. For example, if a = {2, 3} and b = {3, 1}
+ *      it returns {2, 1}.
+ *   - 'T maximum(const T& a, const T& b)' returns the maximum between a and b
+ *      On struct (or classes) returns a new struct (or class)
+ *      with the maximum of each field. For example, if a = {2, 3} and b = {3, 1}
+ *      it returns {3, 3}.
  */
 template <typename T> class Smoother{
     template<typename V>
@@ -250,6 +309,14 @@ template <typename T> class Smoother{
     template<typename V>
     friend std::ofstream& operator<<(std::ofstream& os,
                                      const Smoother<V>& obj);
+private:
+    T _min, _max;
+protected:
+    /**
+     * Adds a sample to the smoother.
+     * @param value The sample to be added.
+     */
+    virtual void addImpl(const T& value) = 0;
 public:
     virtual ~Smoother(){;}
 
@@ -269,7 +336,23 @@ public:
      * Adds a sample to the smoother.
      * @param value The sample to be added.
      */
-    virtual void add(const T& value) = 0;
+    void add(const T& value){
+        _min = minimum(_min, value);
+        _max = maximum(_max, value);
+        addImpl(value);
+    }
+
+    /**
+     * Returns the minimum values added so far.
+     * @return The minimum values added so far.
+     */
+    T min(){return _min;}
+
+    /**
+     * Returns the maximum values added so far.
+     * @return The maximum values added so far.
+     */
+    T max(){return _max;}
 
     /**
      * Gets the last stored sample.
@@ -329,9 +412,18 @@ private:
     T _standardDeviation;
     T _coefficientVariation;
 public:
-    MovingAverageSimple(size_t span):_span(span), _nextIndex(0),
+    explicit MovingAverageSimple(size_t span):_span(span), _nextIndex(0),
                                      _storedValues(0){
         _windowImpl.resize(_span);
+        zero(_lastSample);
+        zero(_oldAverage);
+        zero(_average);
+        zero(_oldTmpVariance);
+        zero(_tmpVariance);
+        zero(_oldVariance);
+        zero(_variance);
+        zero(_standardDeviation);
+        zero(_coefficientVariation);
     }
 
     double getSmoothingFactor() const{
@@ -344,7 +436,7 @@ public:
         _windowImpl.resize(_span);
     }
 
-    void add(const T& value){
+    void addImpl(const T& value){
         _lastSample = value;
         if(_storedValues == 0){
             ++_storedValues;
@@ -429,11 +521,17 @@ private:
     T _standardDeviation;
     T _coefficientVariation;
 public:
-    MovingAverageExponential(double alpha):_alpha(alpha),_storedValues(0){
+    explicit MovingAverageExponential(double alpha):_alpha(alpha),
+                                                     _storedValues(0){
         if(_alpha < 0 || _alpha > 1.0){
             throw std::runtime_error("Alpha must be between 0 and 1 "
                                      "(included)");
         }
+        zero(_lastSample);
+        zero(_average);
+        zero(_variance);
+        zero(_standardDeviation);
+        zero(_coefficientVariation);
     }
 
     double getSmoothingFactor() const{
@@ -444,7 +542,7 @@ public:
         _alpha = s;
     }
 
-    void add(const T& value){
+    void addImpl(const T& value){
         ++_storedValues;
         _lastSample = value;
         if(_storedValues == 1){

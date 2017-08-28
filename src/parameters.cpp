@@ -28,6 +28,7 @@
 #include "parameters.hpp"
 
 #include <cstring>
+#include <limits>
 
 namespace nornir{
 
@@ -38,6 +39,12 @@ using namespace mammut::utils;
 using mammut::Communicator;
 using mammut::Mammut;
 using mammut::utils::enumStrings;
+
+#define CONFIGURATION_VERSION "1.0.0"
+#define CONFPATH_LEN_MAX 512
+#define CONFFILE_VERSION "/nornir/version.csv"
+#define CONFFILE_ARCH "/nornir/archdata.xml"
+#define CONFFILE_VOLTAGE "/nornir/voltage.csv"
 
 void XmlTree::init(const std::string& content, const std::string& rootName){
     rapidxml::xml_document<> xmlContent;
@@ -121,6 +128,28 @@ void XmlTree::getDouble(const char* valueName, double& value){
     }
 }
 
+void XmlTree::getDoubleOrMin(const char* valueName, double& value){
+    rapidxml::xml_node<> *node = getNode(valueName);
+    if(node){
+        if(std::string(node->value()).compare("MIN") == 0){
+            value = NORNIR_REQUIREMENT_MIN;
+        }else{
+            value = stringToDouble(node->value());
+        }
+    }
+}
+
+void XmlTree::getDoubleOrMax(const char* valueName, double& value){
+    rapidxml::xml_node<> *node = getNode(valueName);
+    if(node){
+        if(std::string(node->value()).compare("MAX") == 0){
+            value = NORNIR_REQUIREMENT_MAX;
+        }else{
+            value = stringToDouble(node->value());
+        }
+    }
+}
+
 void XmlTree::getString(const char* valueName, string& value){
     rapidxml::xml_node<> *node = getNode(valueName);
     if(node){
@@ -139,6 +168,20 @@ void XmlTree::getArrayUint(const char* valueName, std::vector<uint>& value){
     }
 }
 
+template<typename T>
+void XmlTree::getArrayEnums(const char* valueName, std::vector<T>& values){
+    rapidxml::xml_node<> *node = getNode(valueName);
+    values.clear();
+    if(node){
+        vector<string> strValues = mammut::utils::split(node->value(), ':');
+        for(size_t i = 0; i < strValues.size(); i++){
+            T value;
+            stringstream line(strValues.at(i));
+            line >> enumFromStringInternal(value);
+            values.push_back(value);
+        }
+    }
+}
 
 template<typename T>
 void XmlTree::getEnum(const char* valueName, T& value){
@@ -155,8 +198,26 @@ void ArchData::loadXml(const string& archFileName){
     SETVALUE(xc, Double, monitoringCost);
 }
 
+Requirements::Requirements(){
+    bandwidth = NORNIR_REQUIREMENT_UNDEF;
+    powerConsumption = NORNIR_REQUIREMENT_UNDEF;
+    minUtilization = NORNIR_REQUIREMENT_UNDEF;
+    maxUtilization = NORNIR_REQUIREMENT_UNDEF;
+    executionTime = NORNIR_REQUIREMENT_UNDEF;
+    expectedTasksNumber = NORNIR_REQUIREMENT_UNDEF;
+    latency = NORNIR_REQUIREMENT_UNDEF;
+}
+
+bool Requirements::anySpecified() const{
+    return bandwidth != NORNIR_REQUIREMENT_UNDEF ||
+           powerConsumption != NORNIR_REQUIREMENT_UNDEF ||
+           minUtilization != NORNIR_REQUIREMENT_UNDEF ||
+           maxUtilization != NORNIR_REQUIREMENT_UNDEF ||
+           executionTime != NORNIR_REQUIREMENT_UNDEF ||
+           latency != NORNIR_REQUIREMENT_UNDEF;
+}
+
 void Parameters::setDefault(){
-    contractType = CONTRACT_NONE;
     triggerQBlocking = TRIGGER_Q_BLOCKING_NO;
     strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_SAME;
     strategySelection = STRATEGY_SELECTION_LEARNING;
@@ -166,52 +227,78 @@ void Parameters::setDefault(){
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
-    strategyCoresChange = STRATEGY_CORES_RETHREADING;
     knobCoresEnabled = true;
     knobMappingEnabled = true;
     knobFrequencyEnabled = true;
+    knobHyperthreadingEnabled = false;
     turboBoost = false;
     fastReconfiguration = true;
     migrateCollector = false;
     smoothingFactor = 0;
     persistenceValue = 0;
+    cooldownPeriod = 200;
     samplingIntervalCalibration = 100;
     samplingIntervalSteady = 1000;
     steadyThreshold = 4;
     minTasksPerSample = 0;
-    underloadThresholdFarm = 80.0;
-    overloadThresholdFarm = 90.0;
-    underloadThresholdWorker = 80.0;
-    overloadThresholdWorker = 90.0;
-    requiredBandwidth = 0;
-    requiredCompletionTime = 0;
-    expectedTasksNumber = 0;
-    synchronousWorkers = false;
-    powerBudget = 0;
+    synchronousWorkers = false;    
     maxCalibrationTime = 0;
-    maxCalibrationConfigurations = 0;
+    maxCalibrationSteps = 0;
     maxPerformancePredictionError = 10.0;
     maxPowerPredictionError = 5.0;
     regressionAging = 0;
     maxMonitoringOverhead = 1.0;
     thresholdQBlocking = -1;
+    thresholdQBlockingBelt = 0.05;
     tolerableSamples = 0;
     qSize = 1;
     conservativeValue = 0;
     isolateManager = false;
     statsReconfiguration = false;
+    roiFile = "";
 
-    mishra.applicationName = "";
-    mishra.namesData = "";
-    mishra.bandwidthData = "";
-    mishra.powerData = "";
-    mishra.numSamples = 20;
+    leo.applicationName = "";
+    leo.namesData = "";
+    leo.bandwidthData = "";
+    leo.powerData = "";
+    leo.numSamples = 20;
+
     dataflow.orderedProcessing = false;
     dataflow.orderedOutput = false;
     dataflow.maxGraphs = 1000;
     dataflow.maxInterpreters = 0;
 
-    observer = NULL;
+    /** Retrieving global configuration files. **/
+    char* confHome_c = getenv("XDG_CONFIG_DIRS");
+    vector<string> confHomes;
+    if(!confHome_c || strcmp(confHome_c, "") == 0){
+        confHomes.push_back(string("/etc/xdg"));
+    }else{
+        confHomes = split(string(confHome_c), ':');
+    }
+
+    size_t i = 0;
+    bool found = false;
+    while(i < confHomes.size() && !found){
+        string confFileArch = confHomes.at(i) + string(CONFFILE_ARCH);
+        string confFileVoltage = confHomes.at(i) + string(CONFFILE_VOLTAGE);
+        string confFileVersion = confHomes.at(i) + string(CONFFILE_VERSION);
+
+        if(existsFile(confFileArch) &&
+           existsFile(confFileVoltage) &&
+           existsFile(confFileVersion) &&
+           readFirstLineFromFile(confFileVersion).compare(CONFIGURATION_VERSION) == 0){
+            archData.loadXml(confFileArch);
+            loadVoltageTable(archData.voltageTable, confFileVoltage);
+            found = true;
+        }
+        i++;
+    }
+
+    if(!found){
+        throw runtime_error("Impossible to find configuration files. Please run "
+                            "'sudo make microbench' from the nornir root folder.");
+    }
 }
 
 uint Parameters::getLowOverheadSamplingInterval() const{
@@ -272,6 +359,7 @@ vector<Frequency> Parameters::getAvailableFrequencies(){
     vector<Frequency> frequencies;
     CpuFreq* cpuFreq = mammut.getInstanceCpuFreq();
     if(cpuFreq){
+        cpuFreq->removeTurboFrequencies();
         vector<Domain*> fDomains = cpuFreq->getDomains();
         if(fDomains.size()){
             frequencies = fDomains.front()->getAvailableFrequencies();
@@ -341,17 +429,13 @@ ParametersValidation Parameters::validateKnobFrequencies(){
 
     if(knobFrequencyEnabled && !(isGovernorAvailable(GOVERNOR_USERSPACE) &&
          availableFrequencies.size())){
-        knobFrequencyEnabled = false;
+        return VALIDATION_NO_MANUAL_DVFS;
     }
 
     for(size_t i = 0; i < virtualCores.size(); i++){
         if(!virtualCores.at(i)->hasFlag("constant_tsc")){
             return VALIDATION_NO_CONSTANT_TSC;
         }
-    }
-
-    if(knobFrequencyEnabled && !knobMappingEnabled){
-        return VALIDATION_STRATEGY_FREQUENCY_REQUIRES_MAPPING;
     }
 
     if(fastReconfiguration &&
@@ -372,92 +456,219 @@ ParametersValidation Parameters::validateKnobFrequencies(){
 
 ParametersValidation Parameters::validateTriggers(){
     if(triggerQBlocking == TRIGGER_Q_BLOCKING_AUTO &&
-       thresholdQBlocking == -1){
-        return VALIDATION_NO_BLOCKING_THRESHOLD;
+       (thresholdQBlocking == -1 ||
+        thresholdQBlockingBelt < 0 || thresholdQBlockingBelt > 1)){
+        return VALIDATION_BLOCKING_PARAMETERS;
     }
     return VALIDATION_OK;
 }
 
-ParametersValidation Parameters::validateContract(){
-    switch(contractType){
-        case CONTRACT_PERF_UTILIZATION:{
-            if(underloadThresholdFarm > overloadThresholdFarm     ||
-               underloadThresholdWorker > overloadThresholdWorker ||
-               underloadThresholdFarm < 0                         ||
-               overloadThresholdFarm > 100                        ||
-               underloadThresholdWorker < 0                       ||
-               overloadThresholdWorker > 100){
-                return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-            }
-        }break;
-        case CONTRACT_PERF_BANDWIDTH:{
-            if(requiredBandwidth <= 0){
-                return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-            }
-        }break;
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            if(!expectedTasksNumber || !requiredCompletionTime){
-                return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-            }
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            if(powerBudget <= 0 ||
-               strategySelection == STRATEGY_SELECTION_ANALYTICAL ||
-               strategySelection == STRATEGY_SELECTION_LIMARTINEZ){
-                return VALIDATION_WRONG_CONTRACT_PARAMETERS;
-            }
-        }break;
-        default:{
-            ;
-        }break;
+ParametersValidation Parameters::validateRequirements(){
+    if(requirements.minUtilization != NORNIR_REQUIREMENT_UNDEF ||
+       requirements.maxUtilization != NORNIR_REQUIREMENT_UNDEF){
+        if(requirements.minUtilization == NORNIR_REQUIREMENT_UNDEF){
+            requirements.minUtilization = 0.1;
+        }
+        if(requirements.maxUtilization == NORNIR_REQUIREMENT_UNDEF){
+            requirements.maxUtilization = 100;
+        }
+        if(requirements.minUtilization > requirements.maxUtilization     ||
+           requirements.minUtilization < 0                               ||
+           requirements.maxUtilization > 100){
+            return VALIDATION_WRONG_REQUIREMENT;
+        }
     }
-
-    if(maxCalibrationTime == 0 && maxCalibrationConfigurations &&
+    if(requirements.bandwidth != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.bandwidth < 0){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+    if(requirements.executionTime != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.executionTime != NORNIR_REQUIREMENT_MIN &&
+       requirements.executionTime < 0){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+    if(requirements.powerConsumption != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.powerConsumption != NORNIR_REQUIREMENT_MIN &&
+       requirements.powerConsumption < 0){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+    if(requirements.latency != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.latency != NORNIR_REQUIREMENT_MIN &&
+       requirements.latency < 0){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+    if(requirements.executionTime != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.expectedTasksNumber == NORNIR_REQUIREMENT_UNDEF){
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+    if(isPrimaryRequirement(requirements.powerConsumption)){
+        if(strategySelection == STRATEGY_SELECTION_ANALYTICAL ||
+           strategySelection == STRATEGY_SELECTION_LIMARTINEZ){
+            return VALIDATION_WRONG_REQUIREMENT;
+        }
+    }
+    if(maxCalibrationTime == 0 && maxCalibrationSteps &&
        (maxPerformancePredictionError <= 0      ||
         maxPerformancePredictionError > 100.0   ||
         maxPowerPredictionError <= 0    ||
         maxPowerPredictionError > 100.0)){
-        return VALIDATION_WRONG_CONTRACT_PARAMETERS;
+        return VALIDATION_WRONG_REQUIREMENT;
+    }
+
+    uint maxMinRequirements = 0;
+    if(requirements.bandwidth == NORNIR_REQUIREMENT_MAX){
+        ++maxMinRequirements;
+    }
+    if(requirements.executionTime == NORNIR_REQUIREMENT_MIN){
+        ++maxMinRequirements;
+    }
+    if(requirements.latency == NORNIR_REQUIREMENT_MIN){
+        ++maxMinRequirements;
+    }
+    if(requirements.powerConsumption == NORNIR_REQUIREMENT_MIN){
+        ++maxMinRequirements;
+    }
+
+    // TODO: Remove Utilization requirements (can be obtained through
+    // bandwidth + tolerance/conservative
+    // At most 1 min/max requirement can be specified.
+    if(maxMinRequirements > 1){
+        return VALIDATION_WRONG_REQUIREMENT;
     }
 
     return VALIDATION_OK;
 }
-
 ParametersValidation Parameters::validateSelector(){
-    if(strategySelection == STRATEGY_SELECTION_MISHRA &&
-       (mishra.bandwidthData.compare("") == 0 ||
-        mishra.powerData.compare("") == 0 ||
-        mishra.applicationName.compare("") == 0 ||
-        mishra.namesData.compare("") == 0)){
-        return VALIDATION_NO_MISHRA_PARAMETERS;
+    bool knobsSupportSelector[STRATEGY_SELECTION_NUM][KNOB_NUM];
+    if(strategySelection == STRATEGY_SELECTION_NUM){
+        return VALIDATION_NO;
     }
+
+    // ANALYTICAL
+    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_MAPPING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_HYPERTHREADING] = false;
+
+    // FULLSEARCH
+    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_MAPPING] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_HYPERTHREADING] = true;
+
+    // For learning we do not check since it depends from the predictors choice.
+    // (we will check in validatePredictors())
+
+    // LIMARTINEZ
+    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_MAPPING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_HYPERTHREADING] = false;
+
+    // LEO
+    knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_MAPPING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_HYPERTHREADING] = false;
+
+    if(strategySelection == STRATEGY_SELECTION_LEO &&
+       (leo.bandwidthData.compare("") == 0 ||
+        leo.powerData.compare("") == 0 ||
+        leo.applicationName.compare("") == 0 ||
+        leo.namesData.compare("") == 0)){
+        return VALIDATION_NO_LEO_PARAMETERS;
+    }
+
+
+    if(strategySelection != STRATEGY_SELECTION_LEARNING){
+        // Check if the knob enabled can be managed by the selector specified.
+        for(size_t i = 0; i < KNOB_NUM; i++){
+            if(_knobEnabled[i] && !knobsSupportSelector[strategySelection][i]){
+                return VALIDATION_UNSUPPORTED_KNOBS;
+            }
+        }
+    }else{
+        /*********************************************/
+        /*            Validate predictors.           */
+        /*********************************************/
+        bool knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_NUM][KNOB_NUM];
+        bool knobsSupportPower[STRATEGY_PREDICTION_POWER_NUM][KNOB_NUM];
+
+        if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_NUM ||
+           strategyPredictionPower == STRATEGY_PREDICTION_POWER_NUM){
+            return VALIDATION_NO;
+        }
+        /******************************************/
+        /*          Performance models.           */
+        /******************************************/
+        // AMDAHL
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_MAPPING] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_HYPERTHREADING] = false;
+        // LEO
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_MAPPING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_HYPERTHREADING] = false;
+        // USL
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_MAPPING] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_HYPERTHREADING] = false;
+        // USLP
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_MAPPING] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_HYPERTHREADING] = false;
+
+        /******************************************/
+        /*              Power models.             */
+        /******************************************/
+        // LINEAR
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_FREQUENCY] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_MAPPING] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_HYPERTHREADING] = false;
+        // LEO
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_FREQUENCY] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_MAPPING] = false;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_HYPERTHREADING] = false;
+
+        // Check if the knob enabled can be managed by the predictors specified.
+        for(size_t i = 0; i < KNOB_NUM; i++){
+            if(_knobEnabled[i] && (!knobsSupportPerformance[strategyPredictionPerformance][i] ||
+                                  !knobsSupportPower[strategyPredictionPower][i])){
+                return VALIDATION_UNSUPPORTED_KNOBS;
+            }
+        }
+
+        if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_LEO &&
+             (leo.bandwidthData.compare("") == 0 ||
+              leo.powerData.compare("") == 0 ||
+              leo.applicationName.compare("") == 0 ||
+              leo.namesData.compare("") == 0)){
+                return VALIDATION_NO_LEO_PARAMETERS;
+        }
+
+        // Currently, USL predictors only works with low discrepancy explorators.
+        // TODO: This is because the additional exploration points at the moment
+        // can only be added to the low discrepancy generators.
+        if((strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
+            strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP) &&
+           (strategyExploration != STRATEGY_EXPLORATION_HALTON && strategyExploration != STRATEGY_EXPLORATION_HALTON_REVERSE &&
+            strategyExploration != STRATEGY_EXPLORATION_RANDOM && strategyExploration != STRATEGY_EXPLORATION_SOBOL)){
+               return VALIDATION_NO;
+        }
+    }
+
     return VALIDATION_OK;
 }
 
-
-ParametersValidation Parameters::validatePredictor(){
-    if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_MISHRA &&
-         (mishra.bandwidthData.compare("") == 0 ||
-          mishra.powerData.compare("") == 0 ||
-          mishra.applicationName.compare("") == 0 ||
-          mishra.namesData.compare("") == 0)){
-            return VALIDATION_NO_MISHRA_PARAMETERS;
-    }
-    if((strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
-       strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING) &&
-       (strategyExploration != STRATEGY_EXPLORATION_HALTON && strategyExploration != STRATEGY_EXPLORATION_HALTON_REVERSE &&
-        strategyExploration != STRATEGY_EXPLORATION_RANDOM && strategyExploration != STRATEGY_EXPLORATION_SOBOL)){
-           return VALIDATION_NO;
-    }
-    return VALIDATION_OK;
-}
-
-template<> char const* enumStrings<ContractType>::data[] = {
-    "NONE",
-    "PERF_UTILIZATION",
-    "PERF_BANDWIDTH",
-    "PERF_COMPLETION_TIME",
-    "POWER_BUDGET"
+template<> char const* enumStrings<LoggerType>::data[] = {
+    "FILE",
+    "GRAPHITE"
 };
 
 template<> char const* enumStrings<TriggerConfQBlocking>::data[] = {
@@ -479,21 +690,22 @@ template<> char const* enumStrings<StrategySelection>::data[] = {
     "ANALYTICAL",
     "FULLSEARCH",
     "LIMARTINEZ",
-    "MISHRA"
+    "LEO",
+    "NUM" // <- Must always be the last
 };
 
 template<> char const* enumStrings<StrategyPredictionPerformance>::data[] = {
     "AMDAHL",
-    "AMDAHL_MAPPING",
     "USL",
-    "USL_MAPPING",
-    "MISHRA"
+    "USLP",
+    "LEO",
+    "NUM" // <- Must always be the last
 };
 
 template<> char const* enumStrings<StrategyPredictionPower>::data[] = {
     "LINEAR",
-    "LINEAR_MAPPING",
-    "MISHRA"
+    "LEO",
+    "NUM" // <- Must always be the last
 };
 
 template<> char const* enumStrings<StrategyExploration>::data[] = {
@@ -526,15 +738,17 @@ template<> char const* enumStrings<StrategyPersistence>::data[] = {
     "VARIATION"
 };
 
-template<> char const* enumStrings<StrategyCoresChange>::data[] = {
-    "RETHREADING",
-    "REMAPPING"
-};
-
 void Parameters::loadXml(const string& paramFileName){
-    XmlTree xt(paramFileName, "adaptivityParameters");
+    XmlTree xt(paramFileName, "nornirParameters");
 
-    SETVALUE(xt, Enum, contractType);
+    SETVALUE(xt, DoubleOrMax, requirements.bandwidth);
+    SETVALUE(xt, DoubleOrMin, requirements.powerConsumption);
+    SETVALUE(xt, Double, requirements.minUtilization);
+    SETVALUE(xt, Double, requirements.maxUtilization);
+    SETVALUE(xt, Double, requirements.expectedTasksNumber);
+    SETVALUE(xt, DoubleOrMin, requirements.executionTime);
+    SETVALUE(xt, DoubleOrMin, requirements.latency);
+
     SETVALUE(xt, Enum, strategyUnusedVirtualCores);
     SETVALUE(xt, Enum, strategySelection);
     SETVALUE(xt, Enum, strategyPredictionPerformance);
@@ -543,49 +757,46 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, strategySmoothing);
     SETVALUE(xt, Enum, strategyPolling);
     SETVALUE(xt, Enum, strategyPersistence);
-    SETVALUE(xt, Enum, strategyCoresChange);
     SETVALUE(xt, Enum, triggerQBlocking);
     SETVALUE(xt, Bool, knobCoresEnabled);
     SETVALUE(xt, Bool, knobMappingEnabled);
     SETVALUE(xt, Bool, knobFrequencyEnabled);
+    SETVALUE(xt, Bool, knobHyperthreadingEnabled);
 
     SETVALUE(xt, Bool, turboBoost);
     SETVALUE(xt, Bool, fastReconfiguration);
     SETVALUE(xt, Double, smoothingFactor);
     SETVALUE(xt, Double, persistenceValue);
+    SETVALUE(xt, Double, cooldownPeriod);
     SETVALUE(xt, Uint, samplingIntervalCalibration);
     SETVALUE(xt, Uint, samplingIntervalSteady);
     SETVALUE(xt, Uint, steadyThreshold);
     SETVALUE(xt, Uint, minTasksPerSample);
-    SETVALUE(xt, Double, underloadThresholdFarm);
-    SETVALUE(xt, Double, overloadThresholdFarm);
-    SETVALUE(xt, Double, underloadThresholdWorker);
-    SETVALUE(xt, Double, overloadThresholdWorker);
     SETVALUE(xt, Bool, migrateCollector);
-    SETVALUE(xt, Double, requiredBandwidth);
-    SETVALUE(xt, Uint, requiredCompletionTime);
-    SETVALUE(xt, Ulong, expectedTasksNumber);
     SETVALUE(xt, Bool, synchronousWorkers);
-    SETVALUE(xt, Double, powerBudget);
     SETVALUE(xt, Double, maxCalibrationTime);
-    SETVALUE(xt, Uint, maxCalibrationConfigurations);
+    SETVALUE(xt, Uint, maxCalibrationSteps);
     SETVALUE(xt, Double, maxPerformancePredictionError);
     SETVALUE(xt, Double, maxPowerPredictionError);
     SETVALUE(xt, Uint, regressionAging);
     SETVALUE(xt, Double, maxMonitoringOverhead);
     SETVALUE(xt, Double, thresholdQBlocking);
+    SETVALUE(xt, Double, thresholdQBlockingBelt);
     SETVALUE(xt, Uint, tolerableSamples);
     SETVALUE(xt, Ulong, qSize);
     SETVALUE(xt, Double, conservativeValue);
     SETVALUE(xt, ArrayUint, disallowedNumCores);
     SETVALUE(xt, Bool, isolateManager);
     SETVALUE(xt, Bool, statsReconfiguration);
+    SETVALUE(xt, String, roiFile);
+    SETVALUE(xt, ArrayEnums, loggersTypes);
+    //xt.getArrayEnums<LoggerType>("loggersTypes", loggersTypes);
 
-    SETVALUE(xt, String, mishra.applicationName);
-    SETVALUE(xt, String, mishra.namesData);
-    SETVALUE(xt, String, mishra.bandwidthData);
-    SETVALUE(xt, String, mishra.powerData);
-    SETVALUE(xt, Uint, mishra.numSamples);
+    SETVALUE(xt, String, leo.applicationName);
+    SETVALUE(xt, String, leo.namesData);
+    SETVALUE(xt, String, leo.bandwidthData);
+    SETVALUE(xt, String, leo.powerData);
+    SETVALUE(xt, Uint, leo.numSamples);
 
     SETVALUE(xt, Bool, dataflow.orderedProcessing);
     SETVALUE(xt, Bool, dataflow.orderedOutput);
@@ -598,48 +809,10 @@ Parameters::Parameters(Communicator* const communicator):
     setDefault();
 }
 
-#define CONFIGURATION_VERSION "\"1.0.0\""
-#define CONFPATH_LEN_MAX 512
-#define CONFFILE_VERSION "/nornir/version.csv"
-#define CONFFILE_ARCH "/nornir/archdata.xml"
-#define CONFFILE_VOLTAGE "/nornir/voltage.csv"
-
 Parameters::Parameters(const string& paramFileName,
                        Communicator* const communicator):
       mammut(communicator){
     setDefault();
-
-    /** Retrieving archdata.xml configuration file. **/
-    char* confHome_c = getenv("XDG_CONFIG_DIRS");
-    vector<string> confHomes;
-    if(!confHome_c || strcmp(confHome_c, "") == 0){
-        confHomes.push_back(string("/etc/xdg"));
-    }else{
-        confHomes = split(string(confHome_c), ':');
-    }
-
-    size_t i = 0;
-    bool found = false;
-    while(i < confHomes.size() && !found){
-        string confFileArch = confHomes.at(i) + string(CONFFILE_ARCH);
-        string confFileVoltage = confHomes.at(i) + string(CONFFILE_VOLTAGE);
-        string confFileVersion = confHomes.at(i) + string(CONFFILE_VERSION);
-
-        if(existsFile(confFileArch) &&
-           existsFile(confFileVoltage) &&
-           existsFile(confFileVersion) &&
-           readFirstLineFromFile(confFileVersion).compare(CONFIGURATION_VERSION) == 0){
-            archData.loadXml(confFileArch);
-            loadVoltageTable(archData.voltageTable, confFileVoltage);
-            found = true;
-        }
-        i++;
-    }
-
-    if(!found){
-        throw runtime_error("Impossible to find configuration files. Please run 'sudo make microbench' from the nornir root folder.");
-    }
-
     /** Loading parameters. **/
     loadXml(paramFileName);
 }
@@ -648,13 +821,23 @@ Parameters::~Parameters(){
     ;
 }
 
-ParametersValidation Parameters::validate(){
-    ParametersValidation r = VALIDATION_OK;
+void Parameters::load(const string& paramFileName){
+    setDefault();
+    /** Loading parameters. **/
+    loadXml(paramFileName);
+}
 
+
+ParametersValidation Parameters::validate(){
     setDefaultPost();
 
+    _knobEnabled[KNOB_FREQUENCY] = knobFrequencyEnabled;
+    _knobEnabled[KNOB_VIRTUAL_CORES] = knobCoresEnabled;
+    _knobEnabled[KNOB_MAPPING] = knobMappingEnabled;
+    _knobEnabled[KNOB_HYPERTHREADING] = knobHyperthreadingEnabled;
+
     /** Validate frequency knob. **/
-    r = validateKnobFrequencies();
+    ParametersValidation r = validateKnobFrequencies();
     if(r != VALIDATION_OK){return r;}
 
     /** Validate triggers. **/
@@ -665,19 +848,28 @@ ParametersValidation Parameters::validate(){
     r = validateUnusedVc(strategyUnusedVirtualCores);
     if(r != VALIDATION_OK){return r;}
 
-    /** Validate contract parameters. **/
-    r = validateContract();
+    /** Validate requirements. **/
+    r = validateRequirements();
     if(r != VALIDATION_OK){return r;}
 
     /** Validate selectors. **/
     r = validateSelector();
     if(r != VALIDATION_OK){return r;}
 
-    /** Validate predictors. **/
-    r = validatePredictor();
-    if(r != VALIDATION_OK){return r;}
-
     return VALIDATION_OK;
+}
+
+bool Parameters::isKnobEnabled(KnobType k) const{
+    return _knobEnabled[k];
+}
+
+bool isMinMaxRequirement(double r){
+    return r == NORNIR_REQUIREMENT_MAX || r == NORNIR_REQUIREMENT_MIN;
+}
+
+bool isPrimaryRequirement(double r){
+    return r != NORNIR_REQUIREMENT_UNDEF &&
+           !isMinMaxRequirement(r);
 }
 
 }

@@ -41,10 +41,10 @@
 #include "node.hpp"
 #include "utils.hpp"
 
-#include "external/Mammut/mammut/module.hpp"
-#include "external/Mammut/mammut/utils.hpp"
-#include "external/Mammut/mammut/mammut.hpp"
-#include "external/orlog/src/orlog.hpp"
+#include "external/mammut/mammut/module.hpp"
+#include "external/mammut/mammut/utils.hpp"
+#include "external/mammut/mammut/mammut.hpp"
+#include "external/knarr/src/knarr.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -64,18 +64,17 @@ using namespace mammut::task;
 using namespace mammut::topology;
 using namespace mammut::utils;
 
-struct MonitoredSample;
 
-typedef struct{
-    size_t numSteps;
-    double bandwidthAccuracy;
-    double powerAccuracy;
-    double currentBandwidth;
-    double currentPower;
-    KnobsValues foundConfiguration;
-    std::vector<double> performanceErrors;
-    std::vector<double> powerErrors;
-}SimulationResult;
+// How to react to the calibration of other applications
+// in order to do not interfere too much with them.
+typedef enum{
+    // Do nothing
+    CALIBRATION_SHRINK_NONE = 0, //TODO: New managers arrived to the multimanager may not have space to calibrate.
+    // Move all the threads on the same core.
+    CALIBRATION_SHRINK_AGGREGATE,
+    // Move all the threads on the same core and pause the process.
+    CALIBRATION_SHRINK_PAUSE,
+}CalibrationShrink;
 
 /*!
  * \class Manager
@@ -86,7 +85,7 @@ typedef struct{
 class Manager: public Thread{
     friend class ManagerMulti;
 public:
-    Manager(Parameters adaptivityParameters);
+    explicit Manager(Parameters nornirParameters);
 
     virtual ~Manager();
     /**
@@ -94,15 +93,27 @@ public:
      * ATTENTION: The user must not call this one but 'start()'.
      */
     void run();
+
+    /** 
+     * Forces the manager to terminate.
+     **/
+    void terminate();
+
+
+    /**
+     * Sets the parameters to be used when simulating nornir. It must be
+     * called soon after the object creation.
+     * @param samplesFileName The name of the file containing the application
+     * samples.
+     * ATTENTION: Only used for testing purposes.
+     */
+    void setSimulationParameters(std::string samplesFileName);
 protected:
     // Flag for checking farm termination.
     volatile bool _terminated;
 
     // The parameters used to take management decisions.
     Parameters _p;
-
-    // The cpufreq module.
-    CpuFreq* _cpufreq;
 
     // The energy counter.
     Counter* _counter;
@@ -142,42 +153,50 @@ protected:
     // The configuration selector.
     Selector* _selector;
 
-    // Watts correction value for multiple applications scenario.
-    Joules _wattsCorrection;
+    // Pid of the monitored process.
+    pid_t _pid;
+
+    // Flag indicating if the execution must be simulated.
+    bool _toSimulate;
+
+    // Samples to be used for simulation.
+    std::list<MonitoredSample> _simulationSamples;
 #ifdef DEBUG_MANAGER
     ofstream samplesFile;
 #endif
 
     /**
-     * Wait for the application to start.
+     * Wait for the application to start and
+     * sets the ProcessHandler to KnobMappingExternal if necessary.
      */
     virtual void waitForStart() = 0;
 
     /**
-     * Asks the application for a sample.
+     * Returns a monitored sample.
+     * @return A monitored sample sample.
      */
-    virtual void askSample() = 0;
+    virtual MonitoredSample getSample() = 0;
 
     /**
-     * Obtain application sample.
-     * @param sample An application sample. It will be filled by this call.
+     * Returns the execution time of the application (milliseconds).
+     * - For ManagerFastflow, it will be the execution time of the pattern.
+     * - For ManagerInstrumented, it will be the execution time between
+     *   the construction of the 'Instrumentation' object and the call of the
+     *   'terminate' function on it (application side).
+     * - For ManagerBlackBox, it will be the execution time from the point where
+     *   the manager is created to the end of the application.
      */
-    virtual void getSample(orlog::ApplicationSample& sample) = 0;
+    virtual ulong getExecutionTime() = 0;
 
     /**
      * Manages a configuration change.
      */
-    virtual void manageConfigurationChange() = 0;
+    virtual void postConfigurationManagement();
 
     /**
      * Cleaning after termination.
      */
-    virtual void clean() = 0;
-
-    /**
-     * Returns the execution time of the application (milliseconds).
-     */
-    virtual ulong getExecutionTime() = 0;
+    virtual void terminationManagement();
 
     /**
      * Updates the required bandwidth.
@@ -189,24 +208,6 @@ protected:
      * @param domain The domain.
      */
     void setDomainToHighestFrequency(const Domain* domain);
-
-    /**
-     * Returns the primary value of a sample according to
-     * the required contract.
-     * @param sample The sample.
-     * @return The primary value of a sample according to
-     * the required contract.
-     */
-    double getPrimaryValue(const MonitoredSample& sample) const;
-
-    /**
-     * Returns the secondary value of a sample according to
-     * the required contract.
-     * @param sample The sample.
-     * @return The secondary value of a sample according to
-     * the required contract.
-     */
-    double getSecondaryValue(const MonitoredSample& sample) const;
 
     /**
      * Returns true if the manager doesn't have still to check for a new
@@ -231,7 +232,7 @@ protected:
      * Updates the tasks count.
      * @param sample The workers sample to be used for the update.
      */
-    void updateTasksCount(orlog::ApplicationSample& sample);
+    void updateTasksCount(MonitoredSample& sample);
 
     /**
      * Observes.
@@ -270,95 +271,165 @@ private:
 
     void disinhibit();
 
+    void shrink(CalibrationShrink type);
+
+    void stretch(CalibrationShrink type);
+
+    virtual void shrinkPause() = 0;
+
+    virtual void stretchPause() = 0;
+
+    /**
+     * Updates the prediction models by letting them now
+     * that there is an interference caused by another application.
+     */
+    void updateModelsInterference();
+
+
+    /**
+     * Wait until the models have been updated and they are
+     * ready to be used.
+     */
+    void waitModelsInterferenceUpdate();
+
     /**
      * Returns the vector of physical cores used by the manager.
-     * The vector is empty if the manager still didn't finished the calibration.
+     * If the manager is still calibrating, it waits until
+     * the manager finishes the calibration.
      *
      * @return The vector of physical cores used by the manager.
      */
     std::vector<PhysicalCoreId> getUsedCores();
 
-    void allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> ids);
-
-    void removeWattsCorrection();
-
-    void updateWattsCorrection();
+    void allowCores(std::vector<mammut::topology::VirtualCoreId> ids);
 };
 
-
-class ManagerExternal: public Manager{
+/**
+ * Manager for instrumented applications.
+ **/
+class ManagerInstrumented: public Manager{
 private:
-    orlog::Monitor _monitor;
-    pid_t _pid;
+    knarr::Monitor _monitor;
+    void shrinkPause();
+    void stretchPause();
 public:
     /**
-     * Creates an adaptivity manager for an external application.
-     * @param orlogChannel The name of the Orlog channel.
-     * @param adaptivityParameters The parameters to be used for
+     * Creates an adaptivity manager for an instrumented application.
+     * @param knarrChannel The name of the knarr channel.
+     * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerExternal(const std::string& orlogChannel,
-                    Parameters adaptivityParameters);
+    ManagerInstrumented(const std::string& knarrChannel,
+                        Parameters nornirParameters);
 
     /**
-     * Creates an adaptivity manager for an external application.
-     * @param orlogSocket The Orlog socket.
+     * Creates an adaptivity manager for an instrumented application.
+     * @param knarrSocket The knarr socket.
      * @param chid The channel id.
-     * @param adaptivityParameters The parameters to be used for
+     * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerExternal(nn::socket& orlogSocket,
-                    int chid,
-                    Parameters adaptivityParameters);
+    ManagerInstrumented(nn::socket& knarrSocket,
+                        int chid,
+                        Parameters nornirParameters);
 
     /**
      * Destroyes this adaptivity manager.
      */
-    ~ManagerExternal();
+    ~ManagerInstrumented();
 protected:
     void waitForStart();
-    void askSample();
-    void getSample(orlog::ApplicationSample& sample);
-    void manageConfigurationChange();
-    void clean();
+    MonitoredSample getSample();
     ulong getExecutionTime();
 };
 
+/**
+ * Manager for non-instrumented applications,
+ * monitored thorugh hardware counters.
+ **/
+class ManagerBlackBox: public Manager{
+private:
+    mammut::task::ProcessHandler* _process;
+    double _startTime;
+    void shrinkPause();
+    void stretchPause();
+public:
+    /**
+     * Creates an adaptivity manager for an external NON-INSTRUMENTED
+     * application (blackbox).
+     * @param pid The identifier of an already running process.
+     * @param nornirParameters The parameters to be used for
+     * adaptivity decisions.
+     */
+    ManagerBlackBox(pid_t pid, Parameters nornirParameters);
+
+    /**
+     * Destroyes this adaptivity manager.
+     */
+    ~ManagerBlackBox();
+
+    /**
+     * Returns the pid of the monitored process.
+     * @return The pid of the monitored process.
+     */
+    pid_t getPid() const;
+protected:
+    void waitForStart();
+    MonitoredSample getSample();
+    ulong getExecutionTime();
+};
+
+/**
+ * Dummy manager for testing purposes.
+ **/
+class ManagerTest: public Manager{
+private:
+    void shrinkPause(){;}
+    void stretchPause(){;}
+public:
+    explicit ManagerTest(Parameters nornirParameters,
+                         uint numWorkers, uint numServiceNodes):Manager(nornirParameters){
+        //TODO: Avoid this initialization phase which is common to all the managers.
+        Manager::_configuration = new ConfigurationExternal(_p);
+        _configuration->_numServiceNodes = numServiceNodes;
+        dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(numWorkers);
+        lockKnobs();
+        _configuration->createAllRealCombinations();
+        _selector = createSelector();
+        // For instrumented application we do not care if synchronous of not
+        // (we count iterations).
+        _p.synchronousWorkers = false;
+    }
+    ~ManagerTest(){;}
+protected:
+    void waitForStart(){;}
+    MonitoredSample getSample(){return MonitoredSample();}
+    ulong getExecutionTime(){return 0;}
+};
 
 /*!
- * \class ManagerFarm
- * \brief This class manages the adaptivity in farm based computations.
+ * \class ManagerFastflow
+ * \brief This class manages the adaptivity in applications written
+ * with FastFlow programming framework.
  *
- * This class manages the adaptivity in farm based computations.
+ * This class manages the adaptivity in applications written
+ * with FastFlow programming framework.
  */
 template <typename lb_t = ff::ff_loadbalancer, typename gt_t = ff::ff_gatherer>
-class ManagerFarm: public Manager{
+class ManagerFastFlow: public Manager{
 public:
     /**
      * Creates a farm adaptivity manager.
      * @param farm The farm to be managed.
-     * @param adaptivityParameters The parameters to be used for
+     * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerFarm(ff_farm<lb_t, gt_t>* farm, Parameters adaptivityParameters);
+    ManagerFastFlow(ff_farm<lb_t, gt_t>* farm, Parameters nornirParameters);
 
     /**
      * Destroyes this adaptivity manager.
      */
-    ~ManagerFarm();
-
-
-    /**
-     * Simulates the execution.
-     * ATTENTION: This is only meant to be used by developers.
-     * @param configurationData The lines contained in configurationData file.
-     * @param maxIterations The maximum number of iterations to be performed
-     *        during calibration phase. If 0, there is no bound on the maximum
-     *        number of iterations.
-     */
-    SimulationResult simulate(std::vector<std::string>& configurationData,
-                              volatile bool* terminate,
-                              size_t maxIterations = 0);
+    ~ManagerFastFlow();
 private:
     // The managed farm.
     ff_farm<lb_t, gt_t>* _farm;
@@ -373,13 +444,16 @@ private:
     std::vector<AdaptiveNode*> _activeWorkers;
 
     void waitForStart();
-    void askSample();
-    void getSample(orlog::ApplicationSample& sample);
+    void askForSample();
+    MonitoredSample getSampleResponse();
+    MonitoredSample getSample();
     void initNodesPreRun();
     void initNodesPostRun();
-    void manageConfigurationChange();
-    void clean();
+    void postConfigurationManagement();
+    void terminationManagement();
     ulong getExecutionTime();
+    void shrinkPause();
+    void stretchPause();
 };
 
 }

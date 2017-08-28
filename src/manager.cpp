@@ -33,15 +33,16 @@
 #include "./node.hpp"
 #include "./utils.hpp"
 
-#include "external/Mammut/mammut/module.hpp"
-#include "external/Mammut/mammut/utils.hpp"
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/module.hpp"
+#include "external/mammut/mammut/utils.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 #include <cmath>
 #include <iostream>
 #include <limits>
 #include <string>
 #include <stdlib.h>
+#include <sys/wait.h>
 
 #undef DEBUG
 #undef DEBUGB
@@ -69,18 +70,17 @@ using namespace mammut::utils;
 static Parameters& validate(Parameters& p){
     ParametersValidation apv = p.validate();
     if(apv != VALIDATION_OK){
-        throw runtime_error("Invalid adaptivity parameters: " + std::to_string(apv));
+        throw runtime_error("Invalid parameters: " + std::to_string(apv));
     }
     return p;
 }
 
-Manager::Manager(Parameters adaptivityParameters):
+Manager::Manager(Parameters nornirParameters):
         _terminated(false),
-        _p(validate(adaptivityParameters)),
-        _cpufreq(_p.mammut.getInstanceCpuFreq()),
-        _counter(_p.mammut.getInstanceEnergy()->getCounter()),
-        _task(_p.mammut.getInstanceTask()),
-        _topology(_p.mammut.getInstanceTopology()),
+        _p(validate(nornirParameters)),
+        _counter(NULL),
+        _task(NULL),
+        _topology(NULL),
         _samples(initSamples()),
         _variations(new MovingAverageExponential<double>(0.5)),
         _totalTasks(0),
@@ -90,62 +90,76 @@ Manager::Manager(Parameters adaptivityParameters):
         _inhibited(false),
         _configuration(NULL),
         _selector(NULL),
-        _wattsCorrection(0)
+        _pid(0),
+        _toSimulate(false)
 {
-    ;
+    DEBUG("Initializing manager.");
+    for(LoggerType lt : _p.loggersTypes){
+        switch(lt){
+        case LOGGER_FILE:{
+            _p.loggers.push_back(new LoggerFile());
+        }break;
+        case LOGGER_GRAPHITE:{
+            // TODO passare comeparametro url e porta
+            _p.loggers.push_back(new LoggerGraphite("178.62.14.35", 2003));
+        }break;
+        default:{
+            throw std::runtime_error("Unknown logger type.");
+        }
+        }
+    }
+    DEBUGB(samplesFile.open("samples.csv"));
 }
 
 Manager::~Manager(){
-    ;
+    for(auto logger : _p.loggers){
+        delete logger;
+    }
+    _p.loggers.clear();
+    DEBUGB(samplesFile.close());
 }
 
 void Manager::run(){
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        _remainingTasks = _p.expectedTasksNumber;
-        _deadline = getMillisecondsTime()/1000.0 + _p.requiredCompletionTime;
+    _p.mammut.getInstanceCpuFreq()->removeTurboFrequencies();
+    DEBUG("Turbo frequencies removed.");
+    if(!_toSimulate){
+        _counter = _p.mammut.getInstanceEnergy()->getCounter();
+        _task = _p.mammut.getInstanceTask();
+        _topology = _p.mammut.getInstanceTopology();
+    }
+    DEBUG("Mammut handlers created.");
+
+    if(isPrimaryRequirement(_p.requirements.executionTime)){
+        _remainingTasks = _p.requirements.expectedTasksNumber;
+        _deadline = getMillisecondsTime()/1000.0 + _p.requirements.executionTime;
     }
 
     waitForStart();
-#if 0
-    /** Creates the parallel section begin file. **/
-    char* default_in_roi = (char*) malloc(sizeof(char)*256);
-    default_in_roi[0] = '\0';
-    default_in_roi = strcat(default_in_roi, getenv("HOME"));
-    default_in_roi = strcat(default_in_roi, "/roi_in");
-    setenv(PAR_BEGIN_ENV, default_in_roi, 0);
-    free(default_in_roi);
-    FILE* in_roi = fopen(getenv(PAR_BEGIN_ENV), "w");
-    fclose(in_roi);
-#endif
+    DEBUG("Application started.");
 
     /** Wait for the disinhibition from global manager. **/
     while(_inhibited){;}
 
-    if(_counter){
-        _counter->reset();
-    }
+    // Reset joules counter
+    getAndResetJoules();
+    //TODO RESET BANDWIDTHIN
     _lastStoredSampleMs = getMillisecondsTime();
-    if(_p.observer){
-        _p.observer->_startMonitoringMs = _lastStoredSampleMs;
-    }
 
     /* Force the first calibration point. **/
     KnobsValues kv = decide();
     act(kv);
 
-    ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
-    thisThread->move(MANAGER_VIRTUAL_CORE);
+    if(!_toSimulate){
+        ThreadHandler* thisThread = _task->getProcessHandler(getpid())->getThreadHandler(gettid());
+        thisThread->move(NORNIR_MANAGER_VIRTUAL_CORE);
+    }
 
-    double microsecsSleep = 0;
     double startSample = getMillisecondsTime();
-    double overheadMs = 0;
-
-    uint samplingInterval;
-    uint steadySamples = 0;
+    uint samplingInterval, steadySamples = 0;
 
     while(!_terminated){
-        overheadMs = getMillisecondsTime() - startSample;
-        if(_selector->isCalibrating()){
+        double overheadMs = getMillisecondsTime() - startSample;
+        if(_selector && _selector->isCalibrating()){
             samplingInterval = _p.samplingIntervalCalibration;
             steadySamples = 0;
         }else if(steadySamples < _p.steadyThreshold){
@@ -154,7 +168,7 @@ void Manager::run(){
         }else{
             samplingInterval = _p.samplingIntervalSteady;
         }
-        microsecsSleep = ((double)samplingInterval - overheadMs)*
+        double microsecsSleep = ((double)samplingInterval - overheadMs)*
                           (double)MAMMUT_MICROSECS_IN_MILLISEC;
         if(microsecsSleep < 0){
             microsecsSleep = 0;
@@ -172,27 +186,25 @@ void Manager::run(){
                 DEBUG("Asking selector.");
                 KnobsValues kv = decide();
                 act(kv);
-                _configuration->trigger();
                 startSample = getMillisecondsTime();
             }
+        }else{
+            // If inhibited, we need to discard the previous samples
+            // (they were taken with less/more applications running).
+            _samples->reset();
         }
     }
 
-    clean();
+    terminationManagement();
     ulong duration = getExecutionTime();
-#if 0
-    unlink(getenv(PAR_BEGIN_ENV));
-#endif
-    if(_p.observer){
-        vector<CalibrationStats> cs;
-        if(_selector){
-            _selector->stopCalibration(_totalTasks);
-            cs = _selector->getCalibrationsStats();
-            _p.observer->calibrationStats(cs, duration, _totalTasks);
-        }
-        ReconfigurationStats rs = _configuration->getReconfigurationStats();
-        _p.observer->summaryStats(cs, rs, duration, _totalTasks);
+
+    for(auto logger : _p.loggers){
+        logger->logSummary(*_configuration, _selector, duration, _totalTasks);
     }
+}
+
+void Manager::terminate(){
+    _terminated = true;
 }
 
 void Manager::inhibit(){
@@ -203,79 +215,106 @@ void Manager::disinhibit(){
     _inhibited = false;
 }
 
-std::vector<PhysicalCoreId> Manager::getUsedCores(){
-    if(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){
-        return std::vector<PhysicalCoreId>();
-    }else{
-        vector<VirtualCore*> vc = ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->getActiveVirtualCores();
-        vector<PhysicalCoreId> pcid;
-        for(size_t i = 0; i < vc.size(); i++){
-            PhysicalCoreId pci = vc.at(i)->getPhysicalCoreId();
-            if(!contains(pcid, pci)){
-                pcid.push_back(pci);
+void Manager::shrink(CalibrationShrink type){
+    switch(type){
+        case CALIBRATION_SHRINK_AGGREGATE:{
+            if(_pid){
+                _task->getProcessHandler(_pid)->move(_topology->getVirtualCores().back());
             }
-        }
-        return pcid;
+        }break;
+        case CALIBRATION_SHRINK_PAUSE:{
+            shrinkPause();
+        }break;
+        default:{
+            ;
+        }break;
     }
 }
 
-void Manager::allowPhysicalCores(std::vector<mammut::topology::PhysicalCoreId> ids){
-    vector<VirtualCore*> vc = _topology->getVirtualCores();
-    vector<VirtualCore*> allowedVc;
-    for(size_t i = 0; i < vc.size(); i++){
-        if(contains(ids, vc.at(i)->getPhysicalCoreId())){
-            allowedVc.push_back(vc.at(i));
-        }
-    }
-    ((KnobVirtualCores*) _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES))->changeMax(ids.size() - _configuration->getNumServiceNodes());
-    ((KnobMapping*) _configuration->getKnob(KNOB_TYPE_MAPPING))->setAllowedCores(allowedVc);
-    _configuration->createAllRealCombinations();
-}
-
-void Manager::removeWattsCorrection(){
-    _wattsCorrection = 0;
-}
-
-void Manager::updateWattsCorrection(){
-    removeWattsCorrection();
-    getAndResetJoules();
-    usleep(100*(double)MAMMUT_MICROSECS_IN_MILLISEC);
-    Joules watts = getAndResetJoules() / 0.1;
-
-    if(_samples->size()){
-        _wattsCorrection = watts - _samples->average().watts;
-    }else{
-        double pred = 0;
-        switch(_p.contractType){
-            case CONTRACT_PERF_BANDWIDTH:
-            case CONTRACT_PERF_COMPLETION_TIME:
-            case CONTRACT_PERF_UTILIZATION:{
-                pred = ((SelectorPredictive*) _selector)->getSecondaryPrediction(_configuration->getRealValues());
-            }break;
-            case CONTRACT_POWER_BUDGET:{
-                pred = ((SelectorPredictive*) _selector)->getPrimaryPrediction(_configuration->getRealValues());
-            }break;
-            default:{
-                throw std::runtime_error("Unknown contract type.");
+void Manager::stretch(CalibrationShrink type){
+    switch(type){
+        case CALIBRATION_SHRINK_AGGREGATE:{
+            if(_pid){
+                std::vector<VirtualCore*> allowedCores = dynamic_cast<KnobMapping*>(_configuration->getKnob(KNOB_MAPPING))->getAllowedCores();
+                _task->getProcessHandler(_pid)->move(allowedCores);
             }
-        }
-        if(pred > watts){
-            _wattsCorrection = pred - watts;
-        }else{
-            _wattsCorrection = watts - pred;
-        }
+        }break;
+        case CALIBRATION_SHRINK_PAUSE:{
+            stretchPause();
+        }break;
+        default:{
+            ;
+        }break;
     }
+}
+
+void Manager::updateModelsInterference(){
+    if(_p.strategySelection != STRATEGY_SELECTION_LEARNING){
+        throw std::runtime_error("updateModelsInterference can only be "
+                "used on LEARNING selectors.");
+    }
+    // Temporarely disinhibit.
     _samples->reset();
-    _lastStoredSampleMs = getMillisecondsTime();
+    disinhibit();
+    dynamic_cast<SelectorLearner*>(_selector)->updateModelsInterference();
 }
+
+void Manager::waitModelsInterferenceUpdate(){
+    if(_p.strategySelection != STRATEGY_SELECTION_LEARNING){
+        throw std::runtime_error("waitModelsInterferenceUpdate can only be "
+                        "used on LEARNING selectors.");
+    }
+    while(!dynamic_cast<SelectorLearner*>(_selector)->areModelsUpdated() && !_terminated){
+        // If in the meanwhile the selector is waiting for calibration,
+        // allow him to calibrate.
+        if(_selector->isCalibrating()){
+           _selector->allowCalibration();
+        }
+    }
+    // Inhibit again.
+    inhibit();
+}
+
+std::vector<VirtualCoreId> Manager::getUsedCores(){
+    while(_selector->isCalibrating() || _selector->getTotalCalibrationTime() == 0){;}
+    vector<VirtualCore*> vc = dynamic_cast<KnobMapping*>(_configuration->getKnob(KNOB_MAPPING))->getActiveVirtualCores();
+    vector<VirtualCoreId> vcid;
+    for(VirtualCore* v : vc){
+        vcid.push_back(v->getVirtualCoreId());
+    }
+    return vcid;
+}
+
+void Manager::allowCores(std::vector<mammut::topology::VirtualCoreId> ids){
+    vector<VirtualCore*> allowedVc;
+    for(auto id : ids){
+        allowedVc.push_back(_topology->getVirtualCore(id));
+    }
+    dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(ids.size() - _configuration->getNumServiceNodes());
+    dynamic_cast<KnobMapping*>(_configuration->getKnob(KNOB_MAPPING))->setAllowedCores(allowedVc);
+}
+
+void Manager::setSimulationParameters(std::string samplesFileName){
+    _toSimulate = true;
+    std::ifstream file(samplesFileName);
+    MonitoredSample sample;
+
+    while(file >> sample){
+        _simulationSamples.push_back(sample);
+    }
+}
+
+void Manager::postConfigurationManagement(){;}
+
+void Manager::terminationManagement(){;}
 
 void Manager::updateRequiredBandwidth() {
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
+    if(isPrimaryRequirement(_p.requirements.executionTime)){
         double now = getMillisecondsTime();
         if(now / 1000.0 >= _deadline){
-            _p.requiredBandwidth = numeric_limits<double>::max();
+            _p.requirements.bandwidth = numeric_limits<double>::max();
         }else{
-            _p.requiredBandwidth = _remainingTasks / ((_deadline * 1000.0 - now) / 1000.0);
+            _p.requirements.bandwidth = _remainingTasks / ((_deadline * 1000.0 - now) / 1000.0);
         }
     }
 }
@@ -284,43 +323,9 @@ void Manager::setDomainToHighestFrequency(const Domain* domain){
     if(!domain->setGovernor(GOVERNOR_PERFORMANCE)){
         if(!domain->setGovernor(GOVERNOR_USERSPACE) ||
            !domain->setHighestFrequencyUserspace()){
-            throw runtime_error("AdaptivityManagerFarm: Fatal error while "
-                                "setting highest frequency for sensitive "
-                                "emitter/collector. Try to run it without "
-                                "sensitivity parameters.");
+            throw runtime_error("Manager: Fatal error when trying to set"
+                                "domain to maximum frequency.");
         }
-    }
-}
-
-double Manager::getPrimaryValue(const MonitoredSample& sample) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            return sample.bandwidth;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            return sample.watts;
-        }break;
-        default:{
-            return 0;
-        }break;
-    }
-}
-
-double Manager::getSecondaryValue(const MonitoredSample& sample) const{
-    switch(_p.contractType){
-        case CONTRACT_PERF_UTILIZATION:
-        case CONTRACT_PERF_BANDWIDTH:
-        case CONTRACT_PERF_COMPLETION_TIME:{
-            return sample.watts;
-        }break;
-        case CONTRACT_POWER_BUDGET:{
-            return sample.bandwidth;
-        }break;
-        default:{
-            return 0;
-        }break;
     }
 }
 
@@ -332,16 +337,10 @@ bool Manager::persist() const{
         }break;
         case STRATEGY_PERSISTENCE_VARIATION:{
             const MonitoredSample& variation = _samples->coefficientVariation();
-            double primaryVariation =  getPrimaryValue(variation);
-            double secondaryVariation =  getSecondaryValue(variation);
             r = _samples->size() < 1 ||
-                primaryVariation > _p.persistenceValue ||
-                secondaryVariation > _p.persistenceValue;
-#if 0
-            double primaryVariation = _variations->coefficientVariation();
-            std::cout << "Variation size: " << _variations->size() << " PrimaryVariation: " << primaryVariation << std::endl;
-            r = _variations->size() < 2 || primaryVariation > _p.persistenceValue;
-#endif
+                variation.bandwidth > _p.persistenceValue ||
+                variation.latency > _p.persistenceValue ||
+                variation.watts > _p.persistenceValue;
         }break;
     }
     return r;
@@ -349,54 +348,21 @@ bool Manager::persist() const{
 
 void Manager::lockKnobs() const{
     if(!_p.knobCoresEnabled){
-        _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->lockToMax();
-        _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMax();
+        _configuration->getKnob(KNOB_VIRTUAL_CORES)->lockToMax();
     }
     if(!_p.knobMappingEnabled){
-        _configuration->getKnob(KNOB_TYPE_MAPPING)->lock(MAPPING_TYPE_LINEAR);
+        _configuration->getKnob(KNOB_MAPPING)->lock(MAPPING_TYPE_LINEAR);
     }
     if(!_p.knobFrequencyEnabled){
-        _configuration->getKnob(KNOB_TYPE_FREQUENCY)->lockToMax();
+        _configuration->getKnob(KNOB_FREQUENCY)->lockToMax();
     }
-
-    switch(_p.strategySelection){
-        case STRATEGY_SELECTION_ANALYTICAL:{
-            _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-            _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
-        }break;
-        case STRATEGY_SELECTION_LEARNING:{
-            switch(_p.strategyPredictionPerformance){
-                case STRATEGY_PREDICTION_PERFORMANCE_MISHRA:
-                case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL:
-                case STRATEGY_PREDICTION_PERFORMANCE_USL:{
-                    _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-                    _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
-                }break;
-                case STRATEGY_PREDICTION_PERFORMANCE_AMDAHL_MAPPING:
-                case STRATEGY_PREDICTION_PERFORMANCE_USL_MAPPING:{
-                    _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-                }break;
-            }
-        }break;
-        case STRATEGY_SELECTION_LIMARTINEZ:{
-            _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-            _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
-        }break;
-        case STRATEGY_SELECTION_MISHRA:{
-            _configuration->getKnob(KNOB_TYPE_HYPERTHREADING)->lockToMin();
-            _configuration->getKnob(KNOB_TYPE_MAPPING)->lock((double) MAPPING_TYPE_LINEAR);
-        }break;
-        case STRATEGY_SELECTION_FULLSEARCH:{
-            ;
-        }break;
-        default:{
-            throw std::runtime_error("Selector not yet implemented.");
-        }break;
+    if(!_p.knobHyperthreadingEnabled){
+        _configuration->getKnob(KNOB_HYPERTHREADING)->lockToMin();
     }
 }
 
 Selector* Manager::createSelector() const{
-    if(_p.contractType == CONTRACT_NONE){
+    if(!_p.requirements.anySpecified()){
         return new SelectorFixed(_p, *_configuration, _samples);
     }else{
         switch(_p.strategySelection){
@@ -409,8 +375,8 @@ Selector* Manager::createSelector() const{
             case STRATEGY_SELECTION_LIMARTINEZ:{
                 return new SelectorLiMartinez(_p, *_configuration, _samples);
             }break;
-            case STRATEGY_SELECTION_MISHRA:{
-                return new SelectorMishra(_p, *_configuration, _samples);
+            case STRATEGY_SELECTION_LEO:{
+                return new SelectorLeo(_p, *_configuration, _samples);
             }break;
             case STRATEGY_SELECTION_FULLSEARCH:{
                 return new SelectorFullSearch(_p, *_configuration, _samples);
@@ -437,19 +403,11 @@ Smoother<MonitoredSample>* Manager::initSamples() const{
     }
 }
 
-void Manager::updateTasksCount(orlog::ApplicationSample& sample){
-    double newTasks = sample.tasksCount;
-    if(_p.synchronousWorkers){
-        // When we have synchronous workers we need to count the iterations,
-        // not the real tasks (indeed in this case each worker will receive
-        // the same amount of tasks, e.g. in canneal) since they are sent in
-        // broadcast.
-        newTasks /= _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
-    }
-    _totalTasks += newTasks;
-    if(_p.contractType == CONTRACT_PERF_COMPLETION_TIME){
-        if(_remainingTasks > newTasks){
-            _remainingTasks -= newTasks;
+void Manager::updateTasksCount(MonitoredSample &sample){
+    _totalTasks += sample.numTasks;
+    if(isPrimaryRequirement(_p.requirements.executionTime)){
+        if(_remainingTasks > sample.numTasks){
+            _remainingTasks -= sample.numTasks;
         }else{
             _remainingTasks = 0;
         }
@@ -457,46 +415,51 @@ void Manager::updateTasksCount(orlog::ApplicationSample& sample){
 }
 
 void Manager::observe(){
-    MonitoredSample sample;
-    orlog::ApplicationSample ws;
     Joules joules = 0.0;
+    MonitoredSample sample;
+    if(_toSimulate){
+        if(_simulationSamples.empty()){
+            return;
+        }else{
+            sample = _simulationSamples.front();
+            _simulationSamples.pop_front();
+            if(_simulationSamples.empty()){
+                _terminated = true;
+            }
+        }
+    }else{
+        sample = getSample();
+        double now = getMillisecondsTime();
+        joules = getAndResetJoules();
+        for(auto logger : _p.loggers){
+            logger->addJoules(joules);
+        }
 
-    askSample();
-    getSample(ws);
-    updateTasksCount(ws);
+        double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
+        _lastStoredSampleMs = now;
 
-    joules = getAndResetJoules();
-    if(_p.observer){
-        _p.observer->addJoules(joules);
+        // Add watts to the sample
+        sample.watts = joules / durationSecs;
+
+        if(_p.synchronousWorkers){
+            // When we have synchronous workers we need to divide
+            // for the number of workers since we do it for the totalTasks
+            // count. When this flag is set we count iterations, not real
+            // tasks.
+            sample.bandwidth /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+            // When we have synchronous workers we need to count the iterations,
+            // not the real tasks (indeed in this case each worker will receive
+            // the same amount of tasks, e.g. in canneal) since they are sent in
+            // broadcast.
+            sample.numTasks /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+        }
     }
 
-    double now = getMillisecondsTime();
-    double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
-    _lastStoredSampleMs = now;
-
-    sample.watts = joules / durationSecs - _wattsCorrection;
-    // ATTENTION: Bandwidth is not the number of task since the
-    //            last observation but the number of expected
-    //            tasks that will be processed in 1 second.
-    //            For this reason, if we sum all the bandwidths in
-    //            the result observation file, we may have an higher
-    //            number than the number of tasks.
-    sample.bandwidth = ws.bandwidthTotal;
-    sample.utilisation = ws.loadPercentage;
-    sample.latency = ws.latency;
-
-    if(_p.synchronousWorkers){
-        // When we have synchronous workers we need to divide
-        // for the number of workers since we do it for the totalTasks
-        // count. When this flag is set we count iterations, not real
-        // tasks.
-        sample.bandwidth /= _configuration->getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
-    }
-
+    updateTasksCount(sample);
     _samples->add(sample);
-    _variations->add(getPrimaryValue(_samples->coefficientVariation()));
+    _variations->add(_samples->coefficientVariation().bandwidth);
 
-    DEBUGB(samplesFile << *_samples << "\n");
+    DEBUGB(samplesFile << sample << "\n");
 }
 
 KnobsValues Manager::decide(){
@@ -509,96 +472,86 @@ KnobsValues Manager::decide(){
         // some tasks.  By doing this check, we avoid updating bandwidth for
         // the first forced reconfiguration.
         _selector->updateBandwidthIn();
+        _selector->updateTotalTasks(_totalTasks);
     }
-    return _selector->getNextKnobsValues(_totalTasks);
+    return _selector->getNextKnobsValues();
 }
 
 void Manager::act(KnobsValues kv, bool force){
     if(force || !_configuration->equal(kv)){
         _configuration->setValues(kv);
-        manageConfigurationChange();
+        postConfigurationManagement();
 
         /****************** Clean state ******************/
         _samples->reset();
         _variations->reset();
         DEBUG("Resetting sample.");
-        // _lastStoredSampleMs = getMillisecondsTime();
-        // Discarding a sample since it may be between 2 different configurations.
-        orlog::ApplicationSample ws;
-        askSample();
-        getSample(ws);
-        updateTasksCount(ws);
-
-        Joules joules = getAndResetJoules();
-        if(_p.observer){
-            _p.observer->addJoules(joules);
+        // Don't store this sample since it may be inbetween 2
+        // different configurations.
+        if(_p.cooldownPeriod){
+            usleep(_p.cooldownPeriod * 1000);
         }
-        _lastStoredSampleMs = getMillisecondsTime();
+
+        if(!_toSimulate){
+            MonitoredSample sample = getSample();
+            updateTasksCount(sample);
+            _lastStoredSampleMs = getMillisecondsTime();
+            Joules joules = getAndResetJoules();
+            for(auto logger : _p.loggers){
+                logger->addJoules(joules);
+            }
+        }
+        _configuration->trigger();
     }
 }
 
 Joules Manager::getAndResetJoules(){
     Joules joules = 0.0;
-    if(_counter){
-        switch(_counter->getType()){
-            case COUNTER_CPUS:{
-                joules = ((CounterCpus*) _counter)->getJoulesCoresAll();
-            }break;
-            default:{
-                joules = _counter->getJoules();
-            }break;
+    if(!_toSimulate){
+        if(_counter){
+            joules = _counter->getJoules();
+            _counter->reset();
         }
-        _counter->reset();
     }
     return joules;
 }
 
 void Manager::logObservation(){
-    if(_p.observer){
-        const KnobMapping* kMapping = dynamic_cast<const KnobMapping*>(_configuration->getKnob(KNOB_TYPE_MAPPING));
-        MonitoredSample ms = _samples->average();
-        _p.observer->observe(_lastStoredSampleMs,
-                             _configuration->getRealValue(KNOB_TYPE_VIRTUAL_CORES),
-                             _configuration->getRealValue(KNOB_TYPE_FREQUENCY),
-                             kMapping->getActiveVirtualCores(),
-                             _samples->getLastSample().bandwidth,
-                             ms.bandwidth,
-                             _samples->coefficientVariation().bandwidth,
-                             ms.latency,
-                             ms.utilisation,
-                             _samples->getLastSample().watts + _wattsCorrection,
-                             ms.watts + _wattsCorrection);
+    for(auto logger : _p.loggers){
+        logger->log(*_configuration, *_samples);
     }
 }
 
-ManagerExternal::ManagerExternal(const std::string& orlogChannel,
-                                 Parameters adaptivityParameters):
-        Manager(adaptivityParameters), _monitor(orlogChannel), _pid(0){
+ManagerInstrumented::ManagerInstrumented(const std::string& knarrChannel,
+                                 Parameters nornirParameters):
+        Manager(nornirParameters), _monitor(knarrChannel){
+    DEBUG("Creating configuration.");
     Manager::_configuration = new ConfigurationExternal(_p);
+    DEBUG("Configuration created.");
     lockKnobs();
+    DEBUG("Knobs locked.");
     _configuration->createAllRealCombinations();
     _selector = createSelector();
-    // Only remapping is possible for external applications. 
-    _p.strategyCoresChange = STRATEGY_CORES_REMAPPING;
-    // For external application we do not care if synchronous of not (we count iterations).   
+    DEBUG("Selector created.");
+    // For instrumented application we do not care if synchronous of not
+    // (we count iterations).
     _p.synchronousWorkers = false;
 }
 
-ManagerExternal::ManagerExternal(nn::socket& orlogSocket,
+ManagerInstrumented::ManagerInstrumented(nn::socket& knarrSocket,
                                  int chid,
-                                 Parameters adaptivityParameters):
-            Manager(adaptivityParameters), _monitor(orlogSocket, chid), _pid(0){
+                                 Parameters nornirParameters):
+            Manager(nornirParameters), _monitor(knarrSocket, chid){
     Manager::_configuration = new ConfigurationExternal(_p);
     lockKnobs();
     _configuration->createAllRealCombinations();
     _selector = createSelector();
-    // Only remapping is possible for external applications. 
-    _p.strategyCoresChange = STRATEGY_CORES_REMAPPING;
-    // For external application we do not care if synchronous of not (we count iterations).
+    // For instrumented application we do not care if synchronous of not (we
+    // count iterations).
     _p.synchronousWorkers = false;
 }
 
-ManagerExternal::~ManagerExternal(){
+ManagerInstrumented::~ManagerInstrumented(){
     if(Manager::_configuration){
         delete Manager::_configuration;
     }
@@ -607,26 +560,111 @@ ManagerExternal::~ManagerExternal(){
     }
 }
 
-void ManagerExternal::waitForStart(){
-    _pid = _monitor.waitStart();
-    ((KnobMappingExternal*)_configuration->getKnob(KNOB_TYPE_MAPPING))->setPid(_pid);
+void ManagerInstrumented::waitForStart(){
+    Manager::_pid = _monitor.waitStart();
+    dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
 }
 
-void ManagerExternal::askSample(){
-    return;
-}
-void ManagerExternal::getSample(orlog::ApplicationSample& sample){
+MonitoredSample ManagerInstrumented::getSample(){
+    MonitoredSample sample;
     if(!_monitor.getSample(sample)){
         _terminated = true;
     }
+    return sample;
 }
 
-void ManagerExternal::manageConfigurationChange(){;}
-
-void ManagerExternal::clean(){;}
-
-ulong ManagerExternal::getExecutionTime(){
+ulong ManagerInstrumented::getExecutionTime(){
     return _monitor.getExecutionTime();
+}
+
+void ManagerInstrumented::shrinkPause(){
+    kill(_pid, SIGSTOP);
+}
+
+void ManagerInstrumented::stretchPause(){
+    kill(_pid, SIGCONT);
+}
+
+ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters nornirParameters):
+        Manager(nornirParameters), _process(nornirParameters.mammut.getInstanceTask()->getProcessHandler(pid)){
+    Manager::_pid = pid;
+    Manager::_configuration = new ConfigurationExternal(_p);
+    lockKnobs();
+    _configuration->createAllRealCombinations();
+    _selector = createSelector();
+    // For blackbox application we do not care if synchronous of not
+    // (we count instructions).
+    _p.synchronousWorkers = false;
+    // Check supported requirements.
+    if(isPrimaryRequirement(_p.requirements.bandwidth) ||
+       _p.requirements.maxUtilization != NORNIR_REQUIREMENT_UNDEF ||
+       isPrimaryRequirement(_p.requirements.executionTime) ||
+       _p.requirements.latency != NORNIR_REQUIREMENT_UNDEF){
+        throw std::runtime_error("ManagerBlackBox. Unsupported requirement.");
+    }
+    _startTime = 0;
+}
+
+ManagerBlackBox::~ManagerBlackBox(){
+    if(Manager::_configuration){
+        delete Manager::_configuration;
+    }
+    if(_selector){
+        delete _selector;
+    }
+}
+
+pid_t ManagerBlackBox::getPid() const{
+    return _pid;
+}
+
+void ManagerBlackBox::waitForStart(){
+    // We know for sure that when the Manager is created the process
+    // already started.
+    // However if we have been required to monitor only the ROI, we
+    // wait for ROI start by waiting for the roiFile creation.
+    if(_p.roiFile.compare("")){
+        while(!mammut::utils::existsFile(_p.roiFile)){
+            usleep(1000);
+        }
+    }
+    _startTime = getMillisecondsTime();
+    dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setProcessHandler(_process);
+    _process->resetInstructions(); // To remove those executed before entering ROI
+}
+
+static bool isRunning(pid_t pid) {
+    return !kill(pid, 0);
+}
+
+MonitoredSample ManagerBlackBox::getSample(){
+    MonitoredSample sample;
+    double instructions = 0;
+    if(!isRunning(_process->getId()) ||
+       (_p.roiFile.compare("") && !mammut::utils::existsFile(_p.roiFile))){
+        _terminated = true;
+        return sample;
+    }
+    _process->getAndResetInstructions(instructions);
+    sample.bandwidth = instructions / ((getMillisecondsTime() - _lastStoredSampleMs) / 1000.0);
+    sample.latency = -1; // Not used.
+    sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
+    sample.numTasks = instructions; // We consider a task to be an instruction.
+    return sample;
+}
+
+ulong ManagerBlackBox::getExecutionTime(){
+    return getMillisecondsTime() - _startTime;
+}
+
+void ManagerBlackBox::shrinkPause(){
+    pid_t pid = _process->getId();
+    kill(pid, SIGSTOP);
+}
+
+void ManagerBlackBox::stretchPause(){
+    pid_t pid = _process->getId();
+    kill(pid, SIGCONT);
 }
 
 }

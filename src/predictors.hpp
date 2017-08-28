@@ -35,7 +35,7 @@
 #include "configuration.hpp"
 #include "utils.hpp"
 
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 #include <gsl/gsl_multifit.h>
 #include <mlpack/core.hpp>
@@ -100,7 +100,6 @@ public:
  */
 class RegressionDataServiceTime: public RegressionData{
 private:
-    uint _phyCores;
     mammut::cpufreq::Frequency _minFrequency;
     double _invScalFactorFreq;
     double _invScalFactorFreqAndCores;
@@ -283,28 +282,59 @@ public:
 };
 
 /**
- * A linear regression predictor for <Cores, Frequency, Mapping> configurations.
+ * A regression predictor for <Cores, Frequency, Mapping> configurations.
+ * It works by using one predictor for each mapping.
  */
-class PredictorLinearRegressionMapping: public Predictor{
+template <class P>
+class PredictorRegressionMapping: public Predictor{
 private:
     Predictor* _predictors[MAPPING_TYPE_NUM];
 public:
-    PredictorLinearRegressionMapping(PredictorType type,
+    PredictorRegressionMapping(PredictorType type,
                               const Parameters& p,
                               const Configuration& configuration,
-                              const Smoother<MonitoredSample>* samples);
+                              const Smoother<MonitoredSample>* samples):
+                                  Predictor(type, p, configuration, samples){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            _predictors[i] = new P(type, p, configuration, samples);
+        }
+    }
 
-    ~PredictorLinearRegressionMapping();
+    ~PredictorRegressionMapping(){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            delete _predictors[i];
+        }
+    }
 
-    void clear();
+    void clear(){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            _predictors[i]->clear();
+        }
+    }
 
-    bool readyForPredictions();
+    bool readyForPredictions(){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            if(!_predictors[i]->readyForPredictions()){
+                return false;
+            }
+        }
+        return true;
+    }
 
-    void refine();
+    void refine(){
+        _predictors[(MappingType) _configuration.getRealValue(KNOB_MAPPING)]->refine();
+    }
 
-    void prepareForPredictions();
+    void prepareForPredictions(){
+        for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
+            _predictors[i]->prepareForPredictions();
+        }
+    }
 
-    double predict(const KnobsValues& configuration);
+    double predict(const KnobsValues& values){
+        const KnobsValues real = _configuration.getRealValues(values);
+        return _predictors[(MappingType) real[KNOB_MAPPING]]->predict(values);
+    }
 };
 
 /**
@@ -313,8 +343,14 @@ public:
  */
 #define POLYNOMIAL_DEGREE_USL 3 // Second degree polynomial
 
+typedef enum{
+    RECONFARG_N1 = 0,
+    RECONFARG_N2,
+}RecordInterferenceArgument;
+
 class PredictorUsl: public Predictor{
 private:
+    double _maxPolDegree;
     std::vector<double> _xs;
     std::vector<double> _ys;
     gsl_multifit_linear_workspace *_ws;
@@ -325,9 +361,24 @@ private:
     bool _preparationNeeded;
     double _maxFreqBw;
     double _minFreqBw;
+    double _minFreqCoresBw;
     double _minFrequency;
     double _maxFrequency;
-    double _maxCores;
+
+    // The following variables are used to update
+    // the model after an external interference (typical
+    // another application running on the system).
+    double _minFreqCoresBwNew;
+    double _n1, _n2;
+    double _minFreqN1Bw, _minFreqN2Bw;
+
+    double getMinFreqCoresBw() const;
+    double geta() const;
+    double getb() const;
+    void seta(double a);
+    void setb(double b);
+    double getTheta(RecordInterferenceArgument n);
+    double getLambda(RecordInterferenceArgument n) const;
 public:
     PredictorUsl(PredictorType type,
                  const Parameters& p,
@@ -345,6 +396,24 @@ public:
     void prepareForPredictions();
 
     double predict(const KnobsValues& configuration);
+
+    /**
+     * Updates the data required to modify the model
+     * in order to consider the interference.
+     * The selector should act in the following way:
+     *  Move to N1 -> updateInterference -> Move to N2 ->
+     *  updateInterference -> Move to 1 -> updateInterference
+     */
+    void updateInterference();
+
+    /**
+     * Updates the prediction coefficients after an external
+     * interference has been detected. It must only be called
+     * after that the following functions updateInterference
+     * has been called 3 times. Between two successive calls, the
+     * number of cores used must be changed. N1->N2->Seq
+     */
+    void updateCoefficients();
 };
 
 /*
@@ -385,7 +454,7 @@ public:
  * Energy Under Performance Constraints" - Mishra, Nikita and Zhang, Huazhe
  * and Lafferty, John D. and Hoffmann, Henry
  */
-class PredictorMishra: public Predictor{
+class PredictorLeo: public Predictor{
 private:
     std::map<KnobsValues, size_t> _confIndexes;
     arma::vec _values;
@@ -393,12 +462,12 @@ private:
     bool _preparationNeeded;
     size_t _appId;
 public:
-    PredictorMishra(PredictorType type,
+    PredictorLeo(PredictorType type,
               const Parameters& p,
               const Configuration& configuration,
               const Smoother<MonitoredSample>* samples);
 
-    ~PredictorMishra();
+    ~PredictorLeo();
 
     bool readyForPredictions();
 

@@ -46,7 +46,7 @@
 */
 
 #include <iostream>
-#include "../../src/manager.hpp"
+#include "../../src/nornir.hpp"
 #include <ff/spin-lock.hpp>
 
 #include "marX2.h"
@@ -246,11 +246,9 @@ int main(int argc, char ** argv) {
 	if(ncores>=4)
 	    farm.add_collector(&C);
 
-    nornir::Observer obs;
     nornir::Parameters ap("parameters.xml");
-    ap.observer = &obs;
     ap.expectedTasksNumber = dim;
-    nornir::ManagerFarm<> amf(&farm, ap);
+    nornir::ManagerFastFlow<> amf(&farm, ap);
     amf.start();
     std::cout << "amf started" << std::endl;
     amf.join();

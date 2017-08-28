@@ -1,8 +1,9 @@
 OPEN libnornir.a
-ADDLIB external/Mammut/mammut/libmammut.a
-ADDLIB external/orlog/src/liborlog.a
+ADDLIB external/mammut/mammut/libmammut.a
+ADDLIB external/knarr/src/libknarr.a
 ADDMOD external/leo/leo.o
 ADDMOD external/queues/hzdptr.o
 ADDMOD external/queues/xxhash.o
+ADDMOD external/graphite-c-client/graphite-client.o
 SAVE
 END

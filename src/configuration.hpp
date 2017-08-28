@@ -35,14 +35,18 @@
 #include "stats.hpp"
 #include "trigger.hpp"
 
-#include "external/Mammut/mammut/utils.hpp"
+#include "external/mammut/mammut/utils.hpp"
 
 namespace nornir{
 
+class ManagerTest;
+
 class Configuration: public mammut::utils::NonCopyable {
+    friend class ManagerTest;
 protected:
-    Knob* _knobs[KNOB_TYPE_NUM];
+    Knob* _knobs[KNOB_NUM];
     Trigger* _triggers[TRIGGER_TYPE_NUM];
+    uint _numServiceNodes;
 private:
     const Parameters& _p;
     bool _combinationsCreated;
@@ -63,7 +67,7 @@ private:
 
     void stopReconfigurationStatsTotal(ticks start);
 public:
-    Configuration(const Parameters& p);
+    explicit Configuration(const Parameters& p);
 
     virtual ~Configuration() = 0;
 
@@ -73,7 +77,14 @@ public:
      * @return true if the values of this configuration are equal to those
      * passed as parameters, false otherwise.
      */
-    bool equal(KnobsValues values) const;
+    bool equal(const KnobsValues& values) const;
+
+    /**
+     * Given some knobs values, returns the corresponding real values.
+     * @param values The knobs values.
+     * @return The corresponding real values.
+     */
+    KnobsValues getRealValues(const KnobsValues& values) const;
 
     /**
      * Returns true if the knobs values need to be changed, false otherwise.
@@ -142,17 +153,15 @@ public:
         return _reconfigurationStats;
     }
 
-    virtual uint getNumServiceNodes() const{return 0;}
+    inline uint getNumServiceNodes() const{return _numServiceNodes;}
 };
 
 class ConfigurationExternal: public Configuration{
 public:
-    ConfigurationExternal(const Parameters& p);
+    explicit ConfigurationExternal(const Parameters& p);
 };
 
 class ConfigurationFarm: public Configuration{
-private:
-    uint _numServiceNodes;
 public:
     ConfigurationFarm(const Parameters& p,
                       Smoother<MonitoredSample> const* samples,
@@ -161,13 +170,7 @@ public:
                       AdaptiveNode* collector,
                       ff::ff_gatherer* gt,
                       volatile bool* terminated);
-
-    inline uint getNumServiceNodes() const{
-        return _numServiceNodes;
-    }
 };
-
-KnobsValues getRealValues(const Configuration& configuration, const KnobsValues& values);
 
 std::vector<AdaptiveNode*> convertWorkers(ff::svector<ff::ff_node*> w);
 

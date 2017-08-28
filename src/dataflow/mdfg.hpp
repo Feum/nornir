@@ -97,7 +97,7 @@ public:
      * \param c A pointer to the \e Computable that the instruction have to
      *        compute.
      */
-    Mdfg(Computable* c);
+    explicit Mdfg(Computable* c);
 
     /**
      * Copy constructor.

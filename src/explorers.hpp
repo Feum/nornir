@@ -39,7 +39,7 @@ private:
 protected:
     bool generate(KnobType kt) const{return _knobs.at((size_t) kt);}
 public:
-    Explorer(std::vector<bool> knobs);
+    explicit Explorer(std::vector<bool> knobs);
     virtual ~Explorer(){;}
 
     /**
@@ -61,7 +61,7 @@ public:
  */
 class ExplorerRandom: public Explorer{
 public:
-    ExplorerRandom(std::vector<bool> knobs);
+    explicit ExplorerRandom(std::vector<bool> knobs);
     virtual ~ExplorerRandom(){;}
     void reset();
     KnobsValues nextRelativeKnobsValues() const;
@@ -95,7 +95,8 @@ public:
 };
 
 /**
- * Explorer to be used when building multiple models together.
+ * Explorer to be used when building multiple models together
+ * (like in the mapping case).
  */
 class ExplorerMultiple: public Explorer{
 private:

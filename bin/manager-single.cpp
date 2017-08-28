@@ -1,6 +1,9 @@
 /*
  * manager-single.cpp
  *
+ * Monitors and adapt an external application by using the knarr library.
+ * Needs the explicit channel name. This is deprecated. Use manager-external.
+ *
  * Created on: 21/06/2016
  *
  * =========================================================================
@@ -28,7 +31,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "../src/manager.hpp"
+#include "../src/nornir.hpp"
 
 using namespace nornir;
 
@@ -43,7 +46,7 @@ int main(int argc, char * argv[]) {
     channelName = argv[1];
 
     Parameters p("parameters.xml");
-    ManagerExternal m(channelName, p);
+    ManagerInstrumented m(channelName, p);
     m.start();
     m.join();
 

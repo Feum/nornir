@@ -42,7 +42,7 @@ using namespace tbb;
 #ifdef ENABLE_FF
 //#define BLOCKING_MODE
 #include <iostream>
-#include "../../../src/dataflow/interpreter.hpp"
+#include "../../../src/nornir.hpp"
 
 using namespace ff;
 using namespace nornir;
@@ -550,17 +550,12 @@ int main (int argc, char **argv)
     bs_thread(&tid);
 #else //ENABLE_TBB
 #ifdef ENABLE_FF
-    nornir::Observer obs;
-    nornir::Parameters ap("parameters.xml");
-    ap.observer = &obs;
     OptionsStreamRate oss(rateFile);
     oss.init();
     dataflow::Computable* farm = dataflow::createStandardFarm<fftask_t, fftask_t, compute>();
 
     Parameters p("parameters.xml");
     p.dataflow.maxInterpreters = nThreads;
-    Observer o;
-    p.observer = &o;
     dataflow::Interpreter inter(&p, farm, &oss);
     inter.start();
     inter.wait();

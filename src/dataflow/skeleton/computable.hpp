@@ -87,6 +87,7 @@ private:
      * NULL = Input stream.
      */
     void setSource(void* s, Computable* c = NULL){
+        //cppcheck-suppress nullPointerDefaultArg
         _sources[c] = s;
     }
 
@@ -94,6 +95,7 @@ private:
      * NULL = Output stream.
      */
     void setDestination(void** d, Computable* c = NULL){
+        //cppcheck-suppress nullPointerDefaultArg
         _destinations[c] = d;
     }
 public:

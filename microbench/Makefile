@@ -19,8 +19,8 @@ checksupported:
 	@echo "========================================================================="
 	sudo ./check
 microbench:
-	cp ../src/external/Mammut/demo/energy/voltageTable.cpp .
-	$(CXX) $(CXXFLAGS) -o voltageTable voltageTable.cpp $(INCS) -I../src/external/Mammut/  -L../src/external/Mammut/mammut $(LDFLAGS) $(LDLIBS)
+	cp ../src/external/mammut/demo/energy/voltageTable.cpp .
+	$(CXX) $(CXXFLAGS) -o voltageTable voltageTable.cpp $(INCS) -I../src/external/mammut/  -L../src/external/mammut/mammut $(LDFLAGS) $(LDLIBS)
 	@echo ""
 	@echo ""
 	@echo "=============================== ATTENTION ==============================="

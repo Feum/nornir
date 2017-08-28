@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nornirParameters>
+<strategyPredictionPerformance>USL</strategyPredictionPerformance>
+<strategySelection>LEARNING</strategySelection>
+<knobCoresEnabled>true</knobCoresEnabled>
+<knobFrequencyEnabled>true</knobFrequencyEnabled>
+<knobMappingEnabled>false</knobMappingEnabled>
+<knobHyperthreadingEnabled>false</knobHyperthreadingEnabled>
+<loggersTypes>FILE</loggersTypes>
+<requirements>
+	<bandwidth>MAX</bandwidth>
+	<powerConsumption>1</powerConsumption>
+</requirements>
+</nornirParameters>

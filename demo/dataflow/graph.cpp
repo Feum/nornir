@@ -27,25 +27,26 @@
 
 #include <iostream>
 #include <stdlib.h>
-#include "../../src/dataflow/interpreter.hpp"
+#include "../../src/nornir.hpp"
 
 using namespace nornir::dataflow;
 
 class DemoInputStream: public nornir::dataflow::InputStream{
 private:
     size_t _currentElem;
-	size_t _streamSize;
-	bool _eos;
+    size_t _streamSize;
+    bool _eos;
 public:
-    inline DemoInputStream(size_t streamSize):
-	        _currentElem(0), _streamSize(streamSize), _eos(false){
-	    srand(time(NULL));
+    explicit inline DemoInputStream(size_t streamSize):
+            _currentElem(0), _streamSize(streamSize), _eos(false){
+        srand(time(NULL));
     }
 
     inline void* next(){
         if(_currentElem < _streamSize){
             ++_currentElem;
-            int* s = new int(rand());
+            int* s = new int();
+            *s = rand();
             std::cout << "Generated " << *s << std::endl;
             std::cout << "Expected output " << ((*s + 1)*2  + (*s + 2) + 10 + 2) * ( (*s + 2) + 20) << std::endl;
             return (void*) s;

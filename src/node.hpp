@@ -32,12 +32,12 @@
 #include "./parameters.hpp"
 #include "utils.hpp"
 
-#include "external/Mammut/mammut/mammut.hpp"
+#include "external/mammut/mammut/mammut.hpp"
 
 
 PUSH_WARNING
 GCC_DISABLE_WARNING(unused-variable)
-#include "external/orlog/src/orlog.hpp"
+#include "external/knarr/src/knarr.hpp"
 POP_WARNING
 
 #undef DEBUG
@@ -96,7 +96,7 @@ typedef struct{
 class AdaptiveNode: public ff::ff_node{
 private:
     template <typename L, typename G>
-    friend class ManagerFarm;
+    friend class ManagerFastFlow;
     friend class KnobVirtualCoresFarm;
     friend class KnobMappingFarm;
     friend class TriggerQBlocking;
@@ -108,11 +108,11 @@ private:
     // We push the pointer to a position in the _managementRequests array.
     // In our case is always _managementRequests[i].type == i
     ManagementRequest _managementRequests[MGMT_REQ_NUM];
-    orlog::ApplicationSample _sampleResponse;
+    MonitoredSample _sampleResponse;
     double _ticksPerNs;
     ticks _startTicks;
     ticks _ticksWork;
-    ticks _tasksCount;
+    ticks _numTasks;
     NodeType _nodeType;
     ff::ff_thread* _ffThread;
     const Parameters* _p;
@@ -158,7 +158,7 @@ private:
      *               time 'askForSample' has been called.
      * @param avgLatency The average latency.
      */
-    void getSampleResponse(orlog::ApplicationSample& sample, double avgLatency);
+    void getSampleResponse(MonitoredSample& sample, double avgLatency);
 
     /**
      * Asks the node to reset the current sample.

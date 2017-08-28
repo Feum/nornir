@@ -1,14 +1,25 @@
 .PHONY = all
 
 all:
-	cd Mammut && git checkout 8d2c36cd20b653f7f58123b6b6ac5e5b69624e6b
-	$(MAKE) -C Mammut
+# Checkout correct versions of external libraries
+	cd mammut && git checkout 4c609823f1ff268b1dd05210a93debbcc3bdfadb
+	cd knarr && git checkout d418655ad7333d1886037cd94f76d3a31980990b
+# Build mammut
+	$(MAKE) -C mammut
+# Build leo
+ifeq ("$(wildcard ./leo/leo.o)","")
 	$(MAKE) -C leo
+endif
+# Build queues
+ifeq ("$(wildcard ./queues/hzdptr.o)","")
 	$(MAKE) -C queues msqueue
-	$(MAKE) -C orlog
+endif
+# Build knarr
+	$(MAKE) -C knarr
+# Build graphite client
+	$(MAKE) -C graphite-c-client all
 clean:
 	$(MAKE) -C leo clean
-	$(MAKE) -C queues clean
 cleanall:
 	$(MAKE) -C leo cleanall
-	$(MAKE) -C queues cleanall
+

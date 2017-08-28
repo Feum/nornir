@@ -150,7 +150,7 @@
 #define PRIu64 "llu"
 #endif
 
-#include "../../src/interface.hpp"
+#include "../../src/nornir.hpp"
 
 /* ------------------ FastFlow specific ---------------- */
 
@@ -358,7 +358,7 @@ class FileWriter: public nornir::Gatherer<ff_task_t>{
 public:
         FileWriter():
 		OutFilename(NULL),currBlock(0),hOutfile(1),// default to stdout
-		CompressedSize(0),OutputBuffer(NumBlocks,(ff_task_t*)0), firstRun(true) {};
+		CompressedSize(0),OutputBuffer(NumBlocks,(ff_task_t*)0),firstRun(true){};
 
 	void set_input_data(char * f) {
 		OutFilename = f;
@@ -380,6 +380,7 @@ public:
                         return -1;
                     }
                 }
+                firstRun = false;
             }
 		return 0;
 	}
@@ -464,18 +465,18 @@ public:
 	}
 	
 	void svc_end() {
-	    if(firstRun){
-            if (OutputStdOut == 0)
-                close(hOutfile);
-            if ((QuietMode != 1))
-            {
-                fprintf(stderr, "    Output Size: %llu bytes\n", (unsigned long long)CompressedSize);
-            }
-
-            OutputBuffer.clear();
-            firstRun = false;
-	    }
+            ;
 	}
+
+        ~FileWriter(){
+        if (OutputStdOut == 0)
+            close(hOutfile);       
+        if ((QuietMode != 1)){
+                fprintf(stderr, "    Output Size: %llu bytes\n", (unsigned long long)CompressedSize);
+        }
+
+        OutputBuffer.clear();
+        }
 	
 private:
 	const char * OutFilename;
@@ -483,7 +484,7 @@ private:
 	int hOutfile;
 	OFF_T CompressedSize;
 	std::vector <ff_task_t *> OutputBuffer;
-	bool firstRun;
+        bool firstRun;
 };
 
 
@@ -2533,12 +2534,9 @@ int main(int argc, char* argv[])
 					
 					if (FW) FW->set_input_data(OutFilename);
 					
-                                        nornir::Observer obs;
 				    nornir::Parameters ap("parameters.xml");
-				    ap.observer = &obs;
-                                    ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
-                                    std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
-				    nornir::ManagerFarm<> amf(&farm, ap);
+                    ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
+				    nornir::ManagerFastFlow<> amf(&farm, ap);
                     amf.start();
                     amf.join();
 #if 0
@@ -2593,13 +2591,10 @@ int main(int argc, char* argv[])
 				
 				if (FW) FW->set_input_data(OutFilename);
 
-				nornir::Observer obs;
 				nornir::Parameters ap("parameters.xml");
-				ap.observer = &obs;
-                                ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
-                                std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
-
-				nornir::ManagerFarm<> amf(&farm, ap);
+                ap.expectedTasksNumber = std::ceil(fileSize / blockSize);
+                std::cout << "Expected tasks: " << ap.expectedTasksNumber << std::endl;
+				nornir::ManagerFastFlow<> amf(&farm, ap);
 				amf.start();
 				amf.join();
 

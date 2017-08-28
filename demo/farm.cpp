@@ -33,7 +33,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "../src/interface.hpp"
+#include "../src/nornir.hpp"
 
 using namespace ff;
 
@@ -52,8 +52,10 @@ public:
         --maxTasks;
         if (maxTasks < 0){
             std::cout << "Scheduler finished" << std::endl;
+            //cppcheck-suppress memleak
             return NULL;
         }
+        //cppcheck-suppress memleak
         return task;
     }
 };

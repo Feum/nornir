@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # When a new parameter is added to the archdata.xml configuration file.
-# 1. Change the CURRENT_VERSION_VARIABLE
+# 1. Change the CONFIGURATION_VERSION #define in parameters.cpp file.
 # 2. Insert another condition in the if for checking if the new field
 #    has been correctly created (e.g. 'grep "ticksPerNs" ... ')
 
@@ -14,7 +14,7 @@ if [ "$(id -u)" != "0" ]; then
 	exit 1
 fi
 
-CURRENT_VERSION=$(grep "define CONFIGURATION_VERSION" ../src/parameters.cpp | cut -d ' ' -f 3)
+CURRENT_VERSION=$(grep "define CONFIGURATION_VERSION" ../src/parameters.cpp | cut -d ' ' -f 3 | tr -d '"')
 
 CONFPATH_ROOT=$XDG_CONFIG_DIRS
 if [ -z "$CONFPATH_ROOT" ];

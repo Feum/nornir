@@ -31,10 +31,12 @@ namespace nornir{
 
 TriggerQBlocking::TriggerQBlocking(TriggerConfQBlocking confQBlocking,
                                    double thresholdQBlocking,
+                                   double thresholdQBlockingBelt,
                                    Smoother<MonitoredSample> const* samples,
                                    AdaptiveNode* emitter):
         _confQBlocking(confQBlocking),
         _thresholdQBlocking(thresholdQBlocking),
+        _thresholdQBlockingBelt(thresholdQBlockingBelt),
         _samples(samples),
         _emitter(emitter),
         _blocking(false){
@@ -45,9 +47,9 @@ double TriggerQBlocking::getIdleTime() const{
     MonitoredSample avg = _samples->average();
 
     /**
-     * Latency = Utilization * Interarrival
-     * Idle = Interarrival - Latency
+     * Idle = (Interarrival - Latency)
      *
+     * Latency = Utilization * Interarrival
      * Interarrival = Latency/Utilization
      * Idle = Latency/Utilization - Latency
      **/
@@ -55,11 +57,9 @@ double TriggerQBlocking::getIdleTime() const{
     // We need to convert to microsec since the threshold is specified in
     // microsec.
     double latencyMicroSec = avg.latency / 1000.0;
-
-
-    if(!avg.utilisation){avg.utilisation = 1;} // Should never happen
-
-    return latencyMicroSec / avg.utilisation - latencyMicroSec;
+    double utilisation = avg.loadPercentage / 100.0; // From [0, 100] to [0, 1]
+    if(!utilisation){utilisation = 1;} // Should never happen
+    return latencyMicroSec / utilisation - latencyMicroSec;
 }
 
 bool TriggerQBlocking::setBlocking(){
@@ -90,9 +90,11 @@ bool TriggerQBlocking::trigger(){
         }break;
         case TRIGGER_Q_BLOCKING_AUTO:{
             double idleTime = getIdleTime();
-            if(idleTime > _thresholdQBlocking){
+            if(idleTime > _thresholdQBlocking +
+                          _thresholdQBlocking*_thresholdQBlockingBelt){
                 return setBlocking();
-            }else if(idleTime < _thresholdQBlocking){
+            }else if(idleTime < _thresholdQBlocking -
+                                _thresholdQBlocking*_thresholdQBlockingBelt){
                 return setNonBlocking();
             }
         }break;

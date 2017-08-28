@@ -31,6 +31,11 @@
  **/
 
 #include "stats.hpp"
+#include "configuration.hpp"
+#include "selectors.hpp"
+extern "C"{
+#include "external/graphite-c-client/graphite-client.h"
+}
 
 namespace nornir{
 
@@ -40,128 +45,123 @@ using namespace mammut::cpufreq;
 using namespace mammut::energy;
 using namespace mammut::topology;
 
-double Observer::calibrationDurationToPerc(const CalibrationStats& cs,
-                                           uint durationMs){
-    return ((double)cs.duration / (double)durationMs) * 100.0;
-}
+Logger::Logger(unsigned int timeOffset):
+    _timeOffset(timeOffset), _startMonitoring(0), _totalJoules(0){;}
 
-Observer::Observer(string statsFile, string calibrationFile, string summaryFile):
-        _startMonitoringMs(0),
-        _totalJoules(0),
-        _lastTimestamp(0){
-    _statsFile.open(statsFile.c_str());
-    _calibrationFile.open(calibrationFile.c_str());
-    _summaryFile.open(summaryFile.c_str());
-    if(!_statsFile ||
-       !_calibrationFile ||
-       !_summaryFile){
-        throw runtime_error("Observer: Impossible to open file.");
-    }
-    _statsFile << "TimestampMillisecs" << "\t";
-    _statsFile << "[VirtualCores]" << "\t";
-    _statsFile << "Workers" << "\t";
-    _statsFile << "Frequency" << "\t";
-    _statsFile << "CurrentBandwidth" << "\t";
-    _statsFile << "SmoothedBandwidth" << "\t";
-    _statsFile << "CoeffVarBandwidth" << "\t";
-    _statsFile << "SmoothedLatency" << "\t";
-    _statsFile << "SmoothedUtilization" << "\t";
-    _statsFile << "CurrentWatts" << "\t";
-    _statsFile << "SmoothedWatts" << "\t";
-    _statsFile << endl;
-
-    _calibrationFile << "NumSteps" << "\t";
-    _calibrationFile << "TimeMs" << "\t";
-    _calibrationFile << "Time%" << "\t";
-    _calibrationFile << "TasksNum" << "\t";
-    _calibrationFile << "Tasks%" << "\t";
-    _calibrationFile << "Watts" << "\t";
-    _calibrationFile << endl;
-
-    _summaryFile << "Watts" << "\t";
-    _summaryFile << "Bandwidth" << "\t";
-    _summaryFile << "CompletionTimeSec" << "\t";
-    _summaryFile << "CalibrationSteps" << "\t";
-    _summaryFile << "CalibrationTimeMs" << "\t";
-    _summaryFile << "CalibrationTime%" << "\t";
-    _summaryFile << "CalibrationTasksNum" << "\t";
-    _summaryFile << "CalibrationTasks%" << "\t";
-    _summaryFile << "CalibrationWatts" << "\t";
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
-        _summaryFile << "Reconfigurations" << knobTypeToString((KnobType) i) << "Average" << "\t";
-        _summaryFile << "Reconfigurations" << knobTypeToString((KnobType) i) << "Stddev" << "\t";
-    }
-    _summaryFile << "ReconfigurationsTotalAverage" << "\t";
-    _summaryFile << "ReconfigurationsTotalStddev" << "\t";
-    _summaryFile << endl;
-}
-
-Observer::~Observer(){
-    _statsFile.close();
-    _calibrationFile.close();
-    _summaryFile.close();
-}
-
-void Observer::addJoules(Joules j){
+void Logger::addJoules(Joules j){
     _totalJoules += j;
 }
 
-void Observer::observe(unsigned int timeStamp,
-                     size_t workers,
-                     Frequency frequency,
-                     const vector<VirtualCore*>& virtualCores,
-                     double currentBandwidth,
-                     double smoothedBandwidth,
-                     double coeffVarBandwidth,
-                     double smoothedLatency,
-                     double smoothedUtilization,
-                     Joules currentWatts,
-                     Joules smoothedWatts){
-    if(_lastTimestamp == 0){
-        _lastTimestamp = _startMonitoringMs;
-    }
-    _lastTimestamp = timeStamp;
-    _statsFile << timeStamp - _startMonitoringMs << "\t";
-    _statsFile << "[";
-    for(size_t i = 0; i < virtualCores.size(); i++){
-        _statsFile << virtualCores.at(i)->getVirtualCoreId() << ",";
-    }
-    _statsFile << "]" << "\t";
-
-    _statsFile << workers << "\t";
-    _statsFile << frequency << "\t";
-    _statsFile << currentBandwidth << "\t";
-    _statsFile << smoothedBandwidth << "\t";
-    _statsFile << coeffVarBandwidth << "\t";
-    _statsFile << smoothedLatency << "\t";
-    _statsFile << smoothedUtilization << "\t";
-
-    _statsFile << currentWatts << "\t";
-    _statsFile << smoothedWatts << "\t";
-
-    _statsFile << endl;
+unsigned int Logger::getAbsoluteTimestamp(){
+    return mammut::utils::getMillisecondsTime();
 }
 
-void Observer::calibrationStats(const vector<CalibrationStats>& calibrationStats,
-                                uint durationMs,
-                                uint64_t totalTasks){
+unsigned int Logger::getRelativeTimestamp(){
+    unsigned int absolute = getAbsoluteTimestamp();
+    if(!_startMonitoring){
+        _startMonitoring = absolute;
+    }
+
+    return absolute - _startMonitoring + _timeOffset;
+}
+
+LoggerStream::LoggerStream(std::ostream *statsStream,
+                           std::ostream *calibrationStream,
+                           std::ostream *summaryStream,
+                           unsigned int timeOffset):
+        Logger(timeOffset),
+        _statsStream(statsStream), _calibrationStream(calibrationStream),
+        _summaryStream(summaryStream), _timeOffset(timeOffset){
+    if(!*_statsStream ||
+       !*_calibrationStream ||
+       !*_summaryStream){
+        throw runtime_error("LoggerOutStream: Impossible to use stream.");
+    }
+    *_statsStream << "TimestampMillisecs" << "\t";
+    *_statsStream << "[VirtualCores]" << "\t";
+    *_statsStream << "Workers" << "\t";
+    *_statsStream << "Frequency" << "\t";
+    *_statsStream << "CurrentBandwidth" << "\t";
+    *_statsStream << "SmoothedBandwidth" << "\t";
+    *_statsStream << "CoeffVarBandwidth" << "\t";
+    *_statsStream << "SmoothedLatency" << "\t";
+    *_statsStream << "SmoothedUtilization" << "\t";
+    *_statsStream << "CurrentWatts" << "\t";
+    *_statsStream << "SmoothedWatts" << "\t";
+    *_statsStream << endl;
+
+    *_calibrationStream << "NumSteps" << "\t";
+    *_calibrationStream << "TimeMs" << "\t";
+    *_calibrationStream << "Time%" << "\t";
+    *_calibrationStream << "TasksNum" << "\t";
+    *_calibrationStream << "Tasks%" << "\t";
+    *_calibrationStream << "Watts" << "\t";
+    *_calibrationStream << endl;
+
+    *_summaryStream << "Watts" << "\t";
+    *_summaryStream << "Bandwidth" << "\t";
+    *_summaryStream << "CompletionTimeSec" << "\t";
+    *_summaryStream << "CalibrationSteps" << "\t";
+    *_summaryStream << "CalibrationTimeMs" << "\t";
+    *_summaryStream << "CalibrationTime%" << "\t";
+    *_summaryStream << "CalibrationTasksNum" << "\t";
+    *_summaryStream << "CalibrationTasks%" << "\t";
+    *_summaryStream << "CalibrationWatts" << "\t";
+    for(size_t i = 0; i < KNOB_NUM; i++){
+        *_summaryStream << "Reconfigurations" << knobTypeToString((KnobType) i) << "Average" << "\t";
+        *_summaryStream << "Reconfigurations" << knobTypeToString((KnobType) i) << "Stddev" << "\t";
+    }
+    *_summaryStream << "ReconfigurationsTotalAverage" << "\t";
+    *_summaryStream << "ReconfigurationsTotalStddev" << "\t";
+    *_summaryStream << endl;
+}
+
+void LoggerStream::log(const Configuration& configuration, const Smoother<MonitoredSample>& samples){
+    const vector<VirtualCore*>& virtualCores = dynamic_cast<const KnobMapping*>(configuration.getKnob(KNOB_MAPPING))->getActiveVirtualCores();
+    MonitoredSample ms = samples.average();
+    *_statsStream << getRelativeTimestamp() << "\t";
+    *_statsStream << "[";
+    for(size_t i = 0; i < virtualCores.size(); i++){
+        *_statsStream << virtualCores.at(i)->getVirtualCoreId() << ",";
+    }
+    *_statsStream << "]" << "\t";
+
+    *_statsStream << configuration.getRealValue(KNOB_VIRTUAL_CORES) << "\t";
+    // Print frequency as string to avoid conversion to exp notation.
+    std::ostringstream strs;
+    strs << std::fixed << std::setprecision(0) << configuration.getRealValue(KNOB_FREQUENCY);
+    *_statsStream << strs.str() << "\t";
+    *_statsStream << samples.getLastSample().bandwidth << "\t";
+    *_statsStream << ms.bandwidth << "\t";
+    *_statsStream << samples.coefficientVariation().bandwidth << "\t";
+    *_statsStream << ms.latency << "\t";
+    *_statsStream << ms.loadPercentage << "\t";
+
+    *_statsStream << samples.getLastSample().watts << "\t";
+    *_statsStream << ms.watts << "\t";
+
+    *_statsStream << endl;
+}
+
+void LoggerStream::logSummary(const Configuration& configuration, Selector* selector, ulong durationMs, double totalTasks){
+    vector<CalibrationStats> calibrationStats;
+    ReconfigurationStats reconfigurationStats = configuration.getReconfigurationStats();
+    if(selector){
+        selector->updateTotalTasks(totalTasks);
+        selector->stopCalibration();
+        calibrationStats = selector->getCalibrationsStats();
+    }
 
     for(size_t i = 0; i < calibrationStats.size(); i++){
         const CalibrationStats& cs = calibrationStats.at(i);
-        _calibrationFile << cs.numSteps << "\t";
-        _calibrationFile << cs.duration << "\t";
-        _calibrationFile << calibrationDurationToPerc(cs, durationMs) << "\t";
-        _calibrationFile << cs.numTasks << "\t";
-        _calibrationFile << ((double) cs.numTasks / totalTasks) * 100.0 << "\t";
-        _calibrationFile << cs.joules / (cs.duration / 1000.0)<< "\t";
-        _calibrationFile << endl;
+        *_calibrationStream << cs.numSteps << "\t";
+        *_calibrationStream << cs.duration << "\t";
+        *_calibrationStream << ((double) cs.duration / (double)durationMs) * 100.0 << "\t";
+        *_calibrationStream << cs.numTasks << "\t";
+        *_calibrationStream << ((double) cs.numTasks / totalTasks) * 100.0 << "\t";
+        *_calibrationStream << cs.joules / (cs.duration / 1000.0)<< "\t";
+        *_calibrationStream << endl;
     }
-}
-
-void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
-                            ReconfigurationStats reconfigurationStats,
-                            uint durationMs,
-                            uint64_t totalTasks){
 
     CalibrationStats totalCalibration;
     for(size_t i = 0; i < calibrationStats.size(); i++){
@@ -172,36 +172,73 @@ void Observer::summaryStats(const vector<CalibrationStats>& calibrationStats,
         durationMs += 0.001; // Just to avoid division by 0
     }
 
-    _summaryFile << (_totalJoules - totalCalibration.joules) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
-    _summaryFile << (totalTasks - totalCalibration.numTasks) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
-    _summaryFile << (double) durationMs / 1000.0 << "\t";
-    _summaryFile << totalCalibration.numSteps << "\t";
-    _summaryFile << totalCalibration.duration << "\t";
-    _summaryFile << calibrationDurationToPerc(totalCalibration, durationMs) << "\t";
-    _summaryFile << totalCalibration.numTasks << "\t";
-    _summaryFile << ((double) totalCalibration.numTasks / totalTasks) * 100.0 << "\t";
-    _summaryFile << totalCalibration.joules / (totalCalibration.duration / 1000.0) << "\t";
-    for(size_t i = 0; i < KNOB_TYPE_NUM; i++){
+    *_summaryStream << (_totalJoules - totalCalibration.joules) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
+    *_summaryStream << (totalTasks - totalCalibration.numTasks) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
+    *_summaryStream << (double) durationMs / 1000.0 << "\t";
+    *_summaryStream << totalCalibration.numSteps << "\t";
+    *_summaryStream << totalCalibration.duration << "\t";
+    *_summaryStream << ((double) totalCalibration.duration / (double)durationMs) * 100.0 << "\t";
+    *_summaryStream << totalCalibration.numTasks << "\t";
+    *_summaryStream << ((double) totalCalibration.numTasks / totalTasks) * 100.0 << "\t";
+    *_summaryStream << totalCalibration.joules / (totalCalibration.duration / 1000.0) << "\t";
+    for(size_t i = 0; i < KNOB_NUM; i++){
         if(reconfigurationStats.storedKnob((KnobType) i)){
-            _summaryFile << reconfigurationStats.getAverageKnob((KnobType) i) << "\t";
-            _summaryFile << reconfigurationStats.getStdDevKnob((KnobType) i) << "\t";
+            *_summaryStream << reconfigurationStats.getAverageKnob((KnobType) i) << "\t";
+            *_summaryStream << reconfigurationStats.getStdDevKnob((KnobType) i) << "\t";
         }else{
-            _summaryFile << "N.D." << "\t";
-            _summaryFile << "N.D." << "\t";
+            *_summaryStream << "N.D." << "\t";
+            *_summaryStream << "N.D." << "\t";
         }
     }
 
     if(reconfigurationStats.storedTotal()){
-        _summaryFile << reconfigurationStats.getAverageTotal() << "\t";
-        _summaryFile << reconfigurationStats.getStdDevTotal() << "\t";
+        *_summaryStream << reconfigurationStats.getAverageTotal() << "\t";
+        *_summaryStream << reconfigurationStats.getStdDevTotal() << "\t";
     }else{
-        _summaryFile << "N.D." << "\t";
-        _summaryFile << "N.D." << "\t";
+        *_summaryStream << "N.D." << "\t";
+        *_summaryStream << "N.D." << "\t";
     }
 
+    *_summaryStream << endl;
+}
 
-    _summaryFile << endl;
+LoggerGraphite::LoggerGraphite(const std::string& host, unsigned int port){
+    graphite_init(host.c_str(), port);
+}
+
+LoggerGraphite::~LoggerGraphite(){
+    graphite_finalize();
+}
+
+void LoggerGraphite::log(const Configuration& configuration,
+                       const Smoother<MonitoredSample>& samples){
+    unsigned int timestamp = time(NULL);
+
+
+    /*************************************************/
+    /*               Resources info                  */
+    /*************************************************/
+    for(auto vc : dynamic_cast<const KnobMapping*>(configuration.getKnob(KNOB_MAPPING))->getActiveVirtualCores()){
+        graphite_send_plain((std::string("nornir.resources.cores.") + utils::intToString(vc->getVirtualCoreId())).c_str(), 1, timestamp);
+    }
+    // Set all other cores to zero.
+    for(auto vc : dynamic_cast<const KnobMapping*>(configuration.getKnob(KNOB_MAPPING))->getUnusedVirtualCores()){
+        graphite_send_plain((std::string("nornir.resources.cores.") + utils::intToString(vc->getVirtualCoreId())).c_str(), 0, timestamp);
+    }
+    graphite_send_plain("nornir.resources.cores.num", configuration.getRealValue(KNOB_VIRTUAL_CORES), timestamp);
+    graphite_send_plain("nornir.resources.frequency", configuration.getRealValue(KNOB_FREQUENCY), timestamp);
+
+    /*************************************************/
+    /*                Monitor info                  */
+    /*************************************************/
+    graphite_send_plain("nornir.monitor.bandwidth.current", samples.getLastSample().bandwidth, timestamp);
+    graphite_send_plain("nornir.monitor.bandwidth.average", samples.average().bandwidth, timestamp);
+    graphite_send_plain("nornir.monitor.power.current", samples.getLastSample().watts, timestamp);
+    graphite_send_plain("nornir.monitor.power.average", samples.average().watts, timestamp);
+    graphite_send_plain("nornir.monitor.latency.current", samples.getLastSample().latency, timestamp);
+    graphite_send_plain("nornir.monitor.latency.average", samples.average().latency, timestamp);
+    graphite_send_plain("nornir.monitor.utilization.current", samples.getLastSample().loadPercentage, timestamp);
+    graphite_send_plain("nornir.monitor.utilization.average", samples.average().loadPercentage, timestamp);
 }
 
 }
-

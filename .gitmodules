@@ -1,6 +1,6 @@
-[submodule "src/external/Mammut"]
-	path = src/external/Mammut
-	url = https://github.com/DanieleDeSensi/Mammut.git
-[submodule "src/external/orlog"]
-	path = src/external/orlog
-	url = https://github.com/DanieleDeSensi/orlog.git
+[submodule "src/external/mammut"]
+	path = src/external/mammut
+	url = https://github.com/DanieleDeSensi/mammut.git
+[submodule "src/external/knarr"]
+	path = src/external/knarr
+	url = https://github.com/DanieleDeSensi/knarr.git

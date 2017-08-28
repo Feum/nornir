@@ -33,7 +33,7 @@
 #include "predictors.hpp"
 #include "manager.hpp"
 
-#include "external/Mammut/mammut/cpufreq/cpufreq.hpp"
+#include "external/mammut/mammut/cpufreq/cpufreq.hpp"
 
 #undef DEBUG
 #undef DEBUGB
@@ -76,7 +76,6 @@ static void getPowerProportions(VoltageTable table, uint physicalCores,
                                 uint numDomains, MappingType mt,
                                 double& staticPower, double& dynamicPower){
     int numCores = physicalCores;
-    double voltage = 0;
     staticPower = 0;
     dynamicPower = 0;
     uint currentCores = 0;
@@ -98,7 +97,7 @@ static void getPowerProportions(VoltageTable table, uint physicalCores,
                 throw std::runtime_error("getPowerProportions: mapping type not supported.");
             }
         }
-        voltage = getVoltage(table, currentCores, frequency);
+        double voltage = getVoltage(table, currentCores, frequency);
 
         staticPower += voltage;
         dynamicPower += currentCores*frequency*voltage*voltage;
@@ -107,8 +106,8 @@ static void getPowerProportions(VoltageTable table, uint physicalCores,
     }
 }
 
-RegressionData::RegressionData(const Parameters& p,
-                               const Configuration& configuration,
+RegressionData::RegressionData(const Parameters &p,
+                               const Configuration &configuration,
                                const Smoother<MonitoredSample>* samples):
         _p(p), _configuration(configuration), _samples(samples){
     _topology = _p.mammut.getInstanceTopology();
@@ -119,7 +118,7 @@ RegressionData::RegressionData(const Parameters& p,
 }
 
 double RegressionData::getUsedPhysicalCores(double numVirtualCores){
-    if(_configuration.getRealValue(KNOB_TYPE_HYPERTHREADING) != 1){
+    if(_configuration.getRealValue(KNOB_HYPERTHREADING) != 1){
         throw std::runtime_error("getUsedPhysicalCores, ht > 1 not yet implemented.");
     }
     uint realVirtualCores = numVirtualCores + _configuration.getNumServiceNodes();
@@ -130,10 +129,10 @@ void RegressionData::init(){init(_configuration.getRealValues());}
 
 void RegressionDataServiceTime::init(const KnobsValues& values){
     _numPredictors = 0;
-    uint numVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
+    uint numVirtualCores = values[KNOB_VIRTUAL_CORES];
 
     if(_p.knobFrequencyEnabled){
-        double frequency = values[KNOB_TYPE_FREQUENCY];
+        double frequency = values[KNOB_FREQUENCY];
         _invScalFactorFreq = (double)_minFrequency / frequency;
         ++_numPredictors;
 
@@ -145,16 +144,21 @@ void RegressionDataServiceTime::init(const KnobsValues& values){
     }
 }
 
-RegressionDataServiceTime::RegressionDataServiceTime(const Parameters& p,
-                                                     const Configuration& configuration,
+RegressionDataServiceTime::RegressionDataServiceTime(const Parameters &p,
+                                                     const Configuration &configuration,
                                                      const Smoother<MonitoredSample>* samples):
         RegressionData(p, configuration, samples),
         _invScalFactorFreq(0),
         _invScalFactorFreqAndCores(0),
         _numPredictors(0){
     _phyCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
-    _minFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->
-                                                    getAvailableFrequencies().at(0);
+    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().at(0);
+    d->removeTurboFrequencies();
+    if(!d->getAvailableFrequencies().empty()){
+        _minFrequency = d->getAvailableFrequencies().at(0);
+    }else if(_p.knobFrequencyEnabled){
+        throw std::runtime_error("Please set knobFrequencyEnabled to false.");
+    }
     init(_configuration.getRealValues());
 }
 
@@ -163,8 +167,8 @@ uint RegressionDataServiceTime::getNumPredictors() const{
 }
 
 void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) const{
-    size_t rowId = 0;
     if(_p.knobFrequencyEnabled){
+        size_t rowId = 0;
         matrix(rowId++, columnId) = _invScalFactorFreq;
         matrix(rowId++, columnId) = _invScalFactorFreqAndCores;
     }
@@ -173,13 +177,13 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
 void RegressionDataPower::init(const KnobsValues& values){
     assert(values.areReal());
     _numPredictors = 0;
-    Frequency frequency = values[KNOB_TYPE_FREQUENCY];
-    uint numVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
+    Frequency frequency = values[KNOB_FREQUENCY];
+    uint numVirtualCores = values[KNOB_VIRTUAL_CORES];
     double usedPhysicalCores = getUsedPhysicalCores(numVirtualCores);
 
     if(_p.knobFrequencyEnabled){
         uint usedCpus = 0;
-        if(values[KNOB_TYPE_MAPPING] == MAPPING_TYPE_LINEAR){
+        if(values[KNOB_MAPPING] == MAPPING_TYPE_LINEAR){
             usedCpus = std::ceil(usedPhysicalCores / (double) _phyCoresPerCpu);
         }else{
             usedCpus = std::min(usedPhysicalCores, (double) _cpus);
@@ -191,7 +195,7 @@ void RegressionDataPower::init(const KnobsValues& values){
         //TODO: Potrebbe non esserci una frequenza se FREQUENCY_NO. In tal caso non possiamo predirre nulla.
         getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
                 frequency, _phyCoresPerCpu,
-                _cpus, (MappingType) values[KNOB_TYPE_MAPPING],
+                _cpus, (MappingType) values[KNOB_MAPPING],
                 staticPowerProp, dynamicPowerProp);
         //_voltagePerUsedSockets = staticPowerProp;
         //++_numPredictors;
@@ -226,8 +230,8 @@ void RegressionDataPower::init(const KnobsValues& values){
     }
 }
 
-RegressionDataPower::RegressionDataPower(const Parameters& p,
-                                         const Configuration& configuration,
+RegressionDataPower::RegressionDataPower(const Parameters &p,
+                                         const Configuration &configuration,
                                          const Smoother<MonitoredSample>* samples):
         RegressionData(p, configuration, samples), _dynamicPowerModel(0),
         _voltagePerUsedSockets(0), _voltagePerUnusedSockets(0),
@@ -238,7 +242,15 @@ RegressionDataPower::RegressionDataPower(const Parameters& p,
     _phyCoresPerCpu = _topology->getCpu(0)->getPhysicalCores().size();
     _virtCoresPerPhyCores = _topology->getPhysicalCore(0)->getVirtualCores().size();
     _strategyUnused = _p.strategyUnusedVirtualCores;
-    _lowestFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().front()->getAvailableFrequencies().front();
+    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().front();
+    d->removeTurboFrequencies();
+
+    if(!d->getAvailableFrequencies().empty()){
+        _lowestFrequency = d->getAvailableFrequencies().front();
+    }else if(_p.knobFrequencyEnabled){
+        throw std::runtime_error("Please set knobFrequencyEnabled to false.");
+    }
+
     init(_configuration.getRealValues());
 }
 
@@ -268,8 +280,8 @@ bool RegressionDataPower::getInactivePowerPosition(size_t& pos) const{
 }
 
 Predictor::Predictor(PredictorType type,
-                     const Parameters& p,
-                     const Configuration& configuration,
+                     const Parameters &p,
+                     const Configuration &configuration,
                      const Smoother<MonitoredSample>* samples):
         _type(type), _p(p), _configuration(configuration),
         _samples(samples), _modelError(0){
@@ -281,7 +293,7 @@ Predictor::~Predictor(){
 }
 
 double Predictor::getMaximumBandwidth() const{
-    if(_samples->average().utilisation >= MAX_RHO){
+    if(_samples->average().loadPercentage >= MAX_RHO){
         return _samples->average().bandwidth;
     }else{
         return _samples->average().getMaximumBandwidth();
@@ -316,7 +328,7 @@ PredictorLinearRegression::~PredictorLinearRegression(){
 void PredictorLinearRegression::clear(){
     for(obs_it iterator = _observations.begin();
                iterator != _observations.end();
-               iterator++){
+               ++iterator){
         delete iterator->second.data;
     }
     _observations.clear();
@@ -349,7 +361,7 @@ void PredictorLinearRegression::refine(){
     _preparationNeeded = true;
     if(_type == PREDICTION_POWER){
         // Add service nodes
-        currentValues[KNOB_TYPE_VIRTUAL_CORES] += _configuration.getNumServiceNodes();
+        currentValues[KNOB_VIRTUAL_CORES] += _configuration.getNumServiceNodes();
     }
     obs_it lb = _observations.lower_bound(currentValues);
 
@@ -401,7 +413,7 @@ void PredictorLinearRegression::prepareForPredictions(){
         size_t i = 0;
         for(obs_it iterator = _observations.begin();
                    iterator != _observations.end();
-                   iterator++){
+                   ++iterator){
             const Observation& obs = iterator->second;
 
             if(!_p.regressionAging || contains(_agingVector, iterator->first)){
@@ -494,7 +506,7 @@ double PredictorLinearRegression::predict(const KnobsValues& values){
 double PredictorLinearRegression::getInactivePowerParameter() const{
     if(_type == PREDICTION_POWER){
         size_t pos;
-        if(!((RegressionDataPower*)_predictionInput)->getInactivePowerPosition(pos)){
+        if(!dynamic_cast<RegressionDataPower*>(_predictionInput)->getInactivePowerPosition(pos)){
             throw std::runtime_error("Impossible to get inactive power parameter.");
         }
         return _lr.Parameters().at(pos);
@@ -503,81 +515,29 @@ double PredictorLinearRegression::getInactivePowerParameter() const{
     }
 }
 
-/*************************************************/
-/*        PredictorLinearRegressionMapping       */
-/*************************************************/
-PredictorLinearRegressionMapping::PredictorLinearRegressionMapping(PredictorType type,
-                          const Parameters& p,
-                          const Configuration& configuration,
-                          const Smoother<MonitoredSample>* samples):
-            Predictor(type, p, configuration, samples){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        if(type == PREDICTION_BANDWIDTH){
-            _predictors[i] = new PredictorUsl(type, p, configuration, samples);
-        }else{
-            _predictors[i] = new PredictorLinearRegression(type, p, configuration, samples);
-        }
-    }
-}
-
-PredictorLinearRegressionMapping::~PredictorLinearRegressionMapping(){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        delete _predictors[i];
-    }
-}
-
-void PredictorLinearRegressionMapping::clear(){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        _predictors[i]->clear();
-    }
-}
-
-bool PredictorLinearRegressionMapping::readyForPredictions(){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        if(!_predictors[i]->readyForPredictions()){
-            return false;
-        }
-    }
-    return true;
-}
-
-void PredictorLinearRegressionMapping::refine(){
-    _predictors[(MappingType) _configuration.getRealValue(KNOB_TYPE_MAPPING)]->refine();
-}
-
-void PredictorLinearRegressionMapping::prepareForPredictions(){
-    for(size_t i = 0; i < MAPPING_TYPE_NUM; i++){
-        _predictors[i]->prepareForPredictions();
-    }
-}
-
-double PredictorLinearRegressionMapping::predict(const KnobsValues& configuration){
-    double realValue = 0.0;
-    if(configuration.areRelative()){
-        _configuration.getKnob(KNOB_TYPE_MAPPING)->getRealFromRelative(configuration[KNOB_TYPE_MAPPING], realValue);
-    }else{
-        realValue = configuration[KNOB_TYPE_MAPPING];
-    }
-    return _predictors[(MappingType) realValue]->predict(configuration);
-}
-
-
 /**************** PredictorUSL ****************/
 PredictorUsl::PredictorUsl(PredictorType type,
-             const Parameters& p,
-             const Configuration& configuration,
+             const Parameters &p,
+             const Configuration &configuration,
              const Smoother<MonitoredSample>* samples):
                     Predictor(type, p, configuration, samples),
+                    _maxPolDegree(POLYNOMIAL_DEGREE_USL),
                     _ws(NULL), _x(NULL), _y(NULL), _chisq(0),
-                    _preparationNeeded(true), _maxFreqBw(0), _minFreqBw(0){
+                    _preparationNeeded(true), _maxFreqBw(0), _minFreqBw(0),
+                    _minFreqCoresBw(0), _minFreqCoresBwNew(0), _n1(0), _n2(0),
+                    _minFreqN1Bw(0), _minFreqN2Bw(0){
     if(type != PREDICTION_BANDWIDTH){
         throw std::runtime_error("PredictorUsl can only be used for bandwidth predictions.");
     }
-    _c = gsl_vector_alloc(POLYNOMIAL_DEGREE_USL);
-    _cov = gsl_matrix_alloc(POLYNOMIAL_DEGREE_USL, POLYNOMIAL_DEGREE_USL);
-    _minFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front();
-    _maxFrequency = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().back();
-    _maxCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getAllowedValues().back();
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        _maxPolDegree -= 1; //To remove x^0 value.
+    }
+    _c = gsl_vector_alloc(_maxPolDegree);
+    _cov = gsl_matrix_alloc(_maxPolDegree, _maxPolDegree);
+    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().at(0);
+    d->removeTurboFrequencies();
+    _minFrequency = d->getAvailableFrequencies().front();
+    _maxFrequency = d->getAvailableFrequencies().back();
 }
 
 PredictorUsl::~PredictorUsl(){
@@ -591,37 +551,50 @@ void PredictorUsl::clear(){
 }
 
 bool PredictorUsl::readyForPredictions(){
-    return _xs.size() >= POLYNOMIAL_DEGREE_USL;
+    return _xs.size() >= _maxPolDegree;
 }
 
 void PredictorUsl::refine(){
-    double numCores = _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealValue();
-    double frequency = _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealValue();
+    double numCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+    double frequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
     double bandwidth = getMaximumBandwidth();
 
-
-    if(frequency == _maxFrequency && numCores == _maxCores){
+    double maxCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().size();
+    if(frequency == _maxFrequency && numCores == maxCores){
         _maxFreqBw = bandwidth;
         return;
-    }else if(frequency == _minFrequency && numCores == _maxCores){
-        _minFreqBw = bandwidth;
+    }else if(frequency == _minFrequency){
+        if(numCores == maxCores){
+            _minFreqBw = bandwidth;
+        }else if(numCores == 1){
+            _minFreqCoresBw = bandwidth;
+        }
     }else if(frequency != _minFrequency){
         return;
+    }
+
+    double x, y;
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        x = numCores - 1;
+        y = ((_minFreqCoresBw * numCores)/bandwidth) - 1;
+    }else{
+        x = numCores - 1;
+        y = numCores / bandwidth;
     }
 
     // Checks if a y is already present for this x
     int pos = -1;
     for(size_t i = 0; i < _xs.size(); i++){
-        if(_xs[i] == numCores - 1){
+        if(_xs[i] == x){
             pos = i;
             break;
         }
     }
     if(pos == -1){
-        _xs.push_back(numCores - 1);
-        _ys.push_back(numCores / bandwidth);
+        _xs.push_back(x);
+        _ys.push_back(y);
     }else{
-        _ys.at(pos) = numCores / bandwidth;
+        _ys.at(pos) = y;
     }
     _preparationNeeded = true;
 }
@@ -631,21 +604,26 @@ void PredictorUsl::prepareForPredictions(){
         if(!readyForPredictions()){
             throw std::runtime_error("PredictorUsl: Not yet ready for predictions.");
         }
-        _x = gsl_matrix_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
+
+        _x = gsl_matrix_alloc(_xs.size(), _maxPolDegree);
         _y = gsl_vector_alloc(_xs.size());
         size_t i = 0, j = 0;
         for(i = 0; i < _xs.size(); i++) {
-            for(j = 0; j < POLYNOMIAL_DEGREE_USL; j++) {
-                gsl_matrix_set(_x, i, j, pow(_xs.at(i), j));
+            for(j = 0; j < _maxPolDegree; j++) {
+                double degree = j;
+                if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+                    degree += 1; //To skip x^0 value.
+                }
+                gsl_matrix_set(_x, i, j, pow(_xs.at(i), degree));
             }
             gsl_vector_set(_y, i, _ys.at(i));
         }
 
-        _ws = gsl_multifit_linear_alloc(_xs.size(), POLYNOMIAL_DEGREE_USL);
+        _ws = gsl_multifit_linear_alloc(_xs.size(), _maxPolDegree);
         gsl_multifit_linear(_x, _y, _c, _cov, &_chisq, _ws);
 
         _coefficients.clear();
-        for(i = 0; i < POLYNOMIAL_DEGREE_USL; i++){
+        for(i = 0; i < _maxPolDegree; i++){
             _coefficients.push_back(gsl_vector_get(_c, i));
         }
         gsl_matrix_free(_x);
@@ -655,36 +633,155 @@ void PredictorUsl::prepareForPredictions(){
     }
 }
 
-double PredictorUsl::predict(const KnobsValues& configuration){
+double PredictorUsl::predict(const KnobsValues& knobsValues){
+    const KnobsValues real = _configuration.getRealValues(knobsValues);
     double result = 0;
-    double numCores = 0;
-    double frequency = 0;
-    if(configuration.areReal()){
-        numCores = configuration[KNOB_TYPE_VIRTUAL_CORES];
-        frequency = configuration[KNOB_TYPE_FREQUENCY];
-    }else{
-        _configuration.getKnob(KNOB_TYPE_VIRTUAL_CORES)->getRealFromRelative(configuration[KNOB_TYPE_VIRTUAL_CORES], numCores);
-        _configuration.getKnob(KNOB_TYPE_FREQUENCY)->getRealFromRelative(configuration[KNOB_TYPE_FREQUENCY], frequency);
-    }
+    double numCores = real[KNOB_VIRTUAL_CORES];
+    double frequency = real[KNOB_FREQUENCY];
     for(size_t i = 0; i < _coefficients.size(); i++){
-        result += _coefficients.at(i)*std::pow(numCores - 1, i);
+        double exp = i;
+        if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+            // I do not have the constant factor b0*(x^0)
+            exp += 1;
+        }
+        result += _coefficients.at(i)*std::pow(numCores - 1, exp);
     }
-    result = (numCores / result);
 
-    if(frequency != _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getAvailableFrequencies().front()){
-        double minMaxScaling = _maxFreqBw / _minFreqBw;
-        double maxFreqPred = result * minMaxScaling;
-        return ((maxFreqPred - result)/(_maxFrequency - _minFrequency))*frequency + ((result*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
+    double bandwidth;
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        bandwidth = (numCores * _minFreqCoresBw)/(result + 1);
     }else{
-        return result;
+        bandwidth = (numCores / result);
     }
+
+    if(frequency != _minFrequency){
+        double minMaxScaling = _maxFreqBw / _minFreqBw;
+        double maxFreqPred = bandwidth * minMaxScaling;
+        return ((maxFreqPred - bandwidth)/(_maxFrequency - _minFrequency))*frequency + ((bandwidth*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
+    }else{
+        return bandwidth;
+    }
+}
+
+double PredictorUsl::getMinFreqCoresBw() const{
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        return _minFreqCoresBw;
+    }else{
+        return 1.0 / _coefficients[0];
+    }
+}
+
+double PredictorUsl::geta() const{
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        return _coefficients[1];
+    }else{
+        return _coefficients[2];
+    }
+}
+
+double PredictorUsl::getb() const{
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        return _coefficients[0];
+    }else{
+        return _coefficients[1];
+    }
+}
+
+void PredictorUsl::seta(double a){
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        _coefficients[1] = a;
+    }else{
+        _coefficients[2] = a;
+    }
+}
+
+void PredictorUsl::setb(double b){
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
+        _coefficients[0] = b;
+    }else{
+        _coefficients[1] = b;
+    }
+}
+
+double PredictorUsl::getTheta(RecordInterferenceArgument n){
+    int numCores;
+    int bw;
+    if(n == RECONFARG_N1){
+        numCores = _n1;
+        bw = _minFreqN1Bw;
+    }else{
+        numCores = _n2;
+        bw = _minFreqN2Bw;
+    }
+    KnobsValues kv(KNOB_VALUE_REAL);
+    kv[KNOB_FREQUENCY] = _minFrequency;
+    kv[KNOB_VIRTUAL_CORES] = numCores;
+    return (((getMinFreqCoresBw()*numCores)/predict(kv)) - 1) - (((_minFreqCoresBwNew*numCores)/bw) - 1);
+}
+
+void PredictorUsl::updateInterference(){
+    double numCores = _configuration.getRealValue(KNOB_VIRTUAL_CORES);
+    double frequency = _configuration.getRealValue(KNOB_FREQUENCY);
+    double bandwidth = _samples->average().bandwidth;
+    // TODO: At the moment I'm assuming that interferences does not change the
+    // slope when we fix number of cores and we change the frequency.
+    if(frequency != _minFrequency){
+        // We compute the 'old' bandwidth at minimum frequency
+        KnobsValues kv(KNOB_VALUE_REAL);
+        kv[KNOB_FREQUENCY] = _minFrequency;
+        kv[KNOB_VIRTUAL_CORES] = numCores;
+        double minFreqPred = predict(kv);
+        kv[KNOB_FREQUENCY] = frequency;
+        double currentFreqPred = predict(kv);
+        double prop = bandwidth / currentFreqPred;
+        bandwidth = prop*minFreqPred;
+    }
+
+    if(numCores == 1){
+        _minFreqCoresBwNew = bandwidth;
+    }else if(!_n1){
+        _n1 = numCores;
+        _minFreqN1Bw = bandwidth;
+    }else{
+        _n2 = numCores;
+        _minFreqN2Bw = bandwidth;
+    }
+}
+
+void PredictorUsl::updateCoefficients(){
+    double newB, newA, firstPartB, secondPartB;
+    firstPartB = ((_n2 - 1)/(_n2 - _n1)*(_n1 - 1))*
+                 (getLambda(RECONFARG_N1) - getTheta(RECONFARG_N1));
+    secondPartB = ((_n1 - 1)/(_n2 - _n1)*(_n2 - 1))*
+                  (getLambda(RECONFARG_N2) - getTheta(RECONFARG_N2));
+    newB = firstPartB - secondPartB;
+    newA = (getLambda(RECONFARG_N2) - getTheta(RECONFARG_N2) - newB*(_n2 - 1))/
+            pow(_n2 - 1, 2);
+    seta(newA);
+    setb(newB);
+    if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL){
+        _minFreqCoresBw = _minFreqCoresBwNew;
+        _n1 = 0;
+        _n2 = 0;
+        _minFreqCoresBwNew = 0;
+    }
+}
+
+double PredictorUsl::getLambda(RecordInterferenceArgument n) const{
+    int numCores;
+    if(n == RECONFARG_N1){
+        numCores = _n1;
+    }else{
+        numCores = _n2;
+    }
+    return getb()*(numCores - 1) + geta()*(numCores - 1)*(numCores - 1);
 }
     
 /**************** PredictorSimple ****************/
 
 PredictorAnalytical::PredictorAnalytical(PredictorType type,
-                                 const Parameters& p,
-                                 const Configuration& configuration,
+                                 const Parameters &p,
+                                 const Configuration &configuration,
                                  const Smoother<MonitoredSample>* samples):
             Predictor(type, p, configuration, samples) {
     Topology* t = _p.mammut.getInstanceTopology();
@@ -694,19 +791,19 @@ PredictorAnalytical::PredictorAnalytical(PredictorType type,
 }
 
 double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
-    double usedVirtualCores = values[KNOB_TYPE_VIRTUAL_CORES];
-    return (double)(values[KNOB_TYPE_FREQUENCY] * usedVirtualCores) /
-           (double)(_configuration.getRealValue(KNOB_TYPE_FREQUENCY) *
-                    _configuration.getRealValue(KNOB_TYPE_VIRTUAL_CORES));
+    double usedVirtualCores = values[KNOB_VIRTUAL_CORES];
+    return (double)(values[KNOB_FREQUENCY] * usedVirtualCores) /
+           (double)(_configuration.getRealValue(KNOB_FREQUENCY) *
+                    _configuration.getRealValue(KNOB_VIRTUAL_CORES));
 }
 
 double PredictorAnalytical::getPowerPrediction(const KnobsValues& values){
     assert(values.areReal());
     double staticPower = 0, dynamicPower = 0;
-    double usedPhysicalCores = values[KNOB_TYPE_VIRTUAL_CORES];
+    double usedPhysicalCores = values[KNOB_VIRTUAL_CORES];
     getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
-                        values[KNOB_TYPE_FREQUENCY], _phyCoresPerCpu,
-                        _cpus, (MappingType) values[KNOB_TYPE_MAPPING],
+                        values[KNOB_FREQUENCY], _phyCoresPerCpu,
+                        _cpus, (MappingType) values[KNOB_MAPPING],
                         staticPower, dynamicPower);
     return dynamicPower;
 }
@@ -741,9 +838,9 @@ double PredictorAnalytical::predict(const KnobsValues& values){
 }
 
 
-PredictorMishra::PredictorMishra(PredictorType type,
-              const Parameters& p,
-              const Configuration& configuration,
+PredictorLeo::PredictorLeo(PredictorType type,
+              const Parameters &p,
+              const Configuration &configuration,
               const Smoother<MonitoredSample>* samples):
                   Predictor(type, p, configuration, samples),
                   _preparationNeeded(true){
@@ -754,42 +851,42 @@ PredictorMishra::PredictorMishra(PredictorType type,
     }
     _values.resize(combinations.size());
     _values.zeros();
-    std::vector<std::string> names = mammut::utils::readFile(p.mishra.namesData);
+    std::vector<std::string> names = mammut::utils::readFile(p.leo.namesData);
     bool appFound = false;
     for(size_t i = 0; i < names.size(); i++){
-        if(names.at(i).compare(p.mishra.applicationName) == 0){
+        if(names.at(i).compare(p.leo.applicationName) == 0){
             _appId = i;
             appFound = true;
         }
     }
     if(!appFound){
-        throw std::runtime_error("Impossible to find application " + p.mishra.applicationName +
-                                 " in " + p.mishra.namesData);
+        throw std::runtime_error("Impossible to find application " + p.leo.applicationName +
+                                 " in " + p.leo.namesData);
     }
 }
 
-PredictorMishra::~PredictorMishra(){
+PredictorLeo::~PredictorLeo(){
     ;
 }
 
-bool PredictorMishra::readyForPredictions(){
+bool PredictorLeo::readyForPredictions(){
     return true;
 }
 
-void PredictorMishra::clear(){
+void PredictorLeo::clear(){
     _values.zeros();
     _predictions.zeros();
 }
 
-void PredictorMishra::refine(){
+void PredictorLeo::refine(){
     _preparationNeeded = true;
     auto it = _confIndexes.find(_configuration.getRealValues());
     if(it == _confIndexes.end()){
-        throw std::runtime_error("[Mishra] Impossible to find index for configuration.");
+        throw std::runtime_error("[Leo] Impossible to find index for configuration.");
     }
     size_t confId = it->second;
     if(confId >= _values.size()){
-        throw std::runtime_error("[Mishra] Invalid configuration index: " + confId);
+        throw std::runtime_error("[Leo] Invalid configuration index: " + confId);
     }
     switch(_type){
         case PREDICTION_BANDWIDTH:{
@@ -798,7 +895,7 @@ void PredictorMishra::refine(){
             // a utilization < 1, results may be wrong.
 #if 0
             if(_samples->average().utilisation < MAX_RHO){
-                throw std::runtime_error("[Mishra] bandwidth bandwidthMax problem.");
+                throw std::runtime_error("[Leo] bandwidth bandwidthMax problem.");
             }
 #endif
             _values.at(confId) = getMaximumBandwidth();
@@ -807,15 +904,15 @@ void PredictorMishra::refine(){
             _values.at(confId) = getCurrentPower();
         }break;
         default:{
-            throw std::runtime_error("[Mishra] Unknown predictor type.");
+            throw std::runtime_error("[Leo] Unknown predictor type.");
         }
     }
 }
 
-void PredictorMishra::prepareForPredictions(){
+void PredictorLeo::prepareForPredictions(){
     if(_preparationNeeded){
         if(!readyForPredictions()){
-            throw std::runtime_error("[Mishra] prepareForPredictions: Not enough "
+            throw std::runtime_error("[Leo] prepareForPredictions: Not enough "
                                      "points are present");
         }
 
@@ -823,11 +920,11 @@ void PredictorMishra::prepareForPredictions(){
         bool perColumnNormalization;
         switch(_type){
             case PREDICTION_BANDWIDTH:{
-                dataFile = _p.mishra.bandwidthData;
+                dataFile = _p.leo.bandwidthData;
                 perColumnNormalization = true;
             }break;
             case PREDICTION_POWER:{
-                dataFile = _p.mishra.powerData;
+                dataFile = _p.leo.powerData;
                 perColumnNormalization = false;
             }break;
             default:{
@@ -842,21 +939,21 @@ void PredictorMishra::prepareForPredictions(){
     }
 }
 
-double PredictorMishra::predict(const KnobsValues& realValues){
+double PredictorLeo::predict(const KnobsValues& realValues){
     auto it = _confIndexes.find(realValues);
     if(it == _confIndexes.end()){
-        throw std::runtime_error("[Mishra] Impossible to find index for configuration.");
+        throw std::runtime_error("[Leo] Impossible to find index for configuration.");
     }
     size_t confId = it->second;
     if(confId >= _predictions.size()){
-        throw std::runtime_error("[Mishra] Invalid configuration index: " + confId);
+        throw std::runtime_error("[Leo] Invalid configuration index: " + confId);
     }
     return _predictions.at(confId);
 }
 
 PredictorFullSearch::PredictorFullSearch(PredictorType type,
-          const Parameters& p,
-          const Configuration& configuration,
+          const Parameters &p,
+          const Configuration &configuration,
           const Smoother<MonitoredSample>* samples):
       Predictor(type, p, configuration, samples),
       _allConfigurations(_configuration.getAllRealCombinations()){

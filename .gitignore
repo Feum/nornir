@@ -1,0 +1,13 @@
+*.o
+*.a
+*.gcov
+*.gcda
+*.gcno
+proc.out
+/src/external/mammut/*
+/src/external/knarr/*
+/test/googletest/*
+microbench/check
+microbench/ticksPerNs
+microbench/voltageTable
+microbench/voltageTable.cpp

@@ -67,7 +67,7 @@ public:
      * Constructor of the identifier.
      * \param instrid Identifier of the instruction.
      */
-    inline TokenId(uint instrid):
+    explicit inline TokenId(uint instrid):
             graphId(MAXUNSLONGINT), mdfiId(instrid), isOutputStream(false){;}
 
     /**Sets the destination to the output stream.**/
@@ -142,7 +142,7 @@ public:
      * Costructor of the token.
      * \param t The input task.
      */
-    inline InputToken(void* t):task(t),presence(true){;}
+    explicit inline InputToken(void* t):task(t),presence(true){;}
 
     /**
      * Constructor of the token.

@@ -27,7 +27,7 @@
 
 #include "stream.hpp"
 
-#include "../external/Mammut/mammut/mammut.hpp"
+#include "../external/mammut/mammut/mammut.hpp"
 
 #undef DEBUG
 #undef DEBUGB
@@ -80,11 +80,11 @@ InputStreamRate::InputStreamRate(const std::string& fileName):
         _nextObject(0), _nextBurst(0), _excess(0), _lastStoredRateTs(0){
     _clockThread = new ClockThread(_lastSec, _terminated);
     FILE* f = NULL;
-    char line[512];
     f = fopen(fileName.c_str(), "r");
     float rate = 0;
     float duration = 0;
     if(f){
+        char line[512];
         while(fgets(line, 512, f) != NULL){
             sscanf(line, "%f %f", &rate, &duration);
             Rates r;
@@ -97,6 +97,7 @@ InputStreamRate::InputStreamRate(const std::string& fileName):
 
     Mammut m;
     CpuFreq* frequency = m.getInstanceCpuFreq();
+    frequency->removeTurboFrequencies();
     vector<Domain*> domains = frequency->getDomains();
     _clockFrequency = 0;
     for(size_t i = 0; i < domains.size(); i++){
