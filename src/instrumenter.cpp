@@ -68,6 +68,7 @@ std::pair<nn::socket*, uint> Instrumenter::getChannel(const std::string& paramet
     int mainChid;
     mainChid = mainChannel.connect(INSTRUMENTATION_CONNECTION_CHANNEL);
     if(mainChid < 0){
+        delete channel;
         throw std::runtime_error("Impossible to connect to Nornir.");
     }
     DEBUG("Connected to main channel.");
@@ -118,6 +119,7 @@ std::pair<nn::socket*, uint> Instrumenter::getChannel(const std::string& paramet
     assert(ret == sizeof(pv));
     DEBUG("Validation results received.");
     if(pv != VALIDATION_OK){
+        delete channel;
         throw runtime_error("Invalid adaptivity parameters: " + std::to_string(pv));
     }
 
@@ -164,5 +166,13 @@ extern "C"{
 
     void nornir_instrumenter_terminate(NornirInstrumenter* instrumenter){
         reinterpret_cast<nornir::Instrumenter*>(instrumenter)->terminate();
+    }
+
+    unsigned long nornir_instrumenter_get_execution_time(NornirInstrumenter* instrumenter){
+        return reinterpret_cast<nornir::Instrumenter*>(instrumenter)->getExecutionTime();
+    }
+
+    unsigned long long nornir_instrumenter_get_total_tasks(NornirInstrumenter* instrumenter){
+        return reinterpret_cast<nornir::Instrumenter*>(instrumenter)->getTotalTasks();
     }
 }

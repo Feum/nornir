@@ -51,6 +51,10 @@ void nornir_instrumenter_end_with_threads(NornirInstrumenter* instrumenter, size
 
 void nornir_instrumenter_terminate(NornirInstrumenter* instrumenter);
 
+unsigned long nornir_instrumenter_get_execution_time(NornirInstrumenter* instrumenter);
+
+unsigned long long nornir_instrumenter_get_total_tasks(NornirInstrumenter* instrumenter);
+
 #ifdef __cplusplus
 }
 #endif
