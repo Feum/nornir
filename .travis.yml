@@ -8,6 +8,7 @@ dist: trusty
 install:
   # CppCheck
   - sudo apt-get install -qq cppcheck
+  - sudo apt-get install libarmadillo-dev
 
 script:
   # Runs compilation, cppcheck, tests and coverage collection

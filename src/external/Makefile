@@ -2,8 +2,14 @@
 
 all:
 # Checkout correct versions of external libraries
-	cd mammut && git checkout 4c609823f1ff268b1dd05210a93debbcc3bdfadb
-	cd knarr && git checkout d418655ad7333d1886037cd94f76d3a31980990b
+	mkdir -p mammut 
+ifeq ("$(wildcard ./mammut/.git)","")
+	git clone https://github.com/DanieleDeSensi/mammut.git ./mammut && cd mammut && git checkout 47ef67d33a998279345ea6f8741b7fa9ec9847b7
+endif
+	mkdir -p knarr
+ifeq ("$(wildcard ./knarr/.git)","")
+	git clone https://github.com/DanieleDeSensi/knarr.git && cd knarr && git checkout aae8e80398a6a516705f0b5472db1e2881dae396
+endif
 # Build mammut
 	$(MAKE) -C mammut
 # Build leo

@@ -14,8 +14,6 @@ export LDFLAGS               = -L$(realpath .)/src -L$(realpath .)/src/external/
 .PHONY: all demo clean cleanall install uninstall microbench bin test gcov develcheck
 
 all:
-	python submodules_init.py
-	git submodule foreach git pull -q origin master
 	$(MAKE) -C src
 	$(MAKE) -C microbench
 	$(MAKE) -C microbench checksupported
