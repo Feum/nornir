@@ -6,7 +6,7 @@
  * This file contains the client code for monitoring a local application
  * through instrumentation, and to send the monitoring data to a Nornir
  * manager running in a different process and acting like a server.
- * First of all, we try to open the INSTRUMENTATION_CONNECTION_CHANNEL channel,
+ * First of all, we try to open the InstrumentationConnectionChannel channel,
  * whose name  is fixed and known by all the clients and by the server. On
  * this channel, the client sends its PID. Then, all the communications between
  * this specific client (i.e. application) and the server will be done on a
@@ -66,7 +66,7 @@ std::pair<nn::socket*, uint> Instrumenter::getChannel(const std::string& paramet
     /** Send pid, then switch to the pid channel. */
     nn::socket mainChannel(AF_SP, NN_PAIR);
     int mainChid;
-    mainChid = mainChannel.connect(INSTRUMENTATION_CONNECTION_CHANNEL);
+    mainChid = mainChannel.connect(getInstrumentationConnectionChannel().c_str());
     if(mainChid < 0){
         throw std::runtime_error("Impossible to connect to Nornir.");
     }
@@ -85,10 +85,7 @@ std::pair<nn::socket*, uint> Instrumenter::getChannel(const std::string& paramet
     DEBUG("Main channel closed.");
 
     /** Send content length. **/
-    std::stringstream out;
-    out << pid;
-    chid = channel->connect((string("ipc:///tmp/nornir/") + out.str() +
-                             string(".ipc")).c_str());
+    chid = channel->connect(getInstrumentationPidChannel(pid).c_str());
     DEBUG("Connected to application channel.");
     assert(chid >= 0);
     vector<string> lines = readFile(parametersFile);

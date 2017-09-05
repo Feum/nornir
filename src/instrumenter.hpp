@@ -28,14 +28,37 @@
 #ifndef NORNIR_INSTRUMENTER_HPP_
 #define NORNIR_INSTRUMENTER_HPP_
 
+#include "utils.hpp"
 #include "external/knarr/src/knarr.hpp"
 #include "external/knarr/src/external/cppnanomsg/nn.hpp"
 #include "external/knarr/src/external/nanomsg/src/pair.h"
 #include "external/mammut/mammut/mammut.hpp"
 
-#define INSTRUMENTATION_CONNECTION_CHANNEL "ipc:///tmp/nornir.ipc"
-
 namespace nornir{
+
+// We cannot use XDG runtime directories since they are
+// user specific. Manager and application could be run
+// by different users (e.g. manager by sudo user
+// and application by normal user).
+inline std::string getInstrumentationChannelsPath(){
+    return "/tmp/nornir_external_manager/";
+}
+
+inline std::string getInstrumentationConnectionChannelPath(){
+    return getInstrumentationChannelsPath() + "/connection.ipc";
+}
+
+inline std::string getInstrumentationPidChannelPath(uint pid){
+    return getInstrumentationChannelsPath() + "/" + mammut::utils::intToString(pid) + ".ipc";
+}
+
+inline std::string getInstrumentationConnectionChannel(){
+    return std::string("ipc://") + getInstrumentationConnectionChannelPath();
+}
+
+inline std::string getInstrumentationPidChannel(uint pid){
+    return std::string("ipc://") + getInstrumentationPidChannelPath(pid);
+}
 
 class InstrumenterHelper: public knarr::Application, mammut::utils::NonCopyable{
 public:

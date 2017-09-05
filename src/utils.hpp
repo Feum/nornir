@@ -46,12 +46,51 @@
 #include <functional>
 #include <limits>
 #include <numeric>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define MSECS_IN_SECS 1000.0 // Milliseconds in 1 second
 #define NSECS_IN_SECS 1000000000.0 // Nanoseconds in 1 second
 #define MAX_RHO 96
 
+#define XDG_CONFIG_DIR_FALLBACK "/etc/xdg"
+
 namespace nornir{
+
+inline std::vector<std::string> getXdgConfigDirs(){
+    char* confHome_c = getenv("XDG_CONFIG_DIRS");
+    std::vector<std::string> confHomes;
+    if(!confHome_c || strcmp(confHome_c, "") == 0){
+        confHomes.push_back(std::string(XDG_CONFIG_DIR_FALLBACK));
+    }else{
+        confHomes = mammut::utils::split(std::string(confHome_c), ':');
+    }
+    for(std::string& s : confHomes){
+        s += "/nornir/";
+    }
+    return confHomes;
+}
+
+inline std::string getRuntimeDir(bool userSpecific = true){
+    char* runtimeDir_c = getenv("XDG_RUNTIME_DIR");
+    if(!runtimeDir_c || strcmp(runtimeDir_c, "") == 0 || !userSpecific){
+        runtimeDir_c = (char*) "/tmp/";
+    }
+    std::string runtimeDir = std::string(runtimeDir_c) + std::string("/nornir/");
+
+    // Create dir if it does not exist
+    if(!mammut::utils::existsDirectory(runtimeDir)){
+        if(system((std::string("mkdir -p ") + runtimeDir).c_str())){
+            throw std::runtime_error("Impossible to create nornir runtime dir.");
+        }
+        if(!userSpecific){
+            if(system((std::string("chmod ugo+rwx ") + runtimeDir).c_str())){
+                throw std::runtime_error("Impossible to set permissions on nornir runtime dir.");
+            }
+        }
+    }
+    return runtimeDir;
+}
 
 inline double ticksToSeconds(double ticks, double ticksPerNs){
     return (ticks/ticksPerNs)/NSECS_IN_SECS;

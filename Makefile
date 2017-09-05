@@ -11,7 +11,7 @@ export LDLIBS                = $(COVERAGE_LIBS) -lnornir -pthread -lrt -lm -lmlp
 export INCS                  = -I$(realpath ./src/external/fastflow) -I$(realpath ./src/external/tclap-1.2.1/include) -I/usr/include/libxml2
 export LDFLAGS               = -L$(realpath .)/src -L$(realpath .)/src/external/knarr/src
 
-.PHONY: all demo clean cleanall install uninstall microbench bin test gcov develcheck
+.PHONY: all demo clean cleanall install uninstall microbench bin test testquick gcov develcheck
 
 all:
 	python submodules_init.py
@@ -37,6 +37,8 @@ cppcheck:
 test:
 	make cleanall
 	make "COVERAGE_FLAGS=-fprofile-arcs -ftest-coverage"
+	make testquick
+testquick:
 	cd test && ./installdep.sh 
 	cd ..
 	$(MAKE) "COVERAGE_LIBS=-lgcov" -C test && cd test && ./runtests.sh

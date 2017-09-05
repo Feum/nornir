@@ -29,7 +29,7 @@
  *         strategySelection = STRATEGY_SELECTION_ANALYTICAL
  *         knobMappingEnabled = false
  *         (Actually was a simpler selection strategy than the current one).
- *     - PPL2016:
+ * - PPL2016:
  *         strategySelection = STRATEGY_SELECTION_ANALYTICAL
  *         knobMappingEnabled = false
  * - PDP2016:
@@ -127,8 +127,11 @@ typedef enum{
 
 // Possible strategies for the selection of the best configuration.
 typedef enum{
+	// Best configuration is manually chosen
+	STRATEGY_SELECTION_MANUAL = 0,
+
     // Applies an online learning algorithm
-    STRATEGY_SELECTION_LEARNING = 0,
+    STRATEGY_SELECTION_LEARNING,
 
     // Applies a simple analytical model.
     STRATEGY_SELECTION_ANALYTICAL,

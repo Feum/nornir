@@ -342,6 +342,16 @@ inline std::ostream& operator<<(std::ostream& os, const KnobsValues& obj){
     return os;
 }
 
+inline std::istream& operator>>(std::istream& is, KnobsValues& sample){
+    is.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+    for(size_t i = 0; i < KNOB_NUM; i++){
+        is >> sample[(KnobType) i];
+        is.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+    }
+    is.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+    return is;
+}
+
 inline bool operator==(const KnobsValues& lhs,
                        const KnobsValues& rhs){
     for(size_t i = 0; i < KNOB_NUM; i++){
