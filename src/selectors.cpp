@@ -252,6 +252,30 @@ double Selector::initBestSuboptimalValue() const{
     throw std::runtime_error("Wrong contract specification.");
 }
 
+
+SelectorManual::SelectorManual(const Parameters& p,
+               const Configuration& configuration,
+               const Smoother<MonitoredSample>* samples):
+                 Selector(p, configuration, samples){
+    ;
+}
+
+SelectorManual::~SelectorManual(){;}
+
+KnobsValues SelectorManual::getNextKnobsValues(){
+    std::ifstream instream(getSelectorManualControlFile());
+    if(!instream.is_open()){
+        // If the file where the configuration should be specified
+        // has not yet been created, remain in the same configuration.
+        return _configuration.getRealValues();
+    }else{
+        KnobsValues kv(KNOB_VALUE_RELATIVE);
+        instream >> kv;
+        instream.close();
+        return kv;
+    }
+}
+
 SelectorFixed::SelectorFixed(const Parameters& p,
          const Configuration& configuration,
          const Smoother<MonitoredSample>* samples):

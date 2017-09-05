@@ -6,10 +6,29 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sstream>
 #include "../src/nornir.hpp"
 #include "gtest/gtest.h"
 
 using namespace nornir;
+
+TEST(KnobsTest, WriteRead){
+    KnobsValues kv(KNOB_VALUE_REAL), validation(KNOB_VALUE_REAL);
+    kv[KNOB_VIRTUAL_CORES] = 1;
+    kv[KNOB_HYPERTHREADING] = 10;
+    kv[KNOB_MAPPING] = MAPPING_TYPE_INTERLEAVED;
+    kv[KNOB_FREQUENCY] = 2.4;
+    std::ofstream outstream;
+    outstream.open("/tmp/testknobs.dat");
+    outstream << kv;
+    outstream.close();
+    std::ifstream instream("/tmp/testknobs.dat");
+    instream >> validation;
+    instream.close();
+    for(size_t i = 0; i < (size_t) KNOB_NUM; i++){
+        EXPECT_EQ(kv[(KnobType) i], validation[(KnobType) i]);
+    }
+}
 
 TEST(KnobsTest, KnobsVirtualCores) {
     Parameters  p = getParameters("repara");

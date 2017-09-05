@@ -206,6 +206,29 @@ public:
 };
 
 /**
+ * Returns the file from which the configuration is read.
+ * The contained knobs values must be in relative form.
+ **/
+inline std::string getSelectorManualControlFile(){
+    return getRuntimeDir(false) + std::string("/selector_manual.dat");
+}
+
+/**
+ * Configuration is manually chosen by an 
+ * external entity.
+ */
+class SelectorManual: public Selector{
+public:
+    SelectorManual(const Parameters& p,
+                   const Configuration& configuration,
+                   const Smoother<MonitoredSample>* samples);
+
+    ~SelectorManual();
+    KnobsValues getNextKnobsValues();
+    bool isMaxPerformanceConfiguration() const{return false;} // Never used by this selectors
+};
+
+/**
  * Always returns the current configuration.
  */
 class SelectorFixed: public Selector{
@@ -213,8 +236,8 @@ protected:
     bool isMaxPerformanceConfiguration() const{return false;} // Never used by this selector
 public:
     SelectorFixed(const Parameters& p,
-             const Configuration& configuration,
-             const Smoother<MonitoredSample>* samples);
+                  const Configuration& configuration,
+                  const Smoother<MonitoredSample>* samples);
 
     ~SelectorFixed();
 

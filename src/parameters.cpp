@@ -26,6 +26,7 @@
  */
 
 #include "parameters.hpp"
+#include "utils.hpp"
 
 #include <cstring>
 #include <limits>
@@ -42,9 +43,9 @@ using mammut::utils::enumStrings;
 
 #define CONFIGURATION_VERSION "1.0.0"
 #define CONFPATH_LEN_MAX 512
-#define CONFFILE_VERSION "/nornir/version.csv"
-#define CONFFILE_ARCH "/nornir/archdata.xml"
-#define CONFFILE_VOLTAGE "/nornir/voltage.csv"
+#define CONFFILE_VERSION "/version.csv"
+#define CONFFILE_ARCH "/archdata.xml"
+#define CONFFILE_VOLTAGE "/voltage.csv"
 
 void XmlTree::init(const std::string& content, const std::string& rootName){
     rapidxml::xml_document<> xmlContent;
@@ -269,20 +270,13 @@ void Parameters::setDefault(){
     dataflow.maxInterpreters = 0;
 
     /** Retrieving global configuration files. **/
-    char* confHome_c = getenv("XDG_CONFIG_DIRS");
-    vector<string> confHomes;
-    if(!confHome_c || strcmp(confHome_c, "") == 0){
-        confHomes.push_back(string("/etc/xdg"));
-    }else{
-        confHomes = split(string(confHome_c), ':');
-    }
+    vector<string> confHomes = getXdgConfigDirs();
 
-    size_t i = 0;
     bool found = false;
-    while(i < confHomes.size() && !found){
-        string confFileArch = confHomes.at(i) + string(CONFFILE_ARCH);
-        string confFileVoltage = confHomes.at(i) + string(CONFFILE_VOLTAGE);
-        string confFileVersion = confHomes.at(i) + string(CONFFILE_VERSION);
+    for(string confHome : getXdgConfigDirs()){
+        string confFileArch = confHome + string(CONFFILE_ARCH);
+        string confFileVoltage = confHome + string(CONFFILE_VOLTAGE);
+        string confFileVersion = confHome + string(CONFFILE_VERSION);
 
         if(existsFile(confFileArch) &&
            existsFile(confFileVoltage) &&
@@ -291,8 +285,8 @@ void Parameters::setDefault(){
             archData.loadXml(confFileArch);
             loadVoltageTable(archData.voltageTable, confFileVoltage);
             found = true;
+            break;
         }
-        i++;
     }
 
     if(!found){
@@ -544,6 +538,12 @@ ParametersValidation Parameters::validateSelector(){
         return VALIDATION_NO;
     }
 
+    // MANUAL
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL][KNOB_MAPPING] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL][KNOB_HYPERTHREADING] = true;
+
     // ANALYTICAL
     knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_VIRTUAL_CORES] = true;
     knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_FREQUENCY] = true;
@@ -686,6 +686,7 @@ template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
 };
 
 template<> char const* enumStrings<StrategySelection>::data[] = {
+	"MANUAL",
     "LEARNING",
     "ANALYTICAL",
     "FULLSEARCH",

@@ -4,9 +4,13 @@
 *.gcda
 *.gcno
 proc.out
+/src/external/mammut/
 /src/external/mammut/*
+/src/external/knarr/
 /src/external/knarr/*
+/src/external/graphite-c-client/*
 /test/googletest/*
+/test/*.csv
 microbench/check
 microbench/ticksPerNs
 microbench/voltageTable

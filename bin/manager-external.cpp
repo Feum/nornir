@@ -8,6 +8,9 @@
  * no coordination between them is provided. The result may thus be inconsistent.
  * Please use this binary to control at most one application at a time.
  *
+ * Since the manager needs to access some architectures priviledged operations
+ * (e.g. changing frequency, reading energy, etc...), it is possible that
+ * this process could be run by using 'sudo'.
  * =========================================================================
  *  Copyright (C) 2015-, Daniele De Sensi (d.desensi.software@gmail.com)
  *
@@ -84,13 +87,28 @@ int main(int argc, char * argv[]){
     // when starts this executable.
     bool multipleApplications = false;
 
+    // Create directory where the channels will be placed and 
+    // set permissions so that everyone can access it.
+    if(!mammut::utils::existsDirectory(getInstrumentationChannelsPath())){
+        if(mkdir(getInstrumentationChannelsPath().c_str(), ACCESSPERMS)){
+            throw std::runtime_error("Impossible to create nornir instrumentation channels dir.");
+        }
+        if(system((std::string("chmod ugo+rwx ") + getInstrumentationChannelsPath()).c_str()) == -1){
+            throw std::runtime_error("Impossible to set permission to nornir channel dir.");
+        }
+    }
+
     nn::socket mainChannel(AF_SP, NN_PAIR);
     int mainChid;
-    mainChid = mainChannel.bind(INSTRUMENTATION_CONNECTION_CHANNEL);
+    mainChid = mainChannel.bind(getInstrumentationConnectionChannel().c_str());
     std::list<ApplicationInstance*> instances;
-    if(system("mkdir -p /tmp/nornir") == -1){throw std::runtime_error("Impossible to create nornir dir.");}
-    if(system("chmod ugo+rwx /tmp/nornir.ipc") == -1){throw std::runtime_error("Impossible to set permission to nornir channel.");}
-    if(system("chmod ugo+rwx /tmp/nornir/") == -1){throw std::runtime_error("Impossible to set permission nornir dir.");}
+    // We need to change the rights of the channel because most likely this manager will be
+    // executed with sudoers rights (since we need to change frequency etc..).
+    // By changing the rights we allow non sudoers users to interact with 
+    // the manager on this channel.
+    if(system((std::string("chmod ugo+rwx ") + getInstrumentationConnectionChannelPath()).c_str()) == -1){
+        throw std::runtime_error("Impossible to set permission to nornir channel.");
+    }
     ManagerMulti mm;
     if(multipleApplications){
         mm.start();
@@ -104,9 +122,11 @@ int main(int argc, char * argv[]){
 
         DEBUG("Received a request from process " << pid);
         ApplicationInstance* ai = new ApplicationInstance;
-        ai->chid = ai->channel.bind((string("ipc:///tmp/nornir/") +
-                                     mammut::utils::intToString(pid) +
-                                     string(".ipc")).c_str());
+        ai->chid = ai->channel.bind(getInstrumentationPidChannel(pid).c_str());
+        // We change the rights for same reasons as before.
+        if(system((std::string("chmod ugo+rwx ") + getInstrumentationPidChannelPath(pid)).c_str()) == -1){
+            throw std::runtime_error("Impossible to set permission to nornir channel.");
+        }
         DEBUG("Created app channel.");
 
         DEBUG("Sending ack.");
