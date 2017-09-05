@@ -52,7 +52,9 @@
 #include <asm/unistd.h>
 #include <stdio.h>
 #include <unistd.h>
+
 #define gettid() syscall(__NR_gettid)
+
 #elif defined(__APPLE__)
 //#define _DARWIN_C_SOURCE
 
@@ -499,5 +501,6 @@ static inline size_t cache_line_size() {
 #error Unrecognized platform
 #endif
 
+#undef gettid
 
 #endif /* FF_MAPPING_UTILS_HPP */
