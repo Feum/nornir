@@ -56,11 +56,11 @@ protected:
     const Parameters& _p;
     const Configuration& _configuration;
     const Smoother<MonitoredSample>* _samples;
-    mammut::topology::Topology* _topology;
     uint _cpus;
+    uint _domains;
     uint _phyCores;
+    uint _phyCoresPerDomain;
     uint _phyCoresPerCpu;
-    uint _virtCoresPerPhyCores;
 
     double getUsedPhysicalCores(double numWorkers);
 public:
@@ -126,8 +126,8 @@ private:
     StrategyUnusedVirtualCores _strategyUnused;
 
     double _dynamicPowerModel;
-    double _voltagePerUsedSockets;
-    double _voltagePerUnusedSockets;
+    double _voltagePerUsedDomains;
+    double _voltagePerUnusedDomains;
     unsigned int _additionalContextes;
     mammut::cpufreq::Frequency _lowestFrequency;
 
@@ -426,8 +426,10 @@ public:
 class PredictorAnalytical: public Predictor{
 private:
     uint _phyCores;
+    uint _phyCoresPerDomain;
     uint _phyCoresPerCpu;
     uint _cpus;
+    uint _domains;
 
     double getScalingFactor(const KnobsValues& values);
     double getPowerPrediction(const KnobsValues& values);
