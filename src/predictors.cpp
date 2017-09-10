@@ -68,53 +68,17 @@ static double getVoltage(VoltageTable table, uint workers, Frequency frequency){
     }
 }
 
-/**
- * Computes a proportional value for power consumption of a configuration.
- */
-static void getPowerProportions(VoltageTable table, uint physicalCores,
-                                Frequency frequency, uint coresPerDomain,
-                                uint numDomains, MappingType mt,
-                                double& staticPower, double& dynamicPower){
-    int numCores = physicalCores;
-    staticPower = 0;
-    dynamicPower = 0;
-    uint currentCores = 0;
-    int interleavedPerDomain = physicalCores / numDomains;
-    int interleavedSpurious = physicalCores % numDomains;
-    while(numCores > 0){
-        switch(mt){
-            case MAPPING_TYPE_LINEAR:{
-                currentCores = (numCores < (int) coresPerDomain)?(uint)numCores:coresPerDomain;
-            }break;
-            case MAPPING_TYPE_INTERLEAVED:{
-                currentCores =  interleavedPerDomain;
-                if(interleavedSpurious){
-                    currentCores +=1;
-                    interleavedSpurious--;
-                }
-            }break;
-            default:{
-                throw std::runtime_error("getPowerProportions: mapping type not supported.");
-            }
-        }
-        double voltage = getVoltage(table, currentCores, frequency);
-
-        staticPower += voltage;
-        dynamicPower += currentCores*frequency*voltage*voltage;
-
-        numCores -= currentCores;
-    }
-}
-
 RegressionData::RegressionData(const Parameters &p,
                                const Configuration &configuration,
                                const Smoother<MonitoredSample>* samples):
         _p(p), _configuration(configuration), _samples(samples){
-    _topology = _p.mammut.getInstanceTopology();
-    _cpus = _topology->getCpus().size();
-    _phyCores = _topology->getPhysicalCores().size();
-    _phyCoresPerCpu = _topology->getCpu(0)->getPhysicalCores().size();
-    _virtCoresPerPhyCores = _topology->getPhysicalCore(0)->getVirtualCores().size();
+    mammut::topology::Topology* t = _p.mammut.getInstanceTopology();
+    _cpus = t->getCpus().size();
+    _domains = _p.mammut.getInstanceCpuFreq()->getDomains().size();
+    _phyCores = t->getPhysicalCores().size();
+    uint virtCoresPerPhyCores = t->getPhysicalCore(0)->getVirtualCores().size();
+    _phyCoresPerDomain = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getVirtualCores().size() / virtCoresPerPhyCores;
+    _phyCoresPerCpu = t->getCpus().at(0)->getPhysicalCores().size();
 }
 
 double RegressionData::getUsedPhysicalCores(double numVirtualCores){
@@ -174,6 +138,67 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
     }
 }
 
+static void getStaticDynamicPower(double usedPhysicalCores, Frequency frequency,
+                                  MappingType mt,
+                                  const mammut::cpufreq::VoltageTable& table, uint numCpus,
+                                  uint numDomains, uint phyCoresPerCpu,
+                                  uint phyCoresPerDomain,
+                                  uint& unusedDomains, double& staticPower, double& dynamicPower){
+    unusedDomains = 0;
+    staticPower = 0;
+    dynamicPower = 0;
+    std::vector<uint> coresPerCpu;
+    uint remainingCores = usedPhysicalCores;
+    uint index = 0;
+
+    for(size_t i = 0; i < numCpus; i++){
+        coresPerCpu.push_back(0);
+    }
+
+    if(mt == MAPPING_TYPE_LINEAR){
+        unusedDomains = numDomains - (usedPhysicalCores / (double) phyCoresPerDomain);
+        // Simulate linear distribution
+        while(remainingCores){
+            ++coresPerCpu[index];
+            --remainingCores;
+            if(coresPerCpu[index] == phyCoresPerCpu){
+                index = (index + 1) % numCpus;
+            }
+        }
+    }else if(mt == MAPPING_TYPE_INTERLEAVED){
+        // Simulate interleaved distribution
+        while(remainingCores){
+            ++coresPerCpu[index];
+            --remainingCores;
+            index = (index + 1) % numCpus;
+        }
+        uint usedDomains = 0;
+        for(uint x : coresPerCpu){
+            usedDomains += std::ceil(x / (double) phyCoresPerDomain);
+        }
+        unusedDomains = numDomains - usedDomains;
+    }else{
+        throw std::runtime_error("Unsupported mapping.");
+    }
+
+    for(uint x : coresPerCpu){
+        uint fullDomains = std::floor(x / phyCoresPerDomain);       
+        uint coresOnSpuriousDomain = x % phyCoresPerDomain;
+
+        // For full domains
+        double voltage = getVoltage(table, phyCoresPerDomain, frequency);
+        staticPower += (voltage)*fullDomains;
+        dynamicPower += (phyCoresPerDomain*frequency*voltage*voltage)*fullDomains;
+
+        // For spurious domain
+        if(coresOnSpuriousDomain){
+            voltage = getVoltage(table, coresOnSpuriousDomain, frequency);
+            staticPower += voltage;
+            dynamicPower += coresOnSpuriousDomain*frequency*voltage*voltage;
+        }
+    }
+}
+
 void RegressionDataPower::init(const KnobsValues& values){
     assert(values.areReal());
     _numPredictors = 0;
@@ -182,43 +207,39 @@ void RegressionDataPower::init(const KnobsValues& values){
     double usedPhysicalCores = getUsedPhysicalCores(numVirtualCores);
 
     if(_p.knobFrequencyEnabled){
-        uint usedCpus = 0;
-        if(values[KNOB_MAPPING] == MAPPING_TYPE_LINEAR){
-            usedCpus = std::ceil(usedPhysicalCores / (double) _phyCoresPerCpu);
-        }else{
-            usedCpus = std::min(usedPhysicalCores, (double) _cpus);
-        }
-        usedCpus = std::min(usedCpus, _cpus);
-        uint unusedCpus = _cpus - usedCpus;
+        uint unusedDomains;
+        double staticPowerUsedDomains = 0, dynamicPower = 0;
+        getStaticDynamicPower(usedPhysicalCores, frequency,
+                              (MappingType) values[KNOB_MAPPING],
+                              _p.archData.voltageTable, _cpus,
+                              _domains, _phyCoresPerCpu,
+                              _phyCoresPerDomain,
+                              unusedDomains, staticPowerUsedDomains, dynamicPower);
 
-        double staticPowerProp = 0, dynamicPowerProp = 0;
-        //TODO: Potrebbe non esserci una frequenza se FREQUENCY_NO. In tal caso non possiamo predirre nulla.
-        getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
-                frequency, _phyCoresPerCpu,
-                _cpus, (MappingType) values[KNOB_MAPPING],
-                staticPowerProp, dynamicPowerProp);
-        //_voltagePerUsedSockets = staticPowerProp;
+        //TODO: Potrebbe non esserci una frequenza se FREQUENCY_NO. In tal
+        //caso non possiamo predirre nulla.
+
+        //_voltagePerUsedDomains = staticPowerProp;
         //++_numPredictors;
 
-        if(_cpus > 1){
-            Frequency frequencyUnused;
-            switch(_strategyUnused){
-                case STRATEGY_UNUSED_VC_SAME:{
-                    frequencyUnused = frequency;
-                }break;
-                case STRATEGY_UNUSED_VC_LOWEST_FREQUENCY:{
-                    frequencyUnused = _lowestFrequency;
-                }break;
-                default:{
-                    throw std::runtime_error("RegressionDataPower: init: strategyUnused unsupported.");
-                }
+        Frequency frequencyUnused;
+        switch(_strategyUnused){
+            case STRATEGY_UNUSED_VC_SAME:{
+                frequencyUnused = frequency;
+            }break;
+            case STRATEGY_UNUSED_VC_LOWEST_FREQUENCY:{
+                frequencyUnused = _lowestFrequency;
+            }break;
+            default:{
+                throw std::runtime_error("RegressionDataPower: init: strategyUnused unsupported.");
             }
-            double voltage = getVoltage(_p.archData.voltageTable, 0, frequencyUnused);
-            _voltagePerUnusedSockets = (voltage * unusedCpus) + staticPowerProp;
-            ++_numPredictors;
         }
+        double voltage = getVoltage(_p.archData.voltageTable, 0, frequencyUnused);
+        // See TACO2016 paper, equations 6. and 7.
+        _voltagePerUnusedDomains = (voltage * unusedDomains) + staticPowerUsedDomains;
+        ++_numPredictors;
 
-        _dynamicPowerModel = dynamicPowerProp;
+        _dynamicPowerModel = dynamicPower;
         ++_numPredictors;
     }else{
         /**
@@ -234,13 +255,8 @@ RegressionDataPower::RegressionDataPower(const Parameters &p,
                                          const Configuration &configuration,
                                          const Smoother<MonitoredSample>* samples):
         RegressionData(p, configuration, samples), _dynamicPowerModel(0),
-        _voltagePerUsedSockets(0), _voltagePerUnusedSockets(0),
+        _voltagePerUsedDomains(0), _voltagePerUnusedDomains(0),
         _additionalContextes(0), _numPredictors(0){
-    _topology = _p.mammut.getInstanceTopology();
-    _cpus = _topology->getCpus().size();
-    _phyCores = _topology->getPhysicalCores().size();
-    _phyCoresPerCpu = _topology->getCpu(0)->getPhysicalCores().size();
-    _virtCoresPerPhyCores = _topology->getPhysicalCore(0)->getVirtualCores().size();
     _strategyUnused = _p.strategyUnusedVirtualCores;
     Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().front();
     d->removeTurboFrequencies();
@@ -262,16 +278,14 @@ void RegressionDataPower::toArmaRow(size_t columnId, arma::mat& matrix) const{
     size_t rowId = 0;
     matrix(rowId++, columnId) = _dynamicPowerModel;
     if(_p.knobFrequencyEnabled){
-        //matrix(rowId++, columnId) = _voltagePerUsedSockets;
-        if(_cpus > 1){
-            matrix(rowId++, columnId) = _voltagePerUnusedSockets;
-        }
+        //matrix(rowId++, columnId) = _voltagePerUsedDomains;
+        matrix(rowId++, columnId) = _voltagePerUnusedDomains;
     }
 }
 
 bool RegressionDataPower::getInactivePowerPosition(size_t& pos) const{
     // ATTENTION: pos = 0 is the intercept (constant value).
-    if(_p.knobFrequencyEnabled && _cpus > 1){
+    if(_p.knobFrequencyEnabled){
         pos = _numPredictors;
         return true;
     }else{
@@ -786,8 +800,11 @@ PredictorAnalytical::PredictorAnalytical(PredictorType type,
             Predictor(type, p, configuration, samples) {
     Topology* t = _p.mammut.getInstanceTopology();
     _phyCores = t->getPhysicalCores().size();
-    _phyCoresPerCpu = t->getCpu(0)->getPhysicalCores().size();
     _cpus = t->getCpus().size();
+    _domains = _p.mammut.getInstanceCpuFreq()->getDomains().size();
+    uint virtCoresPerPhyCores = t->getPhysicalCore(0)->getVirtualCores().size();
+    _phyCoresPerDomain = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getVirtualCores().size() / virtCoresPerPhyCores;
+    _phyCoresPerCpu = t->getCpus().at(0)->getPhysicalCores().size();
 }
 
 double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
@@ -799,12 +816,15 @@ double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
 
 double PredictorAnalytical::getPowerPrediction(const KnobsValues& values){
     assert(values.areReal());
-    double staticPower = 0, dynamicPower = 0;
     double usedPhysicalCores = values[KNOB_VIRTUAL_CORES];
-    getPowerProportions(_p.archData.voltageTable, usedPhysicalCores,
-                        values[KNOB_FREQUENCY], _phyCoresPerCpu,
-                        _cpus, (MappingType) values[KNOB_MAPPING],
-                        staticPower, dynamicPower);
+    uint unusedDomains;
+    double staticPower = 0, dynamicPower = 0;
+    getStaticDynamicPower(usedPhysicalCores, values[KNOB_FREQUENCY],
+                          (MappingType) values[KNOB_MAPPING],
+                          _p.archData.voltageTable, _cpus,
+                          _domains, _phyCoresPerCpu,
+                          _phyCoresPerDomain,
+                          unusedDomains, staticPower, dynamicPower);
     return dynamicPower;
 }
 

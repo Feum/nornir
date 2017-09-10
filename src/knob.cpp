@@ -538,18 +538,25 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
     }else{
         std::vector<mammut::cpufreq::Domain*> scalableDomains;
         scalableDomains = _frequencyHandler->getDomains();
-        for(size_t i = 0; i < scalableDomains.size(); i++){
-            Domain* currentDomain = scalableDomains.at(i);
+        for(Domain* currentDomain : scalableDomains){
             if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
                 throw runtime_error("KnobFrequency: Impossible "
                                     "to set the specified governor.");
+            }            
+            // I set the minimum and maximum frequencies to the min and max
+            // of this system.
+            Frequency lowerBound, upperBound;
+            currentDomain->getHardwareFrequencyBounds(lowerBound, upperBound);
+            if(!currentDomain->setGovernorBounds(lowerBound, upperBound)){
+               throw runtime_error("KnobFrequency: Impossible "
+                                   "to set the governor bounds.");
             }
         }
     }
     _realValue = availableFrequencies.front();
 
-    for(size_t i = 0; i < availableFrequencies.size(); i++){
-        _knobValues.push_back(availableFrequencies.at(i));
+    for(Frequency f : availableFrequencies){
+        _knobValues.push_back(f);
     }
 }
 
