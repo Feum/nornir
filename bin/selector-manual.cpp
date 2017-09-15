@@ -47,7 +47,7 @@ int main(int argc, char** argv){
     // Set knobs
     KnobsValues kv(KNOB_VALUE_RELATIVE);
  	// First load the old ones (we need to do it so to do not overwrite unchanged values)
-	std::ifstream instream(getSelectorManualControlFile());
+	std::ifstream instream(getSelectorManualCliControlFile());
 	instream >> kv;
 	instream.close();
 

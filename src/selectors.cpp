@@ -300,7 +300,7 @@ KnobsValues SelectorManualWeb::getNextKnobsValues(){
 
     if(_connected){
         char *buf = NULL;
-        KnobsValues kv = _configuration.getRealValues();
+        KnobsValues kv(KNOB_VALUE_RELATIVE);
         bool stop = false;
         do{
             // We need to execute in a loop since the interface
@@ -318,7 +318,11 @@ KnobsValues SelectorManualWeb::getNextKnobsValues(){
                 nn_freemsg(buf);
             }
         }while(!stop);
-        return kv;
+        if(buf){
+            return kv;
+        }else{
+            return _configuration.getRealValues();
+        }
     }else{
         return _configuration.getRealValues();
     }

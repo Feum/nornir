@@ -545,9 +545,7 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
             }            
             // I set the minimum and maximum frequencies to the min and max
             // of this system.
-            Frequency lowerBound, upperBound;
-            currentDomain->getHardwareFrequencyBounds(lowerBound, upperBound);
-            if(!currentDomain->setGovernorBounds(lowerBound, upperBound)){
+            if(!currentDomain->setGovernorBounds(availableFrequencies.front(), availableFrequencies.back())){
                throw runtime_error("KnobFrequency: Impossible "
                                    "to set the governor bounds.");
             }
