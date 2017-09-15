@@ -47,6 +47,5 @@
 //#include <sys/syscall.h>
 
 #include "external/fastflow/ff/farm.hpp"
-#undef gettid // gettid macro defined in ff/mapping_utils.hpp collide with the function defined in Mammut
 
 #endif /* NORNIR_FFINCS_HPP_ */

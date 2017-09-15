@@ -127,8 +127,11 @@ typedef enum{
 
 // Possible strategies for the selection of the best configuration.
 typedef enum{
-	// Best configuration is manually chosen
-	STRATEGY_SELECTION_MANUAL = 0,
+	// Best configuration is manually chosen by using the selector-manual command line interface.
+	STRATEGY_SELECTION_MANUAL_CLI = 0,
+
+    // Best configuration is manually chosen by using the selector-manual web interface.
+    STRATEGY_SELECTION_MANUAL_WEB,
 
     // Applies an online learning algorithm
     STRATEGY_SELECTION_LEARNING,

@@ -209,21 +209,39 @@ public:
  * Returns the file from which the configuration is read.
  * The contained knobs values must be in relative form.
  **/
-inline std::string getSelectorManualControlFile(){
+inline std::string getSelectorManualCliControlFile(){
     return getRuntimeDir(false) + std::string("/selector_manual.dat");
 }
 
 /**
  * Configuration is manually chosen by an 
- * external entity.
+ * external entity (selector-manual) command line interface.
  */
-class SelectorManual: public Selector{
+class SelectorManualCli: public Selector{
 public:
-    SelectorManual(const Parameters& p,
+    SelectorManualCli(const Parameters& p,
                    const Configuration& configuration,
                    const Smoother<MonitoredSample>* samples);
 
-    ~SelectorManual();
+    ~SelectorManualCli();
+    KnobsValues getNextKnobsValues();
+    bool isMaxPerformanceConfiguration() const{return false;} // Never used by this selectors
+};
+
+/**
+ * Configuration is manually chosen bythe
+ * selector-manual web interface.
+ */
+class SelectorManualWeb: public Selector{
+private:
+    int _socket;
+    bool _connected;
+public:
+    SelectorManualWeb(const Parameters& p,
+                   const Configuration& configuration,
+                   const Smoother<MonitoredSample>* samples);
+
+    ~SelectorManualWeb();
     KnobsValues getNextKnobsValues();
     bool isMaxPerformanceConfiguration() const{return false;} // Never used by this selectors
 };

@@ -538,11 +538,17 @@ ParametersValidation Parameters::validateSelector(){
         return VALIDATION_NO;
     }
 
-    // MANUAL
-    knobsSupportSelector[STRATEGY_SELECTION_MANUAL][KNOB_VIRTUAL_CORES] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_MANUAL][KNOB_FREQUENCY] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_MANUAL][KNOB_MAPPING] = true;
-    knobsSupportSelector[STRATEGY_SELECTION_MANUAL][KNOB_HYPERTHREADING] = true;
+    // MANUAL CLI
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_MAPPING] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_HYPERTHREADING] = true;
+
+    // MANUAL WEB
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_VIRTUAL_CORES] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_FREQUENCY] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_MAPPING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_HYPERTHREADING] = false;
 
     // ANALYTICAL
     knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_VIRTUAL_CORES] = true;
@@ -686,7 +692,8 @@ template<> char const* enumStrings<StrategyUnusedVirtualCores>::data[] = {
 };
 
 template<> char const* enumStrings<StrategySelection>::data[] = {
-	"MANUAL",
+	"MANUAL_CLI",
+    "MANUAL_WEB",
     "LEARNING",
     "ANALYTICAL",
     "FULLSEARCH",

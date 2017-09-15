@@ -27,7 +27,12 @@
 
 #include "selectors.hpp"
 #include "utils.hpp"
+#include "external/knarr/src/external/cppnanomsg/nn.hpp"
+#include "external/knarr/src/external/nanomsg/src/pair.h"
 #include <cfloat>
+#include <string>
+#include <iostream>
+#include <sstream> 
 
 #undef DEBUG
 #undef DEBUGB
@@ -253,17 +258,17 @@ double Selector::initBestSuboptimalValue() const{
 }
 
 
-SelectorManual::SelectorManual(const Parameters& p,
+SelectorManualCli::SelectorManualCli(const Parameters& p,
                const Configuration& configuration,
                const Smoother<MonitoredSample>* samples):
                  Selector(p, configuration, samples){
     ;
 }
 
-SelectorManual::~SelectorManual(){;}
+SelectorManualCli::~SelectorManualCli(){;}
 
-KnobsValues SelectorManual::getNextKnobsValues(){
-    std::ifstream instream(getSelectorManualControlFile());
+KnobsValues SelectorManualCli::getNextKnobsValues(){
+    std::ifstream instream(getSelectorManualCliControlFile());
     if(!instream.is_open()){
         // If the file where the configuration should be specified
         // has not yet been created, remain in the same configuration.
@@ -273,6 +278,49 @@ KnobsValues SelectorManual::getNextKnobsValues(){
         instream >> kv;
         instream.close();
         return kv;
+    }
+}
+
+SelectorManualWeb::SelectorManualWeb(const Parameters& p,
+               const Configuration& configuration,
+               const Smoother<MonitoredSample>* samples):
+                 Selector(p, configuration, samples), _connected(false){
+    _socket = nn_socket (AF_SP, NN_PAIR);
+    assert(_socket >= 0);
+}
+
+SelectorManualWeb::~SelectorManualWeb(){;}
+
+KnobsValues SelectorManualWeb::getNextKnobsValues(){
+    if(!_connected){
+        if(nn_connect(_socket, "ws://0.0.0.0:3001") >= 0){
+            _connected = true;
+        }
+    }
+
+    if(_connected){
+        char *buf = NULL;
+        KnobsValues kv = _configuration.getRealValues();
+        bool stop = false;
+        do{
+            // We need to execute in a loop since the interface
+            // may have sent multiple messages and we are interested
+            // only in the last one (the most recent one).
+            if(nn_recv(_socket, &buf, NN_MSG, NN_DONTWAIT) < 0){
+                if(errno == EAGAIN){
+                    stop = true;
+                }else{
+                    throw std::runtime_error("nn_recv failed.");
+                }
+            }else{
+                std::stringstream ss(buf);
+                ss >> kv;
+                nn_freemsg(buf);
+            }
+        }while(!stop);
+        return kv;
+    }else{
+        return _configuration.getRealValues();
     }
 }
 

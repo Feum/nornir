@@ -362,7 +362,9 @@ void Manager::lockKnobs() const{
 }
 
 Selector* Manager::createSelector() const{
-    if(!_p.requirements.anySpecified() && _p.strategySelection != STRATEGY_SELECTION_MANUAL){
+    if(!_p.requirements.anySpecified() && 
+        _p.strategySelection != STRATEGY_SELECTION_MANUAL_CLI &&
+        _p.strategySelection != STRATEGY_SELECTION_MANUAL_WEB){
         // We use fixed selector if there were no requirements specified and
         // if the selection strategy is different from manual (indeed, for
         // manual selection there is no need to specify requirements since
@@ -370,8 +372,11 @@ Selector* Manager::createSelector() const{
         return new SelectorFixed(_p, *_configuration, _samples);
     }else{
         switch(_p.strategySelection){
-            case STRATEGY_SELECTION_MANUAL:{
-                return new SelectorManual(_p, *_configuration, _samples);
+            case STRATEGY_SELECTION_MANUAL_CLI:{
+                return new SelectorManualCli(_p, *_configuration, _samples);
+            }break;
+            case STRATEGY_SELECTION_MANUAL_WEB:{
+                return new SelectorManualWeb(_p, *_configuration, _samples);
             }break;
             case STRATEGY_SELECTION_ANALYTICAL:{
                 return new SelectorAnalytical(_p, *_configuration, _samples);

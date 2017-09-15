@@ -2,7 +2,7 @@
  * selector-external.cpp
  *
  * This tool is needed to manually control the reconfiguration when
- * SELECTOR_MANUAL is chosen as selectors.
+ * STRATEGY_SELECTION_MANUAL_CLI is chosen as selector.
  *
  * Created on: 30/08/2017
  *
