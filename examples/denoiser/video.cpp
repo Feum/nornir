@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
     
     nornir::Parameters ap("parameters.xml");
     if(numframes){
-        ap.expectedTasksNumber = numframes*numfiles;
+        ap.requirements.expectedTasksNumber = numframes*numfiles;
     }
     nornir::ManagerFastFlow<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
 

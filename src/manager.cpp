@@ -582,6 +582,28 @@ MonitoredSample ManagerInstrumented::getSample(){
     if(!_monitor.getSample(sample)){
         _terminated = true;
     }
+    // Knarr may return inconsistent data for latency and
+    // utilization factor when performs sampling.
+    // Check if this is the case.
+    if(sample.loadPercentage == KNARR_VALUE_INCONSISTENT){
+        sample.loadPercentage = NORNIR_VALUE_INCONSISTENT;
+        if(_p.requirements.minUtilization != NORNIR_REQUIREMENT_UNDEF ||
+           _p.requirements.maxUtilization != NORNIR_REQUIREMENT_UNDEF){
+            throw std::runtime_error("You specified requirements on loadPercentage but instrumenter is "
+                                     "providing inconsistent loadPercentage values. Please call "
+                                     "setConfiguration with samplingLengthMs = 0 on nornir's Instrumenter "
+                                     "to fix this issue.");
+        }
+    }
+    if(sample.latency == KNARR_VALUE_INCONSISTENT){
+        sample.latency = NORNIR_VALUE_INCONSISTENT;
+        if(_p.requirements.latency != NORNIR_REQUIREMENT_UNDEF){
+            throw std::runtime_error("You specified requirements on latency but instrumenter is "
+                                     "providing inconsistent latency values. Please call "
+                                     "setConfiguration with samplingLengthMs = 0 on nornir's Instrumenter "
+                                     "to fix this issue.");
+        }
+    }
     return sample;
 }
 

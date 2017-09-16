@@ -64,9 +64,8 @@ class InstrumenterHelper: public knarr::Application, mammut::utils::NonCopyable{
 public:
     InstrumenterHelper(std::pair<nn::socket*, uint> p,
                        size_t numThreads = 1,
-                       bool quickReply = true,
                        knarr::Aggregator* aggregator = NULL):
-        knarr::Application(*p.first, p.second, numThreads, quickReply, aggregator){;}
+        knarr::Application(*p.first, p.second, numThreads, aggregator){;}
 };
 
 /**
@@ -83,7 +82,6 @@ public:
      */
     explicit Instrumenter(const std::string& parametersFile,
                           size_t numThreads = 1,
-                          bool quickReply = true,
                           knarr::Aggregator* aggregator = NULL);
 };
 

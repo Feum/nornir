@@ -247,7 +247,7 @@ int main(int argc, char ** argv) {
 	    farm.add_collector(&C);
 
     nornir::Parameters ap("parameters.xml");
-    ap.expectedTasksNumber = dim;
+    ap.requirements.expectedTasksNumber = dim;
     nornir::ManagerFastFlow<> amf(&farm, ap);
     amf.start();
     std::cout << "amf started" << std::endl;

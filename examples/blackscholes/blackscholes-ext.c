@@ -561,7 +561,7 @@ int main (int argc, char **argv)
 #else //ENABLE_TBB
 #ifdef ENABLE_FF
     nornir::Parameters ap("parameters.xml");
-    ap.expectedTasksNumber = numOptions * NUM_RUNS / CHUNKSIZE;
+    ap.requirements.expectedTasksNumber = numOptions * NUM_RUNS / CHUNKSIZE;
     nornir::Farm<fftask_t> farm(&ap);
     farm.start<Emitter, Worker>(nThreads);
     std::cout << "Farm started" << std::endl;
