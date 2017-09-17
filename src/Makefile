@@ -23,6 +23,7 @@ lib: $(TARGET)
 	ar -M < buildlib.ar
 install:
 	mkdir -p $(NORNIR_PATH_INCLUDE)
+	mkdir -p $(NORNIR_PATH_LIB)
 	find . -name '*.h' -exec cp --parents \{\} $(NORNIR_PATH_INCLUDE) \;
 	find . -name '*.hpp' -exec cp --parents \{\} $(NORNIR_PATH_INCLUDE) \;
 	find . -name '*.tpp' -exec cp --parents \{\} $(NORNIR_PATH_INCLUDE) \;

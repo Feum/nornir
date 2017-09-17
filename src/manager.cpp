@@ -195,7 +195,7 @@ void Manager::run(){
         }
     }
 
-    terminationManagement();
+    terminationManagement(); // e.g. to collect final tasks count from knarr
     ulong duration = getExecutionTime();
 
     for(auto logger : _p.loggers){
@@ -504,8 +504,13 @@ void Manager::act(KnobsValues kv, bool force){
             usleep(_p.cooldownPeriod * 1000);
         }
 
-        if(!_toSimulate){
-            MonitoredSample sample = getSample();
+        // We need to explicitely check that is not terminated.
+        // Indeed, termination may have been detected by observe(),
+        // but since we exit the control loop only after the act(),
+        // at this point we may be still in the control loop 
+        // with _terminated = true.
+        if(!_toSimulate && !_terminated){
+            MonitoredSample sample = clearStoredSample();
             updateTasksCount(sample);
             _lastStoredSampleMs = getMillisecondsTime();
             Joules joules = getAndResetJoules();
@@ -577,9 +582,9 @@ void ManagerInstrumented::waitForStart(){
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
 }
 
-MonitoredSample ManagerInstrumented::getSample(){
+MonitoredSample ManagerInstrumented::getSample(bool fromAll){
     MonitoredSample sample;
-    if(!_monitor.getSample(sample)){
+    if(!_monitor.getSample(sample, fromAll)){
         _terminated = true;
     }
     // Knarr may return inconsistent data for latency and
@@ -604,11 +609,34 @@ MonitoredSample ManagerInstrumented::getSample(){
                                      "to fix this issue.");
         }
     }
+    // If we were not able to collect sample data (e.g. because no tasks have
+    // been received during the last sampling period), then we set
+    // the latency the same as the last one.
+    if(sample.latency == KNARR_VALUE_NOT_AVAILABLE){
+        sample.latency = _samples->getLastSample().latency;
+    }
     return sample;
+}
+
+MonitoredSample ManagerInstrumented::getSample(){
+    return getSample(false);
+}
+
+MonitoredSample ManagerInstrumented::clearStoredSample(){
+    return getSample(true);
 }
 
 ulong ManagerInstrumented::getExecutionTime(){
     return _monitor.getExecutionTime();
+}
+
+void ManagerInstrumented::terminationManagement(){
+    // We need to overwrite the tasks count because
+    // due to sampling, the last batch of tasks may still
+    // not have been communicated to the manager.
+    // By doing so, we are sure that _totalTasks
+    // represents the total amount of processed tasks.
+    _totalTasks = _monitor.getTotalTasks();
 }
 
 void ManagerInstrumented::shrinkPause(){

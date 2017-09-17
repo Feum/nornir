@@ -178,6 +178,12 @@ protected:
     virtual MonitoredSample getSample() = 0;
 
     /**
+     * Clears the currently stored sample and returns it.
+     * @return The current sample.
+     **/
+    virtual MonitoredSample clearStoredSample(){return getSample();}
+
+    /**
      * Returns the execution time of the application (milliseconds).
      * - For ManagerFastflow, it will be the execution time of the pattern.
      * - For ManagerInstrumented, it will be the execution time between
@@ -312,6 +318,7 @@ private:
     knarr::Monitor _monitor;
     void shrinkPause();
     void stretchPause();
+    MonitoredSample getSample(bool fromAll);
 public:
     /**
      * Creates an adaptivity manager for an instrumented application.
@@ -340,7 +347,9 @@ public:
 protected:
     void waitForStart();
     MonitoredSample getSample();
+    MonitoredSample clearStoredSample();
     ulong getExecutionTime();
+    void terminationManagement();
 };
 
 /**

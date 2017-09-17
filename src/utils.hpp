@@ -52,7 +52,7 @@
 #define MSECS_IN_SECS 1000.0 // Milliseconds in 1 second
 #define NSECS_IN_SECS 1000000000.0 // Nanoseconds in 1 second
 #define MAX_RHO 96
-#define NORNIR_VALUE_INCONSISTENT (std::numeric_limits<double>::min() + 1)
+#define NORNIR_VALUE_INCONSISTENT -1.0
 
 #define XDG_CONFIG_DIR_FALLBACK "/etc/xdg"
 
