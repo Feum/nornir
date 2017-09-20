@@ -498,11 +498,6 @@ void Manager::act(KnobsValues kv, bool force){
         _samples->reset();
         _variations->reset();
         DEBUG("Resetting sample.");
-        // Don't store this sample since it may be inbetween 2
-        // different configurations.
-        if(_p.cooldownPeriod){
-            usleep(_p.cooldownPeriod * 1000);
-        }
 
         // We need to explicitely check that is not terminated.
         // Indeed, termination may have been detected by observe(),
@@ -510,6 +505,11 @@ void Manager::act(KnobsValues kv, bool force){
         // at this point we may be still in the control loop 
         // with _terminated = true.
         if(!_toSimulate && !_terminated){
+            if(_p.cooldownPeriod){
+                usleep(_p.cooldownPeriod * 1000);
+            }
+            // Don't store this sample since it may be inbetween 2
+            // different configurations.
             MonitoredSample sample = clearStoredSample();
             updateTasksCount(sample);
             _lastStoredSampleMs = getMillisecondsTime();
