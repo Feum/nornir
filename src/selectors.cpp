@@ -965,14 +965,24 @@ KnobsValues SelectorLearner::getNextKnobsValues(){
 }
 
 bool SelectorLearner::phaseChanged() const{
-    if(!_configuration.equal(_previousConfiguration)){
-        // We need to check that this configuration is equal to the previous one
-        // to avoid to detect as a phase change a configuration change.
-        return false;
+    switch(_p.strategyPhaseDetection){
+        case STRATEGY_PHASE_DETECTION_NONE:{
+            return false;
+        }break;
+        case STRATEGY_PHASE_DETECTION_TRIVIAL:{
+            if(!_configuration.equal(_previousConfiguration)){
+                // We need to check that this configuration is equal to the previous one
+                // to avoid to detect as a phase change a configuration change.
+                return false;
+            }
+            // For multi applications scenario we ignore power consumption variation.
+            return _samples->coefficientVariation().latency > 20.0 ||
+                   (!_calibrationCoordination && _samples->coefficientVariation().watts > 20.0);
+        }break;
+        default:{
+            return false;
+        }break;
     }
-    // For multi applications scenario we ignore power consumption variation.
-    return _samples->coefficientVariation().latency > 20.0 ||
-           (!_calibrationCoordination && _samples->coefficientVariation().watts > 20.0);
 }
 
 void SelectorLearner::updateModelsInterference(){

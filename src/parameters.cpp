@@ -228,6 +228,7 @@ void Parameters::setDefault(){
     strategySmoothing = STRATEGY_SMOOTHING_EXPONENTIAL;
     strategyPolling = STRATEGY_POLLING_SLEEP_SMALL;
     strategyPersistence = STRATEGY_PERSISTENCE_SAMPLES;
+    strategyPhaseDetection = STRATEGY_PHASE_DETECTION_NONE;
     knobCoresEnabled = true;
     knobMappingEnabled = true;
     knobFrequencyEnabled = true;
@@ -746,6 +747,11 @@ template<> char const* enumStrings<StrategyPersistence>::data[] = {
     "VARIATION"
 };
 
+template<> char const* enumStrings<StrategyPhaseDetection>::data[] = {
+    "NONE",
+    "TRIVIAL"
+};
+
 void Parameters::loadXml(const string& paramFileName){
     XmlTree xt(paramFileName, "nornirParameters");
 
@@ -765,6 +771,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Enum, strategySmoothing);
     SETVALUE(xt, Enum, strategyPolling);
     SETVALUE(xt, Enum, strategyPersistence);
+    SETVALUE(xt, Enum, strategyPhaseDetection);
     SETVALUE(xt, Enum, triggerQBlocking);
     SETVALUE(xt, Bool, knobCoresEnabled);
     SETVALUE(xt, Bool, knobMappingEnabled);

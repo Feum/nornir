@@ -236,6 +236,12 @@ typedef enum{
     STRATEGY_PERSISTENCE_VARIATION
 }StrategyPersistence;
 
+// Phase detection algorithm.
+typedef enum{
+    STRATEGY_PHASE_DETECTION_NONE = 0,
+    STRATEGY_PHASE_DETECTION_TRIVIAL
+}StrategyPhaseDetection;
+
 /// Possible parameters validation results.
 typedef enum{
     // Parameters are ok.
@@ -726,6 +732,9 @@ public:
 
     // Persistence strategy [default = STRATEGY_PERSISTENCE_SAMPLES].
     StrategyPersistence strategyPersistence;
+
+    // Phase detection strategy [default = STRATEGY_PHASE_DETECTION_NONE].
+    StrategyPhaseDetection strategyPhaseDetection;
 
     // Flag to enable/disable cores knobs [default = true].
     bool knobCoresEnabled;
