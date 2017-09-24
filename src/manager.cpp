@@ -135,6 +135,9 @@ void Manager::run(){
     }
 
     waitForStart();
+    for(auto logger : _p.loggers){
+        logger->setStartTimestamp();
+    }
     DEBUG("Application started.");
 
     /** Wait for the disinhibition from global manager. **/
@@ -444,7 +447,7 @@ void Manager::observe(){
         double now = getMillisecondsTime();
         joules = getAndResetJoules();
         for(auto logger : _p.loggers){
-            logger->addJoules(joules);
+            logger->addJoules(joules, now);
         }
 
         double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
@@ -515,7 +518,7 @@ void Manager::act(KnobsValues kv, bool force){
             _lastStoredSampleMs = getMillisecondsTime();
             Joules joules = getAndResetJoules();
             for(auto logger : _p.loggers){
-                logger->addJoules(joules);
+                logger->addJoules(joules, _lastStoredSampleMs);
             }
         }
         _configuration->trigger();
@@ -535,7 +538,7 @@ Joules Manager::getAndResetJoules(){
 
 void Manager::logObservation(){
     for(auto logger : _p.loggers){
-        logger->log(*_configuration, *_samples);
+        logger->log(*_configuration, *_samples, _p.requirements);
     }
 }
 

@@ -79,7 +79,7 @@ public:
     /**
      * Creates a client for interaction with a local server. The suggestion
      * is to create as soon as possible (i.e. before the beginning of critical
-     * parts of applcation) such that in the meanwhile a connection
+     * parts of application) such that in the meanwhile a connection
      * with the manager can be established.
      * @param parameters The file containing the Nornir parameters.
      */

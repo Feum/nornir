@@ -46,10 +46,14 @@ using namespace mammut::energy;
 using namespace mammut::topology;
 
 Logger::Logger(unsigned int timeOffset):
-    _timeOffset(timeOffset), _startMonitoring(0), _totalJoules(0){;}
+    _timeOffset(timeOffset), _startMonitoring(0), _totalJoules(0), _lastTotalJoules(0),
+    _joulesTimestamp(0), _lastJoulesTimestamp(0){;}
 
-void Logger::addJoules(Joules j){
+void Logger::addJoules(Joules j, double timestamp){
+    _lastTotalJoules = _totalJoules;
+    _lastJoulesTimestamp = _joulesTimestamp;
     _totalJoules += j;
+    _joulesTimestamp = timestamp;
 }
 
 unsigned int Logger::getAbsoluteTimestamp(){
@@ -63,6 +67,10 @@ unsigned int Logger::getRelativeTimestamp(){
     }
 
     return absolute - _startMonitoring + _timeOffset;
+}
+
+void Logger::setStartTimestamp(){
+    _startMonitoring = getAbsoluteTimestamp();
 }
 
 LoggerStream::LoggerStream(std::ostream *statsStream,
@@ -116,7 +124,9 @@ LoggerStream::LoggerStream(std::ostream *statsStream,
     *_summaryStream << endl;
 }
 
-void LoggerStream::log(const Configuration& configuration, const Smoother<MonitoredSample>& samples){
+void LoggerStream::log(const Configuration& configuration, 
+                       const Smoother<MonitoredSample>& samples,
+                       const Requirements& requirements){
     const vector<VirtualCore*>& virtualCores = dynamic_cast<const KnobMapping*>(configuration.getKnob(KNOB_MAPPING))->getActiveVirtualCores();
     MonitoredSample ms = samples.average();
     *_statsStream << getRelativeTimestamp() << "\t";
@@ -172,7 +182,11 @@ void LoggerStream::logSummary(const Configuration& configuration, Selector* sele
         durationMs += 0.001; // Just to avoid division by 0
     }
 
-    *_summaryStream << (_totalJoules - totalCalibration.joules) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
+    // We consider _lastTotalJoules instead
+    // of _totalJoules since _totalJoules includes also joules
+    // collected after application termination.
+    double joulesDuration = (_lastJoulesTimestamp - _startMonitoring);
+    *_summaryStream << (_lastTotalJoules - totalCalibration.joules) / (double) ((joulesDuration - totalCalibration.duration) / 1000.0) << "\t";
     *_summaryStream << (totalTasks - totalCalibration.numTasks) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
     *_summaryStream << (double) durationMs / 1000.0 << "\t";
     *_summaryStream << totalCalibration.numSteps << "\t";
@@ -211,7 +225,8 @@ LoggerGraphite::~LoggerGraphite(){
 }
 
 void LoggerGraphite::log(const Configuration& configuration,
-                       const Smoother<MonitoredSample>& samples){
+                         const Smoother<MonitoredSample>& samples,
+                         const Requirements& requirements){
     unsigned int timestamp = time(NULL);
 
 
@@ -229,7 +244,7 @@ void LoggerGraphite::log(const Configuration& configuration,
     graphite_send_plain("nornir.resources.frequency", configuration.getRealValue(KNOB_FREQUENCY), timestamp);
 
     /*************************************************/
-    /*                Monitor info                  */
+    /*                Monitor info                   */
     /*************************************************/
     graphite_send_plain("nornir.monitor.bandwidth.current", samples.getLastSample().bandwidth, timestamp);
     graphite_send_plain("nornir.monitor.bandwidth.average", samples.average().bandwidth, timestamp);
@@ -239,6 +254,19 @@ void LoggerGraphite::log(const Configuration& configuration,
     graphite_send_plain("nornir.monitor.latency.average", samples.average().latency, timestamp);
     graphite_send_plain("nornir.monitor.utilization.current", samples.getLastSample().loadPercentage, timestamp);
     graphite_send_plain("nornir.monitor.utilization.average", samples.average().loadPercentage, timestamp);
+
+    /*************************************************/
+    /*              Requirements info                */
+    /*************************************************/
+    if(requirements.bandwidth != NORNIR_REQUIREMENT_MAX &&
+       requirements.bandwidth != NORNIR_REQUIREMENT_UNDEF){
+        graphite_send_plain("nornir.requirements.bandwidth", requirements.bandwidth, timestamp);
+    }
+
+    if(requirements.powerConsumption != NORNIR_REQUIREMENT_MIN &&
+       requirements.powerConsumption != NORNIR_REQUIREMENT_UNDEF){
+        graphite_send_plain("nornir.requirements.power", requirements.powerConsumption, timestamp);
+    }
 }
 
 }

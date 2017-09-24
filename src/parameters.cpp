@@ -238,7 +238,7 @@ void Parameters::setDefault(){
     migrateCollector = false;
     smoothingFactor = 0;
     persistenceValue = 0;
-    cooldownPeriod = 100;
+    cooldownPeriod = 200;
     samplingIntervalCalibration = 100;
     samplingIntervalSteady = 1000;
     steadyThreshold = 4;
@@ -329,7 +329,7 @@ void Parameters::setDefaultPost(){
                 smoothingFactor = 10;
             }break;
             case STRATEGY_SMOOTHING_EXPONENTIAL:{
-                smoothingFactor = 0.1;
+                smoothingFactor = 0.5;
             }break;
         }
     }

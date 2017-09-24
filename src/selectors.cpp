@@ -1043,7 +1043,6 @@ KnobsValues SelectorFixedExploration::getNextKnobsValues(){
             startCalibration();
         }else{
             refine();
-
         }
         KnobsValues r = _confToExplore.back();
         _confToExplore.pop_back();

@@ -766,7 +766,7 @@ public:
 
     // The smoothing factor. It's meaning changes according to the smoothing
     // strategy adopted. If 0, default value will be set.
-    // [default = 10 for moving average, 0.1 for exponential].
+    // [default = 10 for moving average, 0.5 for exponential].
     double smoothingFactor;
 
     // The persistence value. It's meaning changes according to the persistence
@@ -776,7 +776,7 @@ public:
 
     // The number of milliseconds required for the system to cooldown
     // after a reconfiguration. Since this is a transient state, the statistics
-    // collected in the cooldownPeriod will be discarded [default = 100].
+    // collected in the cooldownPeriod will be discarded [default = 200].
     double cooldownPeriod;
 
     // The length of the sampling interval (in milliseconds) for the data

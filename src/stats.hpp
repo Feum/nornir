@@ -153,26 +153,27 @@ class Selector;
  */
 class Logger{
     friend class Manager;
-
-    template <typename T, typename V>
-    friend class ManagerFastFlow;
+    template <typename T, typename V> friend class ManagerFastFlow;
 private:
     unsigned int _timeOffset;
-    unsigned int _startMonitoring;
 
-    void addJoules(mammut::energy::Joules j);
+    void addJoules(mammut::energy::Joules j, double timestamp);
 protected:
-    mammut::energy::Joules _totalJoules;
+    unsigned int _startMonitoring;
+    mammut::energy::Joules _totalJoules, _lastTotalJoules;
+    double _joulesTimestamp, _lastJoulesTimestamp;
+    
     unsigned int getRelativeTimestamp();
     unsigned int getAbsoluteTimestamp();
 public:
     explicit Logger(unsigned int timeOffset = 0);
     virtual ~Logger(){;}
+    void setStartTimestamp();
     virtual void log(const Configuration& configuration,
-                     const Smoother<MonitoredSample>& samples) = 0;
+                     const Smoother<MonitoredSample>& samples,
+                     const Requirements& requirements) = 0;
     virtual void logSummary(const Configuration& configuration,
-                            Selector* selector,
-                            ulong duration, double totalTasks) = 0;
+                            Selector* selector, ulong duration, double totalTasks) = 0;
 };
 
 /**
@@ -192,7 +193,8 @@ public:
                  unsigned int timeOffset = 0);
 
     void log(const Configuration& configuration,
-             const Smoother<MonitoredSample>& samples);
+             const Smoother<MonitoredSample>& samples,
+             const Requirements& requirements);
     void logSummary(const Configuration& configuration,
                     Selector* selector, ulong durationMs, double totalTasks);
 };
@@ -263,7 +265,8 @@ public:
     ~LoggerGraphite();
 
     void log(const Configuration& configuration,
-             const Smoother<MonitoredSample>& samples);
+             const Smoother<MonitoredSample>& samples,
+             const Requirements& requirements);
 
     // Doesn't log anything.
     void logSummary(const Configuration& configuration, Selector* selector,

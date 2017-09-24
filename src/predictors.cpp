@@ -668,6 +668,13 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
         bandwidth = (numCores / result);
     }
 
+    // If we are trying to predict the bandwidth with the
+    // maximum number of cores, as value for bandwidth at minimum frequency
+    // use the value we stored instead of the predicted one.
+    if(numCores == _configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().size()){
+        bandwidth = _minFreqBw;
+    }
+
     if(frequency != _minFrequency){
         double minMaxScaling = _maxFreqBw / _minFreqBw;
         double maxFreqPred = bandwidth * minMaxScaling;
