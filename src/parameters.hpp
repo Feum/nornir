@@ -776,7 +776,7 @@ public:
 
     // The number of milliseconds required for the system to cooldown
     // after a reconfiguration. Since this is a transient state, the statistics
-    // collected in the cooldownPeriod will be discarded [default = 200].
+    // collected in the cooldownPeriod will be discarded [default = 100].
     double cooldownPeriod;
 
     // The length of the sampling interval (in milliseconds) for the data

@@ -543,9 +543,12 @@ KnobsValues SelectorPredictive::getBestKnobsValues(){
         double powerPrediction = getPowerPrediction(currentValues);
         double utilizationPrediction = _bandwidthIn->average() /
                                        bandwidthPrediction * 100.0;
-        assert(bandwidthPrediction >= 0);
-        assert(powerPrediction > 0);
-        assert(utilizationPrediction >= 0);
+        // Skip negative predictions
+        if(bandwidthPrediction < 0 ||
+           powerPrediction < 0 ||
+           utilizationPrediction < 0){
+            continue;
+        }
 
         updateMaxPerformanceConfiguration(currentValues, bandwidthPrediction);
 #if STORE_PREDICTIONS
@@ -892,9 +895,9 @@ KnobsValues SelectorLearner::getNextKnobsValues(){
     }
 
     if(isCalibrating()){
-        ++_numCalibrationPoints;
         if(!predictorsReady()){
             kv = _explorer->nextRelativeKnobsValues();
+            ++_numCalibrationPoints;
         }else{
             if(predictionsDone() && accurate){
                 kv = getBestKnobsValues();
@@ -902,9 +905,13 @@ KnobsValues SelectorLearner::getNextKnobsValues(){
                 DEBUG("Finished in " << _numCalibrationPoints <<
                       " steps with configuration " << kv);
                 stopCalibration();
+                // In this case I do not update _numCalibrationPoints
+                // since the next one will be (hopefully) the definitive
+                // configuration.
             }else{
                 kv = _explorer->nextRelativeKnobsValues();
                 updatePredictions(kv);
+                ++_numCalibrationPoints;
             }
         }
     }else{
@@ -920,6 +927,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(){
             clearPredictors();
 
             startCalibration();
+            ++_numCalibrationPoints;
             resetTotalCalibrationTime();
             _accuracyViolations = 0;
             _contractViolations = 0;
@@ -947,6 +955,7 @@ KnobsValues SelectorLearner::getNextKnobsValues(){
             refine();
             ++_totalCalPoints;
             startCalibration();
+            ++_numCalibrationPoints;
             _accuracyViolations = 0;
             _contractViolations = 0;
             if(!accurate){

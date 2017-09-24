@@ -238,7 +238,7 @@ void Parameters::setDefault(){
     migrateCollector = false;
     smoothingFactor = 0;
     persistenceValue = 0;
-    cooldownPeriod = 200;
+    cooldownPeriod = 100;
     samplingIntervalCalibration = 100;
     samplingIntervalSteady = 1000;
     steadyThreshold = 4;
