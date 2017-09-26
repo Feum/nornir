@@ -526,8 +526,8 @@ ParametersValidation Parameters::validateRequirements(){
 
     // TODO: Remove Utilization requirements (can be obtained through
     // bandwidth + tolerance/conservative
-    // At most 1 min/max requirement can be specified.
-    if(maxMinRequirements > 1){
+    // Exactly 1 min/max requirement can be specified.
+    if(maxMinRequirements != 1){
         return VALIDATION_WRONG_REQUIREMENT;
     }
 

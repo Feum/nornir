@@ -11,4 +11,6 @@
 	<bandwidth>25</bandwidth>
 	<powerConsumption>MIN</powerConsumption>
 </requirements>
+<strategyPhaseDetection>TRIVIAL</strategyPhaseDetection>
+<smoothingFactor>0.1</smoothingFactor>
 </nornirParameters>

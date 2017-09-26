@@ -220,7 +220,7 @@ void Selector::updateTotalTasks(u_int64_t totalTasks){
 
 void Selector::updateBandwidthIn(){
     if(_samples->average().loadPercentage < MAX_RHO && 
-       _samples->average().loadPercentage != NORNIR_VALUE_INCONSISTENT){
+       _samples->average().loadPercentage != KNARR_VALUE_INCONSISTENT){
         if(_bandwidthIn->average() == numeric_limits<double>::max()){
             _bandwidthIn->reset();
         }
@@ -430,6 +430,8 @@ bool SelectorPredictive::isBestMinMax(double bandwidth, double latency, double u
         if(bandwidth > best){
             best = bandwidth;
             return true;
+        }else{
+            return false;
         }
     }
 
@@ -440,6 +442,8 @@ bool SelectorPredictive::isBestMinMax(double bandwidth, double latency, double u
         if(latency < best){
             best = latency;
             return true;
+        }else{
+            return false;
         }
         */
     }
@@ -449,6 +453,8 @@ bool SelectorPredictive::isBestMinMax(double bandwidth, double latency, double u
         if(utilization > best){
             best = utilization;
             return true;
+        }else{
+            return false;
         }
     }
 
@@ -457,10 +463,13 @@ bool SelectorPredictive::isBestMinMax(double bandwidth, double latency, double u
         if(power < best){
             best = power;
             return true;
+        }else{
+            return false;
         }
     }
 
-    return false;
+    // If no MIN/MAX requirements, return true.
+    return true;
 }
 
 bool SelectorPredictive::isBestSuboptimal(double bandwidth, double latency,

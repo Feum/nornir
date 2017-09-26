@@ -51,8 +51,7 @@
 
 #define MSECS_IN_SECS 1000.0 // Milliseconds in 1 second
 #define NSECS_IN_SECS 1000000000.0 // Nanoseconds in 1 second
-#define MAX_RHO 96
-#define NORNIR_VALUE_INCONSISTENT -1.0
+#define MAX_RHO 0.0001 //96 //TODO Fix.
 
 #define XDG_CONFIG_DIR_FALLBACK "/etc/xdg"
 
@@ -128,7 +127,7 @@ typedef struct MonitoredSample: public knarr::ApplicationSample{
 
     double getMaximumBandwidth(){
         if(loadPercentage < MAX_RHO &&
-           loadPercentage != NORNIR_VALUE_INCONSISTENT){
+           loadPercentage != KNARR_VALUE_INCONSISTENT){
             return bandwidth / (loadPercentage / 100.0);
         }else{
             return bandwidth;
@@ -244,16 +243,16 @@ inline std::istream& operator>>(std::istream& is, MonitoredSample& sample){
 
 inline MonitoredSample squareRoot(const MonitoredSample& x){
     MonitoredSample r;
-    if(x.loadPercentage != NORNIR_VALUE_INCONSISTENT){
+    if(x.loadPercentage != KNARR_VALUE_INCONSISTENT){
         r.loadPercentage = sqrt(x.loadPercentage);
     }
-    if(x.bandwidth != NORNIR_VALUE_INCONSISTENT){
+    if(x.bandwidth != KNARR_VALUE_INCONSISTENT){
        r.bandwidth = sqrt(x.bandwidth);
     }
-    if(x.latency != NORNIR_VALUE_INCONSISTENT){
+    if(x.latency != KNARR_VALUE_INCONSISTENT){
         r.latency = sqrt(x.latency);
     }
-    if(x.numTasks != NORNIR_VALUE_INCONSISTENT){
+    if(x.numTasks != KNARR_VALUE_INCONSISTENT){
         r.numTasks = sqrt(x.numTasks);
     }
     for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
@@ -275,16 +274,16 @@ inline void zero(MonitoredSample& x){
 }
 
 inline void regularize(MonitoredSample& x){
-    if(x.loadPercentage < 0 && x.loadPercentage != NORNIR_VALUE_INCONSISTENT){
+    if(x.loadPercentage < 0 && x.loadPercentage != KNARR_VALUE_INCONSISTENT){
         x.loadPercentage = 0;
     }
-    if(x.bandwidth < 0 && x.bandwidth != NORNIR_VALUE_INCONSISTENT){
+    if(x.bandwidth < 0 && x.bandwidth != KNARR_VALUE_INCONSISTENT){
         x.bandwidth = 0;
     }
-    if(x.latency < 0 && x.latency != NORNIR_VALUE_INCONSISTENT){
+    if(x.latency < 0 && x.latency != KNARR_VALUE_INCONSISTENT){
         x.latency = 0;
     }
-    if(x.numTasks < 0 && x.numTasks != NORNIR_VALUE_INCONSISTENT){
+    if(x.numTasks < 0 && x.numTasks != KNARR_VALUE_INCONSISTENT){
         x.numTasks = 0;
     }
     for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
@@ -300,25 +299,25 @@ inline void regularize(MonitoredSample& x){
 inline MonitoredSample minimum(const MonitoredSample& a,
                                const MonitoredSample& b){
     MonitoredSample ms;
-    if(a.loadPercentage != NORNIR_VALUE_INCONSISTENT && b.loadPercentage != NORNIR_VALUE_INCONSISTENT){
+    if(a.loadPercentage != KNARR_VALUE_INCONSISTENT && b.loadPercentage != KNARR_VALUE_INCONSISTENT){
         ms.loadPercentage = std::min(a.loadPercentage, b.loadPercentage);
     }else{
-        ms.loadPercentage = NORNIR_VALUE_INCONSISTENT;
+        ms.loadPercentage = KNARR_VALUE_INCONSISTENT;
     }
-    if(a.bandwidth != NORNIR_VALUE_INCONSISTENT && b.bandwidth != NORNIR_VALUE_INCONSISTENT){
+    if(a.bandwidth != KNARR_VALUE_INCONSISTENT && b.bandwidth != KNARR_VALUE_INCONSISTENT){
         ms.bandwidth = std::min(a.bandwidth, b.bandwidth);
     }else{
-        ms.bandwidth = NORNIR_VALUE_INCONSISTENT;
+        ms.bandwidth = KNARR_VALUE_INCONSISTENT;
     }
-    if(a.latency != NORNIR_VALUE_INCONSISTENT && b.latency != NORNIR_VALUE_INCONSISTENT){
+    if(a.latency != KNARR_VALUE_INCONSISTENT && b.latency != KNARR_VALUE_INCONSISTENT){
         ms.latency = std::min(a.latency, b.latency);
     }else{
-        ms.latency = NORNIR_VALUE_INCONSISTENT;
+        ms.latency = KNARR_VALUE_INCONSISTENT;
     }
-    if(a.numTasks != NORNIR_VALUE_INCONSISTENT && b.numTasks != NORNIR_VALUE_INCONSISTENT){
+    if(a.numTasks != KNARR_VALUE_INCONSISTENT && b.numTasks != KNARR_VALUE_INCONSISTENT){
         ms.numTasks = std::min(a.numTasks, b.numTasks);
     }else{
-        ms.numTasks = NORNIR_VALUE_INCONSISTENT;
+        ms.numTasks = KNARR_VALUE_INCONSISTENT;
     }
     for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
         ms.customFields[i] = std::min(a.customFields[i], b.customFields[i]);
@@ -330,25 +329,25 @@ inline MonitoredSample minimum(const MonitoredSample& a,
 inline MonitoredSample maximum(const MonitoredSample& a,
                                const MonitoredSample& b){
     MonitoredSample ms;
-    if(a.loadPercentage != NORNIR_VALUE_INCONSISTENT && b.loadPercentage != NORNIR_VALUE_INCONSISTENT){
+    if(a.loadPercentage != KNARR_VALUE_INCONSISTENT && b.loadPercentage != KNARR_VALUE_INCONSISTENT){
         ms.loadPercentage = std::max(a.loadPercentage, b.loadPercentage);
     }else{
-        ms.loadPercentage = NORNIR_VALUE_INCONSISTENT;
+        ms.loadPercentage = KNARR_VALUE_INCONSISTENT;
     }
-    if(a.bandwidth != NORNIR_VALUE_INCONSISTENT && b.bandwidth != NORNIR_VALUE_INCONSISTENT){
+    if(a.bandwidth != KNARR_VALUE_INCONSISTENT && b.bandwidth != KNARR_VALUE_INCONSISTENT){
         ms.bandwidth = std::max(a.bandwidth, b.bandwidth);
     }else{
-        ms.bandwidth = NORNIR_VALUE_INCONSISTENT;
+        ms.bandwidth = KNARR_VALUE_INCONSISTENT;
     }
-    if(a.latency != NORNIR_VALUE_INCONSISTENT && b.latency != NORNIR_VALUE_INCONSISTENT){
+    if(a.latency != KNARR_VALUE_INCONSISTENT && b.latency != KNARR_VALUE_INCONSISTENT){
         ms.latency = std::max(a.latency, b.latency);
     }else{
-        ms.latency = NORNIR_VALUE_INCONSISTENT;
+        ms.latency = KNARR_VALUE_INCONSISTENT;
     }
-    if(a.numTasks != NORNIR_VALUE_INCONSISTENT && b.numTasks != NORNIR_VALUE_INCONSISTENT){
+    if(a.numTasks != KNARR_VALUE_INCONSISTENT && b.numTasks != KNARR_VALUE_INCONSISTENT){
         ms.numTasks = std::max(a.numTasks, b.numTasks);
     }else{
-        ms.numTasks = NORNIR_VALUE_INCONSISTENT;
+        ms.numTasks = KNARR_VALUE_INCONSISTENT;
     }
     for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
         ms.customFields[i] = std::max(a.customFields[i], b.customFields[i]);

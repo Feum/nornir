@@ -307,7 +307,8 @@ Predictor::~Predictor(){
 }
 
 double Predictor::getMaximumBandwidth() const{
-    if(_samples->average().loadPercentage >= MAX_RHO){
+    if(_samples->average().loadPercentage >= MAX_RHO ||
+       _samples->average().loadPercentage == KNARR_VALUE_INCONSISTENT){
         return _samples->average().bandwidth;
     }else{
         return _samples->average().getMaximumBandwidth();
@@ -584,7 +585,17 @@ void PredictorUsl::refine(){
             _minFreqCoresBw = bandwidth;
         }
     }else if(frequency != _minFrequency){
+#if 1
+        double minMaxScaling = _maxFreqBw / _minFreqBw;
+        // We get the expected bandwidth at minimum frequency starting from the actual
+        // bandwidth at generic frequency. To do so we apply the inverse of the function 
+        // used in predict() to get the bandwidth at a generic frequency starting
+        // from that at minimum frequency.
+        bandwidth = (bandwidth*(_maxFrequency - _minFrequency))/(_maxFrequency - frequency + minMaxScaling*(frequency - _minFrequency));
+        frequency = _minFrequency;
+#else
         return;
+#endif
     }
 
     double x, y;

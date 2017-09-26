@@ -594,7 +594,7 @@ MonitoredSample ManagerInstrumented::getSample(bool fromAll){
     // utilization factor when performs sampling.
     // Check if this is the case.
     if(sample.loadPercentage == KNARR_VALUE_INCONSISTENT){
-        sample.loadPercentage = NORNIR_VALUE_INCONSISTENT;
+        sample.loadPercentage = KNARR_VALUE_INCONSISTENT;
         if(_p.requirements.minUtilization != NORNIR_REQUIREMENT_UNDEF ||
            _p.requirements.maxUtilization != NORNIR_REQUIREMENT_UNDEF){
             throw std::runtime_error("You specified requirements on loadPercentage but instrumenter is "
@@ -604,7 +604,7 @@ MonitoredSample ManagerInstrumented::getSample(bool fromAll){
         }
     }
     if(sample.latency == KNARR_VALUE_INCONSISTENT){
-        sample.latency = NORNIR_VALUE_INCONSISTENT;
+        sample.latency = KNARR_VALUE_INCONSISTENT;
         if(_p.requirements.latency != NORNIR_REQUIREMENT_UNDEF){
             throw std::runtime_error("You specified requirements on latency but instrumenter is "
                                      "providing inconsistent latency values. Please call "
