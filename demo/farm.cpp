@@ -45,12 +45,14 @@ static int maxTasks;
  * Scheduler.
  */
 class Emitter: public nornir::Scheduler<int>{
+private:
+    int _nextTask;
 public:
+    Emitter():_nextTask(0){;}
     int* schedule() {
-        usleep(MICROSECSSLEEP);
-        int * task = new int(maxTasks);
-        --maxTasks;
-        if (maxTasks < 0){
+        int * task = new int(_nextTask);
+        _nextTask++;
+        if(_nextTask > maxTasks){
             std::cout << "Scheduler finished" << std::endl;
             //cppcheck-suppress memleak
             return NULL;
@@ -66,9 +68,8 @@ public:
 class Worker: public nornir::Worker<int, int>{
 public:
     int * compute(int * task) {
-        usleep(MICROSECSSLEEP);
-        std::cout << "Worker " << getId()
-                  << " received task " << *task << std::endl;
+        usleep((rand()/RAND_MAX)*MICROSECSSLEEP);
+        //std::cout << "Worker " << getId() << " received task " << *task << std::endl;
         return task;
     }
 };
@@ -87,15 +88,25 @@ int main(int argc, char * argv[]) {
     int nworkers = 1;
     int streamlen = 10;
 
-    if (argc>1) {
-        if (argc!=3) {
+    if (argc > 1) {
+        if (argc < 3) {
             std::cerr << "use: " 
                       << argv[0] 
-                      << " nworkers streamlen\n";
+                      << " nworkers streamlen [ondemand] [ordering]\n";
             return -1;
         }   
         nworkers = atoi(argv[1]);
         streamlen = atoi(argv[2]);
+    }
+
+    bool ondemand = false;
+    bool ordering = false;
+    if(argc >= 4){
+        ondemand = atoi(argv[3]);
+    }
+
+    if(argc >= 5){
+        ordering = atoi(argv[4]);
     }
 
     if (!nworkers || !streamlen) {
@@ -106,7 +117,18 @@ int main(int argc, char * argv[]) {
     maxTasks = streamlen;
 
     nornir::Farm<int, int> farm("parameters.xml");
-    farm.start<Emitter, Worker, Collector>(nworkers);
+    farm.addScheduler(new Emitter());
+    for(int i = 0; i < nworkers; i++){
+        farm.addWorker(new Worker());
+    }
+    farm.addGatherer(new Collector());
+    if(ondemand){
+        farm.setOndemandScheduling();
+    }
+    if(ordering){
+        farm.preserveOrdering();
+    }
+    farm.start();
     farm.wait();
 
     return 0;

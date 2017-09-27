@@ -31,32 +31,87 @@
 #include "manager.hpp"
 
 #include <cstddef>
+#include <queue>
 
 namespace nornir{
 
 template <typename I, typename O> class FarmBase;
+
+// For internal use
+class OrderedTask{
+private:
+    std::pair<unsigned long long, void*> _pair;
+public:
+    OrderedTask(unsigned long long id, void* task){
+        _pair = std::pair<unsigned long long, void*>(id, task);
+    }
+
+    unsigned long long getId() const{
+        return _pair.first;
+    }
+
+    void* getTask() const{
+        return _pair.second;
+    }
+
+    void setTask(void* task){
+        _pair.second = task;
+    }
+};
+
+class CompareOTasks{
+public:
+    bool operator()(const OrderedTask& a, const OrderedTask& b){
+        return a.getId() > b.getId();
+    }
+};
 
 /**
  * @class SchedulerBase
  * Common base class for scheduler (e.g. scheduler, accelerator scheduler, etc...).
  */
 template <typename O> class SchedulerBase: public AdaptiveNode{
-    template <typename IN, typename OUT> friend class FarmBase;
+    template <typename T, typename V> friend class FarmBase;
 private:
     ff::ff_loadbalancer* _lb;
+    bool _ondemand;
+    bool _preserveOrdering;
+    unsigned long long _nextTaskId;
 
     void setLb(ff::ff_loadbalancer* lb){
         _lb = lb;
     }
+
+    void setOndemand(){
+        _ondemand = true;
+    }
+
+    void preserveOrdering(){
+        _preserveOrdering = true;
+    }
+protected:
+    void* transformTaskForOrdering(O* task){
+        if(!task){
+            return NULL;
+        }
+        if(_preserveOrdering){
+            OrderedTask* ot = new OrderedTask(_nextTaskId, (void*) task);
+            ++_nextTaskId;
+            return (void*) ot;
+        }else{
+            return (void*) task;
+        }
+    }
 public:
-    SchedulerBase():_lb(NULL){;}
+    SchedulerBase():_lb(NULL), _nextTaskId(0){;}
 
     /**
      * Sends a task to one of the workers.
      * @param task The task to be sent.
      */
     void send(O* task) CX11_KEYWORD(final){
-        while(!ff_send_out((void*) task)){;}
+        void* realTask = transformTaskForOrdering(task);
+        while(!ff_send_out(realTask)){;}
     }
 
     /**
@@ -65,7 +120,8 @@ public:
      * @return true if the task has been sent, false otherwise.
      */
     bool sendNonBlocking(O* task) CX11_KEYWORD(final){
-        return ff_send_out((void*) task);
+        void* realTask = transformTaskForOrdering(task);
+        return ff_send_out(realTask);
     }
 
     /**
@@ -79,7 +135,12 @@ public:
                                          "Please ensure that your application is "
                                          "notified when a rethreading occur.");
         }
-        while(!_lb->ff_send_out_to(task, id)){;}
+        if(_ondemand){
+            throw new std::runtime_error("ERROR: Don't use sendTo call in scheduler if "
+                                        "setOndemandScheduling is called on the farm.");
+        }
+        void* realTask = transformTaskForOrdering(task);
+        while(!_lb->ff_send_out_to(realTask, id)){;}
     }
 
     /**
@@ -94,7 +155,12 @@ public:
                                          "Please ensure that your application is "
                                          "notified when a rethreading occur.");
         }
-        return _lb->ff_send_out_to(task, id);
+        if(_ondemand){
+            throw new std::runtime_error("ERROR: Don't use sendToNonBlocking call in scheduler if "
+                                         "setOndemandScheduling is called on the farm.");
+        }
+        void* realTask = transformTaskForOrdering(task);
+        return _lb->ff_send_out_to(realTask, id);
     }
 
     /**
@@ -102,7 +168,12 @@ public:
      * @param task The task to be sent.
      */
     void broadcast(O* task) CX11_KEYWORD(final){
-        _lb->broadcast_task(task);
+        // We can't rely on FastFlow broadcast
+        // otherwise our ordering implementation
+        // would not work.
+        for(size_t i = 0; i < _lb->getnworkers(); i++){
+            sendTo(task, i);
+        }
     }
 };
 
@@ -113,9 +184,12 @@ public:
  */
 template <typename I, typename O = std::nullptr_t> class Scheduler: public SchedulerBase<O>{
 private:
+    // We force it to be private to avoid misuse by the user.
+    using SchedulerBase<O>::transformTaskForOrdering; 
+
     void* svc(void* task) CX11_KEYWORD(final){
         O* r = schedule((I*)(task));
-        void* outTask = (void*)(r);
+        void* outTask = transformTaskForOrdering(r);
         if(outTask){
            return outTask;
         }else{
@@ -149,9 +223,12 @@ public:
 template <typename O>
 class Scheduler<O, std::nullptr_t>: public SchedulerBase<O>{
 private:
+    // We force it to be private to avoid misuse by the user.
+    using SchedulerBase<O>::transformTaskForOrdering; 
+
     void* svc(void* task) CX11_KEYWORD(final){
         O* r = schedule();
-        void* outTask = (void*)(r);
+        void* outTask = transformTaskForOrdering(r);
         if(outTask){
            return outTask;
         }else{
@@ -166,6 +243,12 @@ public:
 };
 
 
+template <typename I, typename O> class SchedulerDummy: public Scheduler<I, O>{
+public:
+    O* schedule(I* task){
+        return (O*) task;
+    }
+};
 
 //! @cond
 /**
@@ -174,7 +257,25 @@ public:
  */
 template <typename I, typename O>
 class WorkerBase: public AdaptiveNode{
+    template <typename T, typename V> friend class FarmBase;
+protected:
+    bool _ordering;
+
+    I* getComputeInput(void* t){
+        if(_ordering){
+            void* tvoid = reinterpret_cast<OrderedTask*>(t)->getTask();
+            return reinterpret_cast<I*>(tvoid);
+        }else{
+            return reinterpret_cast<I*>(t);
+        }
+    }
+private:
+    void preserveOrdering(){
+        _ordering = true;
+    }
 public:
+    WorkerBase():_ordering(false){;}
+
     virtual ~WorkerBase(){;}
 
     /**
@@ -197,8 +298,19 @@ public:
  */
 template <typename I, typename O = std::nullptr_t> class Worker: public WorkerBase<I, O>{
 private:
+    // We force it to be private to avoid misuse by the user.
+    using WorkerBase<I, O>::getComputeInput;
+    using WorkerBase<I, O>::_ordering;
+
     void* svc(void* t) CX11_KEYWORD(final){
-        return (void*) compute(reinterpret_cast<I*>(t));
+        I* computeInput = getComputeInput(t);
+        void* computeOutput = (void*) compute(computeInput); 
+        if(_ordering){
+            OrderedTask* ot = reinterpret_cast<OrderedTask*>(t);
+            ot->setTask((void*) computeOutput);
+            computeOutput = (void*) ot;
+        }
+        return computeOutput;
     }
 public:
     virtual ~Worker(){;}
@@ -219,8 +331,12 @@ public:
 template <typename I>
 class Worker<I, std::nullptr_t>: public WorkerBase<I, std::nullptr_t>{
 private:
+    // We force it to be private to avoid misuse by the user.
+    using WorkerBase<I, std::nullptr_t>::getComputeInput;
+
     void* svc(void* t) CX11_KEYWORD(final){
-        compute(reinterpret_cast<I*>(t));
+        I* computeInput = getComputeInput(t);
+        compute(computeInput);
         return (void*) GO_ON;
     }
 public:
@@ -243,7 +359,44 @@ public:
  * Common base class for gatherers (e.g. gatherer, accelerator gatherer, etc...).
  */
 template <typename I>
-class GathererBase: public AdaptiveNode{
+class GathererBase: public AdaptiveNode{    
+    template <typename T, typename V> friend class FarmBase;
+private:
+    bool _ordering;
+    unsigned long long _nextTaskId;
+    std::priority_queue<OrderedTask, std::vector<OrderedTask>, CompareOTasks> _priorityQueue;
+
+    void preserveOrdering(){
+        _ordering = true;
+    }
+protected:
+    // Gets the gather inputs.
+    // The vector can contain more than one
+    // element only if ordering is required.
+    void getGatherInputs(void* t, std::vector<I*>& toReturn){
+        if(_ordering){
+            OrderedTask* ot = reinterpret_cast<OrderedTask*>(t);
+            if(ot->getId() == _nextTaskId){
+                // Lucky. This is the correct task.
+                toReturn.push_back(reinterpret_cast<I*>(ot->getTask()));
+                ++_nextTaskId;
+            }else{
+                // Put in queue 
+                _priorityQueue.push(*ot);
+            }
+            while(!_priorityQueue.empty() && _priorityQueue.top().getId() == _nextTaskId){
+                toReturn.push_back(reinterpret_cast<I*>(_priorityQueue.top().getTask()));
+                _priorityQueue.pop();
+                ++_nextTaskId;
+            }
+            delete ot;
+        }else{
+            toReturn.push_back(reinterpret_cast<I*>(t));
+        }
+    }
+public:
+    GathererBase():_ordering(false), _nextTaskId(0){;}
+
     //TODO: Receivefrom?
 };
 //! @endcond
@@ -256,11 +409,19 @@ class GathererBase: public AdaptiveNode{
  */
 template <typename I, typename O = std::nullptr_t> class Gatherer: public GathererBase<I>{
 private:
+    using GathererBase<I>::getGatherInputs;
+
     void* svc(void* t) CX11_KEYWORD(final){
-        O* r = gather(reinterpret_cast<I*>(t));
-        return (void*)(r);
+        std::vector<I*> realTasks;
+        getGatherInputs(t, realTasks);
+        for(I* task : realTasks){
+            this->ff_send_out((void*) task);
+        }
+        return GO_ON;
     }
 public:
+    Gatherer(){;}
+
     virtual ~Gatherer(){;}
 
     /**
@@ -276,8 +437,14 @@ public:
 template <typename I>
 class Gatherer<I, std::nullptr_t>: public GathererBase<I>{
 private:
+    using GathererBase<I>::getGatherInputs;
+    
     void* svc(void* t) CX11_KEYWORD(final){
-        gather(reinterpret_cast<I*>(t));
+        std::vector<I*> realTasks;
+        getGatherInputs(t, realTasks);
+        for(I* task : realTasks){
+            gather(task);
+        }
         return GO_ON;
     }
 public:
@@ -290,6 +457,12 @@ public:
     virtual void gather(I* task) = 0;
 };
 
+template <typename I> class GathererDummy: public Gatherer<I, I>{
+public:
+    I* gather(I* task){
+        return task;
+    }
+};
 
 /**
  * @class FarmBase
@@ -302,12 +475,15 @@ public:
 template <typename I, typename O> class FarmBase: public mammut::utils::NonCopyable{
 protected:
     ff::ff_farm<>* _farm;
-    std::vector<ff::ff_node*> _workers;
+    std::vector<ff::ff_node*> _rawWorkers;
 private:
     bool _nodesCreated;
     const Parameters* _params;
     bool _paramsCreated;
     ManagerFastFlow<>* _manager;
+    SchedulerBase<I>* _scheduler;
+    GathererBase<O>* _gatherer;
+    std::vector<WorkerBase<I, O>* > _workers;
 
     template <class S, class W>
     void init(size_t numWorkers){
@@ -330,6 +506,7 @@ protected:
         if(!_farm){
             createFarm();
         }
+        _scheduler = s;
         _farm->add_emitter(s);
     }
 
@@ -344,7 +521,8 @@ protected:
         if(!_farm){
             createFarm();
         }
-        _workers.push_back(dynamic_cast<ff::ff_node*>(w));
+        _rawWorkers.push_back(dynamic_cast<ff::ff_node*>(w));
+        _workers.push_back(w);
     }
 
     /**
@@ -358,6 +536,7 @@ protected:
         if(!_farm){
             createFarm();
         }
+        _gatherer = g;
         _farm->add_collector(g);
     }
 
@@ -374,7 +553,8 @@ public:
      * @param parameters The configuration parameters.
      */
     explicit FarmBase(const Parameters* parameters):_farm(NULL),
-                                       _params(NULL), _manager(NULL){
+                                       _params(NULL), _manager(NULL), 
+                                       _scheduler(NULL), _gatherer(NULL){
         _nodesCreated = false;
         _params = parameters;
         _paramsCreated = false;
@@ -386,7 +566,8 @@ public:
      *        configuration parameters.
      */
     explicit FarmBase(const std::string& paramFileName):_farm(NULL),
-                                          _params(NULL), _manager(NULL){
+                                          _params(NULL), _manager(NULL), 
+                                          _scheduler(NULL), _gatherer(NULL){
         _nodesCreated = false;
         _params = new Parameters(paramFileName);
         _paramsCreated = true;
@@ -444,7 +625,7 @@ public:
         if(!_farm){
             createFarm();
         }
-        _farm->add_workers(_workers);
+        _farm->add_workers(_rawWorkers);
         if(_farm->getEmitter()){
             (dynamic_cast<SchedulerBase<I>*>(_farm->getEmitter()))->setLb(_farm->getlb());
         }
@@ -464,8 +645,8 @@ public:
             if(_farm->getEmitter()){
                 delete _farm->getEmitter();
             }
-            for(size_t i = 0; i < _workers.size(); i++){
-                delete _workers.at(i);
+            for(size_t i = 0; i < _rawWorkers.size(); i++){
+                delete _rawWorkers.at(i);
             }
             if(_farm->getCollector()){
                 delete _farm->getCollector();
@@ -485,6 +666,43 @@ public:
 
     void stats(std::ostream& o) const{
         _farm->ffStats(o);
+    }
+
+    /**
+     * Sets on demand scheduling. 
+     * If you use on demand scheduling, DON't use
+     * sendTo(...) call if you have a user
+     * defined scheduler.
+     * This function must be called after the scheduler
+     * has been set.
+     **/
+    void setOndemandScheduling(){
+        _farm->set_scheduling_ondemand();
+        if(_scheduler){
+            // This is done to allow the scheduler to check
+            // that sendTo is not used.
+            _scheduler->setOndemand();
+        }
+    }
+
+    /**
+     * By default, the farm does not preserve the order of the 
+     * input elements. I.e. corresponding output elements may
+     * be produced in a different order. 
+     * By calling this function it is possible to force
+     * the farm to preserve the order of the elements.
+     * This function must be called after the sheduler
+     * and the gatherer have been set. 
+     **/
+    void preserveOrdering(){
+        if(!_gatherer){
+            setGatherer(new GathererDummy<O>());
+        }
+        _scheduler->preserveOrdering();
+        for(auto w : _workers){
+            w->preserveOrdering();
+        }
+        _gatherer->preserveOrdering();
     }
 };
 
@@ -533,21 +751,6 @@ public:
      */
     void addGatherer(Gatherer<O>* g){
         FarmBase<I,O>::setGatherer(g);
-    }
-};
-
-
-template <typename I, typename O> class SchedulerDummy: public Scheduler<I, O>{
-public:
-    O* schedule(I* task){
-        return (O*) task;
-    }
-};
-
-template <typename I> class GathererDummy: public Gatherer<I, I>{
-public:
-    I* gather(I* task){
-        return task;
     }
 };
 
