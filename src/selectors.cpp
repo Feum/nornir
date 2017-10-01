@@ -145,17 +145,19 @@ bool Selector::isContractViolated() const{
 }
 
 void Selector::startCalibration(){
-    DEBUG("Starting calibration.");
-    _calibrating = true;
-    if(_calibrationCoordination){
-        while(!_calibrationAllowed){;}
-        _calibrationAllowed = false;
-    }
-    _numCalibrationPoints = 0;
-    _calibrationStartMs = getMillisecondsTime();
-    _calibrationStartTasks = _totalTasks;
-    if(_joulesCounter){
-        _joulesCounter->reset();
+    if(!_calibrating){
+        DEBUG("Starting calibration.");
+        _calibrating = true;
+        if(_calibrationCoordination){
+            while(!_calibrationAllowed){;}
+            _calibrationAllowed = false;
+        }
+        _numCalibrationPoints = 0;
+        _calibrationStartMs = getMillisecondsTime();
+        _calibrationStartTasks = _totalTasks;
+        if(_joulesCounter){
+            _joulesCounter->reset();
+        }
     }
 }
 
@@ -691,30 +693,44 @@ SelectorAnalytical::SelectorAnalytical(const Parameters& p,
     SelectorPredictive(p, configuration, samples,
                        std::unique_ptr<Predictor>(new PredictorAnalytical(PREDICTION_BANDWIDTH, p, configuration, samples)),
                        std::unique_ptr<Predictor>(new PredictorAnalytical(PREDICTION_POWER, p, configuration, samples))),
-    _violations(0){
+    _violations(0), _firstPointGenerated(false){
     ;
 }
 
 KnobsValues SelectorAnalytical::getNextKnobsValues(){
     _previousConfiguration = _configuration.getRealValues();
+    KnobsValues kv;
+    if(!_firstPointGenerated){
+        kv = getBestKnobsValues();
+    }
     if(isContractViolated() || (isPrimaryRequirement(_p.requirements.bandwidth) &&
-                                ((_samples->average().bandwidth - _p.requirements.bandwidth)/_p.requirements.bandwidth > 0.05 ||
-                                 (_samples->average().bandwidth < _p.requirements.bandwidth)))){
-        if(_violations > _p.tolerableSamples){
+                                _samples->average().bandwidth < _p.requirements.bandwidth)){        
+        if(++_violations > _p.tolerableSamples){
             _violations = 0;
-            KnobsValues kv = getBestKnobsValues();
+            kv = getBestKnobsValues();
             _bandwidthIn->reset();
-            return kv;
         }else{
             ++_violations;
-            return _configuration.getRealValues();
+            kv = _configuration.getRealValues();
         }
     }else{
+        stopCalibration();
         if(_violations){
             --_violations;
         }
-        return _configuration.getRealValues();
+        kv = _configuration.getRealValues();
     }
+    if(_configuration.equal(kv)){
+        stopCalibration();
+    }else{
+        if(!_firstPointGenerated){
+            _firstPointGenerated = true;
+        }else{
+            startCalibration();
+            ++_numCalibrationPoints;
+        }
+    }
+    return kv;
 }
 
 void SelectorAnalytical::updateBandwidthIn(){

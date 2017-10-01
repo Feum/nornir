@@ -46,15 +46,7 @@ using namespace mammut::energy;
 using namespace mammut::topology;
 
 Logger::Logger(unsigned int timeOffset):
-    _timeOffset(timeOffset), _startMonitoring(0), _totalJoules(0), _lastTotalJoules(0),
-    _joulesTimestamp(0), _lastJoulesTimestamp(0){;}
-
-void Logger::addJoules(Joules j, double timestamp){
-    _lastTotalJoules = _totalJoules;
-    _lastJoulesTimestamp = _joulesTimestamp;
-    _totalJoules += j;
-    _joulesTimestamp = timestamp;
-}
+    _timeOffset(timeOffset), _startMonitoring(0){;}
 
 unsigned int Logger::getAbsoluteTimestamp(){
     return mammut::utils::getMillisecondsTime();
@@ -79,7 +71,8 @@ LoggerStream::LoggerStream(std::ostream *statsStream,
                            unsigned int timeOffset):
         Logger(timeOffset),
         _statsStream(statsStream), _calibrationStream(calibrationStream),
-        _summaryStream(summaryStream), _timeOffset(timeOffset){
+        _summaryStream(summaryStream), _timeOffset(timeOffset),
+        _steadySamples(0), _steadyBandwidth(0), _steadyWatts(0){
     if(!*_statsStream ||
        !*_calibrationStream ||
        !*_summaryStream){
@@ -124,7 +117,8 @@ LoggerStream::LoggerStream(std::ostream *statsStream,
     *_summaryStream << endl;
 }
 
-void LoggerStream::log(const Configuration& configuration, 
+void LoggerStream::log(bool isCalibrationPhase,
+                       const Configuration& configuration, 
                        const Smoother<MonitoredSample>& samples,
                        const Requirements& requirements){
     const vector<VirtualCore*>& virtualCores = dynamic_cast<const KnobMapping*>(configuration.getKnob(KNOB_MAPPING))->getActiveVirtualCores();
@@ -151,6 +145,12 @@ void LoggerStream::log(const Configuration& configuration,
     *_statsStream << ms.watts << "\t";
 
     *_statsStream << endl;
+
+    if(!isCalibrationPhase){
+        ++_steadySamples;
+        _steadyBandwidth += samples.getLastSample().bandwidth;
+        _steadyWatts += samples.getLastSample().watts;
+    }
 }
 
 void LoggerStream::logSummary(const Configuration& configuration, Selector* selector, ulong durationMs, double totalTasks){
@@ -182,12 +182,8 @@ void LoggerStream::logSummary(const Configuration& configuration, Selector* sele
         durationMs += 0.001; // Just to avoid division by 0
     }
 
-    // We consider _lastTotalJoules instead
-    // of _totalJoules since _totalJoules includes also joules
-    // collected after application termination.
-    double joulesDuration = (_lastJoulesTimestamp - _startMonitoring);
-    *_summaryStream << (_lastTotalJoules - totalCalibration.joules) / (double) ((joulesDuration - totalCalibration.duration) / 1000.0) << "\t";
-    *_summaryStream << (totalTasks - totalCalibration.numTasks) / (double) ((durationMs - totalCalibration.duration) / 1000.0) << "\t";
+    *_summaryStream << _steadyWatts / _steadySamples << "\t";
+    *_summaryStream << _steadyBandwidth / _steadySamples << "\t";
     *_summaryStream << (double) durationMs / 1000.0 << "\t";
     *_summaryStream << totalCalibration.numSteps << "\t";
     *_summaryStream << totalCalibration.duration << "\t";
@@ -224,7 +220,8 @@ LoggerGraphite::~LoggerGraphite(){
     graphite_finalize();
 }
 
-void LoggerGraphite::log(const Configuration& configuration,
+void LoggerGraphite::log(bool isCalibrationPhase,
+                         const Configuration& configuration,
                          const Smoother<MonitoredSample>& samples,
                          const Requirements& requirements){
     unsigned int timestamp = time(NULL);

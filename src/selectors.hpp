@@ -426,6 +426,7 @@ public:
 class SelectorAnalytical: public SelectorPredictive{
 private:
     uint _violations;
+    bool _firstPointGenerated;
 public:
     SelectorAnalytical(const Parameters& p,
                    const Configuration& configuration,

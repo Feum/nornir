@@ -1056,6 +1056,93 @@ public:
 };
 
 
+typedef struct ParallelForRange{
+    long long int start;
+    long long int end;
+    long long int step;
+}ParallelForRange;
+
+
+template <typename Function>
+class ParallelForWorker: public nornir::Worker<ParallelForRange>{
+private:
+    const Function& _function;
+public:
+    ParallelForWorker(const Function& function):_function(function){;}
+
+    void compute(ParallelForRange* range) {
+        for(long long int i = range->start; i < range->end; i += range->step){
+            _function(i, getId());
+        }
+    }
+};
+
+/**
+ * @param chunkSize If 0, iteration space is statically divided among threads,
+ * i.e. each thread gets numIterations/numThreads iterations
+ **/
+template <typename Function>
+inline void parallel_for(long long int start, long long int end, long long int step, 
+                         long int chunkSize, unsigned long int numThreads,
+                         nornir::Parameters* parameters, const Function& function){
+    FarmAccelerator<ParallelForRange> acc(parameters);
+    // Allocate ranges here so pointers will be valid for all the function duration.
+    std::vector<ParallelForRange> ranges; 
+    std::vector<ParallelForWorker<Function>*> workers;
+
+    if(step > (end - start)){
+        throw std::runtime_error("parallel_for: step cannot be greater than iteration space.");
+    }
+
+    for(unsigned long int i = 0; i < numThreads; i++){
+        workers.push_back(new ParallelForWorker<Function>(function));
+        acc.addWorker(workers.back());
+    }
+
+    // If dynamic scheduling, set ondemand
+    if(chunkSize){
+        acc.setOndemandScheduling();
+    }else{
+        unsigned long long numIterations = std::ceil((end - start)/(double) step);
+        chunkSize = std::ceil(numIterations / (double) numThreads);
+    }
+    acc.start();
+
+    long long nextStart = start;
+    for(long i = 0; i < chunkSize; i++){
+        ParallelForRange pfr;
+        pfr.start = nextStart;
+        if(nextStart + chunkSize <= end){
+            pfr.end = nextStart + chunkSize;
+        }else{
+            pfr.end = end;
+        }
+        nextStart = pfr.end;
+
+        /**
+         * Actually next one should not start
+         * at start + chunkSize if step is > 1.
+         * In that case, it should start at a j >= (start + chunkSize)
+         * such that j is a correct index
+         **/
+        if(step > 1){
+            // TODO Maybe works only for positive, i.e. end > start
+            unsigned long long unprocessed = (pfr.end - start) % step;
+            pfr.end += (step - unprocessed);
+        }
+        pfr.step = step;
+        ranges.push_back(pfr);
+        acc.offload(&(ranges.back()));
+    }
+
+    acc.shutdown();
+    acc.wait();
+    for(unsigned long int i = 0; i < numThreads; i++){
+        delete workers[i];
+    }
+}
+
+
 }
 
 #endif /* NORNIR_INTERFACE_HPP_ */

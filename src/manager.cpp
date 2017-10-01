@@ -172,7 +172,7 @@ void Manager::run(){
             samplingInterval = _p.samplingIntervalSteady;
         }
         double microsecsSleep = ((double)samplingInterval - overheadMs)*
-                          (double)MAMMUT_MICROSECS_IN_MILLISEC;
+                                 (double)MAMMUT_MICROSECS_IN_MILLISEC;
         if(microsecsSleep < 0){
             microsecsSleep = 0;
         }else{
@@ -183,7 +183,6 @@ void Manager::run(){
         if(!_inhibited){
             observe();
             updateRequiredBandwidth();
-            logObservation();
 
             if(!persist()){
                 DEBUG("Asking selector.");
@@ -432,6 +431,7 @@ void Manager::updateTasksCount(MonitoredSample &sample){
 void Manager::observe(){
     Joules joules = 0.0;
     MonitoredSample sample;
+    bool store = true;
     if(_toSimulate){
         if(_simulationSamples.empty()){
             return;
@@ -444,37 +444,44 @@ void Manager::observe(){
         }
     }else{
         sample = getSample();
-        double now = getMillisecondsTime();
-        joules = getAndResetJoules();
-        for(auto logger : _p.loggers){
-            logger->addJoules(joules, now);
-        }
+        if(_terminated){
+            // When checking for sample, we may find out
+            // that the application is terminated and we may
+            // not have received an actual sample. In that
+            // case, we do not store the sample (which is the last one).
+            store = false;            
+        }else{
+            double now = getMillisecondsTime();
+            joules = getAndResetJoules();
+            double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
+            _lastStoredSampleMs = now;
 
-        double durationSecs = (now - _lastStoredSampleMs) / 1000.0;
-        _lastStoredSampleMs = now;
+            // Add watts to the sample
+            sample.watts = joules / durationSecs;
 
-        // Add watts to the sample
-        sample.watts = joules / durationSecs;
-
-        if(_p.synchronousWorkers){
-            // When we have synchronous workers we need to divide
-            // for the number of workers since we do it for the totalTasks
-            // count. When this flag is set we count iterations, not real
-            // tasks.
-            sample.bandwidth /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
-            // When we have synchronous workers we need to count the iterations,
-            // not the real tasks (indeed in this case each worker will receive
-            // the same amount of tasks, e.g. in canneal) since they are sent in
-            // broadcast.
-            sample.numTasks /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+            if(_p.synchronousWorkers){
+                // When we have synchronous workers we need to divide
+                // for the number of workers since we do it for the totalTasks
+                // count. When this flag is set we count iterations, not real
+                // tasks.
+                sample.bandwidth /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+                // When we have synchronous workers we need to count the iterations,
+                // not the real tasks (indeed in this case each worker will receive
+                // the same amount of tasks, e.g. in canneal) since they are sent in
+                // broadcast.
+                sample.numTasks /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+            }
         }
     }
 
-    updateTasksCount(sample);
-    _samples->add(sample);
-    _variations->add(_samples->coefficientVariation().bandwidth);
+    if(store){
+        updateTasksCount(sample);
+        _samples->add(sample);
+        _variations->add(_samples->coefficientVariation().bandwidth);
 
-    DEBUGB(samplesFile << sample << "\n");
+        DEBUGB(samplesFile << sample << "\n");
+        logObservation();
+    }
 }
 
 KnobsValues Manager::decide(){
@@ -516,10 +523,7 @@ void Manager::act(KnobsValues kv, bool force){
             MonitoredSample sample = clearStoredSample();
             updateTasksCount(sample);
             _lastStoredSampleMs = getMillisecondsTime();
-            Joules joules = getAndResetJoules();
-            for(auto logger : _p.loggers){
-                logger->addJoules(joules, _lastStoredSampleMs);
-            }
+            getAndResetJoules(); // Reset joules
         }
         _configuration->trigger();
     }
@@ -538,7 +542,7 @@ Joules Manager::getAndResetJoules(){
 
 void Manager::logObservation(){
     for(auto logger : _p.loggers){
-        logger->log(*_configuration, *_samples, _p.requirements);
+        logger->log(_selector->isCalibrating(), *_configuration, *_samples, _p.requirements);
     }
 }
 

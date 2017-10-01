@@ -152,16 +152,10 @@ class Selector;
  * for each observed statistic.
  */
 class Logger{
-    friend class Manager;
-    template <typename T, typename V> friend class ManagerFastFlow;
 private:
     unsigned int _timeOffset;
-
-    void addJoules(mammut::energy::Joules j, double timestamp);
 protected:
     unsigned int _startMonitoring;
-    mammut::energy::Joules _totalJoules, _lastTotalJoules;
-    double _joulesTimestamp, _lastJoulesTimestamp;
     
     unsigned int getRelativeTimestamp();
     unsigned int getAbsoluteTimestamp();
@@ -169,7 +163,8 @@ public:
     explicit Logger(unsigned int timeOffset = 0);
     virtual ~Logger(){;}
     void setStartTimestamp();
-    virtual void log(const Configuration& configuration,
+    virtual void log(bool isCalibrationPhase,
+                     const Configuration& configuration,
                      const Smoother<MonitoredSample>& samples,
                      const Requirements& requirements) = 0;
     virtual void logSummary(const Configuration& configuration,
@@ -185,6 +180,9 @@ protected:
     std::ostream* _calibrationStream;
     std::ostream* _summaryStream;
     unsigned int _timeOffset;
+    unsigned long long _steadySamples;
+    double _steadyBandwidth;
+    double _steadyWatts;
 public:
 
     LoggerStream(std::ostream* statsStream,
@@ -192,7 +190,8 @@ public:
                  std::ostream* summaryStream,
                  unsigned int timeOffset = 0);
 
-    void log(const Configuration& configuration,
+    void log(bool isCalibrationPhase,
+             const Configuration& configuration,
              const Smoother<MonitoredSample>& samples,
              const Requirements& requirements);
     void logSummary(const Configuration& configuration,
@@ -264,7 +263,8 @@ public:
     LoggerGraphite(const std::string& host, unsigned int port);
     ~LoggerGraphite();
 
-    void log(const Configuration& configuration,
+    void log(bool isCalibrationPhase,
+             const Configuration& configuration,
              const Smoother<MonitoredSample>& samples,
              const Requirements& requirements);
 
