@@ -257,7 +257,12 @@ double Selector::initBestSuboptimalValue() const{
         return NORNIR_REQUIREMENT_MAX;
     }
 
-    throw std::runtime_error("Wrong contract specification.");
+    /**
+     * If no primary requirement (i.e. we only have a MIN/MAX
+     * requirement) we can return anything, since we will never
+     * check the suboptimal values (all values are always feasible).
+     **/
+    return 0;
 }
 
 

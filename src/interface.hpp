@@ -137,7 +137,7 @@ public:
         }
         if(_ondemand){
             throw new std::runtime_error("ERROR: Don't use sendTo call in scheduler if "
-                                        "setOndemandScheduling is called on the farm.");
+                                         "setOndemandScheduling is called on the farm.");
         }
         void* realTask = transformTaskForOrdering(task);
         while(!_lb->ff_send_out_to(realTask, id)){;}
@@ -174,6 +174,26 @@ public:
         for(size_t i = 0; i < _lb->getnworkers(); i++){
             sendTo(task, i);
         }
+    }
+
+    /**
+     * Returns a special element which will be
+     * ignored by the runtime.
+     * @return A special element which will be
+     * ignored by the runtime.
+     **/
+    O* nothing(){
+        return (O*) GO_ON;
+    }
+
+    /**
+     * Returns a special element which will be
+     * considered as the last of the stream.
+     * @return A special element which will be
+     * considered as the last of the stream.
+     **/
+    O* lastElement(){
+        return (O*) EOS;
     }
 };
 
@@ -241,7 +261,6 @@ public:
 
     virtual O* schedule() = 0;
 };
-
 
 template <typename I, typename O> class SchedulerDummy: public Scheduler<I, O>{
 public:
@@ -703,6 +722,15 @@ public:
             w->preserveOrdering();
         }
         _gatherer->preserveOrdering();
+    }
+
+    /**
+     * Connects the gatherer to the scheduler.
+     * If a gatherer is not present, connects each
+     * worker to the scheduler.
+     **/
+    void setFeedback(){
+        _farm->wrap_around();
     }
 };
 
