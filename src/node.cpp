@@ -71,16 +71,16 @@ static inline void nSleep(long ns) {
 #endif
 }
 
-void AdaptiveNode::initPreRun(const Parameters* p, NodeType nodeType,
+void AdaptiveNode::initPreRun(const Parameters p, NodeType nodeType,
                               volatile bool* terminated,
                               ff::ff_thread* ffThread){
     _p = p;
-    _tasksManager = _p->mammut.getInstanceTask();
+    _tasksManager = _p.mammut.getInstanceTask();
     if(!_tasksManager){
         throw runtime_error("Node init(): impossible to "
                             "get the tasks manager.");
     }
-    _ticksPerNs = _p->archData.ticksPerNs;
+    _ticksPerNs = _p.archData.ticksPerNs;
     _nodeType = nodeType;
     _terminated = terminated;
     _ffThread = ffThread;
@@ -118,7 +118,7 @@ void AdaptiveNode::getSampleResponse(MonitoredSample &sample, double avgLatency)
         if(*_terminated){
             return;
         }
-        switch(_p->strategyPolling){
+        switch(_p.strategyPolling){
             case STRATEGY_POLLING_SPINNING:{
                 continue;
             }break;
@@ -253,7 +253,7 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
             /*************************************/
             case MGMT_REQ_GET_AND_RESET_SAMPLE:{
                 DEBUG("Get and reset received");
-                if(taskcnt >= _p->minTasksPerSample){
+                if(taskcnt >= _p.minTasksPerSample){
                     _managementQ.inc();
                     storeSample();
                 }else{
@@ -357,6 +357,8 @@ AdaptiveNode::~AdaptiveNode(){
 }
 
 void AdaptiveNode::terminate(){
+    // Do not set termination flag if the application is not yet started.
+    while(!_started){;}
     *_terminated = true;
 }
 

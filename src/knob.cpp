@@ -524,6 +524,10 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
         _knobMapping(knobMapping),
         _frequencyHandler(_p.mammut.getInstanceCpuFreq()),
         _topologyHandler(_p.mammut.getInstanceTopology()){
+    // Save rollback points
+    for(Domain* currentDomain : _frequencyHandler->getDomains()){
+        _rollbackPoints.push_back(currentDomain->getRollbackPoint());
+    }
 
     _frequencyHandler->removeTurboFrequencies();
     std::vector<mammut::cpufreq::Frequency> availableFrequencies;
@@ -555,6 +559,14 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
 
     for(Frequency f : availableFrequencies){
         _knobValues.push_back(f);
+    }
+}
+
+KnobFrequency::~KnobFrequency(){
+    size_t i = 0;
+    for(Domain* currentDomain : _frequencyHandler->getDomains()){
+        currentDomain->rollback(_rollbackPoints[i]);
+        ++i;
     }
 }
 

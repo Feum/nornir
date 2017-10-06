@@ -115,7 +115,7 @@ private:
     ticks _numTasks;
     NodeType _nodeType;
     ff::ff_thread* _ffThread;
-    const Parameters* _p;
+    Parameters _p;
 
     // Queue used by the manager to notify that a request is present.
     ff::SWSR_Ptr_Buffer _managementQ;
@@ -131,7 +131,7 @@ private:
      * @param terminated A pointer to the termination flag.
      * @param ffThread The lb or gt thread.
      */
-    void initPreRun(const Parameters* p, NodeType nodeType,
+    void initPreRun(Parameters p, NodeType nodeType,
                     volatile bool* terminated, ff::ff_thread* ffThread = NULL);
 
 

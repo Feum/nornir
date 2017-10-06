@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HTML5 &lt;x-knob&gt; rotating knob web component</title>
+<title>Nornir Manual Management</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Start nanomsg client (for sending data to nornir). POST method sends data, GET msg retrieves data -->
@@ -27,11 +27,12 @@ if (!document.registerElement) {
 
 <style type="text/css">
 html, body {
-	background: white;
-	color: black;
+	background: #1F1D1D;
+	color: white;
+	text-color: #D8D9DA;
 }
 h2 {
-	border-top: 1px solid black;
+	border-top: 1px solid white;
 	margin: 2em 0 1ex;
 }
 :target {
@@ -134,20 +135,20 @@ table#bigdemofrequency th {
 	<!-- Most of the colors are from Tango palette -->
 	<defs id="sample_gfx">
 		<symbol id="circle-with-dot" viewBox="-6 -6 12 12">
-			<circle cx="0" cy="0" r="5.875" stroke="#2e3436" fill="#babdb6" stroke-width="0.25"/>
-			<circle cx="0" cy="-3.75" r="0.75" stroke="none" fill="#2e3436"/>
+			<circle cx="0" cy="0" r="5.875" stroke="#D8D9DA" fill="#babdb6" stroke-width="0.25"/>
+			<circle cx="0" cy="-3.75" r="0.75" stroke="none" fill="#D8D9DA"/>
 		</symbol>
 		<symbol id="long-stick" viewBox="-6 -6 12 12">
-			<circle cx="0" cy="0" r="2.5" stroke="#2e3436" fill="#888a85" stroke-width="0.25"/>
-			<rect x="-1" y="-5" rx="1" ry="1" width="2" height="10" stroke="#2e3436" fill="#babdb6" stroke-width="0.25"/>
-			<line x1="0" y1="-3.75" x2="0" y2="-4.5" stroke="#2e3436" stroke-width="0.5px" stroke-linecap="round"/>
+			<circle cx="0" cy="0" r="2.5" stroke="#D8D9DA" fill="#888a85" stroke-width="0.25"/>
+			<rect x="-1" y="-5" rx="1" ry="1" width="2" height="10" stroke="#D8D9DA" fill="#babdb6" stroke-width="0.25"/>
+			<line x1="0" y1="-3.75" x2="0" y2="-4.5" stroke="#D8D9DA" stroke-width="0.5px" stroke-linecap="round"/>
 		</symbol>
 		<symbol id="arrow" viewBox="-3 -3 6 6">
-			<path fill="#2e3436" d="M0,-3 l2,3 h-1 v2.5 h-2 v-2.5 h-1 z"/>
+			<path fill="#D8D9DA" d="M0,-3 l2,3 h-1 v2.5 h-2 v-2.5 h-1 z"/>
 		</symbol>
 		<symbol id="arrow-inside-circle" viewBox="-3 -3 6 6">
 			<circle cx="0" cy="0" r="3" fill="#fce94f"/>
-			<path fill="#2e3436" d="M0,-3 l2,3 h-1 v2.5 h-2 v-2.5 h-1 z"/>
+			<path fill="#D8D9DA" d="M0,-3 l2,3 h-1 v2.5 h-2 v-2.5 h-1 z"/>
 		</symbol>
 		<symbol id="arrow-too-big" viewBox="-3 -3 6 6">
 			<circle cx="0" cy="0" r="3" fill="#fce94f"/>
@@ -156,7 +157,7 @@ table#bigdemofrequency th {
 		<symbol id="transparent-circle" viewBox="-4 -4 8 8">
 			<!-- A transparent SVG object still receives pointer events. -->
 			<circle cx="0" cy="0" r="4" opacity="0"/>
-			<path fill="#2e3436" d="M0,-4 l0.5,5 h-1 z"/>
+			<path fill="#D8D9DA" d="M0,-4 l0.5,5 h-1 z"/>
 		</symbol>
 		<symbol id="chromatic-wheel" viewBox="-4 -4 8 8">
 			<!-- Inspired by https://openclipart.org/detail/181641/chromatic-wheel-1 -->
@@ -337,122 +338,122 @@ table#bigdemofrequency th {
 			<circle cx="0" cy="0" r="1" fill="#8ae234"/>
 		</symbol>
 		<symbol id="bg-radial-lines-2" viewBox="-1 -1 2 2">
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(  0)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(180)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(  0)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(180)"/>
 		</symbol>
 		<symbol id="bg-radial-lines-3" viewBox="-1 -1 2 2">
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(  0)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(120)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(240)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(  0)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(120)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(240)"/>
 		</symbol>
 		<symbol id="bg-radial-lines-4" viewBox="-1 -1 2 2">
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(  0)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 90)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(180)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(270)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(  0)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 90)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(180)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(270)"/>
 		</symbol>
 		<symbol id="bg-radial-lines-5" viewBox="-1 -1 2 2">
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(  0)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 72)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(144)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(216)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(288)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(  0)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 72)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(144)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(216)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(288)"/>
 		</symbol>
 		<symbol id="bg-radial-lines-6" viewBox="-1 -1 2 2">
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(  0)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 60)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(120)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(180)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(240)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(300)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(  0)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 60)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(120)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(180)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(240)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(300)"/>
 		</symbol>
 		<symbol id="bg-radial-lines-8" viewBox="-1 -1 2 2">
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(  0)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 45)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 90)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(135)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(180)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(225)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(270)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(315)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(  0)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 45)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 90)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(135)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(180)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(225)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(270)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(315)"/>
 		</symbol>
 		<symbol id="bg-radial-lines-12" viewBox="-1 -1 2 2">
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(  0)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 30)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 60)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 90)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(120)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(150)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(180)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(210)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(240)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(270)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(300)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(330)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(  0)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 30)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 60)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 90)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(120)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(150)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(180)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(210)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(240)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(270)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(300)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(330)"/>
 		</symbol>
 		<symbol id="bg-radial-lines-24" viewBox="-1 -1 2 2">
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(  0)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 15)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 30)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 45)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 60)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 75)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 90)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(105)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(120)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(135)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(150)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(165)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(180)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(195)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(210)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(225)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(240)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(255)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(270)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(285)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(300)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(315)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(330)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(345)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(  0)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 15)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 30)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 45)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 60)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 75)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 90)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(105)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(120)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(135)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(150)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(165)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(180)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(195)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(210)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(225)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(240)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(255)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(270)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(285)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(300)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(315)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(330)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(345)"/>
 		</symbol>
 		<symbol id="bg-radial-lines-36" viewBox="-1 -1 2 2">
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(  0)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 10)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 20)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 30)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 40)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 50)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 60)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 70)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 80)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate( 90)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(100)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(110)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(120)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(130)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(140)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(150)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(160)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(170)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(180)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(190)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(200)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(210)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(220)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(230)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(240)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(250)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(260)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(270)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(280)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(290)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(300)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(310)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(320)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(330)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(340)"/>
-			<line x1="0" y1="0" x2="0" y2="-1" stroke="#2e3436" stroke-width="0.0078125px" transform="rotate(350)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(  0)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 10)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 20)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 30)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 40)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 50)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 60)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 70)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 80)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate( 90)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(100)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(110)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(120)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(130)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(140)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(150)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(160)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(170)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(180)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(190)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(200)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(210)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(220)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(230)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(240)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(250)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(260)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(270)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(280)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(290)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(300)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(310)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(320)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(330)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(340)"/>
+			<line x1="0" y1="0" x2="0" y2="-1" stroke="#D8D9DA" stroke-width="0.0578125px" transform="rotate(350)"/>
 		</symbol>
 	</defs>
 </svg>
@@ -475,7 +476,8 @@ if (window.WebComponents) {
 <tr>
 <td>
 <!-- I'm sorry I'm using a table for layout. But my intent is to demonstrate the knob, not the table. -->
-<table id="bigdemocores">
+<center><h2 font="arial">Numero di Processori</h2></center></br>
+<table id="bigdemocores" style="border-right: solid 5px #D8D9DA">
 	<tr>
 		<td rowspan="9" id="big_containercores">
 			<!-- Just a background. -->
@@ -483,11 +485,11 @@ if (window.WebComponents) {
 			<!-- This is the main element! -->
 			<x-knob id="bigcores"></x-knob>
 		</td>
-		<th><label for="bigdivisionscores"><code>divisions</code></label></th>
-		<td><input type="number" id="bigdivisionscores" min="0" step="1" value="0" title="Accepts integers starting from 2. Any other value is ignored."></td>
+		<th><label for="bigdivisionscores">Divisions</label></th>
+		<td style="padding-right:20px"><input type="number" id="bigdivisionscores" min="0" step="1" value="0" title="Accepts integers starting from 2. Any other value is ignored."></td>
 	</tr>
 	<tr>
-		<th><label for="bigbackgroundcores">background</label></th>
+		<th><label for="bigbackgroundcores">Background</label></th>
 		<td><select id="bigbackgroundcores">
 			<option value="" selected>none</option>
 		</select>
@@ -520,6 +522,7 @@ if (window.WebComponents) {
 </td>
 <td>
 <!-- I'm sorry I'm using a table for layout. But my intent is to demonstrate the knob, not the table. -->
+<center><h2 font="arial">Frequenza di Clock</h2></center></br>
 <table id="bigdemofrequency">
 	<tr>
 		<td rowspan="9" id="big_containerfrequency">
@@ -528,11 +531,11 @@ if (window.WebComponents) {
 			<!-- This is the main element! -->
 			<x-knob id="bigfrequency"></x-knob>
 		</td>
-		<th><label for="bigdivisionsfrequency"><code>divisions</code></label></th>
-		<td><input type="number" id="bigdivisionsfrequency" min="0" step="1" value="0" title="Accepts integers starting from 2. Any other value is ignored."></td>
+		<th><label font="arial" for="bigdivisionsfrequency">Divisions</label></th>
+		<td style="padding-right:20px"><input type="number" id="bigdivisionsfrequency" min="0" step="1" value="0" title="Accepts integers starting from 2. Any other value is ignored."></td>
 	</tr>
 	<tr>
-		<th><label for="bigbackgroundfrequency">background</label></th>
+		<th><label for="bigbackgroundfrequency">Background</label></th>
 		<td><select id="bigbackgroundfrequency">
 			<option value="" selected>none</option>
 		</select>

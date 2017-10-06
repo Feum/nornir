@@ -256,6 +256,7 @@ public:
 class KnobFrequency: public Knob{
 public:
     KnobFrequency(Parameters p, const KnobMapping& knobMapping);
+    ~KnobFrequency();
     void changeValue(double v);
 private:
     void applyUnusedVCStrategySame(const std::vector<mammut::topology::VirtualCore*>& unusedVc, mammut::cpufreq::Frequency v);
@@ -267,6 +268,7 @@ private:
     const KnobMapping& _knobMapping;
     mammut::cpufreq::CpuFreq* _frequencyHandler;
     mammut::topology::Topology* _topologyHandler;
+    std::vector<mammut::cpufreq::RollbackPoint> _rollbackPoints; // One per domain
 };
 
 

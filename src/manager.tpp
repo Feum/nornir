@@ -149,15 +149,15 @@ ManagerFastFlow<lb_t, gt_t>::~ManagerFastFlow(){
 template <typename lb_t, typename gt_t>
 void ManagerFastFlow<lb_t, gt_t>::initNodesPreRun() {
     for (size_t i = 0; i < _activeWorkers.size(); i++) {
-        _activeWorkers.at(i)->initPreRun(&_p, NODE_TYPE_WORKER, &_terminated);
+        _activeWorkers.at(i)->initPreRun(_p, NODE_TYPE_WORKER, &_terminated);
     }
     if (_emitter) {
-        _emitter->initPreRun(&_p, NODE_TYPE_EMITTER, &_terminated, _farm->getlb());
+        _emitter->initPreRun(_p, NODE_TYPE_EMITTER, &_terminated, _farm->getlb());
     } else {
         throw runtime_error("Emitter is needed to use the manager.");
     }
     if (_collector) {
-        _collector->initPreRun(&_p, NODE_TYPE_COLLECTOR, &_terminated,
+        _collector->initPreRun(_p, NODE_TYPE_COLLECTOR, &_terminated,
                                _farm->getgt());
     }
 }

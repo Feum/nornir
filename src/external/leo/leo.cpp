@@ -216,32 +216,32 @@ PredictionResults compute(uint appId, std::string dataFile,
 
 #ifdef TESTMAIN
 int main(int argc, char** argv){
-	int appId = atoi(argv[1]);
-	char* powerFile = argv[2]; 
-	char* bandwidthFile = argv[3];
+    int appId = atoi(argv[1]);
+    char* powerFile = argv[2]; 
+    char* bandwidthFile = argv[3];
 
-	vec sampledPower, sampledPerformance;
-	mat powerData, perfData;
-	powerData.load(powerFile);
-	perfData.load(bandwidthFile);
-	sampledPower = powerData.col(appId);
-	sampledPerformance = perfData.col(appId);
+    vec sampledPower, sampledPerformance;
+    mat powerData, perfData;
+    powerData.load(powerFile);
+    perfData.load(bandwidthFile);
+    sampledPower = powerData.col(appId);
+    sampledPerformance = perfData.col(appId);
 
-	size_t n = 286;	
-	for(size_t i = 0; i < n; i++){
-		if(i % ((n/20 + 1)) == 0){
-			sampledPower[i] = powerData.col(appId)[i];
-			sampledPerformance[i] = perfData.col(appId)[i];
-		}else{
-			sampledPower[i] = 0;
-			sampledPerformance[i] = 0;
-		}
-	}
+    size_t n = 312; //ATTENTION: This must be set equal to the number of columns in file (TODO)
+    for(size_t i = 0; i < n; i++){
+        if(i % ((n/20 + 1)) == 0){
+            sampledPower[i] = powerData.col(appId)[i];
+            sampledPerformance[i] = perfData.col(appId)[i];
+        }else{
+            sampledPower[i] = 0;
+            sampledPerformance[i] = 0;
+        }
+    }
 
-	leo::PredictionResults pr = leo::compute(appId, bandwidthFile, &sampledPerformance, true, true);
+    leo::PredictionResults pr = leo::compute(appId, bandwidthFile, &sampledPerformance, true, true);
     std::cout << pr.accuracy << std::endl;
 
-	pr = leo::compute(appId, powerFile, &sampledPower, false, true);
-	std::cout << pr.accuracy << " ";
+    pr = leo::compute(appId, powerFile, &sampledPower, false, true);
+    std::cout << pr.accuracy << std::endl;
 }
 #endif

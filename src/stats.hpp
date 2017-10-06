@@ -240,7 +240,8 @@ public:
  *  1. Modify the retention by adding an appropriate rule to the
  *     /etc/carbon/storage-schemas.conf (path may be different).
  *     For example, to store one sample for each second and to keep stored
- *     only the samples received during the last day the rule is the following:.
+ *     only the samples received during the last day the rule is the following:
+ *     (ATTENTION: Put at the top of the file to overwrite other rules)
  *
  *         [default_nornir]
  *         pattern = nornir.*
