@@ -751,9 +751,6 @@ public:
     // Parameters for LEO predictor.
     LeoParameters leo;
 
-    // Flag to enable/disable cores turbo boosting [default = false].
-    bool turboBoost;
-
     // If true, before changing the number of workers the frequency will be
     // set to maximum to reduce the latency of the reconfiguration. The
     // frequency will be be set again to the correct value after the farm

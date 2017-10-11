@@ -565,6 +565,7 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
 KnobFrequency::~KnobFrequency(){
     size_t i = 0;
     for(Domain* currentDomain : _frequencyHandler->getDomains()){
+        currentDomain->reinsertTurboFrequencies();
         currentDomain->rollback(_rollbackPoints[i]);
         ++i;
     }

@@ -233,7 +233,6 @@ void Parameters::setDefault(){
     knobMappingEnabled = true;
     knobFrequencyEnabled = true;
     knobHyperthreadingEnabled = false;
-    turboBoost = false;
     fastReconfiguration = true;
     migrateCollector = false;
     smoothingFactor = 0;
@@ -439,13 +438,6 @@ ParametersValidation Parameters::validateKnobFrequencies(){
         fastReconfiguration = false;
     }
 
-    if(mammut.getInstanceCpuFreq()->isBoostingSupported()){
-        if(turboBoost){
-            mammut.getInstanceCpuFreq()->enableBoosting();
-        }else{
-            mammut.getInstanceCpuFreq()->disableBoosting();
-        }
-    }
     return VALIDATION_OK;
 }
 
@@ -778,7 +770,6 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, knobFrequencyEnabled);
     SETVALUE(xt, Bool, knobHyperthreadingEnabled);
 
-    SETVALUE(xt, Bool, turboBoost);
     SETVALUE(xt, Bool, fastReconfiguration);
     SETVALUE(xt, Double, smoothingFactor);
     SETVALUE(xt, Double, persistenceValue);
