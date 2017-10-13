@@ -736,4 +736,154 @@ void ManagerBlackBox::stretchPause(){
     kill(pid, SIGCONT);
 }
 
+void ManagerFastFlow::waitForStart(){
+    if(_p.qSize){
+        _farm->setFixedSize(true);
+        // We need to multiply for the number of workers since FastFlow
+        // will divide the size for the number of workers.
+        _farm->setInputQueueLength(_p.qSize * _activeWorkers.size());
+        _farm->setOutputQueueLength(_p.qSize * _activeWorkers.size());
+    }
+
+    DEBUG("Init pre run");
+    initNodesPreRun();
+
+    DEBUG("Going to run");
+    _farm->run_then_freeze();
+
+    DEBUG("Init post run");
+    initNodesPostRun();
+    DEBUG("Farm started.");
+}
+
+void ManagerFastFlow::askForSample(){
+    for(size_t i = 0; i < _activeWorkers.size(); i++){
+        _activeWorkers.at(i)->askForSample();
+    }
+}
+
+MonitoredSample ManagerFastFlow::getSampleResponse(){
+    MonitoredSample sample;    
+    uint numActiveWorkers = _activeWorkers.size();
+    for(size_t i = 0; i < numActiveWorkers; i++){
+        MonitoredSample tmp;
+        AdaptiveNode* w = _activeWorkers.at(i);
+        w->getSampleResponse(tmp, _samples->average().latency);
+        sample.loadPercentage += tmp.loadPercentage;
+        sample.numTasks += tmp.numTasks;
+        sample.latency += tmp.latency;
+        sample.bandwidth += tmp.bandwidth;
+    }
+    sample.loadPercentage /= numActiveWorkers;
+    sample.latency /= numActiveWorkers;
+    return sample;
+}
+
+MonitoredSample ManagerFastFlow::getSample(){
+    askForSample();
+    return getSampleResponse();
+}
+
+ManagerFastFlow::ManagerFastFlow(ff_farm<>* farm,
+                                     Parameters parameters):
+        Manager(parameters),
+        _farm(farm),
+        _emitter(dynamic_cast<AdaptiveNode*>(_farm->getEmitter())),
+        _collector(dynamic_cast<AdaptiveNode*>(_farm->getCollector())),
+        _activeWorkers(convertWorkers(_farm->getWorkers())){
+    Manager::_pid = getpid();
+    Manager::_configuration = new ConfigurationFarm(_p, _samples, _emitter,
+                                                   _activeWorkers,
+                                                   _collector, _farm->getgt(),
+                                                   &_terminated);
+    lockKnobs();
+    _configuration->createAllRealCombinations();
+    _selector = createSelector();
+}
+
+ManagerFastFlow::~ManagerFastFlow(){
+    delete _samples;
+    delete _variations;
+    if(_selector){
+        delete _selector;
+    }
+    if(Manager::_configuration){
+        delete Manager::_configuration;
+    }
+}
+
+void ManagerFastFlow::initNodesPreRun() {
+    for (size_t i = 0; i < _activeWorkers.size(); i++) {
+        _activeWorkers.at(i)->initPreRun(_p, NODE_TYPE_WORKER, &_terminated);
+    }
+    if (_emitter) {
+        _emitter->initPreRun(_p, NODE_TYPE_EMITTER, &_terminated, _farm->getlb());
+    } else {
+        throw runtime_error("Emitter is needed to use the manager.");
+    }
+    if (_collector) {
+        _collector->initPreRun(_p, NODE_TYPE_COLLECTOR, &_terminated,
+                               _farm->getgt());
+    }
+}
+
+void ManagerFastFlow::initNodesPostRun() {
+    for (size_t i = 0; i < _activeWorkers.size(); i++) {
+        _activeWorkers.at(i)->initPostRun();
+    }
+    DEBUG("initNodesPostRun: Workers done.");
+    _emitter->initPostRun();
+    DEBUG("initNodesPostRun: Emitter done.");
+    if (_collector) {
+        _collector->initPostRun();
+    }
+    DEBUG("initNodesPostRun: Collector done.");
+}
+
+void ManagerFastFlow::postConfigurationManagement(){
+    const KnobVirtualCoresFarm* knobWorkers = dynamic_cast<const KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
+    std::vector<AdaptiveNode*> newWorkers = knobWorkers->getActiveWorkers();
+    MonitoredSample sample;
+
+    if(_activeWorkers.size() != newWorkers.size()){
+        /**
+         * Since I stopped the workers after I asked for a sample, there
+         * may still be tasks that have been processed but I did not count.
+         * For this reason, I get them.
+         * I do not need to ask since the node put it in the Q when it
+         * terminated.
+         */
+        DEBUG("Getting spurious..");
+        sample = getSampleResponse();
+        updateTasksCount(sample);
+        DEBUG("Spurious got.");
+    }
+
+    _activeWorkers = newWorkers;
+}
+
+void ManagerFastFlow::terminationManagement(){
+    DEBUG("Terminating...wait freezing.");
+    _farm->wait_freezing();
+    _farm->wait();
+    DEBUG("Terminated.");
+}
+
+ulong ManagerFastFlow::getExecutionTime(){
+    return _farm->ffTime();
+}
+
+void ManagerFastFlow::shrinkPause(){
+    KnobVirtualCoresFarm* k = dynamic_cast<KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
+    k->prepareToFreeze();
+    k->freeze();
+}
+
+void ManagerFastFlow::stretchPause(){
+    KnobVirtualCoresFarm* k = dynamic_cast<KnobVirtualCoresFarm*>(_configuration->getKnob(KNOB_VIRTUAL_CORES));
+    size_t v = k->getRealValue();
+    k->prepareToRun(v);
+    k->run(v);
+}
+
 }

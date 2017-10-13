@@ -36,12 +36,10 @@
 #include <opencv2/opencv.hpp>
 #include "../../src/nornir.hpp"
 
-using namespace ff; 
 using namespace cv;
-using namespace nornir;
 
 // reads frame and sends them to the next stage
-struct Source : AdaptiveNode {
+struct Source : nornir::Scheduler<Mat>{
     std::vector<std::string> filenames;
     VideoCapture* cap;
     int maxFrames;
@@ -64,7 +62,7 @@ struct Source : AdaptiveNode {
     }
   
     
-    void * svc(void *) {
+    Mat* schedule() {
         Mat * frame = new Mat();
         if(!cap->read(*frame) || (maxFrames && currentFrameId >= (uint) maxFrames)){
             std::cout << "End of stream in input" << std::endl; 
@@ -76,26 +74,25 @@ struct Source : AdaptiveNode {
                 currentFrameId = 0;
                 cap->read(*frame);
             }else{
-                TERMINATE_APPLICATION;
+                return lastElement();
             }
         }
 
         ++currentFrameId;
-        return (void*) frame;
+        return frame;
 
     }
 }; 
 
 // this stage applys all the filters:  the GaussianBlur filter and the Sobel one, 
 // and it then sends the result to the next stage
-struct Stage1 : AdaptiveNode {
+struct Stage1 : nornir::Worker<Mat, Mat> {
     double d;
     uint id;
     Stage1(double d, uint id):d(d),id(id){;}
 
 
-    void * svc(void *task) {
-        Mat* frame = (Mat*) task;
+    Mat* compute(Mat* frame) {
         Mat frame1;
         //cv::GaussianBlur(*frame, frame1, cv::Size(0, 0), 3);
         //cv::addWeighted(*frame, 1.5, frame1, -0.5, 0, *frame);
@@ -104,12 +101,12 @@ struct Stage1 : AdaptiveNode {
         cv::bilateralFilter(*frame , frame1, d, 80, 80);
         *frame = frame1;
 
-        return (void*) frame;
+        return frame;
     }
 }; 
 
 // this stage shows the output
-struct Drain: AdaptiveNode {
+struct Drain: nornir::Gatherer<Mat> {
     Drain(bool ovf):outvideo(ovf) {}
 
     int svc_init() {
@@ -117,21 +114,20 @@ struct Drain: AdaptiveNode {
         return 0; 
     }
 
-    void *svc (void * task) {
+    void gather(Mat* task) {
         Mat* frame = (Mat*) task;
-	if(outvideo) {
-	    imshow("edges", *frame);
-	    waitKey(30);    
-	} 
-	delete frame;
-	return (void*) GO_ON;
+    	if(outvideo) {
+    	    imshow("edges", *frame);
+    	    waitKey(30);    
+    	} 
+    	delete frame;
     }
 protected:
     const bool outvideo; 
 }; 
 
 int main(int argc, char *argv[]) {
-    //ffvideo numframes d output nw1 file1 file2 ... filen
+    //video numframes d output nw1 file1 file2 ... filen
 
 #ifdef NO_CV_THREADS
     setNumThreads(0);
@@ -154,12 +150,6 @@ int main(int argc, char *argv[]) {
     // pardegree 
     size_t nw1 = atol(argv[4]); 
 
-    // creates an ordered farm
-    ff_ofarm ofarm;
-    std::vector<ff_node*> W;
-    for(size_t i=0; i<nw1; i++)
-        W.push_back(new Stage1(d, i+1));
-    ofarm.add_workers(W);
 
     std::vector<std::string> filenames;
     uint numfiles = argc - 5;
@@ -167,20 +157,22 @@ int main(int argc, char *argv[]) {
         filenames.push_back(argv[i + 5]);
     }
 
-    Source source(filenames, numframes);
-    ofarm.setEmitterF((ff_node*) &source);
-    Drain  drain(outvideo);
-    ofarm.setCollectorF((ff_node*) &drain);
-    
+    // creates an ordered farm
     nornir::Parameters ap("parameters.xml");
     if(numframes){
         ap.requirements.expectedTasksNumber = numframes*numfiles;
     }
-    nornir::ManagerFastFlow<ofarm_lb, ofarm_gt> amf(&ofarm, ap);
+    nornir::Farm<Mat, Mat> farm(&ap);
 
-    amf.start();
-    amf.join();
-
+    farm.addScheduler(new Source(filenames, numframes));
+    for(int i = 0; i < nw1; i++){
+        farm.addWorker(new Stage1(d, i+1));
+    }
+    farm.addGatherer(new Drain(outvideo));
+    
+    farm.preserveOrdering;
+    farm.start();
+    farm.wait();
     return 0;
 }
 

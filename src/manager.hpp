@@ -417,14 +417,13 @@ protected:
 };
 
 /*!
- * \class ManagerFastflow
+ * \class ManagerFastFlow
  * \brief This class manages the adaptivity in applications written
  * with FastFlow programming framework.
  *
  * This class manages the adaptivity in applications written
  * with FastFlow programming framework.
  */
-template <typename lb_t = ff::ff_loadbalancer, typename gt_t = ff::ff_gatherer>
 class ManagerFastFlow: public Manager{
 public:
     /**
@@ -433,7 +432,7 @@ public:
      * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerFastFlow(ff_farm<lb_t, gt_t>* farm, Parameters nornirParameters);
+    ManagerFastFlow(ff_farm<>* farm, Parameters nornirParameters);
 
     /**
      * Destroyes this adaptivity manager.
@@ -441,7 +440,7 @@ public:
     ~ManagerFastFlow();
 private:
     // The managed farm.
-    ff_farm<lb_t, gt_t>* _farm;
+    ff_farm<>* _farm;
 
     // The emitter (if present).
     AdaptiveNode* _emitter;
@@ -466,7 +465,5 @@ private:
 };
 
 }
-
-#include "manager.tpp"
 
 #endif /* NORNIR_FARM_HPP_ */

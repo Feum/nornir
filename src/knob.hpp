@@ -128,7 +128,6 @@ public:
 };
 
 class KnobVirtualCoresFarm: public KnobVirtualCores{
-    template <typename lb_t, typename gt_t>
     friend class ManagerFastFlow;
 public:
     KnobVirtualCoresFarm(Parameters p,

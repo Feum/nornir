@@ -248,7 +248,7 @@ int main(int argc, char ** argv) {
 
     nornir::Parameters ap("parameters.xml");
     ap.requirements.expectedTasksNumber = dim;
-    nornir::ManagerFastFlow<> amf(&farm, ap);
+    nornir::ManagerFastFlow amf(&farm, ap);
     amf.start();
     std::cout << "amf started" << std::endl;
     amf.join();
