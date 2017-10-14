@@ -174,6 +174,8 @@ int main(int argc, char * argv[]){
             m = ai->manager;
             DEBUG("Joining manager.");
             m->join();
+            DEBUG("Manager joined.");
+            delete m;
         }
         managerCleanup(m, instances);
     }
