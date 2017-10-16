@@ -40,25 +40,41 @@
 #endif
 
 namespace nornir{
-    Explorer::Explorer(std::vector<bool> knobs):_knobs(knobs){;}
+    Explorer::Explorer(std::vector<bool> knobs,
+                       std::vector<KnobsValues> additionalPoints):
+        _knobs(knobs),
+        _additionalPoints(additionalPoints){;}
 
-    ExplorerRandom::ExplorerRandom(std::vector<bool> knobs):
-            Explorer(knobs){
+    KnobsValues Explorer::getNextAdditionalPoint() const{
+        KnobsValues r = _additionalPoints.front();
+        if(!r.areRelative()){
+            throw std::runtime_error("Additional calibration points must be relative.");
+        }
+        _additionalPoints.erase(_additionalPoints.begin());
+        return r;
+    }
+
+    ExplorerRandom::ExplorerRandom(std::vector<bool> knobs, std::vector<KnobsValues> additionalPoints):
+            Explorer(knobs, additionalPoints){
         srand(time(NULL));
     }
 
     KnobsValues ExplorerRandom::nextRelativeKnobsValues() const{
         KnobsValues r(KNOB_VALUE_RELATIVE);
-        for(size_t i = 0; i < KNOB_NUM; i++){
-            if(generate((KnobType) i)){
-                r[(KnobType)i] = rand() % 100;
-            }else{
-                /**
-                 * If we do not need to automatically find the value for this knob,
-                 * then it has only 0 or 1 possible value. Accordingly, we can set
-                 * it to any value.
-                 */
-                r[(KnobType)i] = 0;
+        if(_additionalPoints.size()){
+            r = getNextAdditionalPoint();
+        }else{
+            for(size_t i = 0; i < KNOB_NUM; i++){
+                if(generate((KnobType) i)){
+                    r[(KnobType)i] = rand() % 100;
+                }else{
+                    /**
+                     * If we do not need to automatically find the value for this knob,
+                     * then it has only 0 or 1 possible value. Accordingly, we can set
+                     * it to any value.
+                     */
+                    r[(KnobType)i] = 0;
+                }
             }
         }
         return r;
@@ -70,8 +86,7 @@ namespace nornir{
                 std::vector<bool> knobs,
                 StrategyExploration explorationStrategy,
                 std::vector<KnobsValues> additionalPoints):
-            Explorer(knobs), _explorationStrategy(explorationStrategy),
-            _additionalPoints(additionalPoints){
+            Explorer(knobs, additionalPoints), _explorationStrategy(explorationStrategy){
         uint d = 0;
         for(size_t i = 0; i < KNOB_NUM; i++){
             if(generate((KnobType) i)){
@@ -113,11 +128,7 @@ namespace nornir{
     KnobsValues ExplorerLowDiscrepancy::nextRelativeKnobsValues() const{
         KnobsValues r(KNOB_VALUE_RELATIVE);
         if(_additionalPoints.size()){
-            r = _additionalPoints.front();
-            if(!r.areRelative()){
-                throw std::runtime_error("Additional calibration points must be relative.");
-            }
-            _additionalPoints.erase(_additionalPoints.begin());
+            r = getNextAdditionalPoint();
         }else{
             gsl_qrng_get(_generator, _normalizedPoint);
             size_t nextCoordinate = 0;

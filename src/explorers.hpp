@@ -37,9 +37,12 @@ class Explorer{
 private:
     std::vector<bool> _knobs;
 protected:
+    mutable std::vector<KnobsValues> _additionalPoints;
     bool generate(KnobType kt) const{return _knobs.at((size_t) kt);}
+    KnobsValues getNextAdditionalPoint() const;
 public:
-    explicit Explorer(std::vector<bool> knobs);
+    explicit Explorer(std::vector<bool> knobs,
+                      std::vector<KnobsValues> additionalPoints = std::vector<KnobsValues>());
     virtual ~Explorer(){;}
 
     /**
@@ -61,7 +64,8 @@ public:
  */
 class ExplorerRandom: public Explorer{
 public:
-    explicit ExplorerRandom(std::vector<bool> knobs);
+    explicit ExplorerRandom(std::vector<bool> knobs,
+                            std::vector<KnobsValues> additionalPoints = std::vector<KnobsValues>());
     virtual ~ExplorerRandom(){;}
     void reset();
     KnobsValues nextRelativeKnobsValues() const;
@@ -76,7 +80,6 @@ private:
     gsl_qrng* _generator;
     double* _normalizedPoint;
     StrategyExploration _explorationStrategy;
-    mutable std::vector<KnobsValues> _additionalPoints;
 public:
     /**
      * Constructor for a low discrepancy generator.
