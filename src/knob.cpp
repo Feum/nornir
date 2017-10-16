@@ -109,15 +109,18 @@ void Knob::setToMax(){
 }
 
 void Knob::lock(double v){
-    setRealValue(v);
-    _knobValues.clear();
-    _knobValues.push_back(v);
+    setRelativeValue(v);
+    double real;
+    if(getRealFromRelative(v, real)){
+        _knobValues.clear();
+        _knobValues.push_back(real);
+    }
     _locked = true;
 }
 
 void Knob::lockToMax(){
     if(_knobValues.size()){
-        lock(_knobValues.back());
+        lock(100.0);
     }else{
         _locked = true;
     }
@@ -125,7 +128,7 @@ void Knob::lockToMax(){
 
 void Knob::lockToMin(){
     if(_knobValues.size()){
-        lock(_knobValues.front());
+        lock(0);
     }else{
         _locked = true;
     }
@@ -145,10 +148,14 @@ std::vector<double> Knob::getAllowedValues() const{
 
 KnobVirtualCores::KnobVirtualCores(Parameters p):_p(p){
     size_t numVirtualCores = 0;
-    if(_p.knobHyperthreadingEnabled){
-        numVirtualCores = _p.mammut.getInstanceTopology()->getVirtualCores().size();
+    if(_p.activeThreads){
+        numVirtualCores = _p.activeThreads;
     }else{
-        numVirtualCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
+        if(_p.knobHyperthreadingEnabled){
+            numVirtualCores = _p.mammut.getInstanceTopology()->getVirtualCores().size();
+        }else{
+            numVirtualCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
+        }
     }
     changeMax(numVirtualCores);
     _realValue = numVirtualCores;

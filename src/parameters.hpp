@@ -736,17 +736,26 @@ public:
     // Phase detection strategy [default = STRATEGY_PHASE_DETECTION_NONE].
     StrategyPhaseDetection strategyPhaseDetection;
 
-    // Flag to enable/disable cores knobs [default = true].
+    // Flag to enable/disable cores knobs autotuning [default = true].
     bool knobCoresEnabled;
 
-    // Flag to enable/disable mapping knob [default = true].
+    // Flag to enable/disable mapping knob autotuning [default = true].
     bool knobMappingEnabled;
 
-    // Flag to enable/disable frequency knob [default = true].
+    // Flag to enable/disable frequency knob autotuning [default = true].
     bool knobFrequencyEnabled;
 
-    // Flag to enable/disable hyperthreading knob [default = false].
+    // Flag to enable/disable hyperthreading knob autotuning [default = false].
     bool knobHyperthreadingEnabled;
+
+    // Specifies a fixed value to apply to a knob (in the range [0, 100])
+    // It will only be considered if knobHyperthreadingEnabled = false.
+    // Otherwise, value of the knob will be autotuned. [default = 0]
+    double knobHyperthreadingFixedValue; // TODO Do also for other knobs
+
+    // Number of active threads in the application. Useful for
+    // external managers. If 0, number of active threads is unknown [default = 0].
+    uint32_t activeThreads;
 
     // Parameters for LEO predictor.
     LeoParameters leo;

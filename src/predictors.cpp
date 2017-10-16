@@ -82,9 +82,6 @@ RegressionData::RegressionData(const Parameters &p,
 }
 
 double RegressionData::getUsedPhysicalCores(double numVirtualCores){
-    if(_configuration.getRealValue(KNOB_HYPERTHREADING) != 1){
-        throw std::runtime_error("getUsedPhysicalCores, ht > 1 not yet implemented.");
-    }
     uint realVirtualCores = numVirtualCores + _configuration.getNumServiceNodes();
     return std::min(realVirtualCores, _phyCores);
 }
