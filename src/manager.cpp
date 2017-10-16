@@ -359,7 +359,7 @@ void Manager::lockKnobs() const{
         _configuration->getKnob(KNOB_FREQUENCY)->lockToMax();
     }
     if(!_p.knobHyperthreadingEnabled){
-        _configuration->getKnob(KNOB_HYPERTHREADING)->lockToMin();
+        _configuration->getKnob(KNOB_HYPERTHREADING)->lock(_p.knobHyperthreadingFixedValue);
     }
 }
 

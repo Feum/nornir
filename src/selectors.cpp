@@ -850,7 +850,7 @@ SelectorLearner::SelectorLearner(const Parameters& p,
 
     switch(_p.strategyExploration){
         case STRATEGY_EXPLORATION_RANDOM:{
-            _explorer = new ExplorerRandom(knobsFlags);
+            _explorer = new ExplorerRandom(knobsFlags, additionalPoints);
         }break;
         case STRATEGY_EXPLORATION_HALTON:
         case STRATEGY_EXPLORATION_HALTON_REVERSE:

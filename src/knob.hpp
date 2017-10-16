@@ -66,8 +66,8 @@ public:
     void setToMax();
 
     /**
-     * Locks this knob to a value.
-     * @param value The value.
+     * Locks this knob to a relative value in the range [0, 100].
+     * @param value The value in the range [0, 100].
      */
     void lock(double v);
 

@@ -233,6 +233,8 @@ void Parameters::setDefault(){
     knobMappingEnabled = true;
     knobFrequencyEnabled = true;
     knobHyperthreadingEnabled = false;
+    knobHyperthreadingFixedValue = 0;
+    activeThreads = 0;
     fastReconfiguration = true;
     migrateCollector = false;
     smoothingFactor = 0;
@@ -769,7 +771,9 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, knobMappingEnabled);
     SETVALUE(xt, Bool, knobFrequencyEnabled);
     SETVALUE(xt, Bool, knobHyperthreadingEnabled);
+    SETVALUE(xt, Double, knobHyperthreadingFixedValue);
 
+    SETVALUE(xt, Uint, activeThreads);
     SETVALUE(xt, Bool, fastReconfiguration);
     SETVALUE(xt, Double, smoothingFactor);
     SETVALUE(xt, Double, persistenceValue);
