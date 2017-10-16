@@ -44,8 +44,8 @@ class OrderedTask{
 private:
     std::pair<unsigned long long, void*> _pair;
 public:
-    OrderedTask(unsigned long long id, void* task){
-        _pair = std::pair<unsigned long long, void*>(id, task);
+    OrderedTask(unsigned long long id, void* task):_pair(id, task){
+        ;
     }
 
     unsigned long long getId() const{
@@ -105,7 +105,7 @@ protected:
         }
     }
 public:
-    SchedulerBase():_lb(NULL), _nextTaskId(0){;}
+    SchedulerBase():_lb(NULL), _ondemand(false), _preserveOrdering(false), _nextTaskId(0){;}
 
     /**
      * Sends a task to one of the workers.
@@ -137,10 +137,6 @@ public:
                                          "Please ensure that your application is "
                                          "notified when a rethreading occur.");
         }
-        if(_ondemand){
-            throw new std::runtime_error("ERROR: Don't use sendTo call in scheduler if "
-                                         "setOndemandScheduling is called on the farm.");
-        }
         void* realTask = transformTaskForOrdering(task);
         while(!_lb->ff_send_out_to(realTask, id)){;}
     }
@@ -156,10 +152,6 @@ public:
             throw new std::runtime_error("FATAL: Trying to send to a non running worker."
                                          "Please ensure that your application is "
                                          "notified when a rethreading occur.");
-        }
-        if(_ondemand){
-            throw new std::runtime_error("ERROR: Don't use sendToNonBlocking call in scheduler if "
-                                         "setOndemandScheduling is called on the farm.");
         }
         void* realTask = transformTaskForOrdering(task);
         return _lb->ff_send_out_to(realTask, id);
@@ -195,7 +187,7 @@ public:
      * considered as the last of the stream.
      **/
     O* lastElement(){
-        return (O*) EOS;
+        return (O*) NULL;
     }
 };
 
@@ -497,6 +489,7 @@ template <typename I, typename O> class FarmBase: public mammut::utils::NonCopya
 protected:
     ff::ff_farm<>* _farm;
     std::vector<ff::ff_node*> _rawWorkers;
+    bool _schedulerHasInput;
 private:
     bool _nodesCreated;
     const Parameters* _params;
@@ -505,6 +498,7 @@ private:
     SchedulerBase<I>* _scheduler;
     GathererBase<O>* _gatherer;
     std::vector<WorkerBase<I, O>* > _workers;
+    bool _feedback;
 
     template <class S, class W>
     void init(size_t numWorkers){
@@ -573,12 +567,15 @@ public:
      * The constructor of the farm.
      * @param parameters The configuration parameters.
      */
+    // TODO Parameters pointer or Copy?
     explicit FarmBase(const Parameters* parameters):_farm(NULL),
                                        _params(NULL), _manager(NULL), 
                                        _scheduler(NULL), _gatherer(NULL){
         _nodesCreated = false;
         _params = parameters;
         _paramsCreated = false;
+        _feedback = false;
+        _schedulerHasInput = false;
     }
 
     /**
@@ -592,6 +589,8 @@ public:
         _nodesCreated = false;
         _params = new Parameters(paramFileName);
         _paramsCreated = true;
+        _feedback = false;
+        _schedulerHasInput = false;
     }
 
     /**
@@ -649,6 +648,25 @@ public:
         _farm->add_workers(_rawWorkers);
         if(_farm->getEmitter()){
             (dynamic_cast<SchedulerBase<I>*>(_farm->getEmitter()))->setLb(_farm->getlb());
+        }
+        if(_feedback){
+            if(_schedulerHasInput){
+                if(!_gatherer){
+                    // We need to explicitely remove it otherwise it won't work.
+                    _farm->remove_collector();
+                }
+                _farm->wrap_around();
+            }else{
+                throw std::runtime_error("If you want to use feedback, you need to specify as scheduler "
+                                         "extending from nornir::Scheduler<I, O>, i.e. a scheduler with "
+                                         "some input data, corresponding to the data received back on the feedback "
+                                         "channel from workers or from gatherer.");
+            }
+        }else if(_schedulerHasInput){
+            throw std::runtime_error("Unless you set a feedback communication, there is no need to have a scheduler "
+                                     "accepting some input. Accordingly, if you need a feedback call "
+                                     "the setFeedback() call, otherwise let your scheduler extend the "
+                                     "nornir::Scheduler<I> class instead of the nornir::Scheduler<I, O> class.");
         }
         preStart();
         _manager = new ManagerFastFlow(_farm, *_params);
@@ -712,7 +730,7 @@ public:
      * be produced in a different order. 
      * By calling this function it is possible to force
      * the farm to preserve the order of the elements.
-     * This function must be called after the sheduler
+     * This function must be called after the scheduler
      * and the gatherer have been set. 
      **/
     void preserveOrdering(){
@@ -730,9 +748,13 @@ public:
      * Connects the gatherer to the scheduler.
      * If a gatherer is not present, connects each
      * worker to the scheduler.
+     * ATTENTION: You must provide a scheduler that
+     * extends nornir::Scheduler<O, I>, since the scheduler
+     * needs to have an input (i.e. the output of the
+     * gatherer (or the output of workers if gatherer not present)).
      **/
     void setFeedback(){
-        _farm->wrap_around();
+        _feedback = true;
     }
 };
 
@@ -742,7 +764,7 @@ public:
  * @tparam I The type of the tasks produced by the scheduler and received
  *           by the workers.
  * @tparam O The type of the tasks produced by the workers and received by the
- *           gatherer
+ *           gatherer (or back by the scheduler if feedback is used).
  */
 template <typename I, typename O = std::nullptr_t> class Farm: public FarmBase<I, O>{
 public:
@@ -765,6 +787,15 @@ public:
      */
     void addScheduler(Scheduler<I>* s){
         FarmBase<I,O>::setScheduler(s);
+    }
+
+    /**
+     * Adds the scheduler to the farm.
+     * @param s The scheduler of the farm.
+     */
+    virtual void addScheduler(Scheduler<O, I>* s){
+        FarmBase<I,O>::setScheduler(s);
+        FarmBase<I,O>::_schedulerHasInput = true;
     }
 
     /**
@@ -834,6 +865,19 @@ public:
             delete _schedulerDummy;
         }
     }
+
+    /**
+     * Starts the accelerator.
+     * @tparam W The type of the workers. The worker must have a constructor with
+     *           no parameters.
+     * @param numWorkers The maximum number of workers to be used.
+     */
+#if 0
+    template <class W>
+    void start(size_t numWorkers){
+        FarmBase<I, O>::start<SchedulerDummy<S, I>, W>(numWorkers); //TODO
+    }
+#endif
 
     /**
      * Adds the scheduler to the farm.
@@ -1098,7 +1142,7 @@ class ParallelForWorker: public nornir::Worker<ParallelForRange>{
 private:
     const Function& _function;
 public:
-    ParallelForWorker(const Function& function):_function(function){;}
+    explicit ParallelForWorker(const Function& function):_function(function){;}
 
     void compute(ParallelForRange* range) {
         for(long long int i = range->start; i < range->end; i += range->step){
@@ -1117,7 +1161,8 @@ inline void parallel_for(long long int start, long long int end, long long int s
                          nornir::Parameters* parameters, const Function& function){
     FarmAccelerator<ParallelForRange> acc(parameters);
     // Allocate ranges here so pointers will be valid for all the function duration.
-    std::vector<ParallelForRange> ranges; 
+    // We need list because with vector we invalidate pointers when doing push_back
+    std::list<ParallelForRange> ranges;
     std::vector<ParallelForWorker<Function>*> workers;
 
     if(step > (end - start)){
@@ -1138,28 +1183,30 @@ inline void parallel_for(long long int start, long long int end, long long int s
     }
     acc.start();
 
-    long long nextStart = start;
-    for(long i = 0; i < chunkSize; i++){
-        ParallelForRange pfr;
-        pfr.start = nextStart;
-        if(nextStart + chunkSize <= end){
-            pfr.end = nextStart + chunkSize;
-        }else{
-            pfr.end = end;
+    ParallelForRange pfr;
+    bool setStart = true;
+    long long numIterations = 0;
+    long long lastValidId = 0;
+    for(long long int i = start; i < end; i += step){
+        lastValidId = i;
+        if(setStart){
+            pfr.start = i;
+            setStart = false;
         }
-        nextStart = pfr.end;
+        if(++numIterations == chunkSize){
+            pfr.end = i + 1; // +1 because this iteration needs to be computed
+            pfr.step = step;
+            ranges.push_back(pfr);
+            acc.offload(&(ranges.back()));
 
-        /**
-         * Actually next one should not start
-         * at start + chunkSize if step is > 1.
-         * In that case, it should start at a j >= (start + chunkSize)
-         * such that j is a correct index
-         **/
-        if(step > 1){
-            // TODO Maybe works only for positive, i.e. end > start
-            unsigned long long unprocessed = (pfr.end - start) % step;
-            pfr.end += (step - unprocessed);
+            setStart = true;
+            numIterations = 0;
         }
+    }
+    // Spurious element
+    if(!setStart){
+        //TODO Avoid duplicated code)
+        pfr.end = lastValidId + 1; // +1 because this iteration needs to be computed
         pfr.step = step;
         ranges.push_back(pfr);
         acc.offload(&(ranges.back()));
