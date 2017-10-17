@@ -161,9 +161,8 @@ protected:
 
     // Samples to be used for simulation.
     std::list<MonitoredSample> _simulationSamples;
-#ifdef DEBUG_MANAGER
+
     ofstream samplesFile;
-#endif
 
     /**
      * Wait for the application to start and

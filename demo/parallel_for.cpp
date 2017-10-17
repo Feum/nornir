@@ -1,13 +1,25 @@
 #include <interface.hpp>
 #include <iostream>
 
-#define VECTOR_LENGTH 100
-
 int main(int argc, char** argv){
-    nornir::Parameters p;
+    int nworkers, startloop, endloop, step, chunksize;
+
+    if (argc != 6) {
+        std::cerr << "use: "
+                  << argv[0]
+                  << " nworkers startloop endloop step chunksize\n";
+        return -1;
+    }
+    nworkers = atoi(argv[1]);
+    startloop = atoi(argv[2]);
+    endloop = atoi(argv[3]);
+    step = atoi(argv[4]);
+    chunksize = atoi(argv[5]);
+
+    nornir::Parameters p("parameters.xml");
     std::vector<uint> v;
-    v.resize(VECTOR_LENGTH);
-    nornir::parallel_for(0, VECTOR_LENGTH, 1, 2, 4, &p, [&v](long long int idx, uint id){
+    v.resize(endloop - startloop);
+    nornir::parallel_for(startloop, endloop, step, chunksize, nworkers, &p, [&v](long long int idx, uint id){
         v[idx] = idx;
     });
 

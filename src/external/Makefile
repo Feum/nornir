@@ -1,15 +1,17 @@
 .PHONY = all
 
 all:
-# Checkout correct versions of external libraries
-	mkdir -p mammut 
-ifeq ("$(wildcard ./mammut/.git)","")
-	git clone https://github.com/DanieleDeSensi/mammut.git #&& cd mammut && git checkout 47ef67d33a998279345ea6f8741b7fa9ec9847b7
-endif
-	mkdir -p knarr
-ifeq ("$(wildcard ./knarr/.git)","")
-	git clone https://github.com/DanieleDeSensi/knarr.git #&& cd knarr && git checkout aae8e80398a6a516705f0b5472db1e2881dae396
-endif
+# TODO: Checkout correct versions of external libraries. After clone:
+#&& cd mammut && git checkout 47ef67d33a998279345ea6f8741b7fa9ec9847b7
+#&& cd knarr  && git checkout aae8e80398a6a516705f0b5472db1e2881dae396
+	if [ ! -d "./mammut" ]; then  \
+		git clone https://github.com/DanieleDeSensi/mammut.git; \
+	fi
+
+	if [ ! -d "./knarr" ]; then  \
+		git clone https://github.com/DanieleDeSensi/knarr.git; \
+	fi
+
 # Build mammut
 	$(MAKE) -C mammut
 # Build leo
