@@ -286,6 +286,9 @@ private:
     void preserveOrdering(){
         _ordering = true;
     }
+
+    using AdaptiveNode::enableRethreading; // Can only be used on schedueler
+    using AdaptiveNode::disableRethreading; // Can only be used on schedueler
 public:
     WorkerBase():_ordering(false){;}
 
@@ -382,6 +385,9 @@ private:
     void preserveOrdering(){
         _ordering = true;
     }
+
+    using AdaptiveNode::enableRethreading; // Can only be used on schedueler
+    using AdaptiveNode::disableRethreading; // Can only be used on schedueler
 protected:
     // Gets the gather inputs.
     // The vector can contain more than one
@@ -497,8 +503,9 @@ private:
     ManagerFastFlow* _manager;
     SchedulerBase<I>* _scheduler;
     GathererBase<O>* _gatherer;
-    std::vector<WorkerBase<I, O>* > _workers;
     bool _feedback;
+protected:
+    std::vector<WorkerBase<I, O>* > _workers;
 
     template <class S, class W>
     void init(size_t numWorkers){
@@ -897,19 +904,14 @@ public:
 
     /**
      * Offloads a task to the accelerator.
-     * If the task is NULL, the accelerator will be shutdown. You need to
-     * wait for its termination with the wait() call.
+     * Don't use NULL since it is reserved for internal use.
      * This call is blocking and only returns when the task has been sent.
      * @param task The task to be offloaded.
      */
     void offload(S* task){
-        void* realTask;
-        if(!task){
-            realTask = EOS;
-        }else{
-            realTask = (void*) task;
-        }
-        while(!FarmBase<I,O>::_farm->offload(realTask));
+        // Internal: If task == NULL, freeze the farm. If task == EOS, terminate the farm
+        void* realTask = (void*) task;
+        while(!FarmBase<I,O>::_farm->offload(realTask?realTask:EOS));
         if(realTask == EOS){
             ((Scheduler<S, I>*) FarmBase<I, O>::_farm->getEmitter())->terminate();
         }
@@ -917,24 +919,37 @@ public:
 
     /**
      * Offloads a task to the accelerator.
-     * If the task is NULL, the accelerator will be shutdown. You need to
-     * wait for its termination with the wait() call.
+     * Don't use NULL since it is reserved for internal use.
      * This call is non blocking.
      * @param task The task to be offloaded.
      * @return True if the task has been sent, false otherwise.
      */
     bool offloadNonBlocking(S* task){
-        void* realTask;
-        if(!task){
-            realTask = EOS;
-        }else{
-            realTask = (void*) task;
-        }
-        bool res = FarmBase<I,O>::_farm->offload(realTask, 1);
+        void* realTask = (void*) task;
+        bool res = FarmBase<I,O>::_farm->offload(realTask?realTask:EOS, 1);
         if(res && realTask == EOS){
             ((Scheduler<S, I>*) FarmBase<I, O>::_farm->getEmitter())->terminate();
         }
         return res;
+    }
+
+    /**
+     * Temporarely pauses the accelerator.
+     * When the function returns, accelerator is paused.
+     **/
+    void pause(){
+        offload(NULL);
+        FarmBase<I,O>::_farm->wait_freezing();
+    }
+
+    /**
+     * Resumes the accelerator.
+     **/
+    void resume(){
+        for(auto w : FarmBase<I,O>::_workers){
+            w->clean();
+        }
+        FarmBase<I,O>::_farm->run_then_freeze();
     }
 
     /**
@@ -943,7 +958,7 @@ public:
      * This call blocks until it is possible to send a shutdown request.
      */
     void shutdown(){
-        offload(NULL);
+        offload((S*) EOS);
     }
 
     /**
@@ -952,7 +967,7 @@ public:
      * @return True if the shutdown request has been sent, false otherwise.
      */
     bool shutdownNonBlocking(){
-        return offloadNonBlocking(NULL);
+        return offloadNonBlocking(EOS);
     }
 };
 
@@ -1137,12 +1152,15 @@ typedef struct ParallelForRange{
 }ParallelForRange;
 
 
-template <typename Function>
 class ParallelForWorker: public nornir::Worker<ParallelForRange>{
 private:
-    const Function& _function;
+    std::function<void(unsigned long long, unsigned long long)> _function;
 public:
-    explicit ParallelForWorker(const Function& function):_function(function){;}
+    explicit ParallelForWorker(){;}
+
+    void setFunction(const std::function<void(unsigned long long, unsigned long long)>& function){
+        _function = function;
+    }
 
     void compute(ParallelForRange* range) {
         for(long long int i = range->start; i < range->end; i += range->step){
@@ -1150,6 +1168,86 @@ public:
         }
     }
 };
+
+class ParallelFor{
+private:
+    FarmAccelerator<ParallelForRange>* _acc;
+    std::vector<ParallelForWorker*> _workers;
+    size_t _numThreads;
+public:
+    ParallelFor(unsigned long int numThreads,
+                nornir::Parameters* parameters){
+        _acc = new FarmAccelerator<ParallelForRange>(parameters);
+        for(unsigned long int i = 0; i < numThreads; i++){
+            _workers.push_back(new ParallelForWorker());
+            _acc->addWorker(_workers.back());
+        }
+        _acc->setOndemandScheduling();
+        _numThreads = numThreads;
+        _acc->start();
+        _acc->pause();
+    }
+
+    ~ParallelFor(){
+        _acc->shutdown();
+        _acc->wait();
+        delete _acc;
+        for(auto w : _workers){
+            delete w;
+        }
+    }
+
+    inline void parallel_for(long long int start, long long int end, long long int step, 
+                             long int chunkSize, const std::function<void(unsigned long long, unsigned long long)>& function){
+        // Allocate ranges here so pointers will be valid for all the function duration.
+        // We need list because with vector we invalidate pointers when doing push_back
+        std::list<ParallelForRange> ranges;
+        if(step > (end - start)){
+            throw std::runtime_error("parallel_for: step cannot be greater than iteration space.");
+        }
+        for(auto w : _workers){
+            w->setFunction(function);
+        }
+
+        if(!chunkSize){
+            unsigned long long numIterations = std::ceil((end - start)/(double) step);
+            chunkSize = std::ceil(numIterations / (double) _numThreads);
+        }
+        
+        _acc->resume();
+
+        ParallelForRange pfr;
+        bool setStart = true;
+        long long numIterations = 0;
+        long long lastValidId = 0;
+        for(long long int i = start; i < end; i += step){
+            lastValidId = i;
+            if(setStart){
+                pfr.start = i;
+                setStart = false;
+            }
+            if(++numIterations == chunkSize){
+                pfr.end = i + 1; // +1 because this iteration needs to be computed
+                pfr.step = step;
+                ranges.push_back(pfr);
+                _acc->offload(&(ranges.back()));
+
+                setStart = true;
+                numIterations = 0;
+            }
+        }
+        // Spurious element
+        if(!setStart){
+            //TODO Avoid duplicated code)
+            pfr.end = lastValidId + 1; // +1 because this iteration needs to be computed
+            pfr.step = step;
+            ranges.push_back(pfr);
+            _acc->offload(&(ranges.back()));
+        }
+        _acc->pause();
+    }
+};
+
 
 /**
  * @param chunkSize If 0, iteration space is statically divided among threads,
@@ -1159,66 +1257,20 @@ template <typename Function>
 inline void parallel_for(long long int start, long long int end, long long int step, 
                          long int chunkSize, unsigned long int numThreads,
                          nornir::Parameters* parameters, const Function& function){
-    FarmAccelerator<ParallelForRange> acc(parameters);
-    // Allocate ranges here so pointers will be valid for all the function duration.
-    // We need list because with vector we invalidate pointers when doing push_back
-    std::list<ParallelForRange> ranges;
-    std::vector<ParallelForWorker<Function>*> workers;
+    ParallelFor pf(numThreads, parameters);
+    pf.parallel_for(start, end, step, chunkSize, function);
 
-    if(step > (end - start)){
-        throw std::runtime_error("parallel_for: step cannot be greater than iteration space.");
-    }
-
-    for(unsigned long int i = 0; i < numThreads; i++){
-        workers.push_back(new ParallelForWorker<Function>(function));
-        acc.addWorker(workers.back());
-    }
-
-    // If dynamic scheduling, set ondemand
-    if(chunkSize){
-        acc.setOndemandScheduling();
-    }else{
-        unsigned long long numIterations = std::ceil((end - start)/(double) step);
-        chunkSize = std::ceil(numIterations / (double) numThreads);
-    }
-    acc.start();
-
-    ParallelForRange pfr;
-    bool setStart = true;
-    long long numIterations = 0;
-    long long lastValidId = 0;
-    for(long long int i = start; i < end; i += step){
-        lastValidId = i;
-        if(setStart){
-            pfr.start = i;
-            setStart = false;
-        }
-        if(++numIterations == chunkSize){
-            pfr.end = i + 1; // +1 because this iteration needs to be computed
-            pfr.step = step;
-            ranges.push_back(pfr);
-            acc.offload(&(ranges.back()));
-
-            setStart = true;
-            numIterations = 0;
-        }
-    }
-    // Spurious element
-    if(!setStart){
-        //TODO Avoid duplicated code)
-        pfr.end = lastValidId + 1; // +1 because this iteration needs to be computed
-        pfr.step = step;
-        ranges.push_back(pfr);
-        acc.offload(&(ranges.back()));
-    }
-
-    acc.shutdown();
-    acc.wait();
-    for(unsigned long int i = 0; i < numThreads; i++){
-        delete workers[i];
-    }
 }
 
+
+template <typename Function>
+inline void parallel_for(long long int start, long long int end, long long int step, 
+                         long int chunkSize, unsigned long int numThreads,
+                         std::string parametersFile, const Function& function){
+    Parameters p(parametersFile);
+    ParallelFor pf(numThreads, &p);
+    pf.parallel_for(start, end, step, chunkSize, function);
+}
 
 }
 

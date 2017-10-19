@@ -266,6 +266,11 @@ void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
                 reset();
             }break;
             case MGMT_REQ_FREEZE:{
+                if(_rethreadingDisabled){
+                    // This is only possible for the emitter, which is the only one
+                    // receiving freeze requests.
+                    return;
+                }
                 _managementQ.inc();
                 /**
                  * When the emitter returns the EOS, a broadcast will be executed.
@@ -328,11 +333,23 @@ void AdaptiveNode::eosnotify(ssize_t id) CX11_KEYWORD(final){
 #endif
 }
 
+void AdaptiveNode::clean(){
+    reset();
+    while(!_managementQ.empty()){
+        _managementQ.inc();
+    }
+
+    while(!_responseQ.empty()){
+        _responseQ.inc();
+    }
+}
+
 
 
 AdaptiveNode::AdaptiveNode():
         _started(false),
         _terminated(NULL),
+        _rethreadingDisabled(false),
         _tasksManager(NULL),
         _thread(NULL),
         _ticksWork(0),
@@ -364,5 +381,21 @@ void AdaptiveNode::terminate(){
 
 void AdaptiveNode::notifyRethreading(size_t oldNumWorkers,
                                        size_t newNumWorkers){;}
+
+void AdaptiveNode::disableRethreading(){
+    if(_nodeType != NODE_TYPE_EMITTER){
+        throw std::runtime_error("disableRethreading can only be called on the emitter.");
+    }
+    _rethreadingDisabled = true;
 }
+
+void AdaptiveNode::enableRethreading(){
+    if(_nodeType != NODE_TYPE_EMITTER){
+        throw std::runtime_error("enableRethreading can only be called on the emitter.");
+    }
+    _rethreadingDisabled = false;
+}
+
+}
+
 

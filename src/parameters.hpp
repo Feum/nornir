@@ -757,6 +757,9 @@ public:
     // external managers. If 0, number of active threads is unknown [default = 0].
     uint32_t activeThreads;
 
+    // If true, concurrency throttling is used on fastflow/nornir applications [default = true].
+    bool useConcurrencyThrottling;
+
     // Parameters for LEO predictor.
     LeoParameters leo;
 

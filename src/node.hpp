@@ -99,9 +99,11 @@ private:
     friend class KnobVirtualCoresFarm;
     friend class KnobMappingFarm;
     friend class TriggerQBlocking;
+    template <typename S, typename I, typename O, typename G> friend class FarmAcceleratorBase;
 
     volatile bool _started;
     volatile bool* _terminated;
+    bool _rethreadingDisabled;
     mammut::task::TasksManager* _tasksManager;
     mammut::task::ThreadHandler* _thread;
     // We push the pointer to a position in the _managementRequests array.
@@ -122,6 +124,9 @@ private:
     // Queue used by the node to notify that a response is present
     // on _sampleResponse.
     ff::SWSR_Ptr_Buffer _responseQ;
+
+    // To be called after an external pause (not internal freezes)
+    void clean();
 
     /**
      * Operations that need to take place before the node is already running.
@@ -264,6 +269,19 @@ public:
      */
     virtual void notifyRethreading(size_t oldNumWorkers,
                                    size_t newNumWorkers);
+
+protected:
+    /**
+     * Disables rethreading.
+     * Can only be called on the emitter.
+     */
+    void disableRethreading();
+
+    /**
+     * Enables rethreading.
+     * Can only be called on the emitter.
+     */
+    void enableRethreading();
 };
 
 }

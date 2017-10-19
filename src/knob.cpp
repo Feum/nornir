@@ -224,9 +224,8 @@ KnobVirtualCoresFarm::KnobVirtualCoresFarm(Parameters p,
 }
 
 void KnobVirtualCoresFarm::changeValue(double v){
-    if(v != _realValue){
+    if(_p.useConcurrencyThrottling && v != _realValue){
         DEBUG("[Workers] Changing real value to: " << v);
-        prepareToFreeze();
         freeze();
 
         if(!*_terminated){
@@ -234,8 +233,6 @@ void KnobVirtualCoresFarm::changeValue(double v){
                                                    _allWorkers.begin() + v);
 
             notifyNewConfiguration(v);
-
-            prepareToRun(v);
             run(v);
             DEBUG("[Workers] Active Workers: " << _activeWorkers);
         }
@@ -264,6 +261,7 @@ void KnobVirtualCoresFarm::prepareToFreeze(){
 }
 
 void KnobVirtualCoresFarm::freeze(){
+    prepareToFreeze();
     DEBUG("[Workers] Freezing the farm.");
     if(_emitter){
         _emitter->freezeAll((void*)(_collector?FF_EOSW:FF_GO_OUT));
@@ -294,6 +292,7 @@ void KnobVirtualCoresFarm::prepareToRun(uint numWorkers){
 }
 
 void KnobVirtualCoresFarm::run(uint numWorkers){
+    prepareToRun(numWorkers);
     DEBUG("[Workers] Running the emitter.");
     if(_emitter){
         _emitter->thawAll(numWorkers);
@@ -508,12 +507,18 @@ size_t KnobMappingFarm::getNumVirtualCores(){
 void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){
     vector<AdaptiveNode*> workers = ((KnobVirtualCoresFarm*) &_knobCores)->getActiveWorkers();
     size_t nextIndex = 0;
+    size_t emitterIndex = 0;
     if(_emitter){
         _emitter->move(vcOrder[nextIndex]);
+        emitterIndex = nextIndex;
         nextIndex = (nextIndex + 1) % vcOrder.size();
     }
 
     for(size_t i = 0; i < workers.size(); i++){
+        // TODO Decide to do or not to do this check it with a parameter
+        if(nextIndex == emitterIndex){
+            nextIndex = (nextIndex + 1) % vcOrder.size();
+        }
         workers[i]->move(vcOrder[nextIndex]);
         nextIndex = (nextIndex + 1) % vcOrder.size();
     }

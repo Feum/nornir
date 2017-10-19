@@ -235,6 +235,7 @@ void Parameters::setDefault(){
     knobHyperthreadingEnabled = false;
     knobHyperthreadingFixedValue = 0;
     activeThreads = 0;
+    useConcurrencyThrottling = true;
     fastReconfiguration = true;
     migrateCollector = false;
     smoothingFactor = 0;
@@ -774,6 +775,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Double, knobHyperthreadingFixedValue);
 
     SETVALUE(xt, Uint, activeThreads);
+    SETVALUE(xt, Bool, useConcurrencyThrottling);
     SETVALUE(xt, Bool, fastReconfiguration);
     SETVALUE(xt, Double, smoothingFactor);
     SETVALUE(xt, Double, persistenceValue);

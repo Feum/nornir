@@ -113,7 +113,7 @@ protected:
 };
 
 class KnobVirtualCores: public Knob{
-private:
+protected:
     Parameters _p;
 public:
     explicit KnobVirtualCores(Parameters p);
@@ -129,6 +129,7 @@ public:
 
 class KnobVirtualCoresFarm: public KnobVirtualCores{
     friend class ManagerFastFlow;
+    template <typename I, typename O> friend class FarmBase;
 public:
     KnobVirtualCoresFarm(Parameters p,
                   AdaptiveNode* emitter, AdaptiveNode* collector,

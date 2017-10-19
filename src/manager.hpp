@@ -424,6 +424,7 @@ protected:
  * with FastFlow programming framework.
  */
 class ManagerFastFlow: public Manager{
+    template <typename I, typename O> friend class FarmBase;
 public:
     /**
      * Creates a farm adaptivity manager.
