@@ -104,6 +104,11 @@ protected:
             return (void*) task;
         }
     }
+
+    size_t getCurrentNumWorkers() const{
+        return _lb->getnworkers();
+    }
+
 public:
     SchedulerBase():_lb(NULL), _ondemand(false), _preserveOrdering(false), _nextTaskId(0){;}
 
@@ -165,9 +170,12 @@ public:
         // We can't rely on FastFlow broadcast
         // otherwise our ordering implementation
         // would not work.
-        for(size_t i = 0; i < _lb->getnworkers(); i++){
+        disableRethreading(); // Avoid doing rethreading during broadcast
+        size_t nworkers = _lb->getnworkers();
+        for(size_t i = 0; i < nworkers; i++){
             sendTo(task, i);
         }
+        enableRethreading();
     }
 
     /**
@@ -281,6 +289,16 @@ protected:
         }else{
             return reinterpret_cast<I*>(t);
         }
+    }
+
+    /**
+     * Returns a special element which will be
+     * ignored by the runtime.
+     * @return A special element which will be
+     * ignored by the runtime.
+     **/
+    O* nothing(){
+        return (O*) GO_ON;
     }
 private:
     void preserveOrdering(){
@@ -437,6 +455,16 @@ private:
             this->ff_send_out((void*) task);
         }
         return GO_ON;
+    }
+protected:
+    /**
+     * Returns a special element which will be
+     * ignored by the runtime.
+     * @return A special element which will be
+     * ignored by the runtime.
+     **/
+    O* nothing(){
+        return (O*) GO_ON;
     }
 public:
     Gatherer(){;}
@@ -707,7 +735,7 @@ public:
      * Returns the number of workers currently present in the farm.
      */
     size_t getCurrentNumWorkers() const{
-        return _farm->getlb()->getnworkers();
+        return _scheduler->getCurrentNumWorkers();
     }
 
     void stats(std::ostream& o) const{
@@ -909,7 +937,6 @@ public:
      * @param task The task to be offloaded.
      */
     void offload(S* task){
-        // Internal: If task == NULL, freeze the farm. If task == EOS, terminate the farm
         void* realTask = (void*) task;
         while(!FarmBase<I,O>::_farm->offload(realTask?realTask:EOS));
         if(realTask == EOS){
@@ -931,25 +958,6 @@ public:
             ((Scheduler<S, I>*) FarmBase<I, O>::_farm->getEmitter())->terminate();
         }
         return res;
-    }
-
-    /**
-     * Temporarely pauses the accelerator.
-     * When the function returns, accelerator is paused.
-     **/
-    void pause(){
-        offload(NULL);
-        FarmBase<I,O>::_farm->wait_freezing();
-    }
-
-    /**
-     * Resumes the accelerator.
-     **/
-    void resume(){
-        for(auto w : FarmBase<I,O>::_workers){
-            w->clean();
-        }
-        FarmBase<I,O>::_farm->run_then_freeze();
     }
 
     /**
@@ -1151,8 +1159,27 @@ typedef struct ParallelForRange{
     long long int step;
 }ParallelForRange;
 
+ParallelForRange terminationRange; // Just a dummy value to signal termination
 
-class ParallelForWorker: public nornir::Worker<ParallelForRange>{
+
+class ParallelForScheduler: public nornir::Scheduler<ParallelForRange, ParallelForRange>{
+public:
+    ParallelForRange* schedule(ParallelForRange* r){
+        if(r == &terminationRange){
+            disableRethreading();
+            // We record how many workers were active when termination
+            // range was sent.
+            terminationRange.start = getCurrentNumWorkers();
+            broadcast(&terminationRange);
+            enableRethreading();
+            return nothing();
+        }else{
+            return r;
+        }
+    }
+};
+
+class ParallelForWorker: public nornir::Worker<ParallelForRange, ParallelForRange>{
 private:
     std::function<void(unsigned long long, unsigned long long)> _function;
 public:
@@ -1162,22 +1189,58 @@ public:
         _function = function;
     }
 
-    void compute(ParallelForRange* range) {
-        for(long long int i = range->start; i < range->end; i += range->step){
-            _function(i, getId());
+    ParallelForRange* compute(ParallelForRange* range) {
+        if(range == &terminationRange){
+            // We only forward the termination range so the gatherer can sleep
+            // while the workers are working.
+            return range;
+        }else{
+            for(long long int i = range->start; i < range->end; i += range->step){
+                _function(i, getId());
+            }
+            return nothing();
+        }
+    }
+};
+
+class ParallelForGatherer: public nornir::Gatherer<ParallelForRange, ParallelForRange>{
+public:
+    ParallelForRange* gather(ParallelForRange* r){
+        if(r == &terminationRange){
+            return r;
+        }else{
+            throw std::runtime_error("ParallelForGatherer is supposed to receive only terminationRange.");
         }
     }
 };
 
 class ParallelFor{
 private:
-    FarmAccelerator<ParallelForRange>* _acc;
+    FarmAccelerator<ParallelForRange, ParallelForRange, ParallelForRange, ParallelForRange>* _acc;
     std::vector<ParallelForWorker*> _workers;
     size_t _numThreads;
+
+    void pause(){
+        long long int receivedTerminations = 0;
+        _acc->offload(&terminationRange);
+        ParallelForRange* r;
+        do{
+            r = _acc->getResult();
+            if(r != &terminationRange){
+                throw std::runtime_error("ParallelFor getResult is supposed to receive only terminationRange.");
+            }
+            ++receivedTerminations;
+        }while(receivedTerminations < r->start); // r->start is the number of expected ranges
+        // TODO Find a way to freeze the threads of the farm without destroying
+        // everything (it should be enough to call the freeze and run methods of knobworkersfastflow)
+    }
+
+    void resume(){;}
+
 public:
     ParallelFor(unsigned long int numThreads,
                 nornir::Parameters* parameters){
-        _acc = new FarmAccelerator<ParallelForRange>(parameters);
+        _acc = new FarmAccelerator<ParallelForRange, ParallelForRange, ParallelForRange, ParallelForRange>(parameters);
         for(unsigned long int i = 0; i < numThreads; i++){
             _workers.push_back(new ParallelForWorker());
             _acc->addWorker(_workers.back());
@@ -1185,7 +1248,7 @@ public:
         _acc->setOndemandScheduling();
         _numThreads = numThreads;
         _acc->start();
-        _acc->pause();
+        pause();
     }
 
     ~ParallelFor(){
@@ -1214,7 +1277,7 @@ public:
             chunkSize = std::ceil(numIterations / (double) _numThreads);
         }
         
-        _acc->resume();
+        resume();
 
         ParallelForRange pfr;
         bool setStart = true;
@@ -1244,7 +1307,7 @@ public:
             ranges.push_back(pfr);
             _acc->offload(&(ranges.back()));
         }
-        _acc->pause();
+        pause();
     }
 };
 

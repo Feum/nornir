@@ -200,7 +200,7 @@ void AdaptiveNode::thawAll(size_t numWorkers){
 }
 
 void AdaptiveNode::prepareToFreeze(){
-    ;
+    _goingToFreeze = true;
 }
 
 void AdaptiveNode::prepareToRun(){
@@ -320,7 +320,10 @@ void AdaptiveNode::callbackOut(void *p) CX11_KEYWORD(final){
 
 void AdaptiveNode::svc_end() CX11_KEYWORD(final){
     if(_nodeType == NODE_TYPE_WORKER){
-        storeSample();
+        if(_goingToFreeze){
+            storeSample();
+            _goingToFreeze = false;
+        }
     }
 }
 
@@ -333,23 +336,11 @@ void AdaptiveNode::eosnotify(ssize_t id) CX11_KEYWORD(final){
 #endif
 }
 
-void AdaptiveNode::clean(){
-    reset();
-    while(!_managementQ.empty()){
-        _managementQ.inc();
-    }
-
-    while(!_responseQ.empty()){
-        _responseQ.inc();
-    }
-}
-
-
-
 AdaptiveNode::AdaptiveNode():
         _started(false),
         _terminated(NULL),
         _rethreadingDisabled(false),
+        _goingToFreeze(false),
         _tasksManager(NULL),
         _thread(NULL),
         _ticksWork(0),

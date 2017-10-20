@@ -104,6 +104,7 @@ private:
     volatile bool _started;
     volatile bool* _terminated;
     bool _rethreadingDisabled;
+    bool _goingToFreeze;
     mammut::task::TasksManager* _tasksManager;
     mammut::task::ThreadHandler* _thread;
     // We push the pointer to a position in the _managementRequests array.
@@ -124,9 +125,6 @@ private:
     // Queue used by the node to notify that a response is present
     // on _sampleResponse.
     ff::SWSR_Ptr_Buffer _responseQ;
-
-    // To be called after an external pause (not internal freezes)
-    void clean();
 
     /**
      * Operations that need to take place before the node is already running.
