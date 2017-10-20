@@ -1,4 +1,4 @@
-TARGET = instrumenter.o manager-multi.o manager.o knob.o trigger.o node.o parameters.o selectors.o predictors.o explorers.o configuration.o stats.o
+TARGET = interface.o instrumenter.o manager-multi.o manager.o knob.o trigger.o node.o parameters.o selectors.o predictors.o explorers.o configuration.o stats.o
 
 .PHONY: all clean cleanall install uninstall lib
 

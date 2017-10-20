@@ -1159,8 +1159,7 @@ typedef struct ParallelForRange{
     long long int step;
 }ParallelForRange;
 
-ParallelForRange terminationRange; // Just a dummy value to signal termination
-
+extern ParallelForRange terminationRange; // Just a dummy value to signal termination
 
 class ParallelForScheduler: public nornir::Scheduler<ParallelForRange, ParallelForRange>{
 public:
@@ -1238,6 +1237,7 @@ private:
     void resume(){;}
 
 public:
+    // TODO: Dire quand'è che possiamo prendere un sample: piu sample per ogni tipo di loop, un sample per ogni tipo di loop, un sample per il blocco di loop
     ParallelFor(unsigned long int numThreads,
                 nornir::Parameters* parameters){
         _acc = new FarmAccelerator<ParallelForRange, ParallelForRange, ParallelForRange, ParallelForRange>(parameters);
@@ -1245,6 +1245,8 @@ public:
             _workers.push_back(new ParallelForWorker());
             _acc->addWorker(_workers.back());
         }
+        _acc->addScheduler(new ParallelForScheduler());
+        _acc->addGatherer(new ParallelForGatherer());
         _acc->setOndemandScheduling();
         _numThreads = numThreads;
         _acc->start();
