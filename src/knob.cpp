@@ -509,26 +509,34 @@ size_t KnobMappingFarm::getNumVirtualCores(){
 
 void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){
     vector<AdaptiveNode*> workers = ((KnobVirtualCoresFarm*) &_knobCores)->getActiveWorkers();
-    size_t nextIndex = 0;
-    size_t emitterIndex = 0;
-    if(_emitter){
-        _emitter->move(vcOrder[nextIndex]);
-        emitterIndex = nextIndex;
-        nextIndex = (nextIndex + 1) % vcOrder.size();
-    }
-
-    for(size_t i = 0; i < workers.size(); i++){
-        // TODO Decide to do or not to do this check it with a parameter
-        if(nextIndex == emitterIndex){
+    size_t numServiceNodes = 0;
+    if(_emitter) ++numServiceNodes;
+    if(_collector) ++numServiceNodes;
+    if(workers.size() + numServiceNodes <= vcOrder.size()){
+        size_t nextIndex = 0;
+        size_t emitterIndex = 0, collectorIndex = 0;
+        if(_emitter){
+            _emitter->move(vcOrder[nextIndex]);
+            emitterIndex = nextIndex;
             nextIndex = (nextIndex + 1) % vcOrder.size();
         }
-        workers[i]->move(vcOrder[nextIndex]);
-        nextIndex = (nextIndex + 1) % vcOrder.size();
-    }
 
-    if(_collector){
-        _collector->move(vcOrder[nextIndex]);
-        //nextIndex = (nextIndex + 1) % vcOrder.size();
+        if(_collector){
+            _collector->move(vcOrder[nextIndex]);
+            collectorIndex = nextIndex;
+            nextIndex = (nextIndex + 1) % vcOrder.size();                                                                                                                         
+        }
+
+        for(size_t i = 0; i < workers.size(); i++){
+            // TODO Decide to do or not to do this check it with a parameter
+            if(nextIndex == emitterIndex || nextIndex == collectorIndex){
+                nextIndex = (nextIndex + 1) % vcOrder.size();
+            }
+            workers[i]->move(vcOrder[nextIndex]);
+            nextIndex = (nextIndex + 1) % vcOrder.size();
+        }
+    }else{
+        _p.mammut.getInstanceTask()->getProcessHandler(getpid())->move(vcOrder);
     }
 }
 

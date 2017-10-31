@@ -708,6 +708,7 @@ KnobsValues SelectorAnalytical::getNextKnobsValues(){
     if(!_firstPointGenerated){
         kv = getBestKnobsValues();
     }
+
     if(isContractViolated() || (isPrimaryRequirement(_p.requirements.bandwidth) &&
                                 _samples->average().bandwidth < _p.requirements.bandwidth)){        
         if(++_violations > _p.tolerableSamples){
@@ -725,6 +726,7 @@ KnobsValues SelectorAnalytical::getNextKnobsValues(){
         }
         kv = _configuration.getRealValues();
     }
+
     if(_configuration.equal(kv)){
         stopCalibration();
     }else{
@@ -733,6 +735,7 @@ KnobsValues SelectorAnalytical::getNextKnobsValues(){
         }else{
             startCalibration();
             ++_numCalibrationPoints;
+            _bandwidthIn->reset();
         }
     }
     return kv;
