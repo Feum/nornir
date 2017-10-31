@@ -28,8 +28,8 @@
 #define FF_BITFLAGS_HPP
 
 #include <vector>
-#include <tuple>
-
+#include <string>
+#include <cassert>
 namespace ff {
 
 /**
@@ -38,35 +38,84 @@ namespace ff {
  * and device memory allocation.
  *
  */
-enum class BitFlags {
-        COPYTO,              
-        DONTCOPYTO,          
-        REUSE, 
-        DONTREUSE, 
-        RELEASE, 
-        DONTRELEASE, 
-        COPYBACK,
-        DONTCOPYBACK
+enum class CopyFlags    { DONTCOPY, COPY };
+enum class ReuseFlags   { DONTREUSE,  REUSE };
+enum class ReleaseFlags { DONTRELEASE, RELEASE };
+
+struct MemoryFlags {  
+    MemoryFlags():copy(CopyFlags::COPY),
+                  reuse(ReuseFlags::DONTREUSE),
+                  release(ReleaseFlags::DONTRELEASE) {}
+    MemoryFlags(CopyFlags c, ReuseFlags r, ReleaseFlags f):copy(c),reuse(r),release(f) {}
+    CopyFlags    copy;
+    ReuseFlags   reuse;
+    ReleaseFlags release;
 };
 
-using bitflagsVector = std::vector<std::tuple<BitFlags,BitFlags,BitFlags> > ;
+using memoryflagsVector = std::vector<MemoryFlags>;
 
-// TO BE IMPLEMENTED: the current version is just a test case
-static inline const bitflagsVector extractFlags(const std::string &str, const int kernel_id) {
-    bitflagsVector V(10);
-    for(size_t i=0;i<V.size();++i)
-        V[i] = std::make_tuple<BitFlags,BitFlags,BitFlags>(BitFlags::COPYTO, BitFlags::DONTREUSE, BitFlags::DONTRELEASE);
+/**
+ * cmd format:
+ *  ...;$kernel_1;GPU:0; UF;SF;...;$kernel_2;CPU:0;.... ;$ .....
+ *
+ * S: send (COPYTO)
+ * U: reUse (REUSE)
+ * R: receive (COPYFROM)
+ * F: free/remove (RELEASE)
+ */
+static inline const memoryflagsVector extractFlags(const std::string &cmd, const int kernel_id) {
+    memoryflagsVector V;
+    // no command in input, we just return a vector with one (default) entry
+    if (cmd == "") { 
+        V.resize(1);
+        return V;
+    }
+    const std::string kid = "kernel_"+std::to_string(kernel_id);
+    const char semicolon = ';';
+    size_t n = cmd.rfind(kid);
+    assert(n != std::string::npos);
+    n = cmd.find_first_of(semicolon, n);   // first ';' after kernel_id
+    assert(n != std::string::npos);
+    n = cmd.find_first_of(semicolon, n+1); // first ';' after device_id
+    assert(n != std::string::npos);
+
+    size_t m = cmd.find_first_of('$', n+1);
+    assert(m != std::string::npos);
+    // gets just the sub-string of the command related to the memory flags 
+    // starting and ending with ';' (i.e. ; UF;SF;...;)
+    const std::string &flag_string = cmd.substr(n,m-n);
+    assert(flag_string != "");
+
+    n = 0;
+    m = flag_string.find_first_of(semicolon,n+1);  
+    assert(m != std::string::npos);
+    V.reserve(10);    
+    do {
+        const std::string &flags = flag_string.substr(n+1, m-n-1);
+        
+        struct MemoryFlags mf;
+        if (flags.find('S') != std::string::npos)      mf.copy = CopyFlags::COPY;
+        else if (flags.find('R') != std::string::npos) mf.copy = CopyFlags::COPY;
+        else                                           mf.copy = CopyFlags::DONTCOPY;
+        mf.reuse   = (flags.find('U')!=std::string::npos ? ReuseFlags::REUSE     : ReuseFlags::DONTREUSE);
+        mf.release = (flags.find('F')!=std::string::npos ? ReleaseFlags::RELEASE : ReleaseFlags::DONTRELEASE);
+        V.push_back(mf);
+        
+        n = m;
+        m = flag_string.find_first_of(semicolon, n+1);  
+    } while(m != std::string::npos);
+    
     return V;
 }
     
-static inline BitFlags getCopy(int pos, const bitflagsVector &V) {
-    return std::get<0>(V[pos]);
+static inline CopyFlags getCopy(int pos, const memoryflagsVector &V) {
+    return V[pos].copy;
 }
-static inline BitFlags getReuse(int pos, const bitflagsVector &V) {
-    return std::get<1>(V[pos]);
+static inline ReuseFlags getReuse(int pos, const memoryflagsVector &V) {
+    return V[pos].reuse;
 }
-static inline BitFlags getRelease(int pos, const bitflagsVector &V) {
-    return std::get<2>(V[pos]);
+static inline ReleaseFlags getRelease(int pos, const memoryflagsVector &V) {
+    return V[pos].release;
 }
 
 // *******************************************************************

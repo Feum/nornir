@@ -41,6 +41,8 @@
 
 #define FF_TASK_CALLBACK
 #define TRACE_FASTFLOW
+#undef BLOCKING_MODE // Rethreading does not work with blocking mode
+#define FF_ESAVER
 
 // This 2 following includes are needed since ff/mapping_utils.hpp does not include them.
 //#include <unistd.h>

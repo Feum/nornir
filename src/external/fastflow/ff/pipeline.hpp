@@ -36,6 +36,10 @@
 #include <ff/fftree.hpp>
 #include <ff/node.hpp>
 #include <ff/ocl/clEnvironment.hpp>
+#if defined(MAMMUT)
+#include <mammut/mammut.hpp>
+#endif
+
 
 namespace ff {
 
@@ -49,45 +53,15 @@ namespace ff {
 class ff_pipeline: public ff_node {
 protected:
     inline int prepare() {
-        // create input FFBUFFER
         const int nstages=static_cast<int>(nodes_list.size());
+        // create input buffer (FFBUFFER)
         for(int i=1;i<nstages;++i) {
-            pthread_mutex_t   *m        = NULL;
-            pthread_cond_t    *c        = NULL;
-            std::atomic_ulong *counter  = NULL;
-            if (!nodes_list[i]->init_input_blocking(m,c,counter)) {
-                error("PIPE, init input blocking mode for node %d\n", i);
-                return -1;
-            }
-            nodes_list[i-1]->set_output_blocking(m,c,counter);
             if (nodes_list[i]->isMultiInput()) {
-                if (nodes_list[i-1]->create_output_buffer(out_buffer_entries, 
-                                                          fixedsize)<0)
-                    return -1;
+                if (nodes_list[i-1]->create_output_buffer(out_buffer_entries, fixedsize)<0) return -1;
                 svector<ff_node*> w(MAX_NUM_THREADS);
                 nodes_list[i-1]->get_out_nodes(w);
-                if (w.size() == 0) {
-                    nodes_list[i]->set_input(nodes_list[i-1]);
-                    if (!nodes_list[i-1]->init_output_blocking(m,c,counter)) {
-                        error("PIPE, buffernode condition, init output blocking mode for node %d\n", i);
-                        return -1;
-                    }
-                }
-                else {
-                    nodes_list[i]->set_input(w);
-                    for(size_t i=0;i<w.size();++i) {
-                        w[i]->set_output_blocking(m,c,counter);
-
-                        // the following is needed because w[i] can be a buffernode and not a real node
-                        pthread_mutex_t   *mo        = NULL;
-                        pthread_cond_t    *co        = NULL;
-                        std::atomic_ulong *countero  = NULL;
-                        if (!w[i]->init_output_blocking(mo,co,countero)) {
-                            error("PIPE, buffernode condition, init output blocking mode for node %d\n", i);
-                            return -1;
-                        }
-                    }
-                }
+                if (w.size() == 0) nodes_list[i]->set_input(nodes_list[i-1]);
+                else nodes_list[i]->set_input(w);
             } else {
                 if (nodes_list[i]->create_input_buffer(in_buffer_entries, fixedsize)<0) {
                     error("PIPE, creating input buffer for node %d\n", i);
@@ -95,18 +69,11 @@ protected:
                 }
             }
         }
-        
         // set output buffer
         for(int i=0;i<(nstages-1);++i) {
+            // this case has been managed in the previous loop...
             if (nodes_list[i+1]->isMultiInput()) continue;
-            pthread_mutex_t   *m        = NULL;
-            pthread_cond_t    *c        = NULL;
-            std::atomic_ulong *counter  = NULL;
-            if (!nodes_list[i]->init_output_blocking(m,c,counter)) {
-                error("PIPE, init output blocking mode for node %d\n", i);
-                return -1;
-            }
-            nodes_list[i+1]->set_input_blocking(m,c,counter);
+
             if (nodes_list[i]->isMultiOutput()) {
                 nodes_list[i]->set_output(nodes_list[i+1]);
             } else {
@@ -116,7 +83,49 @@ protected:
                 }
             }
         }
-        
+        // blocking stuff -----------------------------------------------------
+        for(int i=1;i<nstages;++i) {
+            pthread_mutex_t   *m        = NULL;
+            pthread_cond_t    *c        = NULL;
+            std::atomic_ulong *counter  = NULL;
+            if (!nodes_list[i]->init_input_blocking(m,c,counter)) {
+                error("PIPE, init input blocking mode for node %d\n", i);
+                return -1;
+            }
+            if (nodes_list[i]->isMultiInput()) {
+                svector<ff_node*> w(MAX_NUM_THREADS);
+                nodes_list[i-1]->get_out_nodes(w);
+                if (w.size()==0) nodes_list[i-1]->set_output_blocking(m,c,counter);
+                else 
+                    for(size_t j=0;j<w.size();++j) {
+                        // we set p_cons_* for each buffernode
+                        w[j]->set_output_blocking(m,c,counter);
+                    }
+                // Initializing prod_* for the previous stage
+                // If the previous stage is a farm without collector then the function
+                // is going to initialize prod_* for each worker.
+                if (!nodes_list[i-1]->init_output_blocking(m,c,counter)) {
+                    error("PIPE, buffernode condition, init output blocking mode for node %d\n", i);
+                    return -1;
+                }
+            } else 
+                nodes_list[i-1]->set_output_blocking(m,c,counter); 
+        }        
+        for(int i=0;i<(nstages-1);++i) {
+            // this case has been managed in the previous loop...
+            if (nodes_list[i+1]->isMultiInput()) continue;
+
+            pthread_mutex_t   *m        = NULL;
+            pthread_cond_t    *c        = NULL;
+            std::atomic_ulong *counter  = NULL;
+            if (!nodes_list[i]->init_output_blocking(m,c,counter)) {
+                error("PIPE, init output blocking mode for node %d\n", i);
+                return -1;
+            }
+            nodes_list[i+1]->set_input_blocking(m,c,counter);
+        }
+        //---------------------------------------------------------------------
+
         // Preparation of buffers for the accelerator
         int ret = 0;
         if (has_input_channel) {
@@ -128,7 +137,7 @@ protected:
                     error("PIPE, output buffer already present for the accelerator\n");
                     ret=-1;
                 } else {
-                    // the last buffer is forced to be unbounded
+                    // NOTE: the last buffer is forced to be unbounded |
                     if (create_output_buffer(out_buffer_entries, false)<0) {
                         error("PIPE, creating output buffer for the accelerator\n");
                         ret = -1;
@@ -182,7 +191,8 @@ protected:
 
     int freeze_and_run(bool skip_init=false) {
         int nstages=static_cast<int>(nodes_list.size());
-        if (!skip_init) {            
+        if (!skip_init) {        
+#if defined(FF_INITIAL_BARRIER)    
             // set the initial value for the barrier 
             if (!barrier)  barrier = new BARRIER_T;
             const int nthreads = cardinality(barrier);
@@ -191,13 +201,14 @@ protected:
                 return -1;
             }
             barrier->barrierSetup(nthreads);
+#endif
         }
         if (!prepared) if (prepare()<0) return -1;
         ssize_t startid = (get_my_id()>0)?get_my_id():0;
         for(ssize_t i=0;i<nstages;++i) {
             nodes_list[i]->set_id(i+startid);
             if (nodes_list[i]->freeze_and_run(true)<0) {
-                error("ERROR: PIPE, (freezing and) running stage %d\n", i);
+                error("ERROR: PIPE, (frbbeezing and) running stage %d\n", i);
                 return -1;
             }
         }
@@ -297,9 +308,9 @@ public:
             error("PIPE, too few pipeline nodes\n");
             return -1;
         }
-        fixedsize=false; // NOTE: forces unbounded size for the queues!
         const int last = static_cast<int>(nodes_list.size())-1;
 
+        // blocking stuff for the first and last stage of the pipeline
         pthread_mutex_t   *mi        = NULL;
         pthread_cond_t    *ci        = NULL;
         std::atomic_ulong *counteri  = NULL;
@@ -316,31 +327,38 @@ public:
             return -1;
         }
         set_input_blocking(mo,co,countero);
-
+        // ------------------------------------------------------------
         if (nodes_list[0]->isMultiInput()) {
             if (nodes_list[last]->isMultiOutput()) {
-                ff_node *t = new ff_buffernode(out_buffer_entries,fixedsize);
+                // NOTE: forces unbounded size for the feedback channel queue!
+                ff_node *t = new ff_buffernode(out_buffer_entries,false); 
                 if (!t) return -1;
                 t->set_id(last); // NOTE: that's not the real node id !
                 t->set_input_blocking(mo,co,countero);
                 t->set_output_blocking(mi,ci,counteri);
                 internalSupportNodes.push_back(t);
                 nodes_list[0]->set_input(t);
-                nodes_list[last]->set_output(t);
+                nodes_list[last]->set_output_feedback(t);
             } else {
-                if (create_output_buffer(out_buffer_entries, fixedsize)<0)
+                // NOTE: forces unbounded size for the feedback channel queue!
+                if (create_output_buffer(out_buffer_entries, false)<0)
                     return -1;
                 svector<ff_node*> w(MAX_NUM_THREADS);
                 this->get_out_nodes(w);
-                nodes_list[0]->set_input(w);
+                if (w.size()==0) {
+                    int last = static_cast<int>(nodes_list.size())-1;
+                    nodes_list[0]->set_input(nodes_list[last]);
+                } else 
+                    nodes_list[0]->set_input(w);
             }
             if (!multi_input) nodes_list[0]->skipfirstpop(true);
         } else {
-            if (create_input_buffer(out_buffer_entries, fixedsize)<0)
+            // NOTE: forces unbounded size for the feedback channel queue!
+            if (create_input_buffer(out_buffer_entries, false)<0)
                 return -1;
             
             if (nodes_list[last]->isMultiOutput()) 
-                nodes_list[last]->set_output(nodes_list[0]);
+                nodes_list[last]->set_output_feedback(nodes_list[0]);
             else 
                 if (set_output_buffer(get_in_buffer())<0)
                     return -1;            
@@ -355,10 +373,7 @@ public:
     inline void get_out_nodes(svector<ff_node*>&w) {
         assert(nodes_list.size()>0);
         int last = static_cast<int>(nodes_list.size())-1;
-        const size_t sizebefore = w.size();
         nodes_list[last]->get_out_nodes(w);
-        if (w.size()==sizebefore) 
-            w.push_back(nodes_list[last]);
     }
 
     /**
@@ -376,6 +391,15 @@ public:
         int nstages=static_cast<int>(nodes_list.size());
 
         if (!skip_init) {            
+
+#if defined(MAMMUT)
+            mammut::energy::Energy *e = mammut.getInstanceEnergy();
+            mammutcounter = e->getCounter();
+            if (mammutcounter) {
+                mammutcounter->reset();
+                printf("Starting Joules = %g\n", mammutcounter->getJoules());
+            }
+#endif
             // set the initial value for the barrier 
             if (!barrier)  barrier = new BARRIER_T;
             const int nthreads = cardinality(barrier);
@@ -397,7 +421,8 @@ public:
 
         ssize_t startid = (get_my_id()>0)?get_my_id():0;
         for(int i=0;i<nstages;++i) {
-            nodes_list[i]->set_id(i+startid);
+            if (i>0) startid += nodes_list[i-1]->cardinality();
+            nodes_list[i]->set_id(startid);
             if (nodes_list[i]->run(true)<0) {
                 error("ERROR: PIPE, running stage %d\n", i);
                 return -1;
@@ -465,6 +490,10 @@ public:
                 ret = -1;
             } 
         
+#if defined(MAMMUT)
+        if (mammutcounter) joules = mammutcounter->getJoules();
+#endif
+
         return ret;
     }
     
@@ -495,18 +524,13 @@ public:
         for(unsigned int i=0;i<nodes_list.size();++i) nodes_list[i]->freeze();
     }
 
-    
-    inline void thaw(bool _freeze=false, ssize_t nw=-1) {
-        for(unsigned int i=0;i<nodes_list.size();++i) nodes_list[i]->thaw(_freeze, nw);
-    }
-    
-    inline bool isfrozen() const { 
+    inline bool done() const { 
         int nstages=static_cast<int>(nodes_list.size());
         for(int i=0;i<nstages;++i) 
-            if (!nodes_list[i]->isfrozen()) return false;
+            if (!nodes_list[i]->done()) return false;
         return true;
     }
-
+    
     /** 
      * \brief offload a task to the pipeline from the offloading thread (accelerator mode)
      * 
@@ -533,11 +557,11 @@ public:
                  ++prod_counter;
                  return true;
              } 
-             pthread_mutex_lock(&prod_m);
+             pthread_mutex_lock(prod_m);
              while(prod_counter.load() >= (inbuffer->buffersize())) {
-                 pthread_cond_wait(&prod_c, &prod_m);
+                 pthread_cond_wait(prod_c, prod_m);
              }
-             pthread_mutex_unlock(&prod_m);
+             pthread_mutex_unlock(prod_m);
              goto _retry;
          }
          for(unsigned long i=0;i<retry;++i) {
@@ -587,11 +611,11 @@ public:
                 if ((*task != (void *)FF_EOS)) return true;
                 else return false;
             }
-            pthread_mutex_lock(&cons_m);
+            pthread_mutex_lock(cons_m);
             while(cons_counter.load() == 0) {
-                pthread_cond_wait(&cons_c, &cons_m);
+                pthread_cond_wait(cons_c, cons_m);
             }
-            pthread_mutex_unlock(&cons_m);
+            pthread_mutex_unlock(cons_m);
             goto _retry;
         }
         for(unsigned long i=0;i<retry;++i) {
@@ -635,6 +659,14 @@ public:
         
         return card;
     }
+
+    int cardinality()  { 
+        int card=0;
+        for(unsigned int i=0;i<nodes_list.size();++i) 
+            card += nodes_list[i]->cardinality();        
+        return card;
+    }
+
     
     /* 
      * \brief Misure execution time (including init and finalise)
@@ -661,6 +693,10 @@ public:
         out << "--- pipeline:\n";
         for(unsigned int i=0;i<nodes_list.size();++i)
             nodes_list[i]->ffStats(out);
+
+#if defined(MAMMUT)
+        out << "Joules: " << joules << "\n";
+#endif
     }
 #else
     void ffStats(std::ostream & out) { 
@@ -669,6 +705,9 @@ public:
 #endif
     
 protected:
+
+    // returns the pipeline starting time
+    const struct timeval startTime() { return nodes_list[0]->getstarttime(); }
 
     void* svc(void * task) { return NULL; }    
     int   svc_init() { return -1; };    
@@ -679,6 +718,17 @@ protected:
     }
     
     int   getCPUId() const { return -1;}
+
+    inline void thaw(bool _freeze=false, ssize_t nw=-1) {
+        for(unsigned int i=0;i<nodes_list.size();++i) nodes_list[i]->thaw(_freeze, nw);
+    }
+    
+    inline bool isfrozen() const { 
+        int nstages=static_cast<int>(nodes_list.size());
+        for(int i=0;i<nstages;++i) 
+            if (!nodes_list[i]->isfrozen()) return false;
+        return true;
+    }
 
     // consumer
     virtual inline bool init_input_blocking(pthread_mutex_t   *&m,
@@ -789,6 +839,12 @@ private:
     int out_buffer_entries;
     svector<ff_node *> nodes_list;
     svector<ff_node*>  internalSupportNodes;
+
+#if defined(MAMMUT)
+    mammut::Mammut           mammut;
+    mammut::energy::Joules   joules        = -1;
+    mammut::energy::Counter* mammutcounter = nullptr;
+#endif
 };
 
 
@@ -817,7 +873,8 @@ private:
     template<typename IN_t=char,typename OUT_t=IN_t>
     class ff_Pipe: public ff_pipeline {
     private:
-#if (!defined(__CUDACC__) && !defined(WIN32) && !defined(__ICC)) 
+
+#if !defined(__CUDACC__) && !defined(WIN32) && !defined(__ICC)
         // 
         // Thanks to Suter Toni (HSR) for suggesting the following code for checking
         // correct input-output types ordering.
@@ -887,7 +944,7 @@ private:
          */
         template<typename... STAGES>
         ff_Pipe(STAGES &&...stages) {    // forwarding reference (aka universal reference)
-#if ( !defined(__CUDACC__) && !defined(WIN32) && !defined(__ICC) )
+#if !defined(__CUDACC__) && !defined(WIN32) && !defined(__ICC)
         	static_assert(valid_stage_types<STAGES...>{}, "Input & output types of the pipe's stages don't match");
 #endif
         	this->add2pipeall(stages...); //this->add2pipeall(std::forward<STAGES>(stages)...);
@@ -906,7 +963,7 @@ private:
          */
         template<typename... STAGES>
         explicit ff_Pipe(bool input_ch, STAGES &&...stages):ff_pipeline(input_ch) {
-#if (!defined(__CUDACC__) && !defined(WIN32))
+#if !defined(__CUDACC__) && !defined(WIN32) && !defined(__ICC)
         	static_assert(valid_stage_types<STAGES...>{},
                           "Input & output types of the pipe's stages don't match");
 #endif

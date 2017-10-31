@@ -70,6 +70,7 @@ static const size_t FF_GO_ON         = (FF_EOS-0x3);  /// non automatically prop
 static const size_t FF_GO_OUT        = (FF_EOS-0x4);  /// non automatically propagated
 static const size_t FF_BLK           = (FF_EOS-0x5);  /// automatically propagated
 static const size_t FF_NBLK          = (FF_EOS-0x6);  /// automatically propagated
+static const size_t FF_TAG_MIN       = (FF_EOS-0xa);  /// just a lower bound mark
 // The FF_GO_OUT is quite similar to the FF_EOS_NOFREEZE, both are not propagated automatically but while 
 // the first one is used to exit the main computation loop and in case being freezed, the second one is used 
 // to exit the computation loop and keep spinning on the input queue for a new task without being freezed.
@@ -86,10 +87,15 @@ static const size_t FF_NBLK          = (FF_EOS-0x6);  /// automatically propagat
 #endif
 
 #if defined(BLOCKING_MODE)
-#define RUNTIME_MODE true
+#define FF_RUNTIME_MODE true
 #else
-#define RUNTIME_MODE false   // by default the run-time is in nonblocking mode
+#define FF_RUNTIME_MODE false   // by default the run-time is in nonblocking mode
 #endif
+
+// if the following is defined, then an initial barrier is executed among all threads
+// to ensure that all threads are started. It can be commented out if that condition 
+// is not needed.
+#define FF_INITIAL_BARRIER
 
 // the barrier implementation to use
 #if !defined(BARRIER_T)

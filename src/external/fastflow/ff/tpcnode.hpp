@@ -112,7 +112,7 @@ public:
      * @param t input task
      * 
      */ 
-    virtual void setTask(const TaskT_in *t) = 0;
+    virtual void setTask(TaskT_in *t) = 0;
     
     /**
      * Releases the input task just computed.
@@ -132,7 +132,7 @@ public:
      * 
      * @param inPtr the host-pointer
      * @param size the number of elements in the input array (bytesize=size*sizeof(ptrT))
-     * @param copy if BitFlags::COPYTO is set the data will be copied into the device
+     * @param copy if CopyFlags::COPY is set the data will be copied into the device
      * @param reuse if BitFlags::REUSE is set then the run-time looks for a previously 
      * allocated device handle associated with the inPtr host pointer
      * @param release if BitFlags::RELEASE is set the device memory will be released 
@@ -140,15 +140,29 @@ public:
      */
     template <typename ptrT>
     void setInPtr(const ptrT* inPtr, size_t size, 
-                  const BitFlags copy   =BitFlags::COPYTO, 
-                  const BitFlags reuse  =BitFlags::DONTREUSE, 
-                  const BitFlags release=BitFlags::DONTRELEASE)  { 
+                  const CopyFlags    copy   =CopyFlags::COPY, 
+                  const ReuseFlags   reuse  =ReuseFlags::DONTREUSE, 
+                  const ReleaseFlags release=ReleaseFlags::DONTRELEASE)  { 
         internal::Arg_t arg(const_cast<ptrT*>(inPtr),size*sizeof(ptrT),
-                            (copy==BitFlags::COPYTO || copy==BitFlags::COPYBACK),
-                            reuse==BitFlags::REUSE,
-                            release==BitFlags::RELEASE);
+                            copy==CopyFlags::COPY,
+                            reuse==ReuseFlags::REUSE,
+                            release==ReleaseFlags::RELEASE);
         tpcInput.push_back(arg);
     }
+
+    /**
+     * Sets the host-pointer to the input parameter.
+     * The order of calls determin the order of parametes.
+     */
+    template <typename ptrT>
+    void setInPtr(const ptrT* inPtr, size_t size, const MemoryFlags &flags) {
+        internal::Arg_t arg(const_cast<ptrT*>(inPtr),size*sizeof(ptrT),
+                            flags.copy==CopyFlags::COPY,
+                            flags.reuse==ReuseFlags::REUSE,
+                            flags.release==ReleaseFlags::RELEASE);
+        tpcInput.push_back(arg);
+    }
+
 
     /**
      * Sets the host-pointer to the input parameter that is passed by-value.
@@ -168,15 +182,30 @@ public:
      */
     template <typename ptrT>
     void setOutPtr(const ptrT* _outPtr, size_t size, 
-                   const BitFlags copyback =BitFlags::COPYBACK, 
-                   const BitFlags reuse    =BitFlags::DONTREUSE, 
-                   const BitFlags release  =BitFlags::DONTRELEASE)  { 
+                   const CopyFlags copyback =CopyFlags::COPY, 
+                   const ReuseFlags reuse    =ReuseFlags::DONTREUSE, 
+                   const ReleaseFlags release  =ReleaseFlags::DONTRELEASE)  { 
         internal::Arg_t arg(const_cast<ptrT*>(_outPtr),size*sizeof(ptrT),
-                            (copyback==BitFlags::COPYBACK || copyback==BitFlags::COPYTO),
-                            reuse==BitFlags::REUSE,
-                            release==BitFlags::RELEASE);
+                            copyback==CopyFlags::COPY,
+                            reuse==ReuseFlags::REUSE,
+                            release==ReleaseFlags::RELEASE);
         tpcOutput.push_back(arg);
     }
+
+    /**
+     * Sets the host-pointer to the output parameter
+     *
+     * @see setInPtr()
+     */
+    template <typename ptrT>
+    void setOutPtr(const ptrT* _outPtr, size_t size, const MemoryFlags &flags) {       
+        internal::Arg_t arg(const_cast<ptrT*>(_outPtr),size*sizeof(ptrT),
+                            flags.copy==CopyFlags::COPY,
+                            flags.reuse==ReuseFlags::REUSE,
+                            flags.release==ReleaseFlags::RELEASE);
+        tpcOutput.push_back(arg);
+    }
+
 
     /**
      * Sets the kernel id
@@ -355,7 +384,7 @@ public:
      *
      * @param task  task to be computed
      */
-    void setTask(const IN_t &task) {
+    void setTask(IN_t &task) {
         Task.resetTask();
         Task.setTask(&task);
     }
@@ -372,6 +401,18 @@ public:
     void setDeviceId(tpc_dev_id_t id)  { deviceId = id; }
     tpc_dev_id_t  getDeviceId()  const  { return deviceId; }    
     int getTPCID() const { return tpcId; }
+
+#if defined(FF_REPARA)
+    /** 
+     *  Returns input data size
+     */
+    size_t rpr_get_sizeIn()  const { return rpr_sizeIn; }
+
+    /** 
+     *  Returns output data size
+     */
+    size_t rpr_get_sizeOut() const { return rpr_sizeOut; }
+#endif
     
 protected:
 
@@ -398,6 +439,10 @@ protected:
             Task.resetTask();
             Task.setTask((IN_t*)task);
         }
+
+#if defined(FF_REPARA)
+        rpr_sizeIn = rpr_sizeOut = 0;
+#endif
 
         const tpc_func_id_t f_id = Task.getKernelId();
         if (tpc_device_func_instance_count(dev_ctx, f_id) == 0) {
@@ -448,6 +493,9 @@ protected:
                         error("ff_tpcNode::svc unable to copy data into the device\n");
                         return (oneshot?NULL:GO_ON);
                     }
+#if defined(FF_REPARA)
+                    rpr_sizeIn += inV[i].size;
+#endif
                 } 
                 
                 res = tpc_device_job_set_arg(dev_ctx, j_id, arg_idx, sizeof(handle), &handle);
@@ -525,6 +573,9 @@ protected:
                     error("ff_tpcNode::svc unable to copy data back from the device\n");
                     return (oneshot?NULL:GO_ON);
                 }
+#if defined(FF_REPARA)
+                rpr_sizeOut += outV[i].size;
+#endif
             } 
 
             // By default the buffers are not released !

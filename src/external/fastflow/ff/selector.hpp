@@ -115,8 +115,10 @@ public:
 
     int nodeInit() {
         if (devices.size() == 0) return -1;
-        for(size_t i=0;i<devices.size();++i)
+        for(size_t i=0;i<devices.size();++i) {
             if (devices[i]->nodeInit()<0) return -1;
+            devices[i]->set_id(ff_node::get_my_id());
+        }
         return 0;
     }
 
@@ -128,6 +130,14 @@ public:
     size_t addNode(ff_node &node) { 
         devices.push_back(&node); 
         node.registerCallback(ff_send_out_selector, this);
+        return devices.size()-1;
+    }
+    size_t addNode(std::unique_ptr<ff_node> node) {
+        ff_node *n = node.get();
+        n->registerCallback(ff_send_out_selector, this);
+        devices.push_back(n); 
+        node.release();
+        cleanup_devices.push_back(n);
         return devices.size()-1;
     }
 
@@ -149,7 +159,14 @@ public:
         nodeEnd();
         return 0;
     }
-            
+
+#if defined(FF_REPARA)
+    bool rpr_get_measure_energy() const { return false; }
+    void rpr_set_measure_energy(bool v) { 
+        for(size_t i=0;i<devices.size();++i)
+            devices[i]->rpr_set_measure_energy(v);
+    }
+#endif           
 protected:
     size_t      selected;
     IN_t       *inTask;

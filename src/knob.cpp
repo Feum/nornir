@@ -224,6 +224,9 @@ KnobVirtualCoresFarm::KnobVirtualCoresFarm(Parameters p,
 }
 
 void KnobVirtualCoresFarm::changeValue(double v){
+#ifdef BLOCKING_MODE
+    #error "If you want to use concurrency throttling, you need to DO NOT define the FastFlow's BLOCKING_MODE macro."
+#endif
     if(_p.useConcurrencyThrottling && v != _realValue){
         DEBUG("[Workers] Changing real value to: " << v);
         freeze();
