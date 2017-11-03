@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
-#include "../../src/external/knarr/src/external/cppnanomsg/nn.hpp"
-#include "../../src/external/knarr/src/external/nanomsg/src/pair.h"
+#include "../../src/external/riff/src/external/cppnanomsg/nn.hpp"
+#include "../../src/external/riff/src/external/nanomsg/src/pair.h"
 
 
 int main (const int argc, const char **argv){

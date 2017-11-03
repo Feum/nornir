@@ -1,6 +1,6 @@
 OPEN libnornir.a
 ADDLIB external/mammut/mammut/libmammut.a
-ADDLIB external/knarr/src/libknarr.a
+ADDLIB external/riff/src/libriff.a
 ADDMOD external/leo/leo.o
 ADDMOD external/queues/hzdptr.o
 ADDMOD external/queues/xxhash.o

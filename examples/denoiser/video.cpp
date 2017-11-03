@@ -170,7 +170,7 @@ int main(int argc, char *argv[]) {
     }
     farm.addGatherer(new Drain(outvideo));
     
-    farm.preserveOrdering;
+    farm.preserveOrdering();
     farm.start();
     farm.wait();
     return 0;

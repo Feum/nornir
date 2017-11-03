@@ -34,7 +34,7 @@
 #define NORNIR_UTILS_HPP_
 
 #include "external/mammut/mammut/mammut.hpp"
-#include "external/knarr/src/knarr.hpp"
+#include "external/riff/src/riff.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -117,17 +117,17 @@ inline double stddev(const std::vector<double>& v){
     return stddev(v, average(v));
 }
 
-typedef struct MonitoredSample: public knarr::ApplicationSample{
+typedef struct MonitoredSample: public riff::ApplicationSample{
     mammut::energy::Joules watts; ///< Consumed watts.
 
-    MonitoredSample():knarr::ApplicationSample(), watts(0){;}
+    MonitoredSample():riff::ApplicationSample(), watts(0){;}
 
     MonitoredSample(MonitoredSample const& sample):
-        knarr::ApplicationSample(sample), watts(sample.watts){;}
+        riff::ApplicationSample(sample), watts(sample.watts){;}
 
     double getMaximumBandwidth(){
         if(loadPercentage < MAX_RHO &&
-           loadPercentage != KNARR_VALUE_INCONSISTENT){
+           loadPercentage != RIFF_VALUE_INCONSISTENT){
             return bandwidth / (loadPercentage / 100.0);
         }else{
             return bandwidth;
@@ -137,7 +137,7 @@ typedef struct MonitoredSample: public knarr::ApplicationSample{
     void swap(MonitoredSample& x){
         using std::swap;
 
-        knarr::ApplicationSample::swap(x);
+        riff::ApplicationSample::swap(x);
         swap(watts, x.watts);
     }
 
@@ -147,37 +147,37 @@ typedef struct MonitoredSample: public knarr::ApplicationSample{
     }
 
     MonitoredSample& operator+=(const MonitoredSample& rhs){
-        knarr::ApplicationSample::operator+=(rhs);
+        riff::ApplicationSample::operator+=(rhs);
         watts += rhs.watts;
         return *this;
     }
 
     MonitoredSample& operator-=(const MonitoredSample& rhs){
-        knarr::ApplicationSample::operator-=(rhs);
+        riff::ApplicationSample::operator-=(rhs);
         watts -= rhs.watts;
         return *this;
     }
 
     MonitoredSample& operator*=(const MonitoredSample& rhs){
-        knarr::ApplicationSample::operator*=(rhs);
+        riff::ApplicationSample::operator*=(rhs);
         watts *= rhs.watts;
         return *this;
     }
 
     MonitoredSample& operator/=(const MonitoredSample& rhs){
-        knarr::ApplicationSample::operator/=(rhs);
+        riff::ApplicationSample::operator/=(rhs);
         watts /= rhs.watts;
         return *this;
     }
 
     MonitoredSample operator/=(double x){
-        knarr::ApplicationSample::operator/=(x);
+        riff::ApplicationSample::operator/=(x);
         watts /= x;
         return *this;
     }
 
     MonitoredSample operator*=(double x){
-        knarr::ApplicationSample::operator*=(x);
+        riff::ApplicationSample::operator*=(x);
         watts *= x;
         return *this;
     }
@@ -226,7 +226,7 @@ inline MonitoredSample operator/(const MonitoredSample& lhs, double x){
 inline std::ostream& operator<<(std::ostream& os, const MonitoredSample& sample){
     os << "[";
     os << "Watts: " << sample.watts << " ";
-    os << "Knarr Sample: " << static_cast<const knarr::ApplicationSample&>(sample) << " ";
+    os << "Knarr Sample: " << static_cast<const riff::ApplicationSample&>(sample) << " ";
     os << "]";
     return os;
 }
@@ -236,26 +236,26 @@ inline std::istream& operator>>(std::istream& is, MonitoredSample& sample){
     is.ignore(std::numeric_limits<std::streamsize>::max(), ':');
     is >> sample.watts;
     is.ignore(std::numeric_limits<std::streamsize>::max(), ':');
-    knarr::operator >> (is, sample);
+    riff::operator >> (is, sample);
     is.ignore(std::numeric_limits<std::streamsize>::max(), ']');
     return is;
 }
 
 inline MonitoredSample squareRoot(const MonitoredSample& x){
     MonitoredSample r;
-    if(x.loadPercentage != KNARR_VALUE_INCONSISTENT){
+    if(x.loadPercentage != RIFF_VALUE_INCONSISTENT){
         r.loadPercentage = sqrt(x.loadPercentage);
     }
-    if(x.bandwidth != KNARR_VALUE_INCONSISTENT){
+    if(x.bandwidth != RIFF_VALUE_INCONSISTENT){
        r.bandwidth = sqrt(x.bandwidth);
     }
-    if(x.latency != KNARR_VALUE_INCONSISTENT){
+    if(x.latency != RIFF_VALUE_INCONSISTENT){
         r.latency = sqrt(x.latency);
     }
-    if(x.numTasks != KNARR_VALUE_INCONSISTENT){
+    if(x.numTasks != RIFF_VALUE_INCONSISTENT){
         r.numTasks = sqrt(x.numTasks);
     }
-    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+    for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
         r.customFields[i] = sqrt(x.customFields[i]);
     }
     r.watts = sqrt(x.watts);
@@ -267,26 +267,26 @@ inline void zero(MonitoredSample& x){
     x.bandwidth = 0;
     x.latency = 0;
     x.numTasks = 0;
-    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+    for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
         x.customFields[i] = 0;
     }
     x.watts = 0;
 }
 
 inline void regularize(MonitoredSample& x){
-    if(x.loadPercentage < 0 && x.loadPercentage != KNARR_VALUE_INCONSISTENT){
+    if(x.loadPercentage < 0 && x.loadPercentage != RIFF_VALUE_INCONSISTENT){
         x.loadPercentage = 0;
     }
-    if(x.bandwidth < 0 && x.bandwidth != KNARR_VALUE_INCONSISTENT){
+    if(x.bandwidth < 0 && x.bandwidth != RIFF_VALUE_INCONSISTENT){
         x.bandwidth = 0;
     }
-    if(x.latency < 0 && x.latency != KNARR_VALUE_INCONSISTENT){
+    if(x.latency < 0 && x.latency != RIFF_VALUE_INCONSISTENT){
         x.latency = 0;
     }
-    if(x.numTasks < 0 && x.numTasks != KNARR_VALUE_INCONSISTENT){
+    if(x.numTasks < 0 && x.numTasks != RIFF_VALUE_INCONSISTENT){
         x.numTasks = 0;
     }
-    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+    for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
         if(x.customFields[i] < 0){
             x.customFields[i] = 0;
         }
@@ -299,27 +299,27 @@ inline void regularize(MonitoredSample& x){
 inline MonitoredSample minimum(const MonitoredSample& a,
                                const MonitoredSample& b){
     MonitoredSample ms;
-    if(a.loadPercentage != KNARR_VALUE_INCONSISTENT && b.loadPercentage != KNARR_VALUE_INCONSISTENT){
+    if(a.loadPercentage != RIFF_VALUE_INCONSISTENT && b.loadPercentage != RIFF_VALUE_INCONSISTENT){
         ms.loadPercentage = std::min(a.loadPercentage, b.loadPercentage);
     }else{
-        ms.loadPercentage = KNARR_VALUE_INCONSISTENT;
+        ms.loadPercentage = RIFF_VALUE_INCONSISTENT;
     }
-    if(a.bandwidth != KNARR_VALUE_INCONSISTENT && b.bandwidth != KNARR_VALUE_INCONSISTENT){
+    if(a.bandwidth != RIFF_VALUE_INCONSISTENT && b.bandwidth != RIFF_VALUE_INCONSISTENT){
         ms.bandwidth = std::min(a.bandwidth, b.bandwidth);
     }else{
-        ms.bandwidth = KNARR_VALUE_INCONSISTENT;
+        ms.bandwidth = RIFF_VALUE_INCONSISTENT;
     }
-    if(a.latency != KNARR_VALUE_INCONSISTENT && b.latency != KNARR_VALUE_INCONSISTENT){
+    if(a.latency != RIFF_VALUE_INCONSISTENT && b.latency != RIFF_VALUE_INCONSISTENT){
         ms.latency = std::min(a.latency, b.latency);
     }else{
-        ms.latency = KNARR_VALUE_INCONSISTENT;
+        ms.latency = RIFF_VALUE_INCONSISTENT;
     }
-    if(a.numTasks != KNARR_VALUE_INCONSISTENT && b.numTasks != KNARR_VALUE_INCONSISTENT){
+    if(a.numTasks != RIFF_VALUE_INCONSISTENT && b.numTasks != RIFF_VALUE_INCONSISTENT){
         ms.numTasks = std::min(a.numTasks, b.numTasks);
     }else{
-        ms.numTasks = KNARR_VALUE_INCONSISTENT;
+        ms.numTasks = RIFF_VALUE_INCONSISTENT;
     }
-    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+    for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
         ms.customFields[i] = std::min(a.customFields[i], b.customFields[i]);
     }
     ms.watts = std::min(a.watts, b.watts);
@@ -329,27 +329,27 @@ inline MonitoredSample minimum(const MonitoredSample& a,
 inline MonitoredSample maximum(const MonitoredSample& a,
                                const MonitoredSample& b){
     MonitoredSample ms;
-    if(a.loadPercentage != KNARR_VALUE_INCONSISTENT && b.loadPercentage != KNARR_VALUE_INCONSISTENT){
+    if(a.loadPercentage != RIFF_VALUE_INCONSISTENT && b.loadPercentage != RIFF_VALUE_INCONSISTENT){
         ms.loadPercentage = std::max(a.loadPercentage, b.loadPercentage);
     }else{
-        ms.loadPercentage = KNARR_VALUE_INCONSISTENT;
+        ms.loadPercentage = RIFF_VALUE_INCONSISTENT;
     }
-    if(a.bandwidth != KNARR_VALUE_INCONSISTENT && b.bandwidth != KNARR_VALUE_INCONSISTENT){
+    if(a.bandwidth != RIFF_VALUE_INCONSISTENT && b.bandwidth != RIFF_VALUE_INCONSISTENT){
         ms.bandwidth = std::max(a.bandwidth, b.bandwidth);
     }else{
-        ms.bandwidth = KNARR_VALUE_INCONSISTENT;
+        ms.bandwidth = RIFF_VALUE_INCONSISTENT;
     }
-    if(a.latency != KNARR_VALUE_INCONSISTENT && b.latency != KNARR_VALUE_INCONSISTENT){
+    if(a.latency != RIFF_VALUE_INCONSISTENT && b.latency != RIFF_VALUE_INCONSISTENT){
         ms.latency = std::max(a.latency, b.latency);
     }else{
-        ms.latency = KNARR_VALUE_INCONSISTENT;
+        ms.latency = RIFF_VALUE_INCONSISTENT;
     }
-    if(a.numTasks != KNARR_VALUE_INCONSISTENT && b.numTasks != KNARR_VALUE_INCONSISTENT){
+    if(a.numTasks != RIFF_VALUE_INCONSISTENT && b.numTasks != RIFF_VALUE_INCONSISTENT){
         ms.numTasks = std::max(a.numTasks, b.numTasks);
     }else{
-        ms.numTasks = KNARR_VALUE_INCONSISTENT;
+        ms.numTasks = RIFF_VALUE_INCONSISTENT;
     }
-    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+    for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
         ms.customFields[i] = std::max(a.customFields[i], b.customFields[i]);
     }
     ms.watts = std::max(a.watts, b.watts);

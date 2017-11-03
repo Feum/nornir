@@ -12,7 +12,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "../../src/external/knarr/src/knarr.hpp"
+#include "../../src/external/riff/src/riff.hpp"
 
 #ifdef ENABLE_PARSEC_HOOKS
 #include <hooks.h>
@@ -377,7 +377,7 @@ int bs_thread(void *tid_ptr) {
     int start = tid * (numOptions / nThreads);
     int end = start + (numOptions / nThreads);
 
-    knarr::Application app("ipc:///tmp/prova");
+    riff::Application app("ipc:///tmp/prova");
 
     for (j=0; j<NUM_RUNS; j++) {
       app.begin();

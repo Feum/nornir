@@ -29,9 +29,9 @@
 #define NORNIR_INSTRUMENTER_HPP_
 
 #include "utils.hpp"
-#include "external/knarr/src/knarr.hpp"
-#include "external/knarr/src/external/cppnanomsg/nn.hpp"
-#include "external/knarr/src/external/nanomsg/src/pair.h"
+#include "external/riff/src/riff.hpp"
+#include "external/riff/src/external/cppnanomsg/nn.hpp"
+#include "external/riff/src/external/nanomsg/src/pair.h"
 #include "external/mammut/mammut/mammut.hpp"
 
 namespace nornir{
@@ -60,16 +60,16 @@ inline std::string getInstrumentationPidChannel(uint pid){
     return std::string("ipc://") + getInstrumentationPidChannelPath(pid);
 }
 
-class InstrumenterHelper: public knarr::Application, mammut::utils::NonCopyable{
+class InstrumenterHelper: public riff::Application, mammut::utils::NonCopyable{
 public:
     InstrumenterHelper(std::pair<nn::socket*, uint> p,
                        size_t numThreads = 1,
-                       knarr::Aggregator* aggregator = NULL):
-        knarr::Application(*p.first, p.second, numThreads, aggregator){;}
+                       riff::Aggregator* aggregator = NULL):
+        riff::Application(*p.first, p.second, numThreads, aggregator){;}
 };
 
 /**
- * Extends knarr::Application by providing a way to automatically connect
+ * Extends riff::Application by providing a way to automatically connect
  * to the nornir manager server.
  */
 class Instrumenter: public InstrumenterHelper{
@@ -85,7 +85,7 @@ public:
      */
     explicit Instrumenter(const std::string& parametersFile,
                           size_t numThreads = 1,
-                          knarr::Aggregator* aggregator = NULL);
+                          riff::Aggregator* aggregator = NULL);
 };
 
 }

@@ -6,8 +6,8 @@
 proc.out
 /src/external/mammut/
 /src/external/mammut/*
-/src/external/knarr/
-/src/external/knarr/*
+/src/external/riff/
+/src/external/riff/*
 /src/external/graphite-c-client/*
 /test/googletest/*
 /test/*.csv

@@ -44,7 +44,7 @@
 #include "external/mammut/mammut/module.hpp"
 #include "external/mammut/mammut/utils.hpp"
 #include "external/mammut/mammut/mammut.hpp"
-#include "external/knarr/src/knarr.hpp"
+#include "external/riff/src/riff.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -314,28 +314,28 @@ private:
  **/
 class ManagerInstrumented: public Manager{
 private:
-    knarr::Monitor _monitor;
+    riff::Monitor _monitor;
     void shrinkPause();
     void stretchPause();
     MonitoredSample getSample(bool fromAll);
 public:
     /**
      * Creates an adaptivity manager for an instrumented application.
-     * @param knarrChannel The name of the knarr channel.
+     * @param riffChannel The name of the riff channel.
      * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerInstrumented(const std::string& knarrChannel,
+    ManagerInstrumented(const std::string& riffChannel,
                         Parameters nornirParameters);
 
     /**
      * Creates an adaptivity manager for an instrumented application.
-     * @param knarrSocket The knarr socket.
+     * @param riffSocket The riff socket.
      * @param chid The channel id.
      * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerInstrumented(nn::socket& knarrSocket,
+    ManagerInstrumented(nn::socket& riffSocket,
                         int chid,
                         Parameters nornirParameters);
 

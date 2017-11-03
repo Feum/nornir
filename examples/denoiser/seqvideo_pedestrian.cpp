@@ -25,8 +25,8 @@
  ****************************************************************************
  */
 /* 
- * Author: Marco Danelutto <marcod@di.unipi.it> 
- * Date:   September 2015
+ * Author: Daniele De Sensi (d.desensi.software@gmail.com)
+ * Date:   03/11/2017
  * 
  */
 
@@ -42,10 +42,12 @@
 using namespace cv;
 
 int main(int argc, char *argv[]) {
-    
+#ifdef NO_CV_THREADS
+    setNumThreads(0);
+#endif
     if(argc == 1) {
         std::cout << "Usage is: " << argv[0]
-              << " input_filename filterno videooutput"
+              << " input_filename videooutput [0 = no ouput, 1 = video display, 2 = dump on output.mp4 file"
               << std::endl;
         return(0);
     }
@@ -61,41 +63,24 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     std::cout << "Input file " << argv[1] << " opened" << std::endl;
-    
-    // filter parameters
-    bool filter1=false, filter2=false;
-    if(atoi(argv[2]) == 1) { 
-        filter1 = true;  filter2 = false; 
-        std::cout << "Applying enhnace filter only" << std::endl;
-    }
-    if(atoi(argv[2]) == 2) { 
-        filter1 = false; filter2 = true;     
-        std::cout << "Applying emboss filter only" << std::endl;
-    }
-    if(atoi(argv[2]) == 3) { 
-        filter1 = true;  filter2 = true;     
-        std::cout << "Applying both filters" << std::endl;
-    }
-    
-    
+      
     Mat edges;
     // output 
-    switch(atoi(argv[3])){
-    case 0:{
-        ;
-    }break;
-    case 1:{
-        namedWindow("edges",1);
-    }break;
-    case 2:{
-        outputFile.open("output.mp4", cap.get(CV_CAP_PROP_FOURCC), cap.get(CV_CAP_PROP_FPS), cvSize((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT)), true);
-    }break;
+    switch(atoi(argv[2])){
+        case 0:{
+            ;
+        }break;
+        case 1:{
+            namedWindow("edges", 1);
+        }break;
+        case 2:{
+            outputFile.open("output.mp4", cap.get(CV_CAP_PROP_FOURCC), cap.get(CV_CAP_PROP_FPS), cvSize((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT)), true);
+        }break;
     }
 
     cv::HOGDescriptor hog;
     hog.setSVMDetector(cv::HOGDescriptor::getDefaultPeopleDetector());
 
-    
     ff::ffTime(ff::START_TIME);
     int frames = 0; 
     for(;;)  {
@@ -111,10 +96,13 @@ int main(int argc, char *argv[]) {
         std::cout << "Read " << TIME(t0) << std::endl;
 #endif
         
+
+#ifdef SHOWTIMES
+        t0 = ff::getusec();
+#endif
+
         frames++; 
-
-
-
+        
         // frame counter
         int counter = 0;
 
@@ -147,10 +135,7 @@ int main(int argc, char *argv[]) {
         // calculate current FPS
         ++counter;
 
-#ifdef SHOWTIMES
-        t0 = ff::getusec();
-#endif
-        switch(atoi(argv[3])){
+        switch(atoi(argv[2])){
         case 0:{
             ;
         }break;
@@ -163,7 +148,7 @@ int main(int argc, char *argv[]) {
         }break;
         }
 #ifdef SHOWTIMES
-        std::cout << "Show " << TIME(t0) << std::endl;
+        std::cout << "Compute + Show " << TIME(t0) << std::endl;
 #endif
     }
     ff::ffTime(ff::STOP_TIME);

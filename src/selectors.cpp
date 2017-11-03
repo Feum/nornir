@@ -27,8 +27,8 @@
 
 #include "selectors.hpp"
 #include "utils.hpp"
-#include "external/knarr/src/external/cppnanomsg/nn.hpp"
-#include "external/knarr/src/external/nanomsg/src/pair.h"
+#include "external/riff/src/external/cppnanomsg/nn.hpp"
+#include "external/riff/src/external/nanomsg/src/pair.h"
 #include <cfloat>
 #include <string>
 #include <iostream>
@@ -222,7 +222,7 @@ void Selector::updateTotalTasks(u_int64_t totalTasks){
 
 void Selector::updateBandwidthIn(){
     if(_samples->average().loadPercentage < MAX_RHO && 
-       _samples->average().loadPercentage != KNARR_VALUE_INCONSISTENT){
+       _samples->average().loadPercentage != RIFF_VALUE_INCONSISTENT){
         if(_bandwidthIn->average() == numeric_limits<double>::max()){
             _bandwidthIn->reset();
         }

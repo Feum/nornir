@@ -197,7 +197,7 @@ void Manager::run(){
         }
     }
 
-    terminationManagement(); // e.g. to collect final tasks count from knarr
+    terminationManagement(); // e.g. to collect final tasks count from riff
     ulong duration = getExecutionTime();
 
     for(auto logger : _p.loggers){
@@ -546,9 +546,9 @@ void Manager::logObservation(){
     }
 }
 
-ManagerInstrumented::ManagerInstrumented(const std::string& knarrChannel,
+ManagerInstrumented::ManagerInstrumented(const std::string& riffChannel,
                                  Parameters nornirParameters):
-        Manager(nornirParameters), _monitor(knarrChannel){
+        Manager(nornirParameters), _monitor(riffChannel){
     DEBUG("Creating configuration.");
     Manager::_configuration = new ConfigurationExternal(_p);
     DEBUG("Configuration created.");
@@ -562,10 +562,10 @@ ManagerInstrumented::ManagerInstrumented(const std::string& knarrChannel,
     _p.synchronousWorkers = false;
 }
 
-ManagerInstrumented::ManagerInstrumented(nn::socket& knarrSocket,
+ManagerInstrumented::ManagerInstrumented(nn::socket& riffSocket,
                                  int chid,
                                  Parameters nornirParameters):
-            Manager(nornirParameters), _monitor(knarrSocket, chid){
+            Manager(nornirParameters), _monitor(riffSocket, chid){
     Manager::_configuration = new ConfigurationExternal(_p);
     lockKnobs();
     _configuration->createAllRealCombinations();
@@ -597,8 +597,8 @@ MonitoredSample ManagerInstrumented::getSample(bool fromAll){
     // Knarr may return inconsistent data for latency and
     // utilization factor when performs sampling.
     // Check if this is the case.
-    if(sample.loadPercentage == KNARR_VALUE_INCONSISTENT){
-        sample.loadPercentage = KNARR_VALUE_INCONSISTENT;
+    if(sample.loadPercentage == RIFF_VALUE_INCONSISTENT){
+        sample.loadPercentage = RIFF_VALUE_INCONSISTENT;
         if(_p.requirements.minUtilization != NORNIR_REQUIREMENT_UNDEF ||
            _p.requirements.maxUtilization != NORNIR_REQUIREMENT_UNDEF){
             throw std::runtime_error("You specified requirements on loadPercentage but instrumenter is "
@@ -607,8 +607,8 @@ MonitoredSample ManagerInstrumented::getSample(bool fromAll){
                                      "to fix this issue.");
         }
     }
-    if(sample.latency == KNARR_VALUE_INCONSISTENT){
-        sample.latency = KNARR_VALUE_INCONSISTENT;
+    if(sample.latency == RIFF_VALUE_INCONSISTENT){
+        sample.latency = RIFF_VALUE_INCONSISTENT;
         if(_p.requirements.latency != NORNIR_REQUIREMENT_UNDEF){
             throw std::runtime_error("You specified requirements on latency but instrumenter is "
                                      "providing inconsistent latency values. Please call "
@@ -619,7 +619,7 @@ MonitoredSample ManagerInstrumented::getSample(bool fromAll){
     // If we were not able to collect sample data (e.g. because no tasks have
     // been received during the last sampling period), then we set
     // the latency the same as the last one.
-    if(sample.latency == KNARR_VALUE_NOT_AVAILABLE){
+    if(sample.latency == RIFF_VALUE_NOT_AVAILABLE){
         sample.latency = _samples->getLastSample().latency;
     }
     return sample;

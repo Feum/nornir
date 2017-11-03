@@ -37,7 +37,7 @@
 
 PUSH_WARNING
 GCC_DISABLE_WARNING(unused-variable)
-#include "external/knarr/src/knarr.hpp"
+#include "external/riff/src/riff.hpp"
 POP_WARNING
 
 #undef DEBUG

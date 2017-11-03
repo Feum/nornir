@@ -305,7 +305,7 @@ Predictor::~Predictor(){
 
 double Predictor::getMaximumBandwidth() const{
     if(_samples->average().loadPercentage >= MAX_RHO ||
-       _samples->average().loadPercentage == KNARR_VALUE_INCONSISTENT){
+       _samples->average().loadPercentage == RIFF_VALUE_INCONSISTENT){
         return _samples->average().bandwidth;
     }else{
         return _samples->average().getMaximumBandwidth();

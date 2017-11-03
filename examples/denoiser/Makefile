@@ -28,12 +28,14 @@ CXXFLAGS += -Wall `pkg-config --cflags opencv` #-DTRACE_FASTFLOW  -pg
 OPENCVLIB = `pkg-config --libs opencv` -pthread 
 LDLIBS 	+= $(OPENCVLIB)
 
-TARGETS	= seqvideo video video_nocvthreads 
+TARGETS	= seqvideo seqvideo_pedestrian video video_nocvthreads 
 
 all: $(TARGETS)
 
 seqvideo: seqvideo.cpp
 	$(CXX) $(OPTIMIZE_FLAGS) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
+seqvideo_pedestrian: seqvideo_pedestrian.cpp
+	$(CXX) $(OPTIMIZE_FLAGS) $(CXXFLAGS) -DSHOWTIMES -DNO_CV_THREADS -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
 video: video.cpp
 	$(CXX) -DNO_DEFAULT_MAPPING $(OPTIMIZE_FLAGS) $(CXXFLAGS) -o $@ $< $(INCS) $(LDFLAGS) $(LDLIBS)
 video_nocvthreads: video.cpp

@@ -78,7 +78,7 @@ size_t getPosition(const string& fieldName, const string& headerLine){
  */
 TEST(ManagerTest, GlobalTest) {
     // Stored samples were taken with 4 custom fileds.
-    EXPECT_EQ(KNARR_MAX_CUSTOM_FIELDS, 4);
+    EXPECT_EQ(RIFF_MAX_CUSTOM_FIELDS, 4);
     EXPECT_EQ(MAX_RHO, 96);
     for(string arch : getTestingArchitectures()){ // For all architectures
         for(string bench : getBenchmarks(arch)){ // For all benchmarks

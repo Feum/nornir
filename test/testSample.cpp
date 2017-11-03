@@ -39,7 +39,7 @@ TEST(SamplesTest, Load) {
     assert(sample.bandwidth == 100);
     assert(sample.latency == 200);
     assert(sample.numTasks == 300);
-    for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+    for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
         assert(sample.customFields[i] == i);
     }
 }
@@ -53,7 +53,7 @@ TEST(SamplesTest, Operators) {
         sample.latency = rand() % 100 + 1;
         sample.loadPercentage = rand() % 100 + 2;
         sample.numTasks = rand() % 100 + 3;
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             sample.customFields[i] = rand() % 100 + 4 + i + 1;
         }
         sample.watts = rand() % 100 + 10;
@@ -67,7 +67,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(sample2.latency, sample.latency*10);
         EXPECT_EQ(sample2.loadPercentage, sample.loadPercentage*10);
         EXPECT_EQ(sample2.numTasks, sample.numTasks*10);
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(sample2.customFields[i], sample.customFields[i]*10);
         }
         EXPECT_EQ(sample2.watts, sample.watts*10);
@@ -78,7 +78,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(sample2.latency, sample.latency);
         EXPECT_EQ(sample2.loadPercentage, sample.loadPercentage);
         EXPECT_EQ(sample2.numTasks, sample.numTasks);
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(sample2.customFields[i], sample.customFields[i]);
         }
         EXPECT_EQ(sample2.watts, sample.watts);
@@ -89,7 +89,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, sample.latency + sample2.latency);
         EXPECT_EQ(r.loadPercentage, sample.loadPercentage + sample2.loadPercentage);
         EXPECT_EQ(r.numTasks, sample.numTasks + sample2.numTasks);
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], sample.customFields[i] + sample2.customFields[i]);
         }
         EXPECT_EQ(r.watts, sample.watts + sample2.watts);
@@ -100,7 +100,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, 0);
         EXPECT_EQ(r.loadPercentage, 0);
         EXPECT_EQ(r.numTasks, 0);
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], 0);
         }
         EXPECT_EQ(r.watts, 0);
@@ -111,7 +111,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, sample.latency * sample2.latency);
         EXPECT_EQ(r.loadPercentage, sample.loadPercentage * sample2.loadPercentage);
         EXPECT_EQ(r.numTasks, sample.numTasks * sample2.numTasks);
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], sample.customFields[i] * sample2.customFields[i]);
         }
         EXPECT_EQ(r.watts, sample.watts * sample2.watts);
@@ -123,7 +123,7 @@ TEST(SamplesTest, Operators) {
         sample2.latency += 1;
         sample2.loadPercentage += 1;
         sample2.numTasks += 1;
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             sample2.customFields[i] += 1;
         }
         sample2.watts += 1;
@@ -132,7 +132,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, sample.latency / sample2.latency);
         EXPECT_EQ(r.loadPercentage, sample.loadPercentage / sample2.loadPercentage);
         EXPECT_EQ(r.numTasks, sample.numTasks / sample2.numTasks);
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], sample.customFields[i] / sample2.customFields[i]);
         }
         EXPECT_EQ(r.watts, sample.watts / sample2.watts);
@@ -143,7 +143,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, sqrt(sample.latency));
         EXPECT_EQ(r.loadPercentage, sqrt(sample.loadPercentage));
         EXPECT_EQ(r.numTasks, sqrt(sample.numTasks));
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], sqrt(sample.customFields[i]));
         }
         EXPECT_EQ(r.watts, sqrt(sample.watts));
@@ -154,7 +154,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, 0);
         EXPECT_EQ(r.loadPercentage, 0);
         EXPECT_EQ(r.numTasks, 0);
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], 0);
         }
         EXPECT_EQ(r.watts, 0);
@@ -166,7 +166,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, 0);
         EXPECT_EQ(r.loadPercentage, 0);
         EXPECT_EQ(r.numTasks, 0);
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], 0);
         }
         EXPECT_EQ(r.watts, 0);
@@ -180,7 +180,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, 0);
         EXPECT_EQ(r.loadPercentage, 0);
         EXPECT_EQ(r.numTasks, 0);
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], 0);
         }
         EXPECT_EQ(r.watts, 0);
@@ -193,7 +193,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, std::min(sample.latency, sample2.latency));
         EXPECT_EQ(r.loadPercentage, std::min(sample.loadPercentage, sample2.loadPercentage));
         EXPECT_EQ(r.numTasks, std::min(sample.numTasks, sample2.numTasks));
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], std::min(sample.customFields[i], sample2.customFields[i]));
         }
         EXPECT_EQ(r.watts, std::min(sample.watts, sample2.watts));
@@ -204,7 +204,7 @@ TEST(SamplesTest, Operators) {
         EXPECT_EQ(r.latency, std::max(sample.latency, sample2.latency));
         EXPECT_EQ(r.loadPercentage, std::max(sample.loadPercentage, sample2.loadPercentage));
         EXPECT_EQ(r.numTasks, std::max(sample.numTasks, sample2.numTasks));
-        for(size_t i = 0; i < KNARR_MAX_CUSTOM_FIELDS; i++){
+        for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
             EXPECT_EQ(r.customFields[i], std::max(sample.customFields[i], sample2.customFields[i]));
         }
         EXPECT_EQ(r.watts, std::max(sample.watts, sample2.watts));

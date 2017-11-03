@@ -125,7 +125,7 @@ std::pair<nn::socket*, uint> Instrumenter::getChannel(const std::string& paramet
 
 Instrumenter::Instrumenter(const std::string& parametersFile,
                            size_t numThreads,
-                           knarr::Aggregator *aggregator):
+                           riff::Aggregator *aggregator):
         InstrumenterHelper(getChannel(parametersFile), numThreads, aggregator){
     ;
 }

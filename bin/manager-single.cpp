@@ -1,7 +1,7 @@
 /*
  * manager-single.cpp
  *
- * Monitors and adapt an external application by using the knarr library.
+ * Monitors and adapt an external application by using the riff library.
  * Needs the explicit channel name. This is deprecated. Use manager-external.
  *
  * Created on: 21/06/2016
