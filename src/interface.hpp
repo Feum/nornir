@@ -966,7 +966,7 @@ public:
      * This call blocks until it is possible to send a shutdown request.
      */
     void shutdown(){
-        offload(dynamic_cast<S*>(EOS));
+        offload(static_cast<S*>(EOS));
     }
 
     /**
