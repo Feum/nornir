@@ -1213,7 +1213,7 @@ public:
     }
 };
 
-class ParallelFor{
+class ParallelFor: public mammut::utils::NonCopyable{
 private:
     FarmAccelerator<ParallelForRange, ParallelForRange, ParallelForRange, ParallelForRange>* _acc;
     std::vector<ParallelForWorker*> _workers;

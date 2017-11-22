@@ -273,8 +273,6 @@ void Parameters::setDefault(){
     dataflow.maxInterpreters = 0;
 
     /** Retrieving global configuration files. **/
-    vector<string> confHomes = getXdgConfigDirs();
-
     bool found = false;
     for(string confHome : getXdgConfigDirs()){
         string confFileArch = confHome + string(CONFFILE_ARCH);
