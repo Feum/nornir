@@ -8,6 +8,9 @@ dist: trusty
 install:
   # CppCheck
   - sudo apt-get install -qq cppcheck
+  # mlpack
+  - sudo add-apt-repository ppa:titas-chanda/armadillo
+  - sudo apt-get update
   - sudo apt-get install libmlpack-dev libarmadillo-dev libgsl0-dev
 
 script:

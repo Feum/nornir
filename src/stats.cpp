@@ -213,7 +213,9 @@ void LoggerStream::logSummary(const Configuration& configuration, Selector* sele
 }
 
 LoggerGraphite::LoggerGraphite(const std::string& host, unsigned int port){
-    graphite_init(host.c_str(), port);
+    if(graphite_init(host.c_str(), port)){
+        throw std::runtime_error("Impossible to connect to Graphite server.");
+    }
 }
 
 LoggerGraphite::~LoggerGraphite(){

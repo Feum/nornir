@@ -5,7 +5,7 @@ TARGET = interpreter.o stream.o mdfg.o mdfi.o
 all: $(TARGET)
 
 %.o: %.cpp *.hpp
-	$(CXX) $(CXXFLAGS) $(INCS) $(OPTIMIZE_FLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(COVERAGE_FLAGS) $(INCS) $(OPTIMIZE_FLAGS) -c -o $@ $<
 clean: 
 	-rm -fr *.o *~
 cleanall:
