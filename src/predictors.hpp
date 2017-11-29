@@ -240,9 +240,9 @@ class PredictorLinearRegression: public Predictor{
 private:
     mlpack::regression::LinearRegression _lr;
 
-    typedef std::map<KnobsValues, Observation> Observations;
+    using Observations = std::map<KnobsValues, Observation>;
     Observations _observations;
-    typedef Observations::iterator obs_it;
+    using obs_it = Observations::iterator;
 
     // Aging vector, it contains the last regressionAging KnobsValues
     std::vector<KnobsValues> _agingVector;

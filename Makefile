@@ -7,9 +7,9 @@ export CXX                   = g++
 export OPTIMIZE_FLAGS        = -finline-functions -O3 #-DPOOL
 export DEBUG_FLAGS           = #-DDEBUG_PREDICTORS -DDEBUG_SELECTORS #-DDEBUG_DF_STREAM -DDEBUG_NODE -DDEBUG_KNOB -DDEBUG_MANAGER
 export CXXFLAGS              = -Wall -pedantic --std=c++11 $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
-export LDLIBS                = -lnornir -pthread -lrt -lm -lmlpack -llapack -lblas -lgsl -lgslcblas -larmadillo -lriff -lanl
+export LDLIBS                = -lnornir -pthread -lrt -lm -lmlpack -llapack -lblas -lgsl -lgslcblas -larmadillo -lanl
 export INCS                  = -I$(realpath ./src/external/fastflow) -I$(realpath ./src/external/tclap-1.2.1/include) -I/usr/include/libxml2
-export LDFLAGS               = -L$(realpath .)/src -L$(realpath .)/src/external/riff/src
+export LDFLAGS               = -L$(realpath .)/src
 
 .PHONY: all demo clean cleanall install uninstall microbench bin test testquick gcov develcheck
 
@@ -33,9 +33,9 @@ cppcheck:
 	cppcheck --xml --xml-version=2 --enable=warning,performance,information,style --inline-suppr --error-exitcode=1 --force  . --suppressions-list=./test/cppcheck/suppressions-list.txt -isrc/external -itest -iexamples 2> cppcheck-report.xml || (cat cppcheck-report.xml; exit 2) 
 # Compiles and runs all the tests.
 test:
-	make cleanall
-	make "COVERAGE_FLAGS=-fprofile-arcs -ftest-coverage"
-	make testquick
+	$(MAKE) cleanall
+	$(MAKE) "COVERAGE_FLAGS=-fprofile-arcs -ftest-coverage"
+	$(MAKE) testquick
 testquick:
 	cd test && ./installdep.sh 
 	cd ..
