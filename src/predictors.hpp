@@ -96,7 +96,7 @@ public:
 
 /**
  * A row of the data matrix to be used in linear
- * regression for prediction of bandwidth.
+ * regression for prediction of throughput.
  */
 class RegressionDataServiceTime: public RegressionData{
 private:
@@ -159,7 +159,7 @@ public:
  * Type of predictor.
  */
 typedef enum PredictorType{
-    PREDICTION_BANDWIDTH = 0,
+    PREDICTION_THROUGHPUT = 0,
     PREDICTION_POWER
 }PredictorType;
 
@@ -174,7 +174,7 @@ protected:
     const Smoother<MonitoredSample>* _samples;
     double _modelError;
 
-    double getMaximumBandwidth() const;
+    double getMaximumThroughput() const;
     double getCurrentPower() const;
 public:
     Predictor(PredictorType type,
@@ -359,20 +359,20 @@ private:
     double _chisq;
     std::vector<double> _coefficients;
     bool _preparationNeeded;
-    double _maxFreqBw;
-    double _minFreqBw;
-    double _minFreqCoresBw;
+    double _maxFreqThr;
+    double _minFreqThr;
+    double _minFreqCoresThr;
     double _minFrequency;
     double _maxFrequency;
 
     // The following variables are used to update
     // the model after an external interference (typical
     // another application running on the system).
-    double _minFreqCoresBwNew;
+    double _minFreqCoresThrNew;
     double _n1, _n2;
-    double _minFreqN1Bw, _minFreqN2Bw;
+    double _minFreqN1Thr, _minFreqN2Thr;
 
-    double getMinFreqCoresBw() const;
+    double getMinFreqCoresThr() const;
     double geta() const;
     double getb() const;
     void seta(double a);

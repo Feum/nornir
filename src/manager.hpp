@@ -204,9 +204,9 @@ protected:
     virtual void terminationManagement();
 
     /**
-     * Updates the required bandwidth.
+     * Updates the required throughput.
      */
-    void updateRequiredBandwidth();
+    void updateRequiredThroughput();
 
     /**
      * Set a specified domain to the highest frequency.

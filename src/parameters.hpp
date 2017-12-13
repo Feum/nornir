@@ -474,10 +474,10 @@ typedef struct ArchData{
  * This class contains the requirements specified by the user.
  */
 typedef struct Requirements{
-    // The bandwidth required for the application (expressed as tasks/sec).
+    // The throughput required for the application (expressed as tasks/sec).
     // It must be greater or equal than 0.
     // [default = unused].
-    double bandwidth;
+    double throughput;
 
     // The maximum cores power to be used.
     // It must be greater or equal than 0.
@@ -527,14 +527,14 @@ typedef struct{
     std::string applicationName;
     /**
      * File containing the names of the applications, in the same
-     * order of the columns in bandwidth and power data.
+     * order of the columns in throughput and power data.
      */
     std::string namesData;
     /**
-     * File containing the data about the bandwidth. One column per application,
+     * File containing the data about the throughput. One column per application,
      * one row per configuration. Data doesn't need to be normalized.
      */
-    std::string bandwidthData;
+    std::string throughputData;
     /**
      * File containing the data about the power. One column per application,
      * one row per configuration. Data doesn't need to be normalized.

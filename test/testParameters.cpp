@@ -42,14 +42,14 @@ TEST(ParametersTest, SimpleTest) {
     p.requirements.minUtilization = NORNIR_REQUIREMENT_UNDEF;
     p.requirements.maxUtilization = NORNIR_REQUIREMENT_UNDEF;
 
-    // Bandwidth negative
-    p.requirements.bandwidth = -1;
+    // Throughput negative
+    p.requirements.throughput = -1;
     EXPECT_EQ(p.validate(), VALIDATION_WRONG_REQUIREMENT);
 
-    // Bandwidth ok
-    p.requirements.bandwidth = 100;
+    // Throughput ok
+    p.requirements.throughput = 100;
     EXPECT_EQ(p.validate(), VALIDATION_OK);
-    p.requirements.bandwidth = NORNIR_REQUIREMENT_UNDEF;
+    p.requirements.throughput = NORNIR_REQUIREMENT_UNDEF;
 
     // Execution time negative
     p.requirements.executionTime = -1;
@@ -82,14 +82,14 @@ TEST(ParametersTest, SimpleTest) {
 
     // Ok power
     p.requirements.powerConsumption = 100;
-    p.requirements.bandwidth = NORNIR_REQUIREMENT_MAX;
+    p.requirements.throughput = NORNIR_REQUIREMENT_MAX;
     EXPECT_EQ(p.validate(), VALIDATION_OK);
     p.requirements.powerConsumption = NORNIR_REQUIREMENT_UNDEF;
 
     // All requirement and one min
     p.requirements.minUtilization = 80;
     p.requirements.maxUtilization = 90;
-    p.requirements.bandwidth = 10;
+    p.requirements.throughput = 10;
     p.requirements.latency = 10;
     p.requirements.powerConsumption = NORNIR_REQUIREMENT_MIN;
     EXPECT_EQ(p.validate(), VALIDATION_OK);
@@ -99,7 +99,7 @@ TEST(ParametersTest, SimpleTest) {
     EXPECT_EQ(p.validate(), VALIDATION_WRONG_REQUIREMENT);
     p.requirements.minUtilization = NORNIR_REQUIREMENT_UNDEF;
     p.requirements.maxUtilization = NORNIR_REQUIREMENT_UNDEF;
-    p.requirements.bandwidth = NORNIR_REQUIREMENT_UNDEF;
+    p.requirements.throughput = NORNIR_REQUIREMENT_UNDEF;
     p.requirements.latency = NORNIR_REQUIREMENT_UNDEF;
     p.requirements.powerConsumption = NORNIR_REQUIREMENT_UNDEF;
 }

@@ -241,13 +241,13 @@ static inline double getMaxPerformance(const std::map<KnobsValues, double>& prim
 void ManagerMulti::updateAllocations(Manager* const m){
     const std::map<KnobsValues, double>& primaryValues = dynamic_cast<SelectorPredictive*>(m->_selector)->getPrimaryPredictions();
     const std::map<KnobsValues, double>& secondaryValues = dynamic_cast<SelectorPredictive*>(m->_selector)->getSecondaryPredictions();
-    double primaryBound = m->_p.requirements.bandwidth;
+    double primaryBound = m->_p.requirements.throughput;
     ManagerData& md = _managerData[m];
     double referencePerformance;
-    if(isMinMaxRequirement(m->_p.requirements.bandwidth)){
+    if(isMinMaxRequirement(m->_p.requirements.throughput)){
         referencePerformance = getMaxPerformance(primaryValues);
     }else{
-        referencePerformance = m->_p.requirements.bandwidth;
+        referencePerformance = m->_p.requirements.throughput;
     }
     md.minPerf = (md.minPerfReqPerc / 100.0) * referencePerformance;
 

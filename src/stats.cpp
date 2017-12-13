@@ -72,7 +72,7 @@ LoggerStream::LoggerStream(std::ostream *statsStream,
         Logger(timeOffset),
         _statsStream(statsStream), _calibrationStream(calibrationStream),
         _summaryStream(summaryStream), _timeOffset(timeOffset),
-        _steadySamples(0), _steadyBandwidth(0), _steadyWatts(0){
+        _steadySamples(0), _steadyThroughput(0), _steadyWatts(0){
     if(!*_statsStream ||
        !*_calibrationStream ||
        !*_summaryStream){
@@ -82,9 +82,9 @@ LoggerStream::LoggerStream(std::ostream *statsStream,
     *_statsStream << "[VirtualCores]" << "\t";
     *_statsStream << "Workers" << "\t";
     *_statsStream << "Frequency" << "\t";
-    *_statsStream << "CurrentBandwidth" << "\t";
-    *_statsStream << "SmoothedBandwidth" << "\t";
-    *_statsStream << "CoeffVarBandwidth" << "\t";
+    *_statsStream << "CurrentThroughput" << "\t";
+    *_statsStream << "SmoothedThroughput" << "\t";
+    *_statsStream << "CoeffVarThroughput" << "\t";
     *_statsStream << "SmoothedLatency" << "\t";
     *_statsStream << "SmoothedUtilization" << "\t";
     *_statsStream << "CurrentWatts" << "\t";
@@ -100,7 +100,7 @@ LoggerStream::LoggerStream(std::ostream *statsStream,
     *_calibrationStream << endl;
 
     *_summaryStream << "Watts" << "\t";
-    *_summaryStream << "Bandwidth" << "\t";
+    *_summaryStream << "Throughput" << "\t";
     *_summaryStream << "CompletionTimeSec" << "\t";
     *_summaryStream << "CalibrationSteps" << "\t";
     *_summaryStream << "CalibrationTimeMs" << "\t";
@@ -135,9 +135,9 @@ void LoggerStream::log(bool isCalibrationPhase,
     std::ostringstream strs;
     strs << std::fixed << std::setprecision(0) << configuration.getRealValue(KNOB_FREQUENCY);
     *_statsStream << strs.str() << "\t";
-    *_statsStream << samples.getLastSample().bandwidth << "\t";
-    *_statsStream << ms.bandwidth << "\t";
-    *_statsStream << samples.coefficientVariation().bandwidth << "\t";
+    *_statsStream << samples.getLastSample().throughput << "\t";
+    *_statsStream << ms.throughput << "\t";
+    *_statsStream << samples.coefficientVariation().throughput << "\t";
     *_statsStream << ms.latency << "\t";
     *_statsStream << ms.loadPercentage << "\t";
 
@@ -148,7 +148,7 @@ void LoggerStream::log(bool isCalibrationPhase,
 
     if(!isCalibrationPhase){
         ++_steadySamples;
-        _steadyBandwidth += samples.getLastSample().bandwidth;
+        _steadyThroughput += samples.getLastSample().throughput;
         _steadyWatts += samples.getLastSample().watts;
     }
 }
@@ -183,7 +183,7 @@ void LoggerStream::logSummary(const Configuration& configuration, Selector* sele
     }
 
     *_summaryStream << _steadyWatts / _steadySamples << "\t";
-    *_summaryStream << _steadyBandwidth / _steadySamples << "\t";
+    *_summaryStream << _steadyThroughput / _steadySamples << "\t";
     *_summaryStream << (double) durationMs / 1000.0 << "\t";
     *_summaryStream << totalCalibration.numSteps << "\t";
     *_summaryStream << totalCalibration.duration << "\t";
@@ -245,8 +245,8 @@ void LoggerGraphite::log(bool isCalibrationPhase,
     /*************************************************/
     /*                Monitor info                   */
     /*************************************************/
-    graphite_send_plain("nornir.monitor.bandwidth.current", samples.getLastSample().bandwidth, timestamp);
-    graphite_send_plain("nornir.monitor.bandwidth.average", samples.average().bandwidth, timestamp);
+    graphite_send_plain("nornir.monitor.throughput.current", samples.getLastSample().throughput, timestamp);
+    graphite_send_plain("nornir.monitor.throughput.average", samples.average().throughput, timestamp);
     graphite_send_plain("nornir.monitor.power.current", samples.getLastSample().watts, timestamp);
     graphite_send_plain("nornir.monitor.power.average", samples.average().watts, timestamp);
     graphite_send_plain("nornir.monitor.latency.current", samples.getLastSample().latency, timestamp);
@@ -257,9 +257,9 @@ void LoggerGraphite::log(bool isCalibrationPhase,
     /*************************************************/
     /*              Requirements info                */
     /*************************************************/
-    if(requirements.bandwidth != NORNIR_REQUIREMENT_MAX &&
-       requirements.bandwidth != NORNIR_REQUIREMENT_UNDEF){
-        graphite_send_plain("nornir.requirements.bandwidth", requirements.bandwidth, timestamp);
+    if(requirements.throughput != NORNIR_REQUIREMENT_MAX &&
+       requirements.throughput != NORNIR_REQUIREMENT_UNDEF){
+        graphite_send_plain("nornir.requirements.throughput", requirements.throughput, timestamp);
     }
 
     if(requirements.powerConsumption != NORNIR_REQUIREMENT_MIN &&

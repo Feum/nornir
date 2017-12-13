@@ -125,12 +125,12 @@ typedef struct MonitoredSample: public riff::ApplicationSample{
     MonitoredSample(MonitoredSample const& sample):
         riff::ApplicationSample(sample), watts(sample.watts){;}
 
-    double getMaximumBandwidth(){
+    double getMaximumThroughput(){
         if(loadPercentage < MAX_RHO &&
            loadPercentage != RIFF_VALUE_INCONSISTENT){
-            return bandwidth / (loadPercentage / 100.0);
+            return throughput / (loadPercentage / 100.0);
         }else{
-            return bandwidth;
+            return throughput;
         }
     }
 
@@ -246,8 +246,8 @@ inline MonitoredSample squareRoot(const MonitoredSample& x){
     if(x.loadPercentage != RIFF_VALUE_INCONSISTENT){
         r.loadPercentage = sqrt(x.loadPercentage);
     }
-    if(x.bandwidth != RIFF_VALUE_INCONSISTENT){
-       r.bandwidth = sqrt(x.bandwidth);
+    if(x.throughput != RIFF_VALUE_INCONSISTENT){
+       r.throughput = sqrt(x.throughput);
     }
     if(x.latency != RIFF_VALUE_INCONSISTENT){
         r.latency = sqrt(x.latency);
@@ -264,7 +264,7 @@ inline MonitoredSample squareRoot(const MonitoredSample& x){
 
 inline void zero(MonitoredSample& x){
     x.loadPercentage = 0;
-    x.bandwidth = 0;
+    x.throughput = 0;
     x.latency = 0;
     x.numTasks = 0;
     for(size_t i = 0; i < RIFF_MAX_CUSTOM_FIELDS; i++){
@@ -277,8 +277,8 @@ inline void regularize(MonitoredSample& x){
     if(x.loadPercentage < 0 && x.loadPercentage != RIFF_VALUE_INCONSISTENT){
         x.loadPercentage = 0;
     }
-    if(x.bandwidth < 0 && x.bandwidth != RIFF_VALUE_INCONSISTENT){
-        x.bandwidth = 0;
+    if(x.throughput < 0 && x.throughput != RIFF_VALUE_INCONSISTENT){
+        x.throughput = 0;
     }
     if(x.latency < 0 && x.latency != RIFF_VALUE_INCONSISTENT){
         x.latency = 0;
@@ -304,10 +304,10 @@ inline MonitoredSample minimum(const MonitoredSample& a,
     }else{
         ms.loadPercentage = RIFF_VALUE_INCONSISTENT;
     }
-    if(a.bandwidth != RIFF_VALUE_INCONSISTENT && b.bandwidth != RIFF_VALUE_INCONSISTENT){
-        ms.bandwidth = std::min(a.bandwidth, b.bandwidth);
+    if(a.throughput != RIFF_VALUE_INCONSISTENT && b.throughput != RIFF_VALUE_INCONSISTENT){
+        ms.throughput = std::min(a.throughput, b.throughput);
     }else{
-        ms.bandwidth = RIFF_VALUE_INCONSISTENT;
+        ms.throughput = RIFF_VALUE_INCONSISTENT;
     }
     if(a.latency != RIFF_VALUE_INCONSISTENT && b.latency != RIFF_VALUE_INCONSISTENT){
         ms.latency = std::min(a.latency, b.latency);
@@ -334,10 +334,10 @@ inline MonitoredSample maximum(const MonitoredSample& a,
     }else{
         ms.loadPercentage = RIFF_VALUE_INCONSISTENT;
     }
-    if(a.bandwidth != RIFF_VALUE_INCONSISTENT && b.bandwidth != RIFF_VALUE_INCONSISTENT){
-        ms.bandwidth = std::max(a.bandwidth, b.bandwidth);
+    if(a.throughput != RIFF_VALUE_INCONSISTENT && b.throughput != RIFF_VALUE_INCONSISTENT){
+        ms.throughput = std::max(a.throughput, b.throughput);
     }else{
-        ms.bandwidth = RIFF_VALUE_INCONSISTENT;
+        ms.throughput = RIFF_VALUE_INCONSISTENT;
     }
     if(a.latency != RIFF_VALUE_INCONSISTENT && b.latency != RIFF_VALUE_INCONSISTENT){
         ms.latency = std::max(a.latency, b.latency);

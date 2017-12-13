@@ -303,12 +303,12 @@ Predictor::~Predictor(){
     ;
 }
 
-double Predictor::getMaximumBandwidth() const{
+double Predictor::getMaximumThroughput() const{
     if(_samples->average().loadPercentage >= MAX_RHO ||
        _samples->average().loadPercentage == RIFF_VALUE_INCONSISTENT){
-        return _samples->average().bandwidth;
+        return _samples->average().throughput;
     }else{
-        return _samples->average().getMaximumBandwidth();
+        return _samples->average().getMaximumThroughput();
     }
 }
 
@@ -322,7 +322,7 @@ PredictorLinearRegression::PredictorLinearRegression(PredictorType type,
                                                      const Smoother<MonitoredSample>* samples):
         Predictor(type, p, configuration, samples), _preparationNeeded(true){
     switch(_type){
-        case PREDICTION_BANDWIDTH:{
+        case PREDICTION_THROUGHPUT:{
             _predictionInput = new RegressionDataServiceTime(p, configuration, samples);
         }break;
         case PREDICTION_POWER:{
@@ -358,8 +358,8 @@ bool PredictorLinearRegression::readyForPredictions(){
 double PredictorLinearRegression::getCurrentResponse() const{
     double r = 0.0;
     switch(_type){
-        case PREDICTION_BANDWIDTH:{
-            r = 1.0 / getMaximumBandwidth();
+        case PREDICTION_THROUGHPUT:{
+            r = 1.0 / getMaximumThroughput();
         }break;
         case PREDICTION_POWER:{
             r = getCurrentPower();
@@ -398,7 +398,7 @@ void PredictorLinearRegression::refine(){
         // The key does not exist in the map
         Observation o;
         switch(_type){
-            case PREDICTION_BANDWIDTH:{
+            case PREDICTION_THROUGHPUT:{
                 o.data = new RegressionDataServiceTime(_p, _configuration, _samples);
             }break;
             case PREDICTION_POWER:{
@@ -506,7 +506,7 @@ double PredictorLinearRegression::predict(const KnobsValues& values){
     predictionInputMlShed.resize(realSize, 1);
 
     _lr.Predict(predictionInputMlShed, result);
-    if(_type == PREDICTION_BANDWIDTH){
+    if(_type == PREDICTION_THROUGHPUT){
         res = 1.0 / result.at(0);
     }else{
         res = result.at(0);
@@ -535,11 +535,11 @@ PredictorUsl::PredictorUsl(PredictorType type,
                     Predictor(type, p, configuration, samples),
                     _maxPolDegree(POLYNOMIAL_DEGREE_USL),
                     _ws(NULL), _x(NULL), _y(NULL), _chisq(0),
-                    _preparationNeeded(true), _maxFreqBw(0), _minFreqBw(0),
-                    _minFreqCoresBw(0), _minFreqCoresBwNew(0), _n1(0), _n2(0),
-                    _minFreqN1Bw(0), _minFreqN2Bw(0){
-    if(type != PREDICTION_BANDWIDTH){
-        throw std::runtime_error("PredictorUsl can only be used for bandwidth predictions.");
+                    _preparationNeeded(true), _maxFreqThr(0), _minFreqThr(0),
+                    _minFreqCoresThr(0), _minFreqCoresThrNew(0), _n1(0), _n2(0),
+                    _minFreqN1Thr(0), _minFreqN2Thr(0){
+    if(type != PREDICTION_THROUGHPUT){
+        throw std::runtime_error("PredictorUsl can only be used for throughput predictions.");
     }
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
         _maxPolDegree -= 1; //To remove x^0 value.
@@ -569,35 +569,35 @@ bool PredictorUsl::readyForPredictions(){
 void PredictorUsl::refine(){
     double numCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
     double frequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
-    double bandwidth = getMaximumBandwidth();
+    double throughput = getMaximumThroughput();
 
     double maxCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().size();
     if(frequency == _maxFrequency && numCores == maxCores){
-        _maxFreqBw = bandwidth;
+        _maxFreqThr = throughput;
         return;
     }else if(frequency == _minFrequency){
         if(numCores == maxCores){
-            _minFreqBw = bandwidth;
+            _minFreqThr = throughput;
         }else if(numCores == 1){
-            _minFreqCoresBw = bandwidth;
+            _minFreqCoresThr = throughput;
         }
     }else if(frequency != _minFrequency){
-        double minMaxScaling = _maxFreqBw / _minFreqBw;
-        // We get the expected bandwidth at minimum frequency starting from the actual
-        // bandwidth at generic frequency. To do so we apply the inverse of the function 
-        // used in predict() to get the bandwidth at a generic frequency starting
+        double minMaxScaling = _maxFreqThr / _minFreqThr;
+        // We get the expected throughput at minimum frequency starting from the actual
+        // throughput at generic frequency. To do so we apply the inverse of the function
+        // used in predict() to get the throughput at a generic frequency starting
         // from that at minimum frequency.
-        bandwidth = (bandwidth*(_maxFrequency - _minFrequency))/(_maxFrequency - frequency + minMaxScaling*(frequency - _minFrequency));
+        throughput = (throughput*(_maxFrequency - _minFrequency))/(_maxFrequency - frequency + minMaxScaling*(frequency - _minFrequency));
         //frequency = _minFrequency;
     }
 
     double x, y;
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
         x = numCores - 1;
-        y = ((_minFreqCoresBw * numCores)/bandwidth) - 1;
+        y = ((_minFreqCoresThr * numCores)/throughput) - 1;
     }else{
         x = numCores - 1;
-        y = numCores / bandwidth;
+        y = numCores / throughput;
     }
 
     // Checks if a y is already present for this x
@@ -665,32 +665,32 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
         result += _coefficients.at(i)*std::pow(numCores - 1, exp);
     }
 
-    double bandwidth;
+    double throughput;
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-        bandwidth = (numCores * _minFreqCoresBw)/(result + 1);
+        throughput = (numCores * _minFreqCoresThr)/(result + 1);
     }else{
-        bandwidth = (numCores / result);
+        throughput = (numCores / result);
     }
 
-    // If we are trying to predict the bandwidth with the
-    // maximum number of cores, as value for bandwidth at minimum frequency
+    // If we are trying to predict the throughput with the
+    // maximum number of cores, as value for throughput at minimum frequency
     // use the value we stored instead of the predicted one.
     if(numCores == _configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().size()){
-        bandwidth = _minFreqBw;
+        throughput = _minFreqThr;
     }
 
     if(frequency != _minFrequency){
-        double minMaxScaling = _maxFreqBw / _minFreqBw;
-        double maxFreqPred = bandwidth * minMaxScaling;
-        return ((maxFreqPred - bandwidth)/(_maxFrequency - _minFrequency))*frequency + ((bandwidth*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
+        double minMaxScaling = _maxFreqThr / _minFreqThr;
+        double maxFreqPred = throughput * minMaxScaling;
+        return ((maxFreqPred - throughput)/(_maxFrequency - _minFrequency))*frequency + ((throughput*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
     }else{
-        return bandwidth;
+        return throughput;
     }
 }
 
-double PredictorUsl::getMinFreqCoresBw() const{
+double PredictorUsl::getMinFreqCoresThr() const{
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-        return _minFreqCoresBw;
+        return _minFreqCoresThr;
     }else{
         return 1.0 / _coefficients[0];
     }
@@ -730,46 +730,46 @@ void PredictorUsl::setb(double b){
 
 double PredictorUsl::getTheta(RecordInterferenceArgument n){
     int numCores;
-    int bw;
+    int throughput;
     if(n == RECONFARG_N1){
         numCores = _n1;
-        bw = _minFreqN1Bw;
+        throughput = _minFreqN1Thr;
     }else{
         numCores = _n2;
-        bw = _minFreqN2Bw;
+        throughput = _minFreqN2Thr;
     }
     KnobsValues kv(KNOB_VALUE_REAL);
     kv[KNOB_FREQUENCY] = _minFrequency;
     kv[KNOB_VIRTUAL_CORES] = numCores;
-    return (((getMinFreqCoresBw()*numCores)/predict(kv)) - 1) - (((_minFreqCoresBwNew*numCores)/bw) - 1);
+    return (((getMinFreqCoresThr()*numCores)/predict(kv)) - 1) - (((_minFreqCoresThrNew*numCores)/throughput) - 1);
 }
 
 void PredictorUsl::updateInterference(){
     double numCores = _configuration.getRealValue(KNOB_VIRTUAL_CORES);
     double frequency = _configuration.getRealValue(KNOB_FREQUENCY);
-    double bandwidth = _samples->average().bandwidth;
+    double throughput = _samples->average().throughput;
     // TODO: At the moment I'm assuming that interferences does not change the
     // slope when we fix number of cores and we change the frequency.
     if(frequency != _minFrequency){
-        // We compute the 'old' bandwidth at minimum frequency
+        // We compute the 'old' throughput at minimum frequency
         KnobsValues kv(KNOB_VALUE_REAL);
         kv[KNOB_FREQUENCY] = _minFrequency;
         kv[KNOB_VIRTUAL_CORES] = numCores;
         double minFreqPred = predict(kv);
         kv[KNOB_FREQUENCY] = frequency;
         double currentFreqPred = predict(kv);
-        double prop = bandwidth / currentFreqPred;
-        bandwidth = prop*minFreqPred;
+        double prop = throughput / currentFreqPred;
+        throughput = prop*minFreqPred;
     }
 
     if(numCores == 1){
-        _minFreqCoresBwNew = bandwidth;
+        _minFreqCoresThrNew = throughput;
     }else if(!_n1){
         _n1 = numCores;
-        _minFreqN1Bw = bandwidth;
+        _minFreqN1Thr = throughput;
     }else{
         _n2 = numCores;
-        _minFreqN2Bw = bandwidth;
+        _minFreqN2Thr = throughput;
     }
 }
 
@@ -785,10 +785,10 @@ void PredictorUsl::updateCoefficients(){
     seta(newA);
     setb(newB);
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL){
-        _minFreqCoresBw = _minFreqCoresBwNew;
+        _minFreqCoresThr = _minFreqCoresThrNew;
         _n1 = 0;
         _n2 = 0;
-        _minFreqCoresBwNew = 0;
+        _minFreqCoresThrNew = 0;
     }
 }
 
@@ -857,9 +857,9 @@ void PredictorAnalytical::clear(){
 
 double PredictorAnalytical::predict(const KnobsValues& values){
     switch(_type){
-        case PREDICTION_BANDWIDTH:{
+        case PREDICTION_THROUGHPUT:{
             double scalingFactor = getScalingFactor(values);
-            return getMaximumBandwidth() * scalingFactor;
+            return getMaximumThroughput() * scalingFactor;
         }break;
         case PREDICTION_POWER:{
             return getPowerPrediction(values);
@@ -920,16 +920,16 @@ void PredictorLeo::refine(){
         throw std::runtime_error("[Leo] Invalid configuration index: " + confId);
     }
     switch(_type){
-        case PREDICTION_BANDWIDTH:{
-            // TODO In the offline profiling data we have bandwidthMax, not bandwidth
+        case PREDICTION_THROUGHPUT:{
+            // TODO In the offline profiling data we have throughputMax, not throughput
             // According, if we do not have PERF_UTILIZATION contracts and we have
             // a utilization < 1, results may be wrong.
 #if 0
             if(_samples->average().utilisation < MAX_RHO){
-                throw std::runtime_error("[Leo] bandwidth bandwidthMax problem.");
+                throw std::runtime_error("[Leo] throughput throughputMax problem.");
             }
 #endif
-            _values.at(confId) = getMaximumBandwidth();
+            _values.at(confId) = getMaximumThroughput();
         }break;
         case PREDICTION_POWER:{
             _values.at(confId) = getCurrentPower();
@@ -950,8 +950,8 @@ void PredictorLeo::prepareForPredictions(){
         string dataFile;
         bool perColumnNormalization;
         switch(_type){
-            case PREDICTION_BANDWIDTH:{
-                dataFile = _p.leo.bandwidthData;
+            case PREDICTION_THROUGHPUT:{
+                dataFile = _p.leo.throughputData;
                 perColumnNormalization = true;
             }break;
             case PREDICTION_POWER:{
@@ -1006,8 +1006,8 @@ void PredictorFullSearch::clear(){
 void PredictorFullSearch::refine(){
     double value = 0;
     switch(_type){
-        case PREDICTION_BANDWIDTH:{
-            value = getMaximumBandwidth();
+        case PREDICTION_THROUGHPUT:{
+            value = getMaximumThroughput();
         }break;
         case PREDICTION_POWER:{
             value = getCurrentPower();

@@ -181,7 +181,7 @@ protected:
     std::ostream* _summaryStream;
     unsigned int _timeOffset;
     unsigned long long _steadySamples;
-    double _steadyBandwidth;
+    double _steadyThroughput;
     double _steadyWatts;
 public:
 

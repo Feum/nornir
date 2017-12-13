@@ -233,7 +233,7 @@ void AdaptiveNode::storeSample(){
     }else{
         _sampleResponse.latency = 0.0;
     }
-    _sampleResponse.bandwidth = (double) _numTasks / ticksToSeconds(totalTicks, _ticksPerNs);
+    _sampleResponse.throughput = (double) _numTasks / ticksToSeconds(totalTicks, _ticksPerNs);
 
     reset();
 

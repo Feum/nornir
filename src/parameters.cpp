@@ -200,7 +200,7 @@ void ArchData::loadXml(const string& archFileName){
 }
 
 Requirements::Requirements(){
-    bandwidth = NORNIR_REQUIREMENT_UNDEF;
+    throughput = NORNIR_REQUIREMENT_UNDEF;
     powerConsumption = NORNIR_REQUIREMENT_UNDEF;
     minUtilization = NORNIR_REQUIREMENT_UNDEF;
     maxUtilization = NORNIR_REQUIREMENT_UNDEF;
@@ -210,7 +210,7 @@ Requirements::Requirements(){
 }
 
 bool Requirements::anySpecified() const{
-    return bandwidth != NORNIR_REQUIREMENT_UNDEF ||
+    return throughput != NORNIR_REQUIREMENT_UNDEF ||
            powerConsumption != NORNIR_REQUIREMENT_UNDEF ||
            minUtilization != NORNIR_REQUIREMENT_UNDEF ||
            maxUtilization != NORNIR_REQUIREMENT_UNDEF ||
@@ -263,7 +263,7 @@ void Parameters::setDefault(){
 
     leo.applicationName = "";
     leo.namesData = "";
-    leo.bandwidthData = "";
+    leo.throughputData = "";
     leo.powerData = "";
     leo.numSamples = 20;
 
@@ -466,8 +466,8 @@ ParametersValidation Parameters::validateRequirements(){
             return VALIDATION_WRONG_REQUIREMENT;
         }
     }
-    if(requirements.bandwidth != NORNIR_REQUIREMENT_UNDEF &&
-       requirements.bandwidth < 0){
+    if(requirements.throughput != NORNIR_REQUIREMENT_UNDEF &&
+       requirements.throughput < 0){
         return VALIDATION_WRONG_REQUIREMENT;
     }
     if(requirements.executionTime != NORNIR_REQUIREMENT_UNDEF &&
@@ -504,7 +504,7 @@ ParametersValidation Parameters::validateRequirements(){
     }
 
     uint maxMinRequirements = 0;
-    if(requirements.bandwidth == NORNIR_REQUIREMENT_MAX){
+    if(requirements.throughput == NORNIR_REQUIREMENT_MAX){
         ++maxMinRequirements;
     }
     if(requirements.executionTime == NORNIR_REQUIREMENT_MIN){
@@ -518,7 +518,7 @@ ParametersValidation Parameters::validateRequirements(){
     }
 
     // TODO: Remove Utilization requirements (can be obtained through
-    // bandwidth + tolerance/conservative
+    // throughput + tolerance/conservative
     // At most 1 min/max requirement can be specified.
     if(maxMinRequirements > 1){
         return VALIDATION_WRONG_REQUIREMENT;
@@ -572,7 +572,7 @@ ParametersValidation Parameters::validateSelector(){
     knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_HYPERTHREADING] = false;
 
     if(strategySelection == STRATEGY_SELECTION_LEO &&
-       (leo.bandwidthData.compare("") == 0 ||
+       (leo.throughputData.compare("") == 0 ||
         leo.powerData.compare("") == 0 ||
         leo.applicationName.compare("") == 0 ||
         leo.namesData.compare("") == 0)){
@@ -645,7 +645,7 @@ ParametersValidation Parameters::validateSelector(){
         }
 
         if(strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_LEO &&
-             (leo.bandwidthData.compare("") == 0 ||
+             (leo.throughputData.compare("") == 0 ||
               leo.powerData.compare("") == 0 ||
               leo.applicationName.compare("") == 0 ||
               leo.namesData.compare("") == 0)){
@@ -748,7 +748,7 @@ template<> char const* enumStrings<StrategyPhaseDetection>::data[] = {
 void Parameters::loadXml(const string& paramFileName){
     XmlTree xt(paramFileName, "nornirParameters");
 
-    SETVALUE(xt, DoubleOrMax, requirements.bandwidth);
+    SETVALUE(xt, DoubleOrMax, requirements.throughput);
     SETVALUE(xt, DoubleOrMin, requirements.powerConsumption);
     SETVALUE(xt, Double, requirements.minUtilization);
     SETVALUE(xt, Double, requirements.maxUtilization);
@@ -804,7 +804,7 @@ void Parameters::loadXml(const string& paramFileName){
 
     SETVALUE(xt, String, leo.applicationName);
     SETVALUE(xt, String, leo.namesData);
-    SETVALUE(xt, String, leo.bandwidthData);
+    SETVALUE(xt, String, leo.throughputData);
     SETVALUE(xt, String, leo.powerData);
     SETVALUE(xt, Uint, leo.numSamples);
 

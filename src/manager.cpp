@@ -182,7 +182,7 @@ void Manager::run(){
         startSample = getMillisecondsTime();
         if(!_inhibited){
             observe();
-            updateRequiredBandwidth();
+            updateRequiredThroughput();
 
             if(!persist()){
                 DEBUG("Asking selector.");
@@ -310,13 +310,13 @@ void Manager::postConfigurationManagement(){;}
 
 void Manager::terminationManagement(){;}
 
-void Manager::updateRequiredBandwidth() {
+void Manager::updateRequiredThroughput() {
     if(isPrimaryRequirement(_p.requirements.executionTime)){
         double now = getMillisecondsTime();
         if(now / 1000.0 >= _deadline){
-            _p.requirements.bandwidth = numeric_limits<double>::max();
+            _p.requirements.throughput = numeric_limits<double>::max();
         }else{
-            _p.requirements.bandwidth = _remainingTasks / ((_deadline * 1000.0 - now) / 1000.0);
+            _p.requirements.throughput = _remainingTasks / ((_deadline * 1000.0 - now) / 1000.0);
         }
     }
 }
@@ -340,7 +340,7 @@ bool Manager::persist() const{
         case STRATEGY_PERSISTENCE_VARIATION:{
             const MonitoredSample& variation = _samples->coefficientVariation();
             r = _samples->size() < 1 ||
-                variation.bandwidth > _p.persistenceValue ||
+                variation.throughput > _p.persistenceValue ||
                 variation.latency > _p.persistenceValue ||
                 variation.watts > _p.persistenceValue;
         }break;
@@ -464,7 +464,7 @@ void Manager::observe(){
                 // for the number of workers since we do it for the totalTasks
                 // count. When this flag is set we count iterations, not real
                 // tasks.
-                sample.bandwidth /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
+                sample.throughput /= _configuration->getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
                 // When we have synchronous workers we need to count the iterations,
                 // not the real tasks (indeed in this case each worker will receive
                 // the same amount of tasks, e.g. in canneal) since they are sent in
@@ -477,7 +477,7 @@ void Manager::observe(){
     if(store){
         updateTasksCount(sample);
         _samples->add(sample);
-        _variations->add(_samples->coefficientVariation().bandwidth);
+        _variations->add(_samples->coefficientVariation().throughput);
 
         DEBUGB(samplesFile << sample << "\n");
         logObservation();
@@ -662,7 +662,7 @@ ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters nornirParameters):
     // (we count instructions).
     _p.synchronousWorkers = false;
     // Check supported requirements.
-    if(isPrimaryRequirement(_p.requirements.bandwidth) ||
+    if(isPrimaryRequirement(_p.requirements.throughput) ||
        _p.requirements.maxUtilization != NORNIR_REQUIREMENT_UNDEF ||
        isPrimaryRequirement(_p.requirements.executionTime) ||
        _p.requirements.latency != NORNIR_REQUIREMENT_UNDEF){
@@ -712,7 +712,7 @@ MonitoredSample ManagerBlackBox::getSample(){
         return sample;
     }
     _process->getAndResetInstructions(instructions);
-    sample.bandwidth = instructions / ((getMillisecondsTime() - _lastStoredSampleMs) / 1000.0);
+    sample.throughput = instructions / ((getMillisecondsTime() - _lastStoredSampleMs) / 1000.0);
     sample.latency = -1; // Not used.
     sample.loadPercentage = 100.0; // We do not know what's the input bandwidth.
     sample.numTasks = instructions; // We consider a task to be an instruction.
@@ -769,7 +769,7 @@ MonitoredSample ManagerFastFlow::getSampleResponse(){
         sample.loadPercentage += tmp.loadPercentage;
         sample.numTasks += tmp.numTasks;
         sample.latency += tmp.latency;
-        sample.bandwidth += tmp.bandwidth;
+        sample.throughput += tmp.throughput;
     }
     sample.loadPercentage /= numActiveWorkers;
     sample.latency /= numActiveWorkers;
