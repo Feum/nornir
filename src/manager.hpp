@@ -317,7 +317,6 @@ private:
     riff::Monitor _monitor;
     void shrinkPause();
     void stretchPause();
-    MonitoredSample getSample(bool fromAll);
 public:
     /**
      * Creates an adaptivity manager for an instrumented application.

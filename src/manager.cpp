@@ -586,12 +586,13 @@ ManagerInstrumented::~ManagerInstrumented(){
 
 void ManagerInstrumented::waitForStart(){
     Manager::_pid = _monitor.waitStart();
+    dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(_monitor.getTotalThreads());
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
 }
 
-MonitoredSample ManagerInstrumented::getSample(bool fromAll){
+MonitoredSample ManagerInstrumented::getSample(){
     MonitoredSample sample;
-    if(!_monitor.getSample(sample, fromAll)){
+    if(!_monitor.getSample(sample)){
         _terminated = true;
     }
     // Knarr may return inconsistent data for latency and
@@ -625,12 +626,8 @@ MonitoredSample ManagerInstrumented::getSample(bool fromAll){
     return sample;
 }
 
-MonitoredSample ManagerInstrumented::getSample(){
-    return getSample(false);
-}
-
 MonitoredSample ManagerInstrumented::clearStoredSample(){
-    return getSample(true);
+    return getSample();
 }
 
 ulong ManagerInstrumented::getExecutionTime(){
