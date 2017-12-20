@@ -26,7 +26,8 @@ TEST(SamplesTest, MaximumThroughput) {
 
 TEST(SamplesTest, Load) {
     nornir::MonitoredSample sample;
-    std::string fieldStr = "[Watts: 99.9 Knarr Sample: [Load: 90 Throughput: 100 "
+    std::string fieldStr = "[Watts: 99.9 Knarr Sample: [Inconsistent: 0 "
+                           "Load: 90 Throughput: 100 "
                            "Latency: 200 NumTasks: 300 "
                            "CustomField0: 0 CustomField1: 1 CustomField2: 2 "
                            "CustomField3: 3 CustomField4: 4 CustomField5: 5 "

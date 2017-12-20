@@ -19,12 +19,13 @@ inline nornir::Parameters getParameters(const std::string& archName,
     //p.knobHyperthreadingEnabled // For knobCores
     //p.disallowedNumCores // For knobCores
     char resolved_path[PATH_MAX]; 
-    if(realpath(("./" + archName + "/config/").c_str(), resolved_path) == NULL){
-        throw std::runtime_error("realpath not working.");
+    std::string relativePath = "./archconfig/" + archName + "/";
+    if(realpath(relativePath.c_str(), resolved_path) == NULL){
+        throw std::runtime_error("realpath not working for path " + relativePath);
     }
     // We set this env variable to load the nornir config for this architecture
-    setenv("XDG_CONFIG_DIRS", resolved_path, 1);
-    nornir::Parameters* p;
+    setenv("XDG_CONFIG_DIRS", resolved_path, 1); 
+    nornir::Parameters* p; 
     if(fileName.compare("") == 0){
         p = new nornir::Parameters();
     }else{

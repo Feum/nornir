@@ -222,7 +222,7 @@ void Selector::updateTotalTasks(u_int64_t totalTasks){
 
 void Selector::updateBandwidthIn(){
     if(_samples->average().loadPercentage < MAX_RHO && 
-       _samples->average().loadPercentage != RIFF_VALUE_INCONSISTENT){
+       !_samples->average().inconsistent){
         if(_bandwidthIn->average() == numeric_limits<double>::max()){
             _bandwidthIn->reset();
         }

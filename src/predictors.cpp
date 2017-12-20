@@ -305,7 +305,7 @@ Predictor::~Predictor(){
 
 double Predictor::getMaximumThroughput() const{
     if(_samples->average().loadPercentage >= MAX_RHO ||
-       _samples->average().loadPercentage == RIFF_VALUE_INCONSISTENT){
+       _samples->average().inconsistent){
         return _samples->average().throughput;
     }else{
         return _samples->average().getMaximumThroughput();

@@ -7,7 +7,7 @@ all:
 	$(MAKE) -C dataflow
 	$(MAKE) lib
 %.o: %.cpp *.hpp
-	$(CXX) $(CXXFLAGS) $(COVERAGE_FLAGS) $(INCS) $(OPTIMIZE_FLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(NORNIR_COVERAGE_FLAGS) $(INCS) $(OPTIMIZE_FLAGS) -c -o $@ $<
 clean: 
 	-rm -fr *.o *~
 	$(MAKE) -C dataflow clean

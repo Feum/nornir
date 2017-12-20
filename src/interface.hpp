@@ -789,6 +789,10 @@ public:
      * gatherer (or the output of workers if gatherer not present)).
      **/
     void setFeedback(){
+#ifdef BLOCKING_MODE
+        throw std::runtime_error("setFeedback cannot be used with FastFlow BLOCKING_MODE macro defined."); 
+        // TODO Set nonblocking at runtime
+#endif
         _feedback = true;
     }
 };

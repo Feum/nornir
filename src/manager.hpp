@@ -162,6 +162,8 @@ protected:
     // Samples to be used for simulation.
     std::list<MonitoredSample> _simulationSamples;
 
+    // When debugging, we print all the monitored samples on this stream
+    // ATTENTION: Do NOT protect with DEBUG ifdefs.
     ofstream samplesFile;
 
     /**
@@ -394,12 +396,10 @@ private:
     void shrinkPause(){;}
     void stretchPause(){;}
 public:
-    explicit ManagerTest(Parameters nornirParameters,
-                         uint numWorkers, uint numServiceNodes):Manager(nornirParameters){
+    explicit ManagerTest(Parameters nornirParameters, uint numthreads):Manager(nornirParameters){
         //TODO: Avoid this initialization phase which is common to all the managers.
         Manager::_configuration = new ConfigurationExternal(_p);
-        _configuration->_numServiceNodes = numServiceNodes;
-        dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(numWorkers);
+        dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(numthreads);
         lockKnobs();
         _configuration->createAllRealCombinations();
         _selector = createSelector();

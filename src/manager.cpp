@@ -113,7 +113,7 @@ Manager::Manager(Parameters nornirParameters):
 
 Manager::~Manager(){
     for(auto logger : _p.loggers){
-        delete logger;
+        delete logger; //TODO: NO, I may also delete loggers created by the user.
     }
     _p.loggers.clear();
     DEBUGB(samplesFile.close());
@@ -598,8 +598,7 @@ MonitoredSample ManagerInstrumented::getSample(){
     // Knarr may return inconsistent data for latency and
     // utilization factor when performs sampling.
     // Check if this is the case.
-    if(sample.loadPercentage == RIFF_VALUE_INCONSISTENT){
-        sample.loadPercentage = RIFF_VALUE_INCONSISTENT;
+    if(sample.inconsistent){
         if(_p.requirements.minUtilization != NORNIR_REQUIREMENT_UNDEF ||
            _p.requirements.maxUtilization != NORNIR_REQUIREMENT_UNDEF){
             throw std::runtime_error("You specified requirements on loadPercentage but instrumenter is "
@@ -608,20 +607,13 @@ MonitoredSample ManagerInstrumented::getSample(){
                                      "to fix this issue.");
         }
     }
-    if(sample.latency == RIFF_VALUE_INCONSISTENT){
-        sample.latency = RIFF_VALUE_INCONSISTENT;
+    if(sample.inconsistent){
         if(_p.requirements.latency != NORNIR_REQUIREMENT_UNDEF){
             throw std::runtime_error("You specified requirements on latency but instrumenter is "
                                      "providing inconsistent latency values. Please call "
                                      "setConfiguration with samplingLengthMs = 0 on nornir's Instrumenter "
                                      "to fix this issue.");
         }
-    }
-    // If we were not able to collect sample data (e.g. because no tasks have
-    // been received during the last sampling period), then we set
-    // the latency the same as the last one.
-    if(sample.latency == RIFF_VALUE_NOT_AVAILABLE){
-        sample.latency = _samples->getLastSample().latency;
     }
     return sample;
 }

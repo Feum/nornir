@@ -34,12 +34,12 @@ cppcheck:
 # Compiles and runs all the tests.
 test:
 	$(MAKE) cleanall
-	$(MAKE) "COVERAGE_FLAGS=-fprofile-arcs -ftest-coverage"
+	$(MAKE) "NORNIR_COVERAGE_FLAGS=-fprofile-arcs -ftest-coverage"
 	$(MAKE) testquick
 testquick:
 	cd test && ./installdep.sh 
 	cd ..
-	$(MAKE) "COVERAGE_LIBS=-lgcov" -C test && cd test && ./runtests.sh
+	$(MAKE) "NORNIR_COVERAGE_LIBS=-lgcov" -C test && cd test && ./runtests.sh
 	cd ..
 gcov:
 	./test/gcov/gcov.sh
