@@ -71,7 +71,7 @@ int main(int argc, char** argv){
     if(needChange){   	
 	    // Write knobs to file.
 	    std::ofstream outstream;
-	    outstream.open(getSelectorManualControlFile());
+	    outstream.open(getSelectorManualCliControlFile());
 	    if(!outstream.is_open()){
 	    	std::cerr << "FATAL ERROR: impossible to open " << getSelectorManualCliControlFile() << std::endl;
 	    	return -1;
