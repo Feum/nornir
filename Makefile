@@ -45,7 +45,7 @@ gcov:
 	./test/gcov/gcov.sh
 # Performs all the checks
 develcheck:
-	$(MAKE) cppcheck && $(MAKE) test && $(MAKE) gcov && $(MAKE) bin
+	$(MAKE) cppcheck && $(MAKE) test && $(MAKE) gcov && $(MAKE) cleanall && $(MAKE) && $(MAKE) bin
 cleanall:
 	$(MAKE) -C src cleanall
 	$(MAKE) -C demo cleanall
