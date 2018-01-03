@@ -55,9 +55,9 @@ unsigned long nornir_instrumenter_get_execution_time(NornirInstrumenter* instrum
 
 unsigned long long nornir_instrumenter_get_total_tasks(NornirInstrumenter* instrumenter);
 
-void nornir_instrumenter_set_total_threads(NornirInstrumenter* instrumenter, uint totalThreads);
+void nornir_instrumenter_set_total_threads(NornirInstrumenter* instrumenter, unsigned int totalThreads);
 
-void nornir_instrumenter_set_phase_id(NornirInstrumenter* instrumenter, uint phaseId);
+void nornir_instrumenter_set_phase_id(NornirInstrumenter* instrumenter, unsigned int phaseId);
 
 void nornir_instrumenter_mark_inconsistent_samples(NornirInstrumenter* instrumenter);
 

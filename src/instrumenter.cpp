@@ -173,11 +173,11 @@ extern "C"{
         return reinterpret_cast<nornir::Instrumenter*>(instrumenter)->getTotalTasks();
     }
 
-    void nornir_instrumenter_set_total_threads(NornirInstrumenter* instrumenter, uint totalThreads){
+    void nornir_instrumenter_set_total_threads(NornirInstrumenter* instrumenter, unsigned int totalThreads){
         return reinterpret_cast<nornir::Instrumenter*>(instrumenter)->setTotalThreads(totalThreads);
     }
 
-    void nornir_instrumenter_set_phase_id(NornirInstrumenter* instrumenter, uint phaseId){
+    void nornir_instrumenter_set_phase_id(NornirInstrumenter* instrumenter, unsigned int phaseId){
         return reinterpret_cast<nornir::Instrumenter*>(instrumenter)->setPhaseId(phaseId);
     }
 
