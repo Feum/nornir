@@ -172,4 +172,16 @@ extern "C"{
     unsigned long long nornir_instrumenter_get_total_tasks(NornirInstrumenter* instrumenter){
         return reinterpret_cast<nornir::Instrumenter*>(instrumenter)->getTotalTasks();
     }
+
+    void nornir_instrumenter_set_total_threads(NornirInstrumenter* instrumenter, uint totalThreads){
+        return reinterpret_cast<nornir::Instrumenter*>(instrumenter)->setTotalThreads(totalThreads);
+    }
+
+    void nornir_instrumenter_set_phase_id(NornirInstrumenter* instrumenter, uint phaseId){
+        return reinterpret_cast<nornir::Instrumenter*>(instrumenter)->setPhaseId(phaseId);
+    }
+
+    void nornir_instrumenter_mark_inconsistent_samples(NornirInstrumenter* instrumenter){
+        return reinterpret_cast<nornir::Instrumenter*>(instrumenter)->markInconsistentSamples();
+    }
 }
