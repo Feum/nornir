@@ -21,9 +21,9 @@ class DummyEmitter: public AdaptiveNode{
 };
 
 TEST(TriggersTest, Blocking){
+    getParameters("repara"); // Only to force setting XDG_CONFIG_DIRS environment variables
     MovingAverageSimple<MonitoredSample> samples(4);
     DummyEmitter emitter;
-    getParameters("repara"); // Only to force setting XDG_* environment variables
     TriggerQBlocking trigger(TRIGGER_Q_BLOCKING_YES, 0, 0, &samples, &emitter);
     EXPECT_TRUE(trigger.trigger());
     ManagementRequest* mr = emitter.checkManagementRequest();
@@ -32,9 +32,9 @@ TEST(TriggersTest, Blocking){
 }
 
 TEST(TriggersTest, NonBlocking){
+    getParameters("repara"); // Only to force setting XDG_CONFIG_DIRS environment variables
     MovingAverageSimple<MonitoredSample> samples(4);
     DummyEmitter emitter;
-    getParameters("repara"); // Only to force setting XDG_* environment variables
     TriggerQBlocking trigger(TRIGGER_Q_BLOCKING_NO, 0, 0, &samples, &emitter);
     // We expect false because it should be non blocking by default so nothing should be changed
     EXPECT_FALSE(trigger.trigger()); 
@@ -42,9 +42,9 @@ TEST(TriggersTest, NonBlocking){
 
 
 TEST(TriggersTest, Auto){
+    getParameters("repara"); // Only to force setting XDG_CONFIG_DIRS environment variables
     MovingAverageSimple<MonitoredSample> samples(4);
-    DummyEmitter emitter;
-    getParameters("repara"); // Only to force setting XDG_* environment variables
+    DummyEmitter emitter;    
     // < 90  -> NonBlocking
     // > 110 -> Blocking
     TriggerQBlocking trigger(TRIGGER_Q_BLOCKING_AUTO, 100, 0.1, &samples, &emitter);

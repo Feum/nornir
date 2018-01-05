@@ -22,3 +22,4 @@ test/testManager
 test/testParameters
 test/testSample
 test/testTrigger
+test/testParallelFor
