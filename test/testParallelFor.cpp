@@ -17,8 +17,9 @@ void runTest(int startloop, int endloop, int step, int chunksize, uint loopDurat
     int nworkers = 4;
     std::vector<uint> v;
     nornir::Parameters p = getParameters("repara");
+    p.requirements.throughput = NORNIR_REQUIREMENT_MAX;
     nornir::ParallelFor pf(nworkers, &p);
-    int iterations = 10;
+    size_t iterations = 10;
     if(loopDuration){
         iterations = 1;
     }
