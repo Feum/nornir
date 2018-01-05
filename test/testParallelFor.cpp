@@ -13,16 +13,23 @@
 using namespace nornir;
 
 
-void runTest(int startloop, int endloop, int step, int chunksize){
+void runTest(int startloop, int endloop, int step, int chunksize, uint loopDuration = 0){
     int nworkers = 4;
     std::vector<uint> v;
     nornir::Parameters p = getParameters("repara");
     nornir::ParallelFor pf(nworkers, &p);
-    for(size_t i = 0; i < 10; i++){
+    int iterations = 10;
+    if(loopDuration){
+        iterations = 1;
+    }
+    for(size_t i = 0; i < iterations; i++){
         v.resize(endloop - startloop, 0);
 
         pf.parallel_for(startloop, endloop, step, chunksize, 
         [&v](long long int idx, long long int id){
+            if(loopDuration){
+                usleep((loopDuration*1000000) / ((endloop - startloop) * nworkers));
+            }
             v[idx] = idx;
         });
 
@@ -51,4 +58,8 @@ TEST(ParallelForTest, DynamicChunk1){
 
 TEST(ParallelForTest, DynamicChunk3){
     runTest(0, 100, 3, 3);
+}
+
+TEST(ParallelForTest, LongLoop10Seconds){
+    runTest(0, 100, 1, 0, 10);
 }
