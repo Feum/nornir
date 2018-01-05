@@ -268,6 +268,16 @@ public:
     virtual void notifyRethreading(size_t oldNumWorkers,
                                    size_t newNumWorkers);
 
+    /**
+     * Gets the last management request received by the node.
+     * NOTE: Only to be used for debug purposes.
+     **/
+    ManagementRequest* checkManagementRequest(){
+        ManagementRequest* mr = static_cast<ManagementRequest*>(_managementQ.top());
+        _managementQ.inc();
+        return mr;
+    }
+
 protected:
     /**
      * Disables rethreading.
