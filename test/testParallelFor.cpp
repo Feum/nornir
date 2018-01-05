@@ -26,7 +26,7 @@ void runTest(int startloop, int endloop, int step, int chunksize, uint loopDurat
         v.resize(endloop - startloop, 0);
 
         pf.parallel_for(startloop, endloop, step, chunksize, 
-        [&v](long long int idx, long long int id){
+        [&](long long int idx, long long int id){
             if(loopDuration){
                 usleep((loopDuration*1000000) / ((endloop - startloop) * nworkers));
             }
