@@ -152,7 +152,7 @@ public:
      * @param id The identifier of the worker. Starts from 0.
      * @return true if the task has been sent, false otherwise.
      */
-    void sendToNonBlocking(O* task, uint id) CX11_KEYWORD(final){
+    bool sendToNonBlocking(O* task, uint id) CX11_KEYWORD(final){
         if(id >= _lb->getnworkers()){
             throw new std::runtime_error("FATAL: Trying to send to a non running worker."
                                          "Please ensure that your application is "
