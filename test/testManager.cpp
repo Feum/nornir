@@ -74,11 +74,20 @@ TEST(ManagerTest, GlobalTest) {
     for(string arch : getTestingArchitectures()){ // For all architectures
         for(string bench : getBenchmarks(arch)){ // For all benchmarks
             for(string testcase : getTestCases(arch, bench)){ // And for all testcases on that benchmark
-                if(testcase.find("leo") != std::string::npos){
-                    continue;
-                }
                 std::cout << "Running test: " << testcase << std::endl;
                 Parameters p = getParameters(arch, testcase + "parameters.xml");
+                if(testcase.find("leo") != std::string::npos){
+                    // For leo, fix the paths.
+                    std::string tmpPath = testcase;
+                    // Remove the '10.0.' part
+                    while(tmpPath.back() != '/'){
+                        tmpPath.pop_back();
+                    }
+                    p.leo.powerData = tmpPath + "leo_power_raw.csv";
+                    p.leo.throughputData = tmpPath + "leo_performance_raw.csv";
+                    p.leo.namesData = tmpPath + "leo_names.csv";
+                    // p.leo.applicationName doesn't need to be modified
+                }
                 // Sampling can be done faster since it is just simulated.
                 p.samplingIntervalCalibration = 1;
                 p.samplingIntervalSteady = 1;
