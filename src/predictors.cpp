@@ -57,6 +57,8 @@ using namespace mlpack::regression;
 
 using namespace arma;
 
+using namespace std;
+
 static double getVoltage(VoltageTable table, uint workers, Frequency frequency){
     VoltageTableKey key(workers, frequency);
     VoltageTableIterator it = table.find(key);

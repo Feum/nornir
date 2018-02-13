@@ -236,7 +236,7 @@ private:
      * @param m The manager.
      * @param cores The vector containing the virtual cores identifiers.
      */
-    void allowCores(Manager* m, const std::vector<VirtualCoreId>& cores);
+    void allowCores(Manager* m, const std::vector<mammut::topology::VirtualCoreId>& cores);
 
     /**
      * Checks if a specified allocation is valid.

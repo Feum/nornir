@@ -55,15 +55,6 @@ namespace nornir{
 class Parameters;
 class ManagerMulti;
 
-//TODO REMOVE USING
-using namespace std;
-using namespace ff;
-using namespace mammut::cpufreq;
-using namespace mammut::energy;
-using namespace mammut::task;
-using namespace mammut::topology;
-using namespace mammut::utils;
-
 
 // How to react to the calibration of other applications
 // in order to do not interfere too much with them.
@@ -82,7 +73,7 @@ typedef enum{
  *
  * This class manages the adaptivity in parallel applications.
  */
-class Manager: public Thread{
+class Manager: public mammut::utils::Thread{
     friend class ManagerMulti;
 public:
     explicit Manager(Parameters nornirParameters);
@@ -116,13 +107,13 @@ protected:
     Parameters _p;
 
     // The energy counter.
-    Counter* _counter;
+    mammut::energy::Counter* _counter;
 
     // The task module.
-    TasksManager* _task;
+    mammut::task::TasksManager* _task;
 
     // The topology module.
-    Topology* _topology;
+    mammut::topology::Topology* _topology;
 
     // Monitored samples;
     Smoother<MonitoredSample>* _samples;
@@ -164,7 +155,7 @@ protected:
 
     // When debugging, we print all the monitored samples on this stream
     // ATTENTION: Do NOT protect with DEBUG ifdefs.
-    ofstream samplesFile;
+    std::ofstream samplesFile;
 
     /**
      * Wait for the application to start and
@@ -214,7 +205,7 @@ protected:
      * Set a specified domain to the highest frequency.
      * @param domain The domain.
      */
-    void setDomainToHighestFrequency(const Domain* domain);
+    void setDomainToHighestFrequency(const mammut::cpufreq::Domain* domain);
 
     /**
      * Returns true if the manager doesn't have still to check for a new
@@ -262,7 +253,7 @@ protected:
      * resets the counter.
      * @return The joules consumed since the last reset.
      */
-    Joules getAndResetJoules();
+    mammut::energy::Joules getAndResetJoules();
 
     /**
      * Logs the last observation.
@@ -306,7 +297,7 @@ private:
      *
      * @return The vector of physical cores used by the manager.
      */
-    std::vector<PhysicalCoreId> getUsedCores();
+    std::vector<mammut::topology::PhysicalCoreId> getUsedCores();
 
     void allowCores(std::vector<mammut::topology::VirtualCoreId> ids);
 };
@@ -431,7 +422,7 @@ public:
      * @param nornirParameters The parameters to be used for
      * adaptivity decisions.
      */
-    ManagerFastFlow(ff_farm<>* farm, Parameters nornirParameters);
+    ManagerFastFlow(ff::ff_farm<>* farm, Parameters nornirParameters);
 
     /**
      * Destroyes this adaptivity manager.
@@ -439,7 +430,7 @@ public:
     ~ManagerFastFlow();
 private:
     // The managed farm.
-    ff_farm<>* _farm;
+    ff::ff_farm<>* _farm;
 
     // The emitter (if present).
     AdaptiveNode* _emitter;
