@@ -39,6 +39,7 @@
 #include <tclap/CmdLine.h>
 
 using namespace nornir;
+using namespace std;
 
 #undef DEBUG
 #undef DEBUGB

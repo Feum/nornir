@@ -8,6 +8,13 @@
 #include "../src/nornir.hpp"
 #include "gtest/gtest.h"
 
+using namespace nornir;
+using namespace mammut;
+using namespace mammut::cpufreq;
+using namespace mammut::energy;
+using namespace mammut::task;
+using namespace mammut::topology;
+using namespace mammut::utils;
 
 // getMaximumThroughput() function.
 TEST(SamplesTest, MaximumThroughput) {
