@@ -586,7 +586,7 @@ void ManagerInstrumented::waitForStart(){
     Manager::_pid = _monitor.waitStart();
     dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(_monitor.getTotalThreads());
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
-    dynamic_cast<knobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD_EMULATED))->setPid(_pid);
+    dynamic_cast<KnobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD_EMULATED))->setPid(_pid);
 }
 
 MonitoredSample ManagerInstrumented::getSample(){
@@ -684,7 +684,7 @@ void ManagerBlackBox::waitForStart(){
     }
     _startTime = getMillisecondsTime();
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setProcessHandler(_process);
-    dynamic_cast<knobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD_EMULATED))->setProcessHandler(_process);
+    dynamic_cast<KnobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD_EMULATED))->setProcessHandler(_process);
     _process->resetInstructions(); // To remove those executed before entering ROI
 }
 

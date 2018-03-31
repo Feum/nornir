@@ -377,7 +377,7 @@ bool Parameters::isUnusedVcOffAvailable(){
 
 bool Parameters::isFrequencySettable(){
     vector<Frequency> frequencies = getAvailableFrequencies();
-    return  isGovernorAvailable(GOVERNOR_USERSPACE) && frequencies.size();
+    return isGovernorAvailable(GOVERNOR_USERSPACE) && frequencies.size();
 
 }
 

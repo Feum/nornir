@@ -1163,9 +1163,10 @@ SelectorLiMartinez::SelectorLiMartinez(const Parameters& p,
         _currentWatts(DBL_MAX), _optimalWatts(DBL_MAX),
         _optimalWorkers(configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().back()),
         _currentBw(0),_leftBw(0), _rightBw(0), _improved(false), _optimalFound(false){
-    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().back();
-    d->removeTurboFrequencies();
-    _availableFrequencies = d->getAvailableFrequencies();
+
+    for(auto it : _configuration.getKnob(KNOB_FREQUENCY)->getAllowedValues()){
+        _availableFrequencies.push_back((Frequency) it);
+    }
     _optimalFrequency = _availableFrequencies.back();
     _allowedCores = configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues();
 }

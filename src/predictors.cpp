@@ -118,10 +118,9 @@ RegressionDataServiceTime::RegressionDataServiceTime(const Parameters &p,
         _invScalFactorFreqAndCores(0),
         _numPredictors(0){
     _phyCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
-    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().at(0);
-    d->removeTurboFrequencies();
-    if(!d->getAvailableFrequencies().empty()){
-        _minFrequency = d->getAvailableFrequencies().at(0);
+    std::vector<double> frequencies = _configuration.getKnob(KNOB_FREQUENCY)->getAllowedValues();
+    if(!frequencies.empty()){
+        _minFrequency = frequencies[0];
     }else if(_p.knobFrequencyEnabled){
         throw std::runtime_error("Please set knobFrequencyEnabled to false.");
     }
@@ -262,11 +261,9 @@ RegressionDataPower::RegressionDataPower(const Parameters &p,
         _voltagePerUsedDomains(0), _voltagePerUnusedDomains(0),
         _additionalContextes(0), _numPredictors(0){
     _strategyUnused = _p.strategyUnusedVirtualCores;
-    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().front();
-    d->removeTurboFrequencies();
-
-    if(!d->getAvailableFrequencies().empty()){
-        _lowestFrequency = d->getAvailableFrequencies().front();
+    std::vector<double> frequencies = _configuration.getKnob(KNOB_FREQUENCY)->getAllowedValues();
+    if(!frequencies.empty()){
+        _lowestFrequency = frequencies[0];
     }else if(_p.knobFrequencyEnabled){
         throw std::runtime_error("Please set knobFrequencyEnabled to false.");
     }
@@ -553,11 +550,9 @@ PredictorUsl::PredictorUsl(PredictorType type,
     }
     _c = gsl_vector_alloc(_maxPolDegree);
     _cov = gsl_matrix_alloc(_maxPolDegree, _maxPolDegree);
-    // TODO Take minFrequency and maxFrequency from configuration rather than from mammut?
-    Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().at(0);
-    d->removeTurboFrequencies();
-    _minFrequency = d->getAvailableFrequencies().front();
-    _maxFrequency = d->getAvailableFrequencies().back();
+    std::vector<double> frequencies = _configuration.getKnob(KNOB_FREQUENCY)->getAllowedValues();
+    _minFrequency = frequencies.front();
+    _maxFrequency = frequencies.back();
     if(_p.knobClkModEmulatedEnabled){
         _minFrequency *= _configuration.getKnob(KNOB_CLKMOD_EMULATED)->getAllowedValues().front();
     }
