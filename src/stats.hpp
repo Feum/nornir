@@ -156,7 +156,7 @@ private:
     unsigned int _timeOffset;
 protected:
     unsigned int _startMonitoring;
-    
+
     unsigned int getRelativeTimestamp();
     unsigned int getAbsoluteTimestamp();
 public:

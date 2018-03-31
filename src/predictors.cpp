@@ -184,7 +184,7 @@ static void getStaticDynamicPower(double usedPhysicalCores, Frequency frequency,
     }
 
     for(uint x : coresPerCpu){
-        uint fullDomains = std::floor(x / phyCoresPerDomain);       
+        uint fullDomains = std::floor(x / phyCoresPerDomain);
         uint coresOnSpuriousDomain = x % phyCoresPerDomain;
 
         // For full domains
@@ -824,7 +824,7 @@ double PredictorUsl::getLambda(RecordInterferenceArgument n) const{
     }
     return getb()*(numCores - 1) + geta()*(numCores - 1)*(numCores - 1);
 }
-    
+
 /**************** PredictorSimple ****************/
 
 PredictorAnalytical::PredictorAnalytical(PredictorType type,

@@ -214,7 +214,7 @@ inline std::string getSelectorManualCliControlFile(){
 }
 
 /**
- * Configuration is manually chosen by an 
+ * Configuration is manually chosen by an
  * external entity (selector-manual) command line interface.
  */
 class SelectorManualCli: public Selector{

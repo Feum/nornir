@@ -273,7 +273,7 @@ private:
 
 class KnobClkModEmulated: public Knob{
 private:
-    Parameters _p;    
+    Parameters _p;
     mammut::task::ProcessHandler* _processHandler;
 public:
     /**

@@ -246,7 +246,7 @@ void Parameters::setDefault(){
     samplingIntervalSteady = 1000;
     steadyThreshold = 4;
     minTasksPerSample = 0;
-    synchronousWorkers = false;    
+    synchronousWorkers = false;
     maxCalibrationTime = 0;
     maxCalibrationSteps = 0;
     maxPerformancePredictionError = 10.0;
@@ -540,7 +540,7 @@ ParametersValidation Parameters::validateSelector(){
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_MAPPING] = true;
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_HYPERTHREADING] = true;
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_CLKMOD_EMULATED] = true;
-    
+
     // MANUAL WEB
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_VIRTUAL_CORES] = true;
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_FREQUENCY] = true;
@@ -614,7 +614,7 @@ ParametersValidation Parameters::validateSelector(){
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_FREQUENCY] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_MAPPING] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_HYPERTHREADING] = false;
-        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_CLKMOD_EMULATED] = true;        
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_CLKMOD_EMULATED] = true;
         // LEO
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_VIRTUAL_CORES] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_FREQUENCY] = true;

@@ -85,7 +85,7 @@ public:
      */
     void run();
 
-    /** 
+    /**
      * Forces the manager to terminate.
      **/
     void terminate();

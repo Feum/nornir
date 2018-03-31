@@ -118,11 +118,11 @@ int main(int argc, char * argv[]) {
 
     if (argc>1) {
         if (argc!=3) {
-            std::cerr << "use: " 
-                      << argv[0] 
+            std::cerr << "use: "
+                      << argv[0]
                       << " nworkers streamlen\n";
             return -1;
-        }   
+        }
         nworkers=atoi(argv[1]);
         streamlen=atoi(argv[2]);
     }
@@ -131,9 +131,9 @@ int main(int argc, char * argv[]) {
         std::cerr << "Wrong parameters values\n";
         return -1;
     }
-    
+
     ff::ff_farm<> farm; // farm object
-    
+
     Emitter E(streamlen);
     farm.add_emitter(&E);
 

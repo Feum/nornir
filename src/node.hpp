@@ -61,7 +61,7 @@ typedef enum{
 typedef enum{
     // Reset the current sample.
     MGMT_REQ_RESET_SAMPLE = 0,
-  
+
     // Get the current sample and reset it.
     MGMT_REQ_GET_AND_RESET_SAMPLE,
 

@@ -132,7 +132,7 @@ Instrumenter::Instrumenter(const std::string& parametersFile,
 
 }
 
-extern "C"{    
+extern "C"{
     NornirInstrumenter* nornir_instrumenter_create(const char* parametersFile){
         return reinterpret_cast<NornirInstrumenter*>(new nornir::Instrumenter(parametersFile));
     }

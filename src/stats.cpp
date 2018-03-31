@@ -118,7 +118,7 @@ LoggerStream::LoggerStream(std::ostream *statsStream,
 }
 
 void LoggerStream::log(bool isCalibrationPhase,
-                       const Configuration& configuration, 
+                       const Configuration& configuration,
                        const Smoother<MonitoredSample>& samples,
                        const Requirements& requirements){
     const vector<VirtualCore*>& virtualCores = dynamic_cast<const KnobMapping*>(configuration.getKnob(KNOB_MAPPING))->getActiveVirtualCores();

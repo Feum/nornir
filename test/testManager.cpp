@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <limits.h>
 #include <stdlib.h>
-#include <stdio.h> 
+#include <stdio.h>
 #include <linux/limits.h>
 #include <time.h>
 #include "../src/nornir.hpp"

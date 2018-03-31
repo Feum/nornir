@@ -365,12 +365,12 @@ void Manager::lockKnobs() const{
         _configuration->getKnob(KNOB_HYPERTHREADING)->lock(_p.knobHyperthreadingFixedValue);
     }
     if(!_p.knobClkModEmulatedEnabled){
-        _configuration->getKnob(KNOB_CLKMOD_EMULATED)->lockToMax();   
+        _configuration->getKnob(KNOB_CLKMOD_EMULATED)->lockToMax();
     }
 }
 
 Selector* Manager::createSelector() const{
-    if(!_p.requirements.anySpecified() && 
+    if(!_p.requirements.anySpecified() &&
         _p.strategySelection != STRATEGY_SELECTION_MANUAL_CLI &&
         _p.strategySelection != STRATEGY_SELECTION_MANUAL_WEB){
         // We use fixed selector if there were no requirements specified and
@@ -455,7 +455,7 @@ void Manager::observe(){
             // that the application is terminated and we may
             // not have received an actual sample. In that
             // case, we do not store the sample (which is the last one).
-            store = false;            
+            store = false;
         }else{
             double now = getMillisecondsTime();
             joules = getAndResetJoules();
@@ -518,7 +518,7 @@ void Manager::act(KnobsValues kv, bool force){
         // We need to explicitely check that is not terminated.
         // Indeed, termination may have been detected by observe(),
         // but since we exit the control loop only after the act(),
-        // at this point we may be still in the control loop 
+        // at this point we may be still in the control loop
         // with _terminated = true.
         if(!_toSimulate && !_terminated){
             if(_p.cooldownPeriod){
@@ -749,7 +749,7 @@ void ManagerFastFlow::askForSample(){
 }
 
 MonitoredSample ManagerFastFlow::getSampleResponse(){
-    MonitoredSample sample;    
+    MonitoredSample sample;
     uint numActiveWorkers = _activeWorkers.size();
     for(size_t i = 0; i < numActiveWorkers; i++){
         MonitoredSample tmp;

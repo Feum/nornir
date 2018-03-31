@@ -268,7 +268,7 @@ void ManagerMulti::updateAllocations(Manager* const m){
     }
 
     md.allocations.clear();
-    // First insert the solutions that satisfies the primary bound (sorted from 
+    // First insert the solutions that satisfies the primary bound (sorted from
     // the best (lowest) to the worst (highest) secondary value).
     for(const auto& it : sortedSecondary){
         // Here all these solutions satisfy the constraint, and we only want to

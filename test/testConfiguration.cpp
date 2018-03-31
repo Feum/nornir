@@ -34,7 +34,7 @@ TEST(ConfigurationTest, SimpleTest) {
     EXPECT_EQ(kv[KNOB_MAPPING], MAPPING_TYPE_INTERLEAVED);
     EXPECT_EQ(kv[KNOB_FREQUENCY], 2400000);
     EXPECT_EQ(kv[KNOB_CLKMOD_EMULATED], 1.0);
-    
+
     // Test equality and correct frequency set.
     ConfigurationExternal configuration2(p);
     dynamic_cast<KnobMappingExternal*>(configuration2.getKnob(KNOB_MAPPING))->setPid(getpid());

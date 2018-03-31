@@ -288,7 +288,7 @@ public:
     }
 
     ~Scheduler(){
-#ifdef POOL        
+#ifdef POOL
         while(_pool->size()!=0){
             Mdfg* g = _pool->front();
             _pool->pop_front();
@@ -346,7 +346,7 @@ public:
         while(!end){
             /////////////////////
             // Get from input. //
-            ///////////////////// 
+            /////////////////////
             if(_graphsInside < _maxGraphs &&
                _in->hasNext() && (next = _in->next()) != NULL){
                 getFromInput(next);

@@ -32,7 +32,7 @@
 #include <cfloat>
 #include <string>
 #include <iostream>
-#include <sstream> 
+#include <sstream>
 
 #undef DEBUG
 #undef DEBUGB
@@ -221,7 +221,7 @@ void Selector::updateTotalTasks(u_int64_t totalTasks){
 }
 
 void Selector::updateBandwidthIn(){
-    if(_samples->average().loadPercentage < MAX_RHO && 
+    if(_samples->average().loadPercentage < MAX_RHO &&
        !_samples->average().inconsistent){
         if(_bandwidthIn->average() == numeric_limits<double>::max()){
             _bandwidthIn->reset();

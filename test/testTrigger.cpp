@@ -44,14 +44,14 @@ TEST(TriggersTest, NonBlocking){
     DummyEmitter emitter;
     TriggerQBlocking trigger(TRIGGER_Q_BLOCKING_NO, 0, 0, &samples, &emitter);
     // We expect false because it should be non blocking by default so nothing should be changed
-    EXPECT_FALSE(trigger.trigger()); 
+    EXPECT_FALSE(trigger.trigger());
 }
 
 
 TEST(TriggersTest, Auto){
     getParameters("repara"); // Only to force setting XDG_CONFIG_DIRS environment variables
     MovingAverageSimple<MonitoredSample> samples(4);
-    DummyEmitter emitter;    
+    DummyEmitter emitter;
     // < 90  -> NonBlocking
     // > 110 -> Blocking
     TriggerQBlocking trigger(TRIGGER_Q_BLOCKING_AUTO, 100, 0.1, &samples, &emitter);

@@ -582,7 +582,7 @@ typedef struct{
  */
 class Parameters{
     friend class Manager;
-private:    
+private:
     // The type of loggers to be activated.
     // It MUST be private because only the manager
     // needs to access it. The loggers created by
@@ -677,7 +677,7 @@ private:
      */
     ParametersValidation validateRequirements();
 
-    /**                                                                                                                                                
+    /**
      * Validates the selector.
      * @return The result of the validation.
      */
@@ -900,14 +900,14 @@ public:
     // Parameters for dataflow applications.
     DataflowParameters dataflow;
 
-    // This is the path of the file used to signal begin/end of a 
+    // This is the path of the file used to signal begin/end of a
     // (region of interest). This file should be created when the
     // application enters the ROI and deleted when the application
     // exits the ROI. It can be used for example on PARSEC applications
     // in order to control only the region of interest of the application
     // excluding initialization and cleanup phases. In that case, the
     // file would be created in the roi_start hook and deleted in the
-    // roi_end hook. If not specified or if empty string, the application 
+    // roi_end hook. If not specified or if empty string, the application
     // will be monitored and controlled throughout its entire execution
     // [default = ""].
     std::string roiFile;

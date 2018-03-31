@@ -31,7 +31,7 @@ void runTest(int startloop, int endloop, int step, int chunksize, uint loopDurat
     for(size_t i = 0; i < iterations; i++){
         v.resize(endloop - startloop, 0);
 
-        pf.parallel_for(startloop, endloop, step, chunksize, 
+        pf.parallel_for(startloop, endloop, step, chunksize,
         [&](long long int idx, long long int id){
             if(loopDuration){
                 usleep((loopDuration*1000000) / ((endloop - startloop) * nworkers));
@@ -47,7 +47,7 @@ void runTest(int startloop, int endloop, int step, int chunksize, uint loopDurat
             }
         }
         v.clear();
-    }    
+    }
 }
 
 TEST(ParallelForTest, Simple){

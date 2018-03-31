@@ -530,7 +530,7 @@ void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){
         if(_collector){
             _collector->move(vcOrder[nextIndex]);
             collectorIndex = nextIndex;
-            nextIndex = (nextIndex + 1) % vcOrder.size();                                                                                                                         
+            nextIndex = (nextIndex + 1) % vcOrder.size();
         }
 
         for(size_t i = 0; i < workers.size(); i++){
@@ -575,7 +575,7 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
             if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
                 throw runtime_error("KnobFrequency: Impossible "
                                     "to set the specified governor.");
-            }            
+            }
             // I set the minimum and maximum frequencies to the min and max
             // of this system.
             if(!currentDomain->setGovernorBounds(availableFrequencies.front(), availableFrequencies.back())){
