@@ -135,6 +135,9 @@ void Manager::run(){
     }
 
     waitForStart();
+    lockKnobs();
+    _configuration->createAllRealCombinations();
+    _selector = createSelector();
     for(auto logger : _p.loggers){
         logger->setStartTimestamp();
     }
@@ -361,6 +364,9 @@ void Manager::lockKnobs() const{
     if(!_p.knobHyperthreadingEnabled){
         _configuration->getKnob(KNOB_HYPERTHREADING)->lock(_p.knobHyperthreadingFixedValue);
     }
+    if(!_p.knobClkModEmulatedEnabled){
+        _configuration->getKnob(KNOB_CLKMOD_EMULATED)->lockToMax();   
+    }
 }
 
 Selector* Manager::createSelector() const{
@@ -552,11 +558,6 @@ ManagerInstrumented::ManagerInstrumented(const std::string& riffChannel,
     DEBUG("Creating configuration.");
     Manager::_configuration = new ConfigurationExternal(_p);
     DEBUG("Configuration created.");
-    lockKnobs();
-    DEBUG("Knobs locked.");
-    _configuration->createAllRealCombinations();
-    _selector = createSelector();
-    DEBUG("Selector created.");
     // For instrumented application we do not care if synchronous of not
     // (we count iterations).
     _p.synchronousWorkers = false;
@@ -567,9 +568,6 @@ ManagerInstrumented::ManagerInstrumented(nn::socket& riffSocket,
                                  Parameters nornirParameters):
             Manager(nornirParameters), _monitor(riffSocket, chid){
     Manager::_configuration = new ConfigurationExternal(_p);
-    lockKnobs();
-    _configuration->createAllRealCombinations();
-    _selector = createSelector();
     // For instrumented application we do not care if synchronous of not (we
     // count iterations).
     _p.synchronousWorkers = false;
@@ -588,6 +586,7 @@ void ManagerInstrumented::waitForStart(){
     Manager::_pid = _monitor.waitStart();
     dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(_monitor.getTotalThreads());
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
+    dynamic_cast<knobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD_EMULATED))->setPid(_pid);
 }
 
 MonitoredSample ManagerInstrumented::getSample(){
@@ -647,9 +646,6 @@ ManagerBlackBox::ManagerBlackBox(pid_t pid, Parameters nornirParameters):
         Manager(nornirParameters), _process(nornirParameters.mammut.getInstanceTask()->getProcessHandler(pid)){
     Manager::_pid = pid;
     Manager::_configuration = new ConfigurationExternal(_p);
-    lockKnobs();
-    _configuration->createAllRealCombinations();
-    _selector = createSelector();
     // For blackbox application we do not care if synchronous of not
     // (we count instructions).
     _p.synchronousWorkers = false;
@@ -688,6 +684,7 @@ void ManagerBlackBox::waitForStart(){
     }
     _startTime = getMillisecondsTime();
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setProcessHandler(_process);
+    dynamic_cast<knobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD_EMULATED))->setProcessHandler(_process);
     _process->resetInstructions(); // To remove those executed before entering ROI
 }
 
@@ -785,9 +782,6 @@ ManagerFastFlow::ManagerFastFlow(ff_farm<>* farm,
                                                    _activeWorkers,
                                                    _collector, _farm->getgt(),
                                                    &_terminated);
-    lockKnobs();
-    _configuration->createAllRealCombinations();
-    _selector = createSelector();
 }
 
 ManagerFastFlow::~ManagerFastFlow(){

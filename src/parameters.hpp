@@ -87,7 +87,8 @@ typedef enum{
     KNOB_VIRTUAL_CORES = 0, // Number of contexts to be used.
     KNOB_HYPERTHREADING, // Number of contexts to be used on each physical core.
     KNOB_MAPPING, // Mapping of threads on physical cores.
-    KNOB_FREQUENCY,
+    KNOB_FREQUENCY, // Clock frequency of the cores.
+    KNOB_CLKMOD_EMULATED, // Emulated clock modulation.
     KNOB_NUM  // <---- This must always be the last value
 }KnobType;
 
@@ -744,6 +745,9 @@ public:
 
     // Flag to enable/disable frequency knob autotuning [default = true].
     bool knobFrequencyEnabled;
+
+    // Flag to enable/disable emulated clock modulation autotuning [default = false].
+    bool knobClkModEmulatedEnabled;
 
     // Flag to enable/disable hyperthreading knob autotuning [default = false].
     bool knobHyperthreadingEnabled;

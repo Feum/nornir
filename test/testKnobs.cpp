@@ -24,6 +24,7 @@ TEST(KnobsTest, WriteRead){
     kv[KNOB_HYPERTHREADING] = 10;
     kv[KNOB_MAPPING] = MAPPING_TYPE_INTERLEAVED;
     kv[KNOB_FREQUENCY] = 2.4;
+    kv[KNOB_CLKMOD_EMULATED] = 20.0;
     std::ofstream outstream;
     outstream.open("/tmp/testknobs.dat");
     outstream << kv;
@@ -158,6 +159,7 @@ TEST(KnobsTest, KnobsMapping){
     KnobHyperThreading knobHT(p);
     knobHT.setToMax();
     KnobMappingExternal knob(p, knobCores, knobHT);
+    knob.setPid(getpid());
 
     // Check values.
     std::vector<double> values = knob.getAllowedValues();
@@ -226,6 +228,7 @@ TEST(KnobsTest, KnobsMapping){
     p.isolateManager = true;
     knobHT.setRealValue(2);
     KnobMappingExternal knob2(p, knobCores, knobHT);
+    knob2.setPid(getpid());
     knob2.setRealValue(MAPPING_TYPE_LINEAR);
     vcs = knob2.getActiveVirtualCores();
     vcs = knob2.getActiveVirtualCores();
@@ -238,6 +241,7 @@ TEST(KnobsTest, KnobsFrequency) {
     KnobVirtualCores knobCores(p);
     KnobHyperThreading knobHT(p);
     KnobMappingExternal knobMapping(p, knobCores, knobHT);
+    knobMapping.setPid(getpid());
     KnobFrequency knob(p, knobMapping);
 
     // Check values.
@@ -273,6 +277,7 @@ TEST(KnobsTest, GlobalUnusedNone){
     KnobVirtualCores knobCores(p);
     KnobHyperThreading knobHT(p);
     KnobMappingExternal knobMapping(p, knobCores, knobHT);
+    knobMapping.setPid(getpid());
     KnobFrequency knobFrequency(p, knobMapping);
 
     // Both domains - linear
@@ -326,6 +331,7 @@ TEST(KnobsTest, GlobalUnusedLowest){
     KnobVirtualCores knobCores(p);
     KnobHyperThreading knobHT(p);
     KnobMappingExternal knobMapping(p, knobCores, knobHT);
+    knobMapping.setPid(getpid());
     KnobFrequency knobFrequency(p, knobMapping);
 
     // Both domains - linear
@@ -379,6 +385,7 @@ TEST(KnobsTest, GlobalUnusedOff){
     KnobVirtualCores knobCores(p);
     KnobHyperThreading knobHT(p);
     KnobMappingExternal knobMapping(p, knobCores, knobHT);
+    knobMapping.setPid(getpid());
     KnobFrequency knobFrequency(p, knobMapping);
 
     // Both domains - linear
@@ -433,6 +440,7 @@ TEST(KnobsTest, GlobalUnusedSame){
     KnobVirtualCores knobCores(p);
     KnobHyperThreading knobHT(p);
     KnobMappingExternal knobMapping(p, knobCores, knobHT);
+    knobMapping.setPid(getpid());
     KnobFrequency knobFrequency(p, knobMapping);
 
     // Both domains - linear

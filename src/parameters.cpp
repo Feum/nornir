@@ -232,6 +232,7 @@ void Parameters::setDefault(){
     knobCoresEnabled = true;
     knobMappingEnabled = true;
     knobFrequencyEnabled = true;
+    knobClkModEmulatedEnabled = false;
     knobHyperthreadingEnabled = false;
     knobHyperthreadingFixedValue = 0;
     activeThreads = 0;
@@ -520,6 +521,7 @@ ParametersValidation Parameters::validateRequirements(){
     // TODO: Remove Utilization requirements (can be obtained through
     // throughput + tolerance/conservative
     // At most 1 min/max requirement can be specified.
+    // TODO: At most one or exactly one?
     if(maxMinRequirements > 1){
         return VALIDATION_WRONG_REQUIREMENT;
     }
@@ -537,24 +539,28 @@ ParametersValidation Parameters::validateSelector(){
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_FREQUENCY] = true;
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_MAPPING] = true;
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_HYPERTHREADING] = true;
-
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_CLI][KNOB_CLKMOD_EMULATED] = true;
+    
     // MANUAL WEB
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_VIRTUAL_CORES] = true;
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_FREQUENCY] = true;
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_MAPPING] = false;
     knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_HYPERTHREADING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_MANUAL_WEB][KNOB_CLKMOD_EMULATED] = false;
 
     // ANALYTICAL
     knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_VIRTUAL_CORES] = true;
     knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_FREQUENCY] = true;
     knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_MAPPING] = false;
     knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_HYPERTHREADING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_ANALYTICAL][KNOB_CLKMOD_EMULATED] = false;
 
     // FULLSEARCH
     knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_VIRTUAL_CORES] = true;
     knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_FREQUENCY] = true;
     knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_MAPPING] = true;
     knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_HYPERTHREADING] = true;
+    knobsSupportSelector[STRATEGY_SELECTION_FULLSEARCH][KNOB_CLKMOD_EMULATED] = true;
 
     // For learning we do not check since it depends from the predictors choice.
     // (we will check in validatePredictors())
@@ -564,12 +570,14 @@ ParametersValidation Parameters::validateSelector(){
     knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_FREQUENCY] = true;
     knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_MAPPING] = false;
     knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_HYPERTHREADING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_LIMARTINEZ][KNOB_CLKMOD_EMULATED] = false;
 
     // LEO
     knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_VIRTUAL_CORES] = true;
     knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_FREQUENCY] = true;
     knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_MAPPING] = false;
     knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_HYPERTHREADING] = false;
+    knobsSupportSelector[STRATEGY_SELECTION_LEO][KNOB_CLKMOD_EMULATED] = false;
 
     if(strategySelection == STRATEGY_SELECTION_LEO &&
        (leo.throughputData.compare("") == 0 ||
@@ -606,21 +614,25 @@ ParametersValidation Parameters::validateSelector(){
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_FREQUENCY] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_MAPPING] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_HYPERTHREADING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_AMDAHL][KNOB_CLKMOD_EMULATED] = true;        
         // LEO
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_VIRTUAL_CORES] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_FREQUENCY] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_MAPPING] = false;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_HYPERTHREADING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_LEO][KNOB_CLKMOD_EMULATED] = false;
         // USL
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_VIRTUAL_CORES] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_FREQUENCY] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_MAPPING] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_HYPERTHREADING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USL][KNOB_CLKMOD_EMULATED] = true;
         // USLP
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_VIRTUAL_CORES] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_FREQUENCY] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_MAPPING] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_HYPERTHREADING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_CLKMOD_EMULATED] = true;
 
         /******************************************/
         /*              Power models.             */
@@ -630,11 +642,13 @@ ParametersValidation Parameters::validateSelector(){
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_FREQUENCY] = true;
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_MAPPING] = true;
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_HYPERTHREADING] = false;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LINEAR][KNOB_CLKMOD_EMULATED] = true;
         // LEO
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_VIRTUAL_CORES] = true;
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_FREQUENCY] = true;
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_MAPPING] = false;
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_HYPERTHREADING] = false;
+        knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_CLKMOD_EMULATED] = false;
 
         // Check if the knob enabled can be managed by the predictors specified.
         for(size_t i = 0; i < KNOB_NUM; i++){
@@ -769,6 +783,7 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Bool, knobCoresEnabled);
     SETVALUE(xt, Bool, knobMappingEnabled);
     SETVALUE(xt, Bool, knobFrequencyEnabled);
+    SETVALUE(xt, Bool, knobClkModEmulatedEnabled);
     SETVALUE(xt, Bool, knobHyperthreadingEnabled);
     SETVALUE(xt, Double, knobHyperthreadingFixedValue);
 
@@ -845,6 +860,7 @@ ParametersValidation Parameters::validate(){
     _knobEnabled[KNOB_VIRTUAL_CORES] = knobCoresEnabled;
     _knobEnabled[KNOB_MAPPING] = knobMappingEnabled;
     _knobEnabled[KNOB_HYPERTHREADING] = knobHyperthreadingEnabled;
+    _knobEnabled[KNOB_CLKMOD_EMULATED] = knobClkModEmulatedEnabled;
 
     /** Validate frequency knob. **/
     ParametersValidation r = validateKnobFrequencies();

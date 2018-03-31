@@ -391,16 +391,15 @@ public:
         //TODO: Avoid this initialization phase which is common to all the managers.
         Manager::_configuration = new ConfigurationExternal(_p);
         dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(numthreads);
-        lockKnobs();
-        _configuration->createAllRealCombinations();
-        _selector = createSelector();
         // For instrumented application we do not care if synchronous of not
         // (we count iterations).
         _p.synchronousWorkers = false;
     }
     ~ManagerTest(){;}
 protected:
-    void waitForStart(){;}
+    void waitForStart(){
+        dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(getpid());
+    }
     MonitoredSample getSample(){return MonitoredSample();}
     ulong getExecutionTime(){return 0;}
 };

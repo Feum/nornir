@@ -96,11 +96,14 @@ void RegressionDataServiceTime::init(const KnobsValues& values){
 
     if(_p.knobFrequencyEnabled){
         double frequency = values[KNOB_FREQUENCY];
+        double throttle = values[KNOB_CLKMOD_EMULATED];
         _invScalFactorFreq = (double)_minFrequency / frequency;
+        _invScalFactorFreq /= throttle;
         ++_numPredictors;
 
         _invScalFactorFreqAndCores = (double)_minFrequency /
                                      (numVirtualCores * frequency);
+        _invScalFactorFreqAndCores /= throttle;
         ++_numPredictors;
     }else{
         throw std::runtime_error("Impossible to use Amdahl regression with no frequency.");
@@ -138,7 +141,7 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
 }
 
 static void getStaticDynamicPower(double usedPhysicalCores, Frequency frequency,
-                                  MappingType mt,
+                                  MappingType mt, double throttle,
                                   const mammut::cpufreq::VoltageTable& table, uint numCpus,
                                   uint numDomains, uint phyCoresPerCpu,
                                   uint phyCoresPerDomain,
@@ -187,13 +190,13 @@ static void getStaticDynamicPower(double usedPhysicalCores, Frequency frequency,
         // For full domains
         double voltage = getVoltage(table, phyCoresPerDomain, frequency);
         staticPower += (voltage)*fullDomains;
-        dynamicPower += (phyCoresPerDomain*frequency*voltage*voltage)*fullDomains;
+        dynamicPower += (phyCoresPerDomain*frequency*voltage*voltage*throttle)*fullDomains;
 
         // For spurious domain
         if(coresOnSpuriousDomain){
             voltage = getVoltage(table, coresOnSpuriousDomain, frequency);
             staticPower += voltage;
-            dynamicPower += coresOnSpuriousDomain*frequency*voltage*voltage;
+            dynamicPower += coresOnSpuriousDomain*frequency*voltage*voltage*throttle;
         }
     }
 }
@@ -202,6 +205,7 @@ void RegressionDataPower::init(const KnobsValues& values){
     assert(values.areReal());
     _numPredictors = 0;
     Frequency frequency = values[KNOB_FREQUENCY];
+    double throttle = values[KNOB_CLKMOD_EMULATED];
     uint numVirtualCores = values[KNOB_VIRTUAL_CORES];
     double usedPhysicalCores = getUsedPhysicalCores(numVirtualCores);
 
@@ -210,6 +214,7 @@ void RegressionDataPower::init(const KnobsValues& values){
         double staticPowerUsedDomains = 0, dynamicPower = 0;
         getStaticDynamicPower(usedPhysicalCores, frequency,
                               (MappingType) values[KNOB_MAPPING],
+                              values[KNOB_CLKMOD_EMULATED],
                               _p.archData.voltageTable, _cpus,
                               _domains, _phyCoresPerCpu,
                               _phyCoresPerDomain,
@@ -245,7 +250,7 @@ void RegressionDataPower::init(const KnobsValues& values){
          * Since I do not control the frequency, this model can be very
          * inaccurate.
          */
-        _dynamicPowerModel = usedPhysicalCores;
+        _dynamicPowerModel = usedPhysicalCores*throttle;
         ++_numPredictors;
     }
 }
@@ -548,10 +553,14 @@ PredictorUsl::PredictorUsl(PredictorType type,
     }
     _c = gsl_vector_alloc(_maxPolDegree);
     _cov = gsl_matrix_alloc(_maxPolDegree, _maxPolDegree);
+    // TODO Take minFrequency and maxFrequency from configuration rather than from mammut?
     Domain* d = _p.mammut.getInstanceCpuFreq()->getDomains().at(0);
     d->removeTurboFrequencies();
     _minFrequency = d->getAvailableFrequencies().front();
     _maxFrequency = d->getAvailableFrequencies().back();
+    if(_p.knobClkModEmulatedEnabled){
+        _minFrequency *= _configuration.getKnob(KNOB_CLKMOD_EMULATED)->getAllowedValues().front();
+    }
 }
 
 PredictorUsl::~PredictorUsl(){
@@ -571,26 +580,28 @@ bool PredictorUsl::readyForPredictions(){
 void PredictorUsl::refine(){
     double numCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
     double frequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
+    double throttle = _configuration.getKnob(KNOB_CLKMOD_EMULATED)->getRealValue();
     double throughput = getMaximumThroughput();
+    double freqThrottle = frequency*throttle;
 
     double maxCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().size();
-    if(frequency == _maxFrequency && numCores == maxCores){
+    if(freqThrottle == _maxFrequency && numCores == maxCores){
         _maxFreqThr = throughput;
         return;
-    }else if(frequency == _minFrequency){
+    }else if(freqThrottle == _minFrequency){
         if(numCores == maxCores){
             _minFreqThr = throughput;
         }else if(numCores == 1){
             _minFreqCoresThr = throughput;
         }
-    }else if(frequency != _minFrequency){
+    }else if(freqThrottle != _minFrequency){
         double minMaxScaling = _maxFreqThr / _minFreqThr;
         // We get the expected throughput at minimum frequency starting from the actual
         // throughput at generic frequency. To do so we apply the inverse of the function
         // used in predict() to get the throughput at a generic frequency starting
         // from that at minimum frequency.
-        throughput = (throughput*(_maxFrequency - _minFrequency))/(_maxFrequency - frequency + minMaxScaling*(frequency - _minFrequency));
-        //frequency = _minFrequency;
+        throughput = (throughput*(_maxFrequency - _minFrequency))/(_maxFrequency - freqThrottle + minMaxScaling*(freqThrottle - _minFrequency));
+        //freqThrottle = _minFrequency;
     }
 
     double x, y;
@@ -658,6 +669,8 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
     double result = 0;
     double numCores = real[KNOB_VIRTUAL_CORES];
     double frequency = real[KNOB_FREQUENCY];
+    double throttle = real[KNOB_CLKMOD_EMULATED];
+    double freqThrottle = frequency*throttle;
     for(size_t i = 0; i < _coefficients.size(); i++){
         double exp = i;
         if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
@@ -681,10 +694,10 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
         throughput = _minFreqThr;
     }
 
-    if(frequency != _minFrequency){
+    if(freqThrottle != _minFrequency){
         double minMaxScaling = _maxFreqThr / _minFreqThr;
         double maxFreqPred = throughput * minMaxScaling;
-        return ((maxFreqPred - throughput)/(_maxFrequency - _minFrequency))*frequency + ((throughput*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
+        return ((maxFreqPred - throughput)/(_maxFrequency - _minFrequency))*freqThrottle + ((throughput*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
     }else{
         return throughput;
     }
@@ -743,12 +756,20 @@ double PredictorUsl::getTheta(RecordInterferenceArgument n){
     KnobsValues kv(KNOB_VALUE_REAL);
     kv[KNOB_FREQUENCY] = _minFrequency;
     kv[KNOB_VIRTUAL_CORES] = numCores;
+    // TODO Does not consider throttling
+    if(_p.knobClkModEmulatedEnabled){
+        throw std::runtime_error("Interference cannot be updated when throttling is used.");
+    }
     return (((getMinFreqCoresThr()*numCores)/predict(kv)) - 1) - (((_minFreqCoresThrNew*numCores)/throughput) - 1);
 }
 
 void PredictorUsl::updateInterference(){
     double numCores = _configuration.getRealValue(KNOB_VIRTUAL_CORES);
     double frequency = _configuration.getRealValue(KNOB_FREQUENCY);
+    // TODO Does not consider throttling
+    if(_p.knobClkModEmulatedEnabled){
+        throw std::runtime_error("Interference cannot be updated when throttling is used.");
+    }
     double throughput = _samples->average().throughput;
     // TODO: At the moment I'm assuming that interferences does not change the
     // slope when we fix number of cores and we change the frequency.
@@ -834,6 +855,7 @@ double PredictorAnalytical::getPowerPrediction(const KnobsValues& values){
     double staticPower = 0, dynamicPower = 0;
     getStaticDynamicPower(usedPhysicalCores, values[KNOB_FREQUENCY],
                           (MappingType) values[KNOB_MAPPING],
+                          values[KNOB_CLKMOD_EMULATED],
                           _p.archData.voltageTable, _cpus,
                           _domains, _phyCoresPerCpu,
                           _phyCoresPerDomain,

@@ -72,6 +72,9 @@ std::string knobTypeToString(KnobType kv){
         case KNOB_FREQUENCY:{
             return "Frequency";
         }break;
+        case KNOB_CLKMOD_EMULATED:{
+            return "ClkModEmulated";
+        }break;
         default:{
             return "Unknown";
         }break;
@@ -487,6 +490,9 @@ void KnobMappingExternal::setProcessHandler(task::ProcessHandler* processHandler
 void KnobMappingExternal::move(const vector<VirtualCore*>& vcOrder){
     if(_processHandler){
         _processHandler->move(vcOrder);
+    }else{
+        throw std::runtime_error("setPid or setProcessHandler must be called "
+                                 "before using KnobMappingExternal.");
     }
 }
 
@@ -673,6 +679,34 @@ void KnobFrequency::applyUnusedVCStrategy(Frequency v){
             insertToEnd(unusedVc, virtualCores);
         }
         applyUnusedVCStrategyOff(virtualCores);
+    }
+}
+
+KnobClkModEmulated::KnobClkModEmulated(Parameters p, double resolution):_p(p), _processHandler(NULL){
+    _realValue = 1.0;
+    _knobValues.clear();
+    for(double i = resolution; i < 100; i += resolution){
+        _knobValues.push_back(i / 100.0); // Move from [0, 100] to [0.0, 1.0]
+    }
+    _knobValues.push_back(1.0);
+}
+
+void KnobClkModEmulated::setPid(pid_t pid){
+    setProcessHandler(_p.mammut.getInstanceTask()->getProcessHandler(pid));
+}
+
+void KnobClkModEmulated::setProcessHandler(task::ProcessHandler* processHandler){
+    _processHandler = processHandler;
+}
+
+void KnobClkModEmulated::changeValue(double v){
+    if(v != _realValue){
+        if(_processHandler){
+            _processHandler->throttle(v*100.0); // Convert from [0, 1] to [0, 100]
+        }else{
+            throw std::runtime_error("setPid or setProcessHandler must be called "
+                                 "before using KnobClkModEmulated.");
+        }
     }
 }
 

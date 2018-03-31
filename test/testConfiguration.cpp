@@ -22,6 +22,8 @@ TEST(ConfigurationTest, SimpleTest) {
     p.strategyUnusedVirtualCores = STRATEGY_UNUSED_VC_OFF;
     p.knobHyperthreadingEnabled = true;
     ConfigurationExternal configuration(p);
+    dynamic_cast<KnobMappingExternal*>(configuration.getKnob(KNOB_MAPPING))->setPid(getpid());
+    dynamic_cast<KnobClkModEmulated*>(configuration.getKnob(KNOB_CLKMOD_EMULATED))->setPid(getpid());
     configuration.createAllRealCombinations();
     EXPECT_EQ(configuration.getNumServiceNodes(), (uint) 0);
     EXPECT_TRUE(configuration.knobsChangeNeeded());
@@ -31,14 +33,18 @@ TEST(ConfigurationTest, SimpleTest) {
     EXPECT_EQ(kv[KNOB_HYPERTHREADING], 2);
     EXPECT_EQ(kv[KNOB_MAPPING], MAPPING_TYPE_INTERLEAVED);
     EXPECT_EQ(kv[KNOB_FREQUENCY], 2400000);
+    EXPECT_EQ(kv[KNOB_CLKMOD_EMULATED], 1.0);
     
     // Test equality and correct frequency set.
     ConfigurationExternal configuration2(p);
+    dynamic_cast<KnobMappingExternal*>(configuration2.getKnob(KNOB_MAPPING))->setPid(getpid());
+    dynamic_cast<KnobClkModEmulated*>(configuration2.getKnob(KNOB_CLKMOD_EMULATED))->setPid(getpid());
     KnobsValues kv2(KNOB_VALUE_REAL);
     kv2[KNOB_VIRTUAL_CORES] = 12;
     kv2[KNOB_HYPERTHREADING] = 1;
     kv2[KNOB_MAPPING] = MAPPING_TYPE_LINEAR;
     kv2[KNOB_FREQUENCY] = 1600000;
+    kv2[KNOB_CLKMOD_EMULATED] = 1.0;
     EXPECT_FALSE(configuration.equal(kv2));
     configuration2.setValues(kv2);
     EXPECT_EQ(p.mammut.getInstanceCpuFreq()->getDomains()[0]->getCurrentGovernor(), GOVERNOR_USERSPACE);
@@ -51,6 +57,8 @@ TEST(ConfigurationTest, SimpleTest) {
 
     // Test unneded change configuration.
     ConfigurationExternal configuration3(p);
+    dynamic_cast<KnobMappingExternal*>(configuration3.getKnob(KNOB_MAPPING))->setPid(getpid());
+    dynamic_cast<KnobClkModEmulated*>(configuration3.getKnob(KNOB_CLKMOD_EMULATED))->setPid(getpid());
     for(size_t i = 0; i < KNOB_NUM; i++){
         configuration3.getKnob((KnobType) i)->lockToMax();
     }

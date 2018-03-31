@@ -249,6 +249,7 @@ ConfigurationExternal::ConfigurationExternal(const Parameters& p):
                                                 *dynamic_cast<KnobHyperThreading*>(_knobs[KNOB_HYPERTHREADING]));
     _knobs[KNOB_FREQUENCY] = new KnobFrequency(p,
                                                     *dynamic_cast<KnobMappingExternal*>(_knobs[KNOB_MAPPING]));
+    _knobs[KNOB_CLKMOD_EMULATED] = new KnobClkModEmulated(p);
 
     _triggers[TRIGGER_TYPE_Q_BLOCKING] = NULL;
 }
@@ -272,6 +273,7 @@ ConfigurationFarm::ConfigurationFarm(const Parameters& p,
                                                emitter, collector);
     _knobs[KNOB_FREQUENCY] = new KnobFrequency(p,
                                                *dynamic_cast<KnobMappingFarm*>(_knobs[KNOB_MAPPING]));
+    _knobs[KNOB_CLKMOD_EMULATED] = new KnobClkModEmulated(p);
 
     _triggers[TRIGGER_TYPE_Q_BLOCKING] = new TriggerQBlocking(p.triggerQBlocking,
                                                               p.thresholdQBlocking,
