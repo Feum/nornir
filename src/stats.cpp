@@ -82,6 +82,7 @@ LoggerStream::LoggerStream(std::ostream *statsStream,
     *_statsStream << "[VirtualCores]" << "\t";
     *_statsStream << "Workers" << "\t";
     *_statsStream << "Frequency" << "\t";
+    *_statsStream << "ClkModEmulated" << "\t";
     *_statsStream << "CurrentThroughput" << "\t";
     *_statsStream << "SmoothedThroughput" << "\t";
     *_statsStream << "CoeffVarThroughput" << "\t";
@@ -131,10 +132,16 @@ void LoggerStream::log(bool isCalibrationPhase,
     *_statsStream << "]" << "\t";
 
     *_statsStream << configuration.getRealValue(KNOB_VIRTUAL_CORES) << "\t";
-    // Print frequency as string to avoid conversion to exp notation.
-    std::ostringstream strs;
-    strs << std::fixed << std::setprecision(0) << configuration.getRealValue(KNOB_FREQUENCY);
-    *_statsStream << strs.str() << "\t";
+    Frequency frequency = configuration.getRealValue(KNOB_FREQUENCY);
+    if(frequency == NORNIR_CLOCK_FREQUENCY_NONE){
+        *_statsStream << "N.A.\t";
+    }else{
+        // Print frequency as string to avoid conversion to exp notation.
+        std::ostringstream strs;
+        strs << std::fixed << std::setprecision(0) << frequency;
+        *_statsStream << strs.str() << "\t";
+    }
+    *_statsStream << configuration.getRealValue(KNOB_CLKMOD_EMULATED) << "\t";
     *_statsStream << samples.getLastSample().throughput << "\t";
     *_statsStream << ms.throughput << "\t";
     *_statsStream << samples.coefficientVariation().throughput << "\t";

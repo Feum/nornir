@@ -828,15 +828,22 @@ SelectorLearner::SelectorLearner(const Parameters& p,
             kv.reset();
             kv[KNOB_VIRTUAL_CORES] = 0.0;
             kv[KNOB_FREQUENCY] = 0.0;
+            kv[KNOB_CLKMOD_EMULATED] = 0.0;
             additionalPoints.push_back(kv);
         }
-        kv[KNOB_VIRTUAL_CORES] = 100.0;
-        kv[KNOB_FREQUENCY] = 100;
-        additionalPoints.push_back(kv);
         kv.reset();
         kv[KNOB_VIRTUAL_CORES] = 100.0;
-        kv[KNOB_FREQUENCY] = 0.0;
+        kv[KNOB_FREQUENCY] = 100;
+        kv[KNOB_CLKMOD_EMULATED] = 100.0;
         additionalPoints.push_back(kv);
+        if(_p.knobFrequencyEnabled || 
+           _p.knobClkModEmulatedEnabled){
+            kv.reset();
+            kv[KNOB_VIRTUAL_CORES] = 100.0;
+            kv[KNOB_FREQUENCY] = 0.0;
+            kv[KNOB_CLKMOD_EMULATED] = 0.0;
+            additionalPoints.push_back(kv);
+        }
 
         // I only need to explore on virtual cores.
         knobsFlags[KNOB_VIRTUAL_CORES] = true;

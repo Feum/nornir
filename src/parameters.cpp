@@ -423,8 +423,8 @@ ParametersValidation Parameters::validateKnobFrequencies(){
     vector<VirtualCore*> virtualCores;
     virtualCores = mammut.getInstanceTopology()->getVirtualCores();
 
-    if(knobFrequencyEnabled && !(isGovernorAvailable(GOVERNOR_USERSPACE) &&
-         availableFrequencies.size())){
+    if(knobFrequencyEnabled &&
+       (!isGovernorAvailable(GOVERNOR_USERSPACE) || availableFrequencies.empty())){
         return VALIDATION_NO_MANUAL_DVFS;
     }
 

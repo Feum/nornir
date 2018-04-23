@@ -584,7 +584,9 @@ ManagerInstrumented::~ManagerInstrumented(){
 
 void ManagerInstrumented::waitForStart(){
     Manager::_pid = _monitor.waitStart();
-    dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(_monitor.getTotalThreads());
+    if(_monitor.getTotalThreads()){
+        dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(_monitor.getTotalThreads());
+    }
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
     dynamic_cast<KnobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD_EMULATED))->setPid(_pid);
 }

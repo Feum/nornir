@@ -546,8 +546,6 @@ void KnobMappingFarm::move(const vector<VirtualCore*>& vcOrder){
     }
 }
 
-#define FREQUENCY_NONE std::numeric_limits<Frequency>::max()
-
 KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
         _p(p),
         _knobMapping(knobMapping),
@@ -561,29 +559,31 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
     _frequencyHandler->removeTurboFrequencies();
     std::vector<mammut::cpufreq::Frequency> availableFrequencies;
     availableFrequencies = _frequencyHandler->getDomains().at(0)->getAvailableFrequencies();
-    if(availableFrequencies.empty()){
-        if(_p.knobFrequencyEnabled){
+
+    if(!_p.knobFrequencyEnabled){
+        availableFrequencies.push_back(NORNIR_CLOCK_FREQUENCY_NONE);
+    }else{
+        if(availableFrequencies.empty()){
             throw std::runtime_error("Frequencies not available. Please set "
                                      "knobFrequencyEnabled to false.");
         }else{
-            availableFrequencies.push_back(FREQUENCY_NONE);
-        }
-    }else{
-        std::vector<mammut::cpufreq::Domain*> scalableDomains;
-        scalableDomains = _frequencyHandler->getDomains();
-        for(Domain* currentDomain : scalableDomains){
-            if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
-                throw runtime_error("KnobFrequency: Impossible "
-                                    "to set the specified governor.");
+            std::vector<mammut::cpufreq::Domain*> scalableDomains;
+            scalableDomains = _frequencyHandler->getDomains();
+            for(Domain* currentDomain : scalableDomains){
+                if(!currentDomain->setGovernor(GOVERNOR_USERSPACE)){
+                    throw runtime_error("KnobFrequency: Impossible "
+                                        "to set the specified governor.");
+                }
+                // I set the minimum and maximum frequencies to the min and max
+                // of this system.
+                if(!currentDomain->setGovernorBounds(availableFrequencies.front(), availableFrequencies.back())){
+                   throw runtime_error("KnobFrequency: Impossible "
+                                       "to set the governor bounds.");
+                }
             }
-            // I set the minimum and maximum frequencies to the min and max
-            // of this system.
-            if(!currentDomain->setGovernorBounds(availableFrequencies.front(), availableFrequencies.back())){
-               throw runtime_error("KnobFrequency: Impossible "
-                                   "to set the governor bounds.");
-            }
-        }
+        }        
     }
+
     _realValue = availableFrequencies.front();
 
     for(Frequency f : availableFrequencies){
@@ -602,7 +602,7 @@ KnobFrequency::~KnobFrequency(){
 
 void KnobFrequency::changeValue(double v){
     DEBUG("[Frequency] Changing real value to: " << v);
-    if(v != FREQUENCY_NONE){
+    if(v != NORNIR_CLOCK_FREQUENCY_NONE){
         std::vector<mammut::cpufreq::Domain*> scalableDomains;
         scalableDomains = _frequencyHandler->getDomains(_knobMapping.getActiveVirtualCores());
         for(size_t i = 0; i < scalableDomains.size(); i++){
@@ -620,7 +620,7 @@ void KnobFrequency::changeValue(double v){
 }
 
 void KnobFrequency::applyUnusedVCStrategySame(const vector<VirtualCore*>& unusedVc, Frequency v){
-    if(v != FREQUENCY_NONE){
+    if(v != NORNIR_CLOCK_FREQUENCY_NONE){
         vector<Domain*> unusedDomains = _frequencyHandler->getDomainsComplete(unusedVc);
         DEBUG("[Frequency] " << unusedDomains.size() << " unused domains.");
         for(size_t i = 0; i < unusedDomains.size(); i++){
