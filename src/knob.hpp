@@ -278,14 +278,7 @@ private:
     Parameters _p;
     mammut::task::ProcessHandler* _processHandler;
 public:
-    /**
-     * Creates a knob to emulate clock modulation.
-     * @param p The configuration parameters.
-     * @param resolution The resolution step to be used in modulation.
-     * e.g. if it is equal to 2.0, possible modulation values will be:
-     * 2.0, 4.0, 6.0, ... , 100.0
-     **/
-    explicit KnobClkModEmulated(Parameters p, double resolution = 2.0);
+    explicit KnobClkModEmulated(Parameters p);
     void setPid(pid_t pid);
     void setProcessHandler(mammut::task::ProcessHandler* processHandler);
     void changeValue(double v);

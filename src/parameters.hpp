@@ -849,6 +849,19 @@ public:
     // [default = 1.0].
     double maxMonitoringOverhead;
 
+    // The minimum value that can be used for clock modulation, in the range (0, 100).
+    // [default = 1].
+    double clockModulationMin;
+
+    // Resolution of the clock modulation, in the range (0, 100).
+    // [default = 2].
+    double clockModulationResolution;
+
+    // Interval of the clock modulation, in microseconds.
+    // Only valid for emulated clock modulation.
+    // [default = 100000].
+    double clockModulationInterval;
+
     // Idle threshold (in microseconds) to switch from non blocking to blocking
     // runtime support. If the current idle time goes above this value,
     // and if the runtime has been configured to do so, it will switch

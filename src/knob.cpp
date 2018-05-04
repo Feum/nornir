@@ -682,10 +682,10 @@ void KnobFrequency::applyUnusedVCStrategy(Frequency v){
     }
 }
 
-KnobClkModEmulated::KnobClkModEmulated(Parameters p, double resolution):_p(p), _processHandler(NULL){
+KnobClkModEmulated::KnobClkModEmulated(Parameters p):_p(p), _processHandler(NULL){
     _realValue = 1.0;
     _knobValues.clear();
-    for(double i = resolution; i < 100; i += resolution){
+    for(double i = _p.clockModulationMin; i < 100; i += _p.clockModulationResolution){
         _knobValues.push_back(i / 100.0); // Move from [0, 100] to [0.0, 1.0]
     }
     _knobValues.push_back(1.0);
@@ -697,6 +697,7 @@ void KnobClkModEmulated::setPid(pid_t pid){
 
 void KnobClkModEmulated::setProcessHandler(task::ProcessHandler* processHandler){
     _processHandler = processHandler;
+    _p.mammut.getInstanceTask()->setThrottlingInterval(_p.clockModulationInterval);
 }
 
 void KnobClkModEmulated::changeValue(double v){

@@ -253,6 +253,9 @@ void Parameters::setDefault(){
     maxPowerPredictionError = 5.0;
     regressionAging = 0;
     maxMonitoringOverhead = 1.0;
+    clockModulationMin = 1.0;
+    clockModulationResolution = 2.0;
+    clockModulationInterval = 1000;
     thresholdQBlocking = -1;
     thresholdQBlockingBelt = 0.05;
     tolerableSamples = 0;
@@ -805,6 +808,9 @@ void Parameters::loadXml(const string& paramFileName){
     SETVALUE(xt, Double, maxPowerPredictionError);
     SETVALUE(xt, Uint, regressionAging);
     SETVALUE(xt, Double, maxMonitoringOverhead);
+    SETVALUE(xt, Double, clockModulationMin);
+    SETVALUE(xt, Double, clockModulationResolution);
+    SETVALUE(xt, Double, clockModulationInterval);
     SETVALUE(xt, Double, thresholdQBlocking);
     SETVALUE(xt, Double, thresholdQBlockingBelt);
     SETVALUE(xt, Uint, tolerableSamples);
