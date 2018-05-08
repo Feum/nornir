@@ -141,7 +141,7 @@ void LoggerStream::log(bool isCalibrationPhase,
         strs << std::fixed << std::setprecision(0) << frequency;
         *_statsStream << strs.str() << "\t";
     }
-    *_statsStream << configuration.getRealValue(KNOB_CLKMOD_EMULATED) << "\t";
+    *_statsStream << configuration.getRealValue(KNOB_CLKMOD) << "\t";
     *_statsStream << samples.getLastSample().throughput << "\t";
     *_statsStream << ms.throughput << "\t";
     *_statsStream << samples.coefficientVariation().throughput << "\t";

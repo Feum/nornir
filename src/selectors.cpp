@@ -828,20 +828,20 @@ SelectorLearner::SelectorLearner(const Parameters& p,
             kv.reset();
             kv[KNOB_VIRTUAL_CORES] = 0.0;
             kv[KNOB_FREQUENCY] = 0.0;
-            kv[KNOB_CLKMOD_EMULATED] = 0.0;
+            kv[KNOB_CLKMOD] = 0.0;
             additionalPoints.push_back(kv);
         }
         kv.reset();
         kv[KNOB_VIRTUAL_CORES] = 100.0;
         kv[KNOB_FREQUENCY] = 100;
-        kv[KNOB_CLKMOD_EMULATED] = 100.0;
+        kv[KNOB_CLKMOD] = 100.0;
         additionalPoints.push_back(kv);
         if(_p.knobFrequencyEnabled || 
-           _p.knobClkModEmulatedEnabled){
+           _p.knobClkModEnabled){
             kv.reset();
             kv[KNOB_VIRTUAL_CORES] = 100.0;
             kv[KNOB_FREQUENCY] = 0.0;
-            kv[KNOB_CLKMOD_EMULATED] = 0.0;
+            kv[KNOB_CLKMOD] = 0.0;
             additionalPoints.push_back(kv);
         }
 

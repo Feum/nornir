@@ -88,7 +88,7 @@ typedef enum{
     KNOB_HYPERTHREADING, // Number of contexts to be used on each physical core.
     KNOB_MAPPING, // Mapping of threads on physical cores.
     KNOB_FREQUENCY, // Clock frequency of the cores.
-    KNOB_CLKMOD_EMULATED, // Emulated clock modulation.
+    KNOB_CLKMOD, // Clock modulation.
     KNOB_NUM  // <---- This must always be the last value
 }KnobType;
 
@@ -304,6 +304,9 @@ typedef enum{
 
     // Parameters for Leo predictors not specified.
     VALIDATION_NO_LEO_PARAMETERS,
+
+    // Clock modulation not available.
+    VALIDATION_NO_CLKMOD,
 }ParametersValidation;
 
 /**
@@ -666,6 +669,12 @@ private:
     ParametersValidation validateKnobFrequencies();
 
     /**
+     * Validates the clock modulation knob.
+     * @return The result of the validation.
+     **/
+    ParametersValidation validateKnobClkMod();
+
+    /**
      * Validates the triggers.
      * @return The result of the validation.
      */
@@ -746,8 +755,8 @@ public:
     // Flag to enable/disable frequency knob autotuning [default = true].
     bool knobFrequencyEnabled;
 
-    // Flag to enable/disable emulated clock modulation autotuning [default = false].
-    bool knobClkModEmulatedEnabled;
+    // Flag to enable/disable clock modulation autotuning [default = false].
+    bool knobClkModEnabled;
 
     // Flag to enable/disable hyperthreading knob autotuning [default = false].
     bool knobHyperthreadingEnabled;
@@ -849,16 +858,22 @@ public:
     // [default = 1.0].
     double maxMonitoringOverhead;
 
+    // If true, clock modulation will be emulated, instead of using hardware
+    // clock modulation [default = true].
+    bool clockModulationEmulated;
+
     // The minimum value that can be used for clock modulation, in the range (0, 100).
+    // Only valid if clockModulationEmulated = true.
     // [default = 1].
     double clockModulationMin;
 
     // Resolution of the clock modulation, in the range (0, 100).
+    // Only valid if clockModulationEmulated = true.
     // [default = 2].
     double clockModulationResolution;
 
     // Interval of the clock modulation, in microseconds.
-    // Only valid for emulated clock modulation.
+    // Only valid if clockModulationEmulated = true.
     // [default = 100000].
     double clockModulationInterval;
 

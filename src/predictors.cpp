@@ -96,7 +96,7 @@ void RegressionDataServiceTime::init(const KnobsValues& values){
 
     if(_p.knobFrequencyEnabled){
         double frequency = values[KNOB_FREQUENCY];
-        double throttle = values[KNOB_CLKMOD_EMULATED];
+        double throttle = values[KNOB_CLKMOD];
         _invScalFactorFreq = (double)_minFrequency / frequency;
         _invScalFactorFreq /= throttle;
         ++_numPredictors;
@@ -204,7 +204,7 @@ void RegressionDataPower::init(const KnobsValues& values){
     assert(values.areReal());
     _numPredictors = 0;
     Frequency frequency = values[KNOB_FREQUENCY];
-    double throttle = values[KNOB_CLKMOD_EMULATED];
+    double throttle = values[KNOB_CLKMOD];
     uint numVirtualCores = values[KNOB_VIRTUAL_CORES];
     double usedPhysicalCores = getUsedPhysicalCores(numVirtualCores);
 
@@ -213,7 +213,7 @@ void RegressionDataPower::init(const KnobsValues& values){
         double staticPowerUsedDomains = 0, dynamicPower = 0;
         getStaticDynamicPower(usedPhysicalCores, frequency,
                               (MappingType) values[KNOB_MAPPING],
-                              values[KNOB_CLKMOD_EMULATED],
+                              values[KNOB_CLKMOD],
                               _p.archData.voltageTable, _cpus,
                               _domains, _phyCoresPerCpu,
                               _phyCoresPerDomain,
@@ -553,8 +553,8 @@ PredictorUsl::PredictorUsl(PredictorType type,
     std::vector<double> frequencies = _configuration.getKnob(KNOB_FREQUENCY)->getAllowedValues();
     _minFrequency = frequencies.front();
     _maxFrequency = frequencies.back();
-    if(_p.knobClkModEmulatedEnabled){
-        _minFrequency *= _configuration.getKnob(KNOB_CLKMOD_EMULATED)->getAllowedValues().front();
+    if(_p.knobClkModEnabled){
+        _minFrequency *= _configuration.getKnob(KNOB_CLKMOD)->getAllowedValues().front();
     }
 }
 
@@ -575,7 +575,7 @@ bool PredictorUsl::readyForPredictions(){
 void PredictorUsl::refine(){
     double numCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
     double frequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
-    double throttle = _configuration.getKnob(KNOB_CLKMOD_EMULATED)->getRealValue();
+    double throttle = _configuration.getKnob(KNOB_CLKMOD)->getRealValue();
     double throughput = getMaximumThroughput();
     double freqThrottle = frequency*throttle;
 
@@ -664,7 +664,7 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
     double result = 0;
     double numCores = real[KNOB_VIRTUAL_CORES];
     double frequency = real[KNOB_FREQUENCY];
-    double throttle = real[KNOB_CLKMOD_EMULATED];
+    double throttle = real[KNOB_CLKMOD];
     double freqThrottle = frequency*throttle;
     for(size_t i = 0; i < _coefficients.size(); i++){
         double exp = i;
@@ -752,7 +752,7 @@ double PredictorUsl::getTheta(RecordInterferenceArgument n){
     kv[KNOB_FREQUENCY] = _minFrequency;
     kv[KNOB_VIRTUAL_CORES] = numCores;
     // TODO Does not consider throttling
-    if(_p.knobClkModEmulatedEnabled){
+    if(_p.knobClkModEnabled){
         throw std::runtime_error("Interference cannot be updated when throttling is used.");
     }
     return (((getMinFreqCoresThr()*numCores)/predict(kv)) - 1) - (((_minFreqCoresThrNew*numCores)/throughput) - 1);
@@ -762,7 +762,7 @@ void PredictorUsl::updateInterference(){
     double numCores = _configuration.getRealValue(KNOB_VIRTUAL_CORES);
     double frequency = _configuration.getRealValue(KNOB_FREQUENCY);
     // TODO Does not consider throttling
-    if(_p.knobClkModEmulatedEnabled){
+    if(_p.knobClkModEnabled){
         throw std::runtime_error("Interference cannot be updated when throttling is used.");
     }
     double throughput = _samples->average().throughput;
@@ -850,7 +850,7 @@ double PredictorAnalytical::getPowerPrediction(const KnobsValues& values){
     double staticPower = 0, dynamicPower = 0;
     getStaticDynamicPower(usedPhysicalCores, values[KNOB_FREQUENCY],
                           (MappingType) values[KNOB_MAPPING],
-                          values[KNOB_CLKMOD_EMULATED],
+                          values[KNOB_CLKMOD],
                           _p.archData.voltageTable, _cpus,
                           _domains, _phyCoresPerCpu,
                           _phyCoresPerDomain,

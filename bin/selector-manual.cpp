@@ -38,12 +38,12 @@ int main(int argc, char** argv){
     // Flag Name Description Required DefaultValue TypeDesc 
     TCLAP::ValueArg<double> virtualCoresArg("v", "virtualcores", "Number of VirtualCores (Relative value between 0 and 100)", false, -1, "double", cmd);
     TCLAP::ValueArg<double> frequencyArg("f", "frequency", "Frequency (Relative value between 0 and 100)", false, -1, "double", cmd);
-    TCLAP::ValueArg<double> clkmodEmulatedArg("e", "clkmodemu", "Clock Modulation Simulation (Relative value between 0 and 100)", false, -1, "double", cmd);
+    TCLAP::ValueArg<double> clkmodArg("e", "clkmodemu", "Clock Modulation Simulation (Relative value between 0 and 100)", false, -1, "double", cmd);
     //TODO Add option to specify real values instead of relative ones.
     cmd.parse(argc, argv);
     double virtualCores = virtualCoresArg.getValue();
     double frequency = frequencyArg.getValue();
-    double clkmodEmulated = clkmodEmulatedArg.getValue();
+    double clkmod = clkmodArg.getValue();
 
     bool needChange = false;
     // Set knobs
@@ -69,12 +69,12 @@ int main(int argc, char** argv){
     	kv[KNOB_FREQUENCY] = frequency;	
         needChange = true;
     }
-    if(clkmodEmulated != -1){
-        if(clkmodEmulated < 0 || clkmodEmulated > 100){
+    if(clkmod != -1){
+        if(clkmod < 0 || clkmod > 100){
             std::cerr << "FATAL ERROR: clkmodemu must be between 0 and 100" << std::endl;
             return -1;
         }
-        kv[KNOB_CLKMOD_EMULATED] = clkmodEmulated; 
+        kv[KNOB_CLKMOD] = clkmod; 
         needChange = true;
     }
     

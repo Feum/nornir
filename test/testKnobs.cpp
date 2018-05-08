@@ -24,7 +24,7 @@ TEST(KnobsTest, WriteRead){
     kv[KNOB_HYPERTHREADING] = 10;
     kv[KNOB_MAPPING] = MAPPING_TYPE_INTERLEAVED;
     kv[KNOB_FREQUENCY] = 2.4;
-    kv[KNOB_CLKMOD_EMULATED] = 20.0;
+    kv[KNOB_CLKMOD] = 20.0;
     std::ofstream outstream;
     outstream.open("/tmp/testknobs.dat");
     outstream << kv;

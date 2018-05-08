@@ -157,6 +157,9 @@ protected:
     // ATTENTION: Do NOT protect with DEBUG ifdefs.
     std::ofstream samplesFile;
 
+    mammut::topology::RollbackPoint _topologyRollbackPoint;
+    mammut::cpufreq::RollbackPoint _cpufreqRollbackPoint;
+
     /**
      * Wait for the application to start and
      * sets the ProcessHandler to KnobMappingExternal if necessary.

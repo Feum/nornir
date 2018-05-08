@@ -91,7 +91,9 @@ Manager::Manager(Parameters nornirParameters):
         _configuration(NULL),
         _selector(NULL),
         _pid(0),
-        _toSimulate(false)
+        _toSimulate(false),
+        _topologyRollbackPoint(_p.mammut.getInstanceTopology()->getRollbackPoint()),
+        _cpufreqRollbackPoint(_p.mammut.getInstanceCpuFreq()->getRollbackPoint())
 {
     DEBUG("Initializing manager.");
     for(LoggerType lt : _p.loggersTypes){
@@ -117,6 +119,8 @@ Manager::~Manager(){
     }
     _p.loggers.clear();
     DEBUGB(samplesFile.close());
+    _topology->rollback(_topologyRollbackPoint);
+    _p.mammut.getInstanceCpuFreq()->rollback(_cpufreqRollbackPoint);
 }
 
 void Manager::run(){
@@ -364,8 +368,8 @@ void Manager::lockKnobs() const{
     if(!_p.knobHyperthreadingEnabled){
         _configuration->getKnob(KNOB_HYPERTHREADING)->lock(_p.knobHyperthreadingFixedValue);
     }
-    if(!_p.knobClkModEmulatedEnabled){
-        _configuration->getKnob(KNOB_CLKMOD_EMULATED)->lockToMax();
+    if(!_p.knobClkModEnabled){
+        _configuration->getKnob(KNOB_CLKMOD)->lockToMax();
     }
 }
 
@@ -588,7 +592,9 @@ void ManagerInstrumented::waitForStart(){
         dynamic_cast<KnobVirtualCores*>(_configuration->getKnob(KNOB_VIRTUAL_CORES))->changeMax(_monitor.getTotalThreads());
     }
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(_pid);
-    dynamic_cast<KnobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD_EMULATED))->setPid(_pid);
+    if(_p.clockModulationEmulated){
+        dynamic_cast<KnobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD))->setPid(_pid);
+    }
 }
 
 MonitoredSample ManagerInstrumented::getSample(){
@@ -686,7 +692,9 @@ void ManagerBlackBox::waitForStart(){
     }
     _startTime = getMillisecondsTime();
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setProcessHandler(_process);
-    dynamic_cast<KnobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD_EMULATED))->setProcessHandler(_process);
+    if(_p.clockModulationEmulated){
+        dynamic_cast<KnobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD))->setProcessHandler(_process);
+    }
     _process->resetInstructions(); // To remove those executed before entering ROI
 }
 

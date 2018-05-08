@@ -270,7 +270,14 @@ private:
     const KnobMapping& _knobMapping;
     mammut::cpufreq::CpuFreq* _frequencyHandler;
     mammut::topology::Topology* _topologyHandler;
-    std::vector<mammut::cpufreq::RollbackPoint> _rollbackPoints; // One per domain
+};
+
+class KnobClkMod: public Knob{
+private:
+    const KnobMapping& _knobMapping;
+public:
+    explicit KnobClkMod(Parameters p, const KnobMapping& knobMapping);
+    void changeValue(double v);
 };
 
 class KnobClkModEmulated: public Knob{

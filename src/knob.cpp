@@ -72,8 +72,8 @@ std::string knobTypeToString(KnobType kv){
         case KNOB_FREQUENCY:{
             return "Frequency";
         }break;
-        case KNOB_CLKMOD_EMULATED:{
-            return "ClkModEmulated";
+        case KNOB_CLKMOD:{
+            return "ClockModulation";
         }break;
         default:{
             return "Unknown";
@@ -551,11 +551,6 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
         _knobMapping(knobMapping),
         _frequencyHandler(_p.mammut.getInstanceCpuFreq()),
         _topologyHandler(_p.mammut.getInstanceTopology()){
-    // Save rollback points
-    for(Domain* currentDomain : _frequencyHandler->getDomains()){
-        _rollbackPoints.push_back(currentDomain->getRollbackPoint());
-    }
-
     _frequencyHandler->removeTurboFrequencies();
     std::vector<mammut::cpufreq::Frequency> availableFrequencies;
     availableFrequencies = _frequencyHandler->getDomains().at(0)->getAvailableFrequencies();
@@ -592,11 +587,8 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
 }
 
 KnobFrequency::~KnobFrequency(){
-    size_t i = 0;
     for(Domain* currentDomain : _frequencyHandler->getDomains()){
         currentDomain->reinsertTurboFrequencies();
-        currentDomain->rollback(_rollbackPoints[i]);
-        ++i;
     }
 }
 
@@ -679,6 +671,18 @@ void KnobFrequency::applyUnusedVCStrategy(Frequency v){
             insertToEnd(unusedVc, virtualCores);
         }
         applyUnusedVCStrategyOff(virtualCores);
+    }
+}
+
+KnobClkMod::KnobClkMod(Parameters p, const KnobMapping& knobMapping):_knobMapping(knobMapping){
+    for(double d : p.mammut.getInstanceTopology()->getCpus().front()->getClockModulationValues()){
+        _knobValues.push_back(d);
+    }
+}
+
+void KnobClkMod::changeValue(double v){
+    for(VirtualCore* vc : _knobMapping.getActiveVirtualCores()){
+        vc->setClockModulation(v);
     }
 }
 
