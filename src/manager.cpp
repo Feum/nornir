@@ -81,6 +81,7 @@ Manager::Manager(Parameters nornirParameters):
         _counter(NULL),
         _task(NULL),
         _topology(NULL),
+        _cpufreq(NULL),
         _samples(initSamples()),
         _variations(new MovingAverageExponential<double>(0.5)),
         _totalTasks(0),
@@ -91,9 +92,7 @@ Manager::Manager(Parameters nornirParameters):
         _configuration(NULL),
         _selector(NULL),
         _pid(0),
-        _toSimulate(false),
-        _topologyRollbackPoint(_p.mammut.getInstanceTopology()->getRollbackPoint()),
-        _cpufreqRollbackPoint(_p.mammut.getInstanceCpuFreq()->getRollbackPoint())
+        _toSimulate(false)
 {
     DEBUG("Initializing manager.");
     for(LoggerType lt : _p.loggersTypes){
@@ -111,6 +110,19 @@ Manager::Manager(Parameters nornirParameters):
         }
     }
     DEBUGB(samplesFile.open("samples.csv"));
+
+    _topology = _p.mammut.getInstanceTopology(); 
+    _cpufreq = _p.mammut.getInstanceCpuFreq();
+    if(!_toSimulate){
+        // We cannot create energy and task modules
+        // since they are not simulated by mammut
+        _counter = _p.mammut.getInstanceEnergy()->getCounter();
+        _task = _p.mammut.getInstanceTask();
+    }
+    DEBUG("Mammut handlers created.");
+
+    _topologyRollbackPoint = _topology->getRollbackPoint();
+    _cpufreqRollbackPoint = _cpufreq->getRollbackPoint();
 }
 
 Manager::~Manager(){
@@ -119,19 +131,14 @@ Manager::~Manager(){
     }
     _p.loggers.clear();
     DEBUGB(samplesFile.close());
+    _cpufreq->reinsertTurboFrequencies(); // Otherwise rollback will not work
     _topology->rollback(_topologyRollbackPoint);
-    _p.mammut.getInstanceCpuFreq()->rollback(_cpufreqRollbackPoint);
+    _cpufreq->rollback(_cpufreqRollbackPoint);
 }
 
 void Manager::run(){
-    _p.mammut.getInstanceCpuFreq()->removeTurboFrequencies();
+    _cpufreq->removeTurboFrequencies();
     DEBUG("Turbo frequencies removed.");
-    if(!_toSimulate){
-        _counter = _p.mammut.getInstanceEnergy()->getCounter();
-        _task = _p.mammut.getInstanceTask();
-        _topology = _p.mammut.getInstanceTopology();
-    }
-    DEBUG("Mammut handlers created.");
 
     if(isPrimaryRequirement(_p.requirements.executionTime)){
         _remainingTasks = _p.requirements.expectedTasksNumber;

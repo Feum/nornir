@@ -115,6 +115,9 @@ protected:
     // The topology module.
     mammut::topology::Topology* _topology;
 
+    // The cpufreq module.
+    mammut::cpufreq::CpuFreq* _cpufreq;
+
     // Monitored samples;
     Smoother<MonitoredSample>* _samples;
 
