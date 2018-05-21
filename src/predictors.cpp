@@ -96,15 +96,19 @@ void RegressionDataServiceTime::init(const KnobsValues& values){
 
     if(_p.knobFrequencyEnabled){
         double frequency = values[KNOB_FREQUENCY];
-        double throttle = values[KNOB_CLKMOD];
-        _invScalFactorFreq = (double)_minFrequency / frequency;
-        _invScalFactorFreq /= throttle;
+
+        _invScalFactorSpeed = (double) _minSpeed / frequency;
         ++_numPredictors;
 
-        _invScalFactorFreqAndCores = (double)_minFrequency /
-                                     (numVirtualCores * frequency);
-        _invScalFactorFreqAndCores /= throttle;
+        _invScalFactorSpeedAndCores = (double) _minSpeed /
+                                      (numVirtualCores * frequency);
         ++_numPredictors;
+
+        if(_p.knobClkModEnabled){
+            double clkMod = values[KNOB_CLKMOD] / 100.0;
+            _invScalFactorSpeed /= clkMod;
+            _invScalFactorSpeedAndCores /= clkMod;
+        }
     }else{
         throw std::runtime_error("Impossible to use Amdahl regression with no frequency.");
     }
@@ -114,13 +118,16 @@ RegressionDataServiceTime::RegressionDataServiceTime(const Parameters &p,
                                                      const Configuration &configuration,
                                                      const Smoother<MonitoredSample>* samples):
         RegressionData(p, configuration, samples),
-        _invScalFactorFreq(0),
-        _invScalFactorFreqAndCores(0),
+        _invScalFactorSpeed(0),
+        _invScalFactorSpeedAndCores(0),
         _numPredictors(0){
     _phyCores = _p.mammut.getInstanceTopology()->getPhysicalCores().size();
     std::vector<double> frequencies = _configuration.getKnob(KNOB_FREQUENCY)->getAllowedValues();
     if(!frequencies.empty()){
-        _minFrequency = frequencies[0];
+        _minSpeed = frequencies[0];
+        if(_p.knobClkModEnabled){
+            _minSpeed *= _configuration.getKnob(KNOB_CLKMOD)->getAllowedValues().front() / 100.0;
+        }
     }else if(_p.knobFrequencyEnabled){
         throw std::runtime_error("Please set knobFrequencyEnabled to false.");
     }
@@ -134,13 +141,13 @@ uint RegressionDataServiceTime::getNumPredictors() const{
 void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) const{
     if(_p.knobFrequencyEnabled){
         size_t rowId = 0;
-        matrix(rowId++, columnId) = _invScalFactorFreq;
-        matrix(rowId++, columnId) = _invScalFactorFreqAndCores;
+        matrix(rowId++, columnId) = _invScalFactorSpeed;
+        matrix(rowId++, columnId) = _invScalFactorSpeedAndCores;
     }
 }
 
 static void getStaticDynamicPower(double usedPhysicalCores, Frequency frequency,
-                                  MappingType mt, double throttle,
+                                  MappingType mt, double clkMod,
                                   const mammut::cpufreq::VoltageTable& table, uint numCpus,
                                   uint numDomains, uint phyCoresPerCpu,
                                   uint phyCoresPerDomain,
@@ -189,13 +196,13 @@ static void getStaticDynamicPower(double usedPhysicalCores, Frequency frequency,
         // For full domains
         double voltage = getVoltage(table, phyCoresPerDomain, frequency);
         staticPower += (voltage)*fullDomains;
-        dynamicPower += (phyCoresPerDomain*frequency*voltage*voltage*throttle)*fullDomains;
+        dynamicPower += (phyCoresPerDomain*frequency*voltage*voltage*clkMod)*fullDomains;
 
         // For spurious domain
         if(coresOnSpuriousDomain){
             voltage = getVoltage(table, coresOnSpuriousDomain, frequency);
             staticPower += voltage;
-            dynamicPower += coresOnSpuriousDomain*frequency*voltage*voltage*throttle;
+            dynamicPower += coresOnSpuriousDomain*frequency*voltage*voltage*clkMod;
         }
     }
 }
@@ -203,17 +210,22 @@ static void getStaticDynamicPower(double usedPhysicalCores, Frequency frequency,
 void RegressionDataPower::init(const KnobsValues& values){
     assert(values.areReal());
     _numPredictors = 0;
-    Frequency frequency = values[KNOB_FREQUENCY];
-    double throttle = values[KNOB_CLKMOD];
+
     uint numVirtualCores = values[KNOB_VIRTUAL_CORES];
     double usedPhysicalCores = getUsedPhysicalCores(numVirtualCores);
 
-    if(_p.knobFrequencyEnabled){
+    if(_p.knobFrequencyEnabled || _p.knobClkModEnabled){
+        Frequency frequency = values[KNOB_FREQUENCY];
+        double clkMod = 1.0;
+        if(_p.knobClkModEnabled){
+            clkMod = values[KNOB_CLKMOD] / 100.0;
+        }
         uint unusedDomains;
         double staticPowerUsedDomains = 0, dynamicPower = 0;
+
         getStaticDynamicPower(usedPhysicalCores, frequency,
                               (MappingType) values[KNOB_MAPPING],
-                              values[KNOB_CLKMOD],
+                              clkMod,
                               _p.archData.voltageTable, _cpus,
                               _domains, _phyCoresPerCpu,
                               _phyCoresPerDomain,
@@ -249,7 +261,7 @@ void RegressionDataPower::init(const KnobsValues& values){
          * Since I do not control the frequency, this model can be very
          * inaccurate.
          */
-        _dynamicPowerModel = usedPhysicalCores*throttle;
+        _dynamicPowerModel = usedPhysicalCores;
         ++_numPredictors;
     }
 }
@@ -539,9 +551,9 @@ PredictorUsl::PredictorUsl(PredictorType type,
                     Predictor(type, p, configuration, samples),
                     _maxPolDegree(POLYNOMIAL_DEGREE_USL),
                     _ws(NULL), _x(NULL), _y(NULL), _chisq(0),
-                    _preparationNeeded(true), _maxFreqThr(0), _minFreqThr(0),
-                    _minFreqCoresThr(0), _minFreqCoresThrNew(0), _n1(0), _n2(0),
-                    _minFreqN1Thr(0), _minFreqN2Thr(0){
+                    _preparationNeeded(true), _maxSpeedThr(0), _minSpeedThr(0),
+                    _minSpeedCoresThr(0), _minSpeedCoresThrNew(0), _n1(0), _n2(0),
+                    _minSpeedN1Thr(0), _minSpeedN2Thr(0){
     if(type != PREDICTION_THROUGHPUT){
         throw std::runtime_error("PredictorUsl can only be used for throughput predictions.");
     }
@@ -551,10 +563,11 @@ PredictorUsl::PredictorUsl(PredictorType type,
     _c = gsl_vector_alloc(_maxPolDegree);
     _cov = gsl_matrix_alloc(_maxPolDegree, _maxPolDegree);
     std::vector<double> frequencies = _configuration.getKnob(KNOB_FREQUENCY)->getAllowedValues();
-    _minFrequency = frequencies.front();
-    _maxFrequency = frequencies.back();
+    _minSpeed = frequencies.front();
+    _maxSpeed = frequencies.back();
     if(_p.knobClkModEnabled){
-        _minFrequency *= _configuration.getKnob(KNOB_CLKMOD)->getAllowedValues().front();
+        _minSpeed *= _configuration.getKnob(KNOB_CLKMOD)->getAllowedValues().front() / 100.0;
+        _maxSpeed *= _configuration.getKnob(KNOB_CLKMOD)->getAllowedValues().back() / 100.0;
     }
 }
 
@@ -575,34 +588,38 @@ bool PredictorUsl::readyForPredictions(){
 void PredictorUsl::refine(){
     double numCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
     double frequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
-    double throttle = _configuration.getKnob(KNOB_CLKMOD)->getRealValue();
     double throughput = getMaximumThroughput();
-    double freqThrottle = frequency*throttle;
+    double speed = frequency;
+
+    if(_p.knobClkModEnabled){
+        double clkMod = _configuration.getKnob(KNOB_CLKMOD)->getRealValue() / 100.0;
+        speed *= clkMod;
+    }
 
     double maxCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().size();
-    if(freqThrottle == _maxFrequency && numCores == maxCores){
-        _maxFreqThr = throughput;
+    if(speed == _maxSpeed && numCores == maxCores){
+        _maxSpeedThr = throughput;
         return;
-    }else if(freqThrottle == _minFrequency){
+    }else if(speed == _minSpeed){
         if(numCores == maxCores){
-            _minFreqThr = throughput;
+            _minSpeedThr = throughput;
         }else if(numCores == 1){
-            _minFreqCoresThr = throughput;
+            _minSpeedCoresThr = throughput;
         }
-    }else if(freqThrottle != _minFrequency){
-        double minMaxScaling = _maxFreqThr / _minFreqThr;
+    }else if(speed != _minSpeed){
+        double minMaxScaling = _maxSpeedThr / _minSpeedThr;
         // We get the expected throughput at minimum frequency starting from the actual
         // throughput at generic frequency. To do so we apply the inverse of the function
         // used in predict() to get the throughput at a generic frequency starting
         // from that at minimum frequency.
-        throughput = (throughput*(_maxFrequency - _minFrequency))/(_maxFrequency - freqThrottle + minMaxScaling*(freqThrottle - _minFrequency));
-        //freqThrottle = _minFrequency;
+        throughput = (throughput * (_maxSpeed - _minSpeed)) / (_maxSpeed - speed + minMaxScaling * (speed - _minSpeed));
+        //speed = _minSpeed;
     }
 
     double x, y;
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
         x = numCores - 1;
-        y = ((_minFreqCoresThr * numCores)/throughput) - 1;
+        y = ((_minSpeedCoresThr * numCores) / throughput) - 1;
     }else{
         x = numCores - 1;
         y = numCores / throughput;
@@ -664,8 +681,13 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
     double result = 0;
     double numCores = real[KNOB_VIRTUAL_CORES];
     double frequency = real[KNOB_FREQUENCY];
-    double throttle = real[KNOB_CLKMOD];
-    double freqThrottle = frequency*throttle;
+    double speed = frequency;
+
+    if(_p.knobClkModEnabled){
+        double clkMod = real[KNOB_CLKMOD] / 100.0;
+        speed *= clkMod;
+    }
+
     for(size_t i = 0; i < _coefficients.size(); i++){
         double exp = i;
         if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
@@ -677,7 +699,7 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
 
     double throughput;
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-        throughput = (numCores * _minFreqCoresThr)/(result + 1);
+        throughput = (numCores * _minSpeedCoresThr)/(result + 1);
     }else{
         throughput = (numCores / result);
     }
@@ -686,21 +708,21 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
     // maximum number of cores, as value for throughput at minimum frequency
     // use the value we stored instead of the predicted one.
     if(numCores == _configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().size()){
-        throughput = _minFreqThr;
+        throughput = _minSpeedThr;
     }
 
-    if(freqThrottle != _minFrequency){
-        double minMaxScaling = _maxFreqThr / _minFreqThr;
+    if(speed != _minSpeed){
+        double minMaxScaling = _maxSpeedThr / _minSpeedThr;
         double maxFreqPred = throughput * minMaxScaling;
-        return ((maxFreqPred - throughput)/(_maxFrequency - _minFrequency))*freqThrottle + ((throughput*_maxFrequency)-(maxFreqPred*_minFrequency))/(_maxFrequency - _minFrequency);
+        return ((maxFreqPred - throughput)/(_maxSpeed - _minSpeed))*speed + ((throughput*_maxSpeed)-(maxFreqPred*_minSpeed))/(_maxSpeed - _minSpeed);
     }else{
         return throughput;
     }
 }
 
-double PredictorUsl::getMinFreqCoresThr() const{
+double PredictorUsl::getMinSpeedCoresThr() const{
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP){
-        return _minFreqCoresThr;
+        return _minSpeedCoresThr;
     }else{
         return 1.0 / _coefficients[0];
     }
@@ -743,35 +765,35 @@ double PredictorUsl::getTheta(RecordInterferenceArgument n){
     int throughput;
     if(n == RECONFARG_N1){
         numCores = _n1;
-        throughput = _minFreqN1Thr;
+        throughput = _minSpeedN1Thr;
     }else{
         numCores = _n2;
-        throughput = _minFreqN2Thr;
+        throughput = _minSpeedN2Thr;
     }
     KnobsValues kv(KNOB_VALUE_REAL);
-    kv[KNOB_FREQUENCY] = _minFrequency;
+    kv[KNOB_FREQUENCY] = _minSpeed;
     kv[KNOB_VIRTUAL_CORES] = numCores;
-    // TODO Does not consider throttling
+    // TODO Does not consider clkMod
     if(_p.knobClkModEnabled){
-        throw std::runtime_error("Interference cannot be updated when throttling is used.");
+        throw std::runtime_error("Interference cannot be updated when clock modulation is used.");
     }
-    return (((getMinFreqCoresThr()*numCores)/predict(kv)) - 1) - (((_minFreqCoresThrNew*numCores)/throughput) - 1);
+    return (((getMinSpeedCoresThr()*numCores)/predict(kv)) - 1) - (((_minSpeedCoresThrNew*numCores)/throughput) - 1);
 }
 
 void PredictorUsl::updateInterference(){
     double numCores = _configuration.getRealValue(KNOB_VIRTUAL_CORES);
     double frequency = _configuration.getRealValue(KNOB_FREQUENCY);
-    // TODO Does not consider throttling
+    // TODO Does not consider clkMod
     if(_p.knobClkModEnabled){
-        throw std::runtime_error("Interference cannot be updated when throttling is used.");
+        throw std::runtime_error("Interference cannot be updated when clock modulation is used.");
     }
     double throughput = _samples->average().throughput;
     // TODO: At the moment I'm assuming that interferences does not change the
     // slope when we fix number of cores and we change the frequency.
-    if(frequency != _minFrequency){
+    if(frequency != _minSpeed){
         // We compute the 'old' throughput at minimum frequency
         KnobsValues kv(KNOB_VALUE_REAL);
-        kv[KNOB_FREQUENCY] = _minFrequency;
+        kv[KNOB_FREQUENCY] = _minSpeed;
         kv[KNOB_VIRTUAL_CORES] = numCores;
         double minFreqPred = predict(kv);
         kv[KNOB_FREQUENCY] = frequency;
@@ -781,13 +803,13 @@ void PredictorUsl::updateInterference(){
     }
 
     if(numCores == 1){
-        _minFreqCoresThrNew = throughput;
+        _minSpeedCoresThrNew = throughput;
     }else if(!_n1){
         _n1 = numCores;
-        _minFreqN1Thr = throughput;
+        _minSpeedN1Thr = throughput;
     }else{
         _n2 = numCores;
-        _minFreqN2Thr = throughput;
+        _minSpeedN2Thr = throughput;
     }
 }
 
@@ -803,10 +825,10 @@ void PredictorUsl::updateCoefficients(){
     seta(newA);
     setb(newB);
     if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL){
-        _minFreqCoresThr = _minFreqCoresThrNew;
+        _minSpeedCoresThr = _minSpeedCoresThrNew;
         _n1 = 0;
         _n2 = 0;
-        _minFreqCoresThrNew = 0;
+        _minSpeedCoresThrNew = 0;
     }
 }
 
@@ -846,11 +868,15 @@ double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
 double PredictorAnalytical::getPowerPrediction(const KnobsValues& values){
     assert(values.areReal());
     double usedPhysicalCores = values[KNOB_VIRTUAL_CORES];
+    double clkMod = 1.0;
+    if(_p.knobClkModEnabled){
+        clkMod = values[KNOB_CLKMOD] / 100.0;
+    }
     uint unusedDomains;
     double staticPower = 0, dynamicPower = 0;
     getStaticDynamicPower(usedPhysicalCores, values[KNOB_FREQUENCY],
                           (MappingType) values[KNOB_MAPPING],
-                          values[KNOB_CLKMOD],
+                          clkMod,
                           _p.archData.voltageTable, _cpus,
                           _domains, _phyCoresPerCpu,
                           _phyCoresPerDomain,

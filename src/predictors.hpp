@@ -100,9 +100,9 @@ public:
  */
 class RegressionDataServiceTime: public RegressionData{
 private:
-    mammut::cpufreq::Frequency _minFrequency;
-    double _invScalFactorFreq;
-    double _invScalFactorFreqAndCores;
+    mammut::cpufreq::Frequency _minSpeed;
+    double _invScalFactorSpeed;
+    double _invScalFactorSpeedAndCores;
 
     uint _numPredictors;
 public:
@@ -359,20 +359,20 @@ private:
     double _chisq;
     std::vector<double> _coefficients;
     bool _preparationNeeded;
-    double _maxFreqThr;
-    double _minFreqThr;
-    double _minFreqCoresThr;
-    double _minFrequency;
-    double _maxFrequency;
+    double _maxSpeedThr;
+    double _minSpeedThr;
+    double _minSpeedCoresThr;
+    double _minSpeed;
+    double _maxSpeed;
 
     // The following variables are used to update
     // the model after an external interference (typical
     // another application running on the system).
-    double _minFreqCoresThrNew;
+    double _minSpeedCoresThrNew;
     double _n1, _n2;
-    double _minFreqN1Thr, _minFreqN2Thr;
+    double _minSpeedN1Thr, _minSpeedN2Thr;
 
-    double getMinFreqCoresThr() const;
+    double getMinSpeedCoresThr() const;
     double geta() const;
     double getb() const;
     void seta(double a);
