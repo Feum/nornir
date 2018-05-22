@@ -133,14 +133,11 @@ void LoggerStream::log(bool isCalibrationPhase,
 
     *_statsStream << configuration.getRealValue(KNOB_VIRTUAL_CORES) << "\t";
     Frequency frequency = configuration.getRealValue(KNOB_FREQUENCY);
-    if(frequency == NORNIR_CLOCK_FREQUENCY_NONE){
-        *_statsStream << "N.A.\t";
-    }else{
-        // Print frequency as string to avoid conversion to exp notation.
-        std::ostringstream strs;
-        strs << std::fixed << std::setprecision(0) << frequency;
-        *_statsStream << strs.str() << "\t";
-    }
+
+    // Print frequency as string to avoid conversion to exp notation.
+    std::ostringstream strs;
+    strs << std::fixed << std::setprecision(0) << frequency;
+    *_statsStream << strs.str() << "\t";
     *_statsStream << configuration.getRealValue(KNOB_CLKMOD) << "\t";
     *_statsStream << samples.getLastSample().throughput << "\t";
     *_statsStream << ms.throughput << "\t";

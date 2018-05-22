@@ -33,7 +33,7 @@ TEST(ConfigurationTest, SimpleTest) {
     EXPECT_EQ(kv[KNOB_HYPERTHREADING], 2);
     EXPECT_EQ(kv[KNOB_MAPPING], MAPPING_TYPE_INTERLEAVED);
     EXPECT_EQ(kv[KNOB_FREQUENCY], 2400000);
-    EXPECT_EQ(kv[KNOB_CLKMOD], 1.0);
+    EXPECT_EQ(kv[KNOB_CLKMOD], 100.0);
 
     // Test equality and correct frequency set.
     ConfigurationExternal configuration2(p);
@@ -44,7 +44,7 @@ TEST(ConfigurationTest, SimpleTest) {
     kv2[KNOB_HYPERTHREADING] = 1;
     kv2[KNOB_MAPPING] = MAPPING_TYPE_LINEAR;
     kv2[KNOB_FREQUENCY] = 1600000;
-    kv2[KNOB_CLKMOD] = 1.0;
+    kv2[KNOB_CLKMOD] = 100.0;
     EXPECT_FALSE(configuration.equal(kv2));
     configuration2.setValues(kv2);
     EXPECT_EQ(p.mammut.getInstanceCpuFreq()->getDomains()[0]->getCurrentGovernor(), GOVERNOR_USERSPACE);

@@ -31,8 +31,6 @@
 #include "ffincs.hpp"
 #include "node.hpp"
 
-#define NORNIR_CLOCK_FREQUENCY_NONE std::numeric_limits<Frequency>::max()
-
 namespace nornir{
 
 class Knob: public mammut::utils::NonCopyable{

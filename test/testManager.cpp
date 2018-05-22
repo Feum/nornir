@@ -99,10 +99,11 @@ TEST(ManagerTest, GlobalTest) {
                 p.samplingIntervalSteady = 1;
 
                 // Simulate the execution
-                ManagerTest m(p, getNumThreads(arch, bench));
-                m.setSimulationParameters(testcase + "samples.csv");
-                m.start();
-                m.join();
+                ManagerTest* m = new ManagerTest(p, getNumThreads(arch, bench));
+                m->setSimulationParameters(testcase + "samples.csv");
+                m->start();
+                m->join();
+                delete m; // To force destructor call for rollback
                 std::cout << "Test completed: " << std::endl;
 
                 /*********************************************************/

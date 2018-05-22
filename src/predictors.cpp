@@ -148,7 +148,7 @@ void RegressionDataServiceTime::toArmaRow(size_t columnId, arma::mat& matrix) co
 
 static void getStaticDynamicPower(double usedPhysicalCores, Frequency frequency,
                                   MappingType mt, double clkMod,
-                                  const mammut::cpufreq::VoltageTable& table, uint numCpus,
+                                  const Parameters &p, uint numCpus,
                                   uint numDomains, uint phyCoresPerCpu,
                                   uint phyCoresPerDomain,
                                   uint& unusedDomains, double& staticPower, double& dynamicPower){
@@ -194,13 +194,18 @@ static void getStaticDynamicPower(double usedPhysicalCores, Frequency frequency,
         uint coresOnSpuriousDomain = x % phyCoresPerDomain;
 
         // For full domains
-        double voltage = getVoltage(table, phyCoresPerDomain, frequency);
+        double voltage = 1.0;
+        if(p.knobFrequencyEnabled){
+            voltage = getVoltage(p.archData.voltageTable, phyCoresPerDomain, frequency);
+        }
         staticPower += (voltage)*fullDomains;
         dynamicPower += (phyCoresPerDomain*frequency*voltage*voltage*clkMod)*fullDomains;
 
         // For spurious domain
         if(coresOnSpuriousDomain){
-            voltage = getVoltage(table, coresOnSpuriousDomain, frequency);
+            if(p.knobFrequencyEnabled){
+                voltage = getVoltage(p.archData.voltageTable, coresOnSpuriousDomain, frequency);
+            }
             staticPower += voltage;
             dynamicPower += coresOnSpuriousDomain*frequency*voltage*voltage*clkMod;
         }
@@ -215,8 +220,11 @@ void RegressionDataPower::init(const KnobsValues& values){
     double usedPhysicalCores = getUsedPhysicalCores(numVirtualCores);
 
     if(_p.knobFrequencyEnabled || _p.knobClkModEnabled){
-        Frequency frequency = values[KNOB_FREQUENCY];
+        Frequency frequency = 1.0;
         double clkMod = 1.0;
+        if(_p.knobFrequencyEnabled){
+            frequency = values[KNOB_FREQUENCY];
+        }
         if(_p.knobClkModEnabled){
             clkMod = values[KNOB_CLKMOD] / 100.0;
         }
@@ -225,8 +233,7 @@ void RegressionDataPower::init(const KnobsValues& values){
 
         getStaticDynamicPower(usedPhysicalCores, frequency,
                               (MappingType) values[KNOB_MAPPING],
-                              clkMod,
-                              _p.archData.voltageTable, _cpus,
+                              clkMod, _p, _cpus,
                               _domains, _phyCoresPerCpu,
                               _phyCoresPerDomain,
                               unusedDomains, staticPowerUsedDomains, dynamicPower);
@@ -249,7 +256,10 @@ void RegressionDataPower::init(const KnobsValues& values){
                 throw std::runtime_error("RegressionDataPower: init: strategyUnused unsupported.");
             }
         }
-        double voltage = getVoltage(_p.archData.voltageTable, 0, frequencyUnused);
+        double voltage = 1.0;
+        if(_p.knobFrequencyEnabled){
+            voltage = getVoltage(_p.archData.voltageTable, 0, frequencyUnused);
+        }
         // See TACO2016 paper, equations 6. and 7.
         _voltagePerUnusedDomains = (voltage * unusedDomains) + staticPowerUsedDomains;
         ++_numPredictors;
@@ -562,9 +572,14 @@ PredictorUsl::PredictorUsl(PredictorType type,
     }
     _c = gsl_vector_alloc(_maxPolDegree);
     _cov = gsl_matrix_alloc(_maxPolDegree, _maxPolDegree);
-    std::vector<double> frequencies = _configuration.getKnob(KNOB_FREQUENCY)->getAllowedValues();
-    _minSpeed = frequencies.front();
-    _maxSpeed = frequencies.back();
+
+    _minSpeed = 1;
+    _maxSpeed = 1;
+    if(_p.knobFrequencyEnabled){
+        std::vector<double> frequencies = _configuration.getKnob(KNOB_FREQUENCY)->getAllowedValues();
+        _minSpeed = frequencies.front();
+        _maxSpeed = frequencies.back();
+    }
     if(_p.knobClkModEnabled){
         _minSpeed *= _configuration.getKnob(KNOB_CLKMOD)->getAllowedValues().front() / 100.0;
         _maxSpeed *= _configuration.getKnob(KNOB_CLKMOD)->getAllowedValues().back() / 100.0;
@@ -587,13 +602,15 @@ bool PredictorUsl::readyForPredictions(){
 
 void PredictorUsl::refine(){
     double numCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getRealValue();
-    double frequency = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
     double throughput = getMaximumThroughput();
-    double speed = frequency;
+    double speed = 1;
+
+    if(_p.knobFrequencyEnabled){
+        speed = _configuration.getKnob(KNOB_FREQUENCY)->getRealValue();
+    }
 
     if(_p.knobClkModEnabled){
-        double clkMod = _configuration.getKnob(KNOB_CLKMOD)->getRealValue() / 100.0;
-        speed *= clkMod;
+        speed *= _configuration.getKnob(KNOB_CLKMOD)->getRealValue() / 100.0;
     }
 
     double maxCores = _configuration.getKnob(KNOB_VIRTUAL_CORES)->getAllowedValues().size();
@@ -680,12 +697,14 @@ double PredictorUsl::predict(const KnobsValues& knobsValues){
     const KnobsValues real = _configuration.getRealValues(knobsValues);
     double result = 0;
     double numCores = real[KNOB_VIRTUAL_CORES];
-    double frequency = real[KNOB_FREQUENCY];
-    double speed = frequency;
+    double speed = 1;
+
+    if(_p.knobFrequencyEnabled){
+        speed = real[KNOB_FREQUENCY];
+    }
 
     if(_p.knobClkModEnabled){
-        double clkMod = real[KNOB_CLKMOD] / 100.0;
-        speed *= clkMod;
+        speed *= real[KNOB_CLKMOD] / 100.0;
     }
 
     for(size_t i = 0; i < _coefficients.size(); i++){
@@ -868,16 +887,19 @@ double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
 double PredictorAnalytical::getPowerPrediction(const KnobsValues& values){
     assert(values.areReal());
     double usedPhysicalCores = values[KNOB_VIRTUAL_CORES];
+    Frequency frequency = 1.0;
     double clkMod = 1.0;
+    if(_p.knobFrequencyEnabled){
+        frequency = values[KNOB_FREQUENCY];
+    }
     if(_p.knobClkModEnabled){
         clkMod = values[KNOB_CLKMOD] / 100.0;
     }
     uint unusedDomains;
     double staticPower = 0, dynamicPower = 0;
-    getStaticDynamicPower(usedPhysicalCores, values[KNOB_FREQUENCY],
+    getStaticDynamicPower(usedPhysicalCores, frequency,
                           (MappingType) values[KNOB_MAPPING],
-                          clkMod,
-                          _p.archData.voltageTable, _cpus,
+                          clkMod, _p, _cpus,
                           _domains, _phyCoresPerCpu,
                           _phyCoresPerDomain,
                           unusedDomains, staticPower, dynamicPower);
