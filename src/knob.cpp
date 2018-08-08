@@ -323,6 +323,46 @@ void KnobVirtualCoresFarm::notifyNewConfiguration(uint numWorkers){
 }
 
 
+KnobVirtualCoresPipe::KnobVirtualCoresPipe(Parameters p,
+                                           std::vector<KnobVirtualCoresFarm*> farms,
+                                           std::vector<std::vector<double>> allowedValues):
+        KnobVirtualCores(p), _farms(farms), _allowedValues(allowedValues){    
+    _knobValues.clear();
+    for(size_t i = 0; i < allowedValues.size(); i++){
+        double sum = 0;
+        for(auto d : allowedValues[i]){sum += d;}
+        _knobValues.push_back(sum);
+    }
+    _realValue = _knobValues.front();
+    DEBUG("KnobVirtualCoresPipe created.");
+}
+
+void KnobVirtualCoresPipe::changeValue(double v){
+    // Search the value
+    std::vector<double> allocation;
+    for(auto av : _allowedValues){
+        double sum = 0;
+        for(auto d : av){sum += d;}
+        if(sum == v){
+            allocation = av;
+            break;
+        }
+    }
+    assert(allocation.size() == _farms.size());
+    for(size_t i = 0; i < allocation.size(); i++){
+        _farms[i]->changeValue(allocation[i]);
+    }
+}
+
+std::vector<AdaptiveNode*> KnobVirtualCoresPipe::getActiveWorkers() const{
+    std::vector<AdaptiveNode*> r;
+    for(auto f : _farms){
+        auto tmp = f->getActiveWorkers();
+        r.insert(r.end(), tmp.begin(), tmp.end());
+    }
+    return r;
+}
+
 KnobHyperThreading::KnobHyperThreading(Parameters p){
     vector<PhysicalCore*> physical = p.mammut.getInstanceTopology()->getPhysicalCores();
     size_t maxHtLevel = physical.at(0)->getVirtualCores().size();
@@ -580,8 +620,8 @@ KnobFrequency::KnobFrequency(Parameters p, const KnobMapping& knobMapping):
         }
         _realValue = availableFrequencies.front();
     }else{
-        _realValue = 0;
-        _knobValues.push_back(0);
+        _realValue = 1;
+        _knobValues.push_back(_realValue);
     }
 }
 

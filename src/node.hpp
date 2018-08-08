@@ -96,10 +96,18 @@ typedef struct{
 class AdaptiveNode: public ff::ff_node{
 private:
     friend class ManagerFastFlow;
+    friend class ManagerFastFlowPipeline;
     friend class KnobVirtualCoresFarm;
     friend class KnobMappingFarm;
     friend class TriggerQBlocking;
     template <typename S, typename I, typename O, typename G> friend class FarmAcceleratorBase;
+    friend void askForSample(std::vector<AdaptiveNode*> nodes);
+    friend MonitoredSample getSampleResponse(std::vector<AdaptiveNode*> nodes, double currentLatency);
+    friend void initNodesPreRun(Parameters p, AdaptiveNode* emitter, std::vector<AdaptiveNode*> workers,
+                                AdaptiveNode* collector, volatile bool* terminated, ff::ff_thread* lb,
+                                ff::ff_thread* gt);
+    friend void initNodesPostRun(AdaptiveNode* emitter, std::vector<AdaptiveNode*> workers,
+                                 AdaptiveNode* collector);
 
     volatile bool _started;
     volatile bool* _terminated;

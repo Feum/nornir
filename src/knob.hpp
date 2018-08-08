@@ -177,6 +177,21 @@ private:
     const volatile bool* _terminated;
 };
 
+class KnobVirtualCoresPipe: public KnobVirtualCores{
+    friend class ManagerFastFlow;
+    template <typename I, typename O> friend class FarmBase;
+public:
+    KnobVirtualCoresPipe(Parameters p,
+                         std::vector<KnobVirtualCoresFarm*> farms,
+                         std::vector<std::vector<double> > allowedValues);
+
+    void changeValue(double v);
+    std::vector<AdaptiveNode*> getActiveWorkers() const;
+private:
+    std::vector<KnobVirtualCoresFarm*> _farms;
+    std::vector<std::vector<double>> _allowedValues;
+};
+
 class KnobHyperThreading: public Knob{
 public:
     explicit KnobHyperThreading(Parameters p);

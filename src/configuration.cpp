@@ -293,6 +293,30 @@ ConfigurationFarm::ConfigurationFarm(const Parameters& p,
     if(collector){++_numServiceNodes;}
 }
 
+ConfigurationPipe::ConfigurationPipe(const Parameters& p,
+                                    Smoother<MonitoredSample> const* samples,
+                                    std::vector<KnobVirtualCoresFarm*> farms,
+                                    std::vector<std::vector<double>> allowedValues):
+        Configuration(p){
+    _knobs[KNOB_VIRTUAL_CORES] = new KnobVirtualCoresPipe(p, farms, allowedValues);
+
+    _knobs[KNOB_HYPERTHREADING] = new KnobHyperThreading(p);
+    _knobs[KNOB_MAPPING] = new KnobMappingExternal(p,
+                                                *dynamic_cast<KnobVirtualCores*>(_knobs[KNOB_VIRTUAL_CORES]),
+                                                *dynamic_cast<KnobHyperThreading*>(_knobs[KNOB_HYPERTHREADING]));
+    _knobs[KNOB_FREQUENCY] = new KnobFrequency(p,
+                                               *dynamic_cast<KnobMappingFarm*>(_knobs[KNOB_MAPPING]));
+
+    if(p.clockModulationEmulated){
+        _knobs[KNOB_CLKMOD] = new KnobClkModEmulated(p);
+    }else{
+        _knobs[KNOB_CLKMOD] = new KnobClkMod(p, *dynamic_cast<KnobMappingExternal*>(_knobs[KNOB_MAPPING]));
+    }
+
+    _triggers[TRIGGER_TYPE_Q_BLOCKING] = NULL;
+}
+
+
 std::vector<AdaptiveNode*> convertWorkers(ff::svector<ff::ff_node*> w){
     std::vector<AdaptiveNode*> r;
     for(size_t i = 0; i < w.size(); i++){

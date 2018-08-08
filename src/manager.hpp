@@ -41,6 +41,7 @@
 #include "node.hpp"
 #include "utils.hpp"
 
+#include "external/fastflow/ff/pipeline.hpp"
 #include "external/mammut/mammut/module.hpp"
 #include "external/mammut/mammut/utils.hpp"
 #include "external/mammut/mammut/mammut.hpp"
@@ -447,13 +448,47 @@ private:
     std::vector<AdaptiveNode*> _activeWorkers;
 
     void waitForStart();
-    void askForSample();
-    MonitoredSample getSampleResponse();
     MonitoredSample getSample();
-    void initNodesPreRun();
-    void initNodesPostRun();
     void postConfigurationManagement();
     void terminationManagement();
+    ulong getExecutionTime();
+    void shrinkPause();
+    void stretchPause();
+};
+
+/*!
+ * \class ManagerFastFlowPipeline
+ * \brief This class manages the adaptivity in applications written
+ * with pipeline pattern in the FastFlow programming framework.
+ *
+ * This class manages the adaptivity in applications written
+ * with pipeline pattern in the FastFlow programming framework.
+ */
+class ManagerFastFlowPipeline: public Manager{
+    template <typename I, typename O> friend class FarmBase;
+public:
+    /**
+     * Creates a pipeline adaptivity manager.
+     * @param pipe The pipeline to be managed.
+     * @param nornirParameters The parameters to be used for
+     * adaptivity decisions.
+     */
+    ManagerFastFlowPipeline(ff::ff_pipeline* pipe, std::vector<bool> farmsFlags, Parameters nornirParameters);
+
+    /**
+     * Destroyes this adaptivity manager.
+     */
+    ~ManagerFastFlowPipeline();
+private:
+    // The managed farm.
+    ff::ff_pipeline* _pipe;
+    std::vector<bool> _farmsFlags;
+    std::vector<KnobVirtualCoresFarm*> _farmsKnobs;
+    std::vector<AdaptiveNode*> _activeWorkers;
+    
+    void waitForStart();
+    MonitoredSample getSample();
+    void postConfigurationManagement();
     ulong getExecutionTime();
     void shrinkPause();
     void stretchPause();
