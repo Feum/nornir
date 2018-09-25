@@ -41,6 +41,50 @@
 #include "node.hpp"
 #include "utils.hpp"
 
+//// Nornir's versions of the nodes
+#include "external/fastflow/ff/config.hpp"
+namespace nornir{
+template<typename IN_t, typename OUT_t = IN_t>
+struct nrnr_node_t: public AdaptiveNode {
+    typedef IN_t  in_type;
+    typedef OUT_t out_type;
+
+    nrnr_node_t():
+        GO_ON((OUT_t*)ff::FF_GO_ON),
+        EOS((OUT_t*)ff::FF_EOS),
+        EOSW((OUT_t*)ff::FF_EOSW),
+        GO_OUT((OUT_t*)ff::FF_GO_OUT),
+        EOS_NOFREEZE((OUT_t*) ff::FF_EOS_NOFREEZE),
+        BLK((OUT_t*)ff::FF_BLK), NBLK((OUT_t*)ff::FF_NBLK) {
+    }
+    OUT_t * const GO_ON,  *const EOS, *const EOSW, *const GO_OUT, *const EOS_NOFREEZE, *const BLK, *const NBLK;
+    virtual ~nrnr_node_t()  {}
+    virtual OUT_t* svc(IN_t*)=0;
+    inline  void *svc(void *task) {
+        void* r = svc(reinterpret_cast<IN_t*>(task));
+        if(!r){
+            TERMINATE_APPLICATION;
+        }else{
+            return r;
+        }
+    };
+};
+
+template<typename TIN, typename TOUT, typename FUNC>
+struct nrnr_node_F: public nrnr_node_t<TIN, TOUT> {
+   nrnr_node_F(FUNC f):F(f) {}
+   TOUT* svc(TIN* task) {
+       TOUT* r = F(task, this);
+       if(!r){
+           TERMINATE_APPLICATION_TYPED(TOUT);
+       }else{
+           return r;
+       }
+   }
+   FUNC F;
+};
+}
+
 #include "external/fastflow/ff/pipeline.hpp"
 #include "external/mammut/mammut/module.hpp"
 #include "external/mammut/mammut/utils.hpp"

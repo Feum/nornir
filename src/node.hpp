@@ -44,6 +44,7 @@ POP_WARNING
 #undef DEBUGB
 
 #define TERMINATE_APPLICATION do{ terminate(); return (void*) ff::FF_EOS;} while(0)
+#define TERMINATE_APPLICATION_TYPED(X) do{ nornir::AdaptiveNode::terminate(); return (X*) ff::FF_EOS;} while(0)
 
 namespace nornir{
 

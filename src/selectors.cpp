@@ -1132,7 +1132,7 @@ Frequency SelectorLiMartinez::findNearestFrequency(Frequency f) const{
     Frequency bestDistance = _availableFrequencies.back();
     Frequency bestFrequency = _availableFrequencies.back();
     for(size_t i = 0; i < _availableFrequencies.size(); i++){
-        Frequency distance = std::abs(_availableFrequencies.at(i) - f);
+        Frequency distance = std::abs(static_cast<long long>(_availableFrequencies.at(i) - f));
         if(distance < bestDistance){
             bestDistance = distance;
             bestFrequency = _availableFrequencies.at(i);

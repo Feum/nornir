@@ -243,6 +243,7 @@ void AdaptiveNode::storeSample(){
 void AdaptiveNode::callbackIn(void *p) CX11_KEYWORD(final){
     _started = true;
     ManagementRequest* request;
+    DEBUG("callbackIn called.");
 
     while(!_managementQ.empty()){
         request = (ManagementRequest*) _managementQ.top();

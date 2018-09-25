@@ -60,7 +60,7 @@ namespace nornir{
 class Parameters;
 
 using namespace std;
-using namespace ff;
+using namespace ::ff;
 using namespace mammut::cpufreq;
 using namespace mammut::energy;
 using namespace mammut::task;
@@ -122,7 +122,9 @@ Manager::Manager(Parameters nornirParameters):
     DEBUG("Mammut handlers created.");
 
     _topologyRollbackPoint = _topology->getRollbackPoint();
-    _cpufreqRollbackPoint = _cpufreq->getRollbackPoint();
+    if(_p.knobFrequencyEnabled){
+        _cpufreqRollbackPoint = _cpufreq->getRollbackPoint();
+    }
 }
 
 Manager::~Manager(){
@@ -131,9 +133,11 @@ Manager::~Manager(){
     }
     _p.loggers.clear();
     DEBUGB(samplesFile.close());
-    _cpufreq->reinsertTurboFrequencies(); // Otherwise rollback will not work
     _topology->rollback(_topologyRollbackPoint);
-    _cpufreq->rollback(_cpufreqRollbackPoint);
+    if(_p.knobFrequencyEnabled){
+        _cpufreq->rollback(_cpufreqRollbackPoint);
+        _cpufreq->reinsertTurboFrequencies(); // Otherwise rollback will not work
+    }
 }
 
 void Manager::run(){
@@ -1000,9 +1004,6 @@ void ManagerFastFlowPipeline::waitForStart(){
                 sndMinThr = tmp.throughput;
             }
         }  
-#ifdef DEBUG_MANAGER
-        std::vector<MonitoredSample> oldMonitoredData = monitoredData;
-#endif      
         std::vector<double> tmp = allowedValues.back();
         double oldNumWorkers = tmp[bottleneckId];
         double newNumWorkers = std::ceil(tmp[bottleneckId] * (sndMinThr / minThr));

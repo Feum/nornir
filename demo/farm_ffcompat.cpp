@@ -35,10 +35,12 @@
  *     ATTENTION: svc_init and svc_end are now called after each rethreading.
  *     Accordingly, if those operations need to be performed only once, you
  *     should ensure that.
- *  2. If the application wants to be aware of the changes in the number
+ *  2. In the emitter, when there are no more tasks to be produced, please
+ *     just call the macro TERMINATE_APPLICATION instead of returing NULL.
+ *  3. If the application wants to be aware of the changes in the number
  *     of workers, the nodes can implement the notifyRethreading virtual
  *     method.
- *  3. Pass the existing farm to the manager.
+ *  4. Pass the existing farm to the manager.
  */
 
 #include <vector>
