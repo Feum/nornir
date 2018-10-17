@@ -71,7 +71,7 @@ public:
         _sleepTimeMs(sleepTimeMs), _farmId(farmId), _workerId(workerId){;}
 
     int svc_init(){
-        std::cout << "Worker svc_init called" << std::endl;
+        //std::cout << "Worker svc_init called" << std::endl;
         return 0;
     }
 

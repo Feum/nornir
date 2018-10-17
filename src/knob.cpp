@@ -338,6 +338,7 @@ KnobVirtualCoresPipe::KnobVirtualCoresPipe(Parameters p,
 }
 
 void KnobVirtualCoresPipe::changeValue(double v){
+    DEBUG("[Workers Pipe] Setting value to: " << v);
     // Search the value
     std::vector<double> allocation;
     for(auto av : _allowedValues){
@@ -350,7 +351,9 @@ void KnobVirtualCoresPipe::changeValue(double v){
     }
     assert(allocation.size() == _farms.size());
     for(size_t i = 0; i < allocation.size(); i++){
-        _farms[i]->changeValue(allocation[i]);
+        DEBUG("[Workers Pipe] Setting num workers to " << allocation[i] << " for farm " << i);
+        _farms[i]->setRealValue(allocation[i]);
+        DEBUG("[Workers Pipe] Num workers for farm " << i << " changed.");
     }
 }
 

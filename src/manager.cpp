@@ -927,7 +927,6 @@ static bool isValidAllocation(std::vector<ff_farm<>*> farms, std::vector<double>
 void ManagerFastFlowPipeline::waitForStart(){
     std::vector<KnobVirtualCoresFarm*> farmsKnobs;
     std::vector<ff_farm<>*> farms;
-    std::vector<AdaptiveNode*> firstWorkers;
     double allowedTotalWorkers = _p.mammut.getInstanceTopology()->getVirtualCores().size();
     for(size_t i = 0; i < _pipe->getStages().size(); i++){
         if(_farmsFlags[i]){
@@ -936,6 +935,7 @@ void ManagerFastFlowPipeline::waitForStart(){
             AdaptiveNode* collector = dynamic_cast<AdaptiveNode*>(realFarm->getCollector());
             std::vector<AdaptiveNode*> workers = convertWorkers(realFarm->getWorkers());
 
+            _allWorkers.push_back(workers);
             if(_p.qSize){
                 realFarm->setFixedSize(true);
                 // We need to multiply for the number of workers since FastFlow
@@ -947,11 +947,9 @@ void ManagerFastFlowPipeline::waitForStart(){
             KnobVirtualCoresFarm* f = new KnobVirtualCoresFarm(_p, emitter, collector, realFarm->getgt(), 
                                                                workers, &_terminated);
             farmsKnobs.push_back(f);
-            firstWorkers.push_back(workers[0]);
             farms.push_back(realFarm);
             initNodesPreRun(_p, emitter, workers, collector, &_terminated, 
                             realFarm->getlb(), realFarm->getgt());
-            _activeWorkers.insert(_activeWorkers.end(), workers.begin(), workers.end());
         }
     }
     _farmsKnobs = farmsKnobs;
@@ -966,20 +964,28 @@ void ManagerFastFlowPipeline::waitForStart(){
         initNodesPostRun(emitter, workers, collector);
     }
     
-    std::vector<std::vector<double>> allowedValues;
     std::vector<double> firstAllocation;
     // Sets all the farm to 1 worker.
+    _activeWorkers.clear();
     for(auto k : farmsKnobs){
-        k->changeValue(1);
+        auto allworkers = k->getActiveWorkers();
+        k->setRealValue(1);
+        // When a change in the number of workers in a farm occurs, their workers push a sample, so we need to retrieve it and discard it
+        for(auto an :allworkers){
+            MonitoredSample tmp;
+            an->getSampleResponse(tmp, 0);
+        }
+        allworkers = k->getActiveWorkers();
+        _activeWorkers.insert(_activeWorkers.end(), allworkers.begin(), allworkers.end());
         firstAllocation.push_back(1);
     }
-    allowedValues.push_back(firstAllocation);
+    _allowedValues.push_back(firstAllocation);
     usleep(_p.samplingIntervalCalibration*MAMMUT_MICROSECS_IN_MILLISEC);
 
     std::vector<MonitoredSample> monitoredData;
     size_t bottleneckId = 0;
-    for(size_t i = 0; i < firstWorkers.size(); i++){
-        AdaptiveNode* an = firstWorkers[i];
+    for(size_t i = 0; i < _activeWorkers.size(); i++){
+        AdaptiveNode* an = _activeWorkers[i];
         an->askForSample();
         MonitoredSample tmp;
         an->getSampleResponse(tmp, 0);
@@ -991,10 +997,10 @@ void ManagerFastFlowPipeline::waitForStart(){
     double minThr = std::numeric_limits<double>::max();
     double sndMinThr = std::numeric_limits<double>::max();
     while(numWorkers < allowedTotalWorkers &&
-          isValidAllocation(farms, allowedValues.back())){
+          isValidAllocation(farms, _allowedValues.back())){
         minThr = std::numeric_limits<double>::max();
         sndMinThr = std::numeric_limits<double>::max();
-        for(size_t i = 0; i < firstWorkers.size(); i++){
+        for(size_t i = 0; i < _activeWorkers.size(); i++){
             MonitoredSample tmp = monitoredData[i];
             if(tmp.throughput < minThr){
                 sndMinThr = minThr;
@@ -1004,13 +1010,13 @@ void ManagerFastFlowPipeline::waitForStart(){
                 sndMinThr = tmp.throughput;
             }
         }  
-        std::vector<double> tmp = allowedValues.back();
+        std::vector<double> tmp = _allowedValues.back();
         double oldNumWorkers = tmp[bottleneckId];
         double newNumWorkers = std::ceil(tmp[bottleneckId] * (sndMinThr / minThr));
         tmp[bottleneckId] = newNumWorkers;
         monitoredData[bottleneckId].throughput = monitoredData[bottleneckId].throughput * 
                                                  (newNumWorkers / oldNumWorkers); 
-        allowedValues.push_back(tmp);
+        _allowedValues.push_back(tmp);
 
 #ifdef DEBUG_MANAGER
         std::cout << "----New Pre-Calibration List Element----" << std::endl;
@@ -1034,12 +1040,12 @@ void ManagerFastFlowPipeline::waitForStart(){
             numWorkers += x;
         }
     }
-    allowedValues.pop_back(); // Remove last allocation since it uses too many cores.
+    _allowedValues.pop_back(); // Remove last allocation since it uses too many cores.
     DEBUG("Pre-calibration terminated.");
     
     // Ok now configuration can be created.
     Manager::_configuration = new ConfigurationPipe(_p, _samples,
-                                                    farmsKnobs, allowedValues);
+                                                    farmsKnobs, _allowedValues);
     dynamic_cast<KnobMappingExternal*>(_configuration->getKnob(KNOB_MAPPING))->setPid(getpid());
     if(_p.clockModulationEmulated){
         dynamic_cast<KnobClkModEmulated*>(_configuration->getKnob(KNOB_CLKMOD))->setPid(getpid());
@@ -1080,18 +1086,42 @@ void ManagerFastFlowPipeline::postConfigurationManagement(){
     std::vector<AdaptiveNode*> newWorkers = knobWorkers->getActiveWorkers();
     MonitoredSample sample;
 
+    std::vector<double> oldAllocation, newAllocation;
+
+    DEBUG("[Manager Pipeline] Moving from " << _activeWorkers.size() << " total workers to " << newWorkers.size() << " total workers.");
     if(_activeWorkers.size() != newWorkers.size()){
-        /**
-         * Since I stopped the workers after I asked for a sample, there
-         * may still be tasks that have been processed but I did not count.
-         * For this reason, I get them.
-         * I do not need to ask since the node put it in the Q when it
-         * terminated.
-         */
-        DEBUG("Getting spurious..");
-        sample = getSampleResponse(_activeWorkers, _samples->average().latency);
-        updateTasksCount(sample);
-        DEBUG("Spurious got.");
+        for(auto v : _allowedValues){
+            double sum = 0;
+            for(auto d : v){
+                sum += d;
+            }
+            if(sum == _activeWorkers.size()){
+                oldAllocation = v;
+            }else if(sum == newWorkers.size()){
+                newAllocation = v;
+            }
+        }
+        DEBUG("[Manager Pipeline] Old allocation " << oldAllocation);
+        DEBUG("[Manager Pipeline] New allocation " << newAllocation);
+
+        for(size_t i = 0; i < newAllocation.size(); i++){
+            // Get spurious only for the farm that changed the number of workers
+            if(newAllocation[i] != oldAllocation[i]){
+                /**
+                 * Since I stopped the workers after I asked for a sample, there
+                 * may still be tasks that have been processed but I did not count.
+                 * For this reason, I get them.
+                 * I do not need to ask since the node put it in the Q when it
+                 * terminated.
+                 */
+                std::vector<AdaptiveNode*> stoppedWorkers = _allWorkers[i];
+                stoppedWorkers.resize(oldAllocation[i]);
+                DEBUG("[Manager Pipeline] Getting spurious..");
+                sample = getSampleResponse(stoppedWorkers, _samples->average().latency);
+                updateTasksCount(sample);
+                DEBUG("[Manager Pipeline] Spurious got.");
+            }
+        }
     }
 
     _activeWorkers = newWorkers;

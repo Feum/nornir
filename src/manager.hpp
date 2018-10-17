@@ -529,6 +529,9 @@ private:
     std::vector<bool> _farmsFlags;
     std::vector<KnobVirtualCoresFarm*> _farmsKnobs;
     std::vector<AdaptiveNode*> _activeWorkers;
+    std::vector<std::vector<AdaptiveNode*>> _allWorkers;
+    std::vector<std::vector<double>> _allowedValues;
+
     
     void waitForStart();
     MonitoredSample getSample();

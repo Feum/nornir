@@ -305,7 +305,7 @@ ConfigurationPipe::ConfigurationPipe(const Parameters& p,
                                                 *dynamic_cast<KnobVirtualCores*>(_knobs[KNOB_VIRTUAL_CORES]),
                                                 *dynamic_cast<KnobHyperThreading*>(_knobs[KNOB_HYPERTHREADING]));
     _knobs[KNOB_FREQUENCY] = new KnobFrequency(p,
-                                               *dynamic_cast<KnobMappingFarm*>(_knobs[KNOB_MAPPING]));
+                                               *dynamic_cast<KnobMappingExternal*>(_knobs[KNOB_MAPPING]));
 
     if(p.clockModulationEmulated){
         _knobs[KNOB_CLKMOD] = new KnobClkModEmulated(p);
