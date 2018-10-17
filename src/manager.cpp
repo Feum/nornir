@@ -135,8 +135,8 @@ Manager::~Manager(){
     DEBUGB(samplesFile.close());
     _topology->rollback(_topologyRollbackPoint);
     if(_p.knobFrequencyEnabled){
-        _cpufreq->rollback(_cpufreqRollbackPoint);
         _cpufreq->reinsertTurboFrequencies(); // Otherwise rollback will not work
+        _cpufreq->rollback(_cpufreqRollbackPoint);
     }
 }
 

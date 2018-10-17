@@ -38,6 +38,12 @@
 #include "external/mammut/mammut/mammut.hpp"
 
 #include <gsl/gsl_multifit.h>
+
+// Needed because someone defined bitset as a macro and collides with boost bitset definition (used by mlpack)
+#ifdef bitset
+#undef bitset
+#endif 
+
 #include <mlpack/core.hpp>
 #include <mlpack/methods/linear_regression/linear_regression.hpp>
 #include "external/leo/leo.h" // Must be included after mlpack

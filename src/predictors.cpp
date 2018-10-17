@@ -81,6 +81,9 @@ RegressionData::RegressionData(const Parameters &p,
     uint virtCoresPerPhyCores = t->getPhysicalCore(0)->getVirtualCores().size();
     _phyCoresPerDomain = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getVirtualCores().size() / virtCoresPerPhyCores;
     _phyCoresPerCpu = t->getCpus().at(0)->getPhysicalCores().size();
+    if(!_phyCoresPerDomain){ // Fallback
+        _phyCoresPerDomain = _phyCoresPerCpu;
+    }
 }
 
 double RegressionData::getUsedPhysicalCores(double numVirtualCores){
@@ -875,6 +878,9 @@ PredictorAnalytical::PredictorAnalytical(PredictorType type,
     uint virtCoresPerPhyCores = t->getPhysicalCore(0)->getVirtualCores().size();
     _phyCoresPerDomain = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getVirtualCores().size() / virtCoresPerPhyCores;
     _phyCoresPerCpu = t->getCpus().at(0)->getPhysicalCores().size();
+    if(!_phyCoresPerDomain){ // Fallback
+        _phyCoresPerDomain = _phyCoresPerCpu;
+    }
 }
 
 double PredictorAnalytical::getScalingFactor(const KnobsValues& values){
