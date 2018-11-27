@@ -63,7 +63,11 @@ static double getVoltage(VoltageTable table, uint workers, Frequency frequency){
     VoltageTableKey key(workers, frequency);
     VoltageTableIterator it = table.find(key);
     if(it != table.end()){
-        return it->second;
+        double v = it->second;
+	if(!v){
+	  v = 1; // Voltages not computed on this machine
+	}
+	return v;
     }else{
         throw runtime_error("Frequency and/or number of virtual cores "
                             "not found in voltage table.");
@@ -82,7 +86,7 @@ RegressionData::RegressionData(const Parameters &p,
     _phyCoresPerDomain = _p.mammut.getInstanceCpuFreq()->getDomains().at(0)->getVirtualCores().size() / virtCoresPerPhyCores;
     _phyCoresPerCpu = t->getCpus().at(0)->getPhysicalCores().size();
     if(!_phyCoresPerDomain){ // Fallback
-        _phyCoresPerDomain = _phyCoresPerCpu;
+      _phyCoresPerDomain = 1; //_phyCoresPerCpu;
     }
 }
 
