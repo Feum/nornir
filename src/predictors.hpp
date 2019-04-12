@@ -515,6 +515,54 @@ public:
     double predict(const KnobsValues& realValues);
 };
 
+/**
+ * @brief The PredictoSMT class
+ */
+class PredictorSMT: public Predictor{
+public:
+    PredictorSMT(PredictorType type,
+                 const Parameters& p,
+                 const Configuration& configuration,
+                 const Smoother<MonitoredSample>* samples);
+
+    ~PredictorSMT();
+
+    /**
+     * Returns true if the predictor is ready to make prediction.
+     * If false is returned, we need to refine the model with
+     * more points.
+     * @return true if the predictor is ready to make prediction,
+     *         false otherwise.
+     */
+    bool readyForPredictions();
+
+    /**
+     * Clears the predictor removing all the collected
+     * data
+     */
+    void clear();
+
+    /**
+     * If possible, refines the model with the information
+     * obtained on the current configuration.
+     */
+    void refine();
+
+    /**
+     * Prepare the predictor to accept a set of prediction requests.
+     * ATTENTION: If it is already ready to perform predictions, nothing should
+     *            be done.
+     */
+    void prepareForPredictions();
+
+    /**
+     * Predicts the value at specific knobs values.
+     * @param values The values.
+     * @return The predicted value at a specific combination of real knobs values.
+     */
+    double predict(const KnobsValues& realValues);
+};
+
 }
 
 

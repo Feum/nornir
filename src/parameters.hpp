@@ -163,6 +163,7 @@ typedef enum{
     STRATEGY_PREDICTION_PERFORMANCE_AMDAHL = 0,
     STRATEGY_PREDICTION_PERFORMANCE_USL,
     STRATEGY_PREDICTION_PERFORMANCE_USLP, // <- More precise than USL but needs one additional calibration point.
+    STRATEGY_PREDICTION_PERFORMANCE_SMT, // <-  Support for Simultaneous Multi-Threading
     STRATEGY_PREDICTION_PERFORMANCE_LEO,
     STRATEGY_PREDICTION_PERFORMANCE_NUM // <- This must always be the last.
 }StrategyPredictionPerformance;
@@ -172,6 +173,7 @@ typedef enum{
 typedef enum{
     STRATEGY_PREDICTION_POWER_LINEAR = 0,
     STRATEGY_PREDICTION_POWER_LEO,
+    STRATEGY_PREDICTION_POWER_SMT, // <-  Support for Simultaneous Multi-Threading
     STRATEGY_PREDICTION_POWER_NUM // <- This must always be the last.
 }StrategyPredictionPower;
 

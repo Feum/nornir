@@ -777,6 +777,9 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
                 case STRATEGY_PREDICTION_PERFORMANCE_LEO:{
                     predictor = new PredictorLeo(type, p, configuration, samples);
                 }break;
+                case STRATEGY_PREDICTION_PERFORMANCE_SMT:{
+                    predictor = new PredictorSMT(type, p, configuration, samples);
+                }break;
                 default:{
                     throw std::runtime_error("Unknown prediction strategy.");
                 }break;
@@ -793,6 +796,9 @@ std::unique_ptr<Predictor> SelectorLearner::getPredictor(PredictorType type,
                 }break;
                 case STRATEGY_PREDICTION_POWER_LEO:{
                     predictor = new PredictorLeo(type, p, configuration, samples);
+                }break;
+                case STRATEGY_PREDICTION_POWER_SMT:{
+                    predictor = new PredictorSMT(type, p, configuration, samples);
                 }break;
                 default:{
                     throw std::runtime_error("Unknown prediction strategy.");
@@ -852,6 +858,10 @@ SelectorLearner::SelectorLearner(const Parameters& p,
         // I only need to explore on virtual cores and frequency.
         knobsFlags[KNOB_VIRTUAL_CORES] = true;
         knobsFlags[KNOB_FREQUENCY] = true;
+    }else if(_p.strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_SMT ||
+             _p.strategyPredictionPower == STRATEGY_PREDICTION_POWER_SMT){
+        // Add to 'additionalPoints' the points that MUST be visited before starting with the proper 'exploration' phase
+        ;
     }else{
         for(size_t i = 0; i < KNOB_NUM; i++){
             knobsFlags[i] = _p.isKnobEnabled((KnobType) i);

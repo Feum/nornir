@@ -649,6 +649,12 @@ ParametersValidation Parameters::validateSelector(){
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_MAPPING] = true;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_HYPERTHREADING] = false;
         knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_USLP][KNOB_CLKMOD] = true;
+        // SMT
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_FREQUENCY] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_MAPPING] = false;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_HYPERTHREADING] = true;
+        knobsSupportPerformance[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_CLKMOD] = false;
 
         /******************************************/
         /*              Power models.             */
@@ -665,6 +671,12 @@ ParametersValidation Parameters::validateSelector(){
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_MAPPING] = false;
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_HYPERTHREADING] = false;
         knobsSupportPower[STRATEGY_PREDICTION_POWER_LEO][KNOB_CLKMOD] = false;
+        // SMT
+        knobsSupportPower[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_VIRTUAL_CORES] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_FREQUENCY] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_MAPPING] = false;
+        knobsSupportPower[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_HYPERTHREADING] = true;
+        knobsSupportPower[STRATEGY_PREDICTION_PERFORMANCE_SMT][KNOB_CLKMOD] = false;
 
         // Check if the knob enabled can be managed by the predictors specified.
         for(size_t i = 0; i < KNOB_NUM; i++){
@@ -686,7 +698,9 @@ ParametersValidation Parameters::validateSelector(){
         // TODO: This is because the additional exploration points at the moment
         // can only be added to the low discrepancy generators.
         if((strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USL ||
-            strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP) &&
+            strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_USLP ||
+            strategyPredictionPerformance == STRATEGY_PREDICTION_PERFORMANCE_SMT ||
+            strategyPredictionPower == STRATEGY_PREDICTION_POWER_SMT) &&
            (strategyExploration != STRATEGY_EXPLORATION_HALTON && strategyExploration != STRATEGY_EXPLORATION_HALTON_REVERSE &&
             strategyExploration != STRATEGY_EXPLORATION_RANDOM && strategyExploration != STRATEGY_EXPLORATION_SOBOL)){
                return VALIDATION_NO;
