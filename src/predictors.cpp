@@ -1223,10 +1223,10 @@ double PredictorFullSearch::predict(const KnobsValues& realValues){
 		}break;
 		case PREDICTION_POWER: {
 
-			double fullCPUvoltage = getVoltage(p.archData.voltageTable, _phyCoresPerCpu, freq);
+			double fullCPUvoltage = getVoltage(_p.archData.voltageTable, _phyCoresPerCpu, freq);
 
 			vec x(4);
-			x(0) = (_cpus - nActiveCpu) * getVoltage(p.archData.voltageTable, 0, freq); //Static power of inutilized cpus
+			x(0) = (_cpus - nActiveCpu) * getVoltage(_p.archData.voltageTable, 0, freq); //Static power of inutilized cpus
 			x(1) = nActiveCpu * fullCPUvoltage; //Static power of fully utilized cpus
 			x(2) = nActiveCpu * fullCPUvoltage * fullCPUvoltage* freq *_phyCoresPerCpu; //Dynamic power of fully utilized cpus
 			x(3) = 1 - (1 / numContexts); //Hyper Threading power overhead
@@ -1261,7 +1261,7 @@ double PredictorFullSearch::predict(const KnobsValues& realValues){
 
 				mat usl_freq = _xs2.submat(0, 0, _xs2.n_rows - 2, _xs2.n_cols - 1);
 				mat ht = _xs2.submat(_xs2.n_rows - 1, 0, _xs2.n_rows - 1, _xs2.n_cols - 1);
-				rowvec extime_noht(_xs2.n_cols);
+				vec extime_noht(_xs2.n_cols);
 
 				//Using trained model to obtain data needed for the second regression
 				_lr1->Predict(usl_freq, extime_noht);
@@ -1309,13 +1309,13 @@ double PredictorFullSearch::predict(const KnobsValues& realValues){
 			usl_freq(1, 0) = getKi(numCores, freq);
 			usl_freq(2, 0) = getGamma(numCores, freq);
 
-			rowvec extime_noht(1);
+			vec extime_noht(1);
 
 			_lr1->Predict(usl_freq, extime_noht);
 
 			mat ht(1, 1);
 			ht(0, 0) = getHT(numContexts);
-			rowvec extime_ht(1);
+			vec extime_ht(1);
 
 			_lr2->Predict(ht, extime_ht);
 
@@ -1327,15 +1327,15 @@ double PredictorFullSearch::predict(const KnobsValues& realValues){
 		}break;
 		case PREDICTION_POWER: {
 
-			double fullCPUvoltage = getVoltage(p.archData.voltageTable, _phyCoresPerCpu, freq);
+			double fullCPUvoltage = getVoltage(_p.archData.voltageTable, _phyCoresPerCpu, freq);
 
 			mat p_regr(4, 1);
-			p_regr(0, 0) = (_cpus - nActiveCpu) * getVoltage(p.archData.voltageTable, 0, freq);
+			p_regr(0, 0) = (_cpus - nActiveCpu) * getVoltage(_p.archData.voltageTable, 0, freq);
 			p_regr(1, 0) = nActiveCpu * fullCPUvoltage;
 			p_regr(2, 0) = nActiveCpu * fullCPUvoltage * fullCPUvoltage* freq *_phyCoresPerCpu;
 			p_regr(3, 0) = 1 - (1 / numContexts);
 
-			rowvec power_ht(1);
+			vec power_ht(1);
 
 			_lr2->Predict(p_regr, power_ht);
 
@@ -1356,7 +1356,7 @@ double PredictorFullSearch::predict(const KnobsValues& realValues){
 		_xs1.reset();	_xs2.reset();
 		_ys1.reset();	_ys2.reset();
 
-		_xs2.set_size(4, 0);-
+		_xs2.set_size(4, 0);
 		_xs1.set_size(3, 0);
 
 	}
