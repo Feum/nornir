@@ -537,9 +537,9 @@ private:
 	double getKi(double numCores, double freq) const;
 	double getGamma(double numCores, double freq) const;
 	double getHT (double numContexts) const;
-		void addObservation(mat& _xs,
-		    rowvec& _ys,
-		    const vec& x,
+		void addObservation(arma::mat& _xs,
+		    arma::rowvec& _ys,
+		    const arma::vec& x,
 		    const double y);
 
 public:
