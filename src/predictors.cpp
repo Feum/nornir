@@ -1243,7 +1243,7 @@ double PredictorFullSearch::predict(const KnobsValues& realValues){
 	}
 	bool PredictorSMT::readyForPredictions() {
 		
-		uint minPoints = 6;
+		uint minPoints = 4;
 		return _xs2.n_cols >= minPoints;
 
 	}
